@@ -1,6 +1,6 @@
 %define name     avalon
 %define ver      2.0
-%define rel      0.6
+%define rel      0.7
 %define prefix   /usr
 
 Summary: Avalon -- The VA Software Engineering Build System
@@ -48,7 +48,7 @@ done
   for i in get co put ci info add new rm purge rtag tag reset login ; do
     ln revtool av$i
   done
-  for i in import prep mod merge ; do
+  for i in import prep mod merge patch ; do
     ln srctool av$i
   done
   for i in rpm pkg ; do

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.3 2001/04/02 07:53:39 mej Exp $
+# $Id: Pkg.pm,v 1.4 2001/04/17 03:20:47 mej Exp $
 #
 
 package Avalon::Pkgtool;
@@ -78,6 +78,7 @@ parse_spec_file($$)
 
     open(SPECFILE, $specfile) || return 0;
     $stage = 0;
+    $specdata->{SPECFILE} = $specfile;
     while (<SPECFILE>) {
         chomp($line = $_);
         next if ($line =~ /^\s*\#/ || $line =~ /^\s*$/);

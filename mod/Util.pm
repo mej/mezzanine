@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.5 2001/04/07 02:22:39 mej Exp $
+# $Id: Util.pm,v 1.6 2001/04/17 03:20:47 mej Exp $
 #
 
 package Avalon::Util;
@@ -38,7 +38,7 @@ BEGIN {
     @EXPORT      = ('$debug', '$progname',
 
                     '&debug_get', '&debug_set',
-		    '&get_timestamp', '&fatal_error', '&dprintf', '&dprint', '&eprintf', '&eprint',
+		    '&get_timestamp', '&fatal_error', '&dprintf', '&dprint', '&eprintf', '&eprint', '&wprintf', '&wprint',
 		    '&handle_signal', '&handle_fatal_signal', '&handle_warning',
 		    '&mkdirhier', '&nuke_tree', '&move_files', '&basename', '&dirname', '&grepdir',
 		    '&xpush',
@@ -46,7 +46,7 @@ BEGIN {
                     '&parse_rpm_name',
 
 		    '&AVALON_SUCCESS', '&AVALON_FATAL_ERROR', '&AVALON_SYNTAX_ERROR', '&AVALON_SYSTEM_ERROR',
-		    '&AVALON_COMMAND_FAILED', '&AVALON_FILE_NOT_FOUND', '&AVALON_FILE_OP_FAILED',
+		    '&AVALON_COMMAND_FAILED', '&AVALON_DUPLICATE', '&AVALON_FILE_NOT_FOUND', '&AVALON_FILE_OP_FAILED',
 		    '&AVALON_ACCESS_DENIED', '&AVALON_BAD_ADDITION', '&AVALON_BAD_LOG_ENTRY', '&AVALON_BAD_LOGIN', 
 		    '&AVALON_BAD_REMOVAL', '&AVALON_CONFLICT_FOUND', '&AVALON_FILE_REMOVED', '&AVALON_INVALID_TAG', 
 		    '&AVALON_NEED_UPDATE', '&AVALON_NO_SERVER', '&AVALON_NO_SOURCES', '&AVALON_SERVER_CRASH', 
@@ -120,6 +120,7 @@ sub AVALON_NEED_UPDATE()        {29;}
 sub AVALON_NO_SERVER()          {30;}
 sub AVALON_NO_SOURCES()         {31;}
 sub AVALON_SERVER_CRASH()       {32;}
+sub AVALON_DUPLICATE()          {33;}
 
 # buildtool-related errors
 sub AVALON_BAD_PRODUCT()        {51;}
@@ -211,6 +212,19 @@ sub
 eprint(@)
 {
     print "$progname:  Error:  ", @_;
+}
+
+# Print a warning
+sub
+wprintf(@)
+{
+    print "$progname:  Warning:  ";
+    printf @_;
+}
+sub
+wprint(@)
+{
+    print "$progname:  Warning:  ", @_;
 }
 
 # Handle a terminate signal

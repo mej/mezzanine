@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.13 2001/04/12 07:52:32 mej Exp $
+# $Id: srctool,v 1.14 2001/04/17 03:20:47 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -35,6 +35,7 @@ use File::Copy ('&cp', '&mv');
 # Avalon modules
 use Avalon::Util;
 use Avalon::Srctool;
+use Avalon::Pkgtool;
 
 # Print usage information
 sub
@@ -46,7 +47,7 @@ print_usage_info
     $underbar =~ s/./-/g;
     print "$leader\n$underbar\n";
     print "\n";
-    print "  Syntax:   srctool [ options ]\n";
+    print "  Syntax:   srctool [ options ] [ <pkg> ]\n";
     print "\n";
     print "    -h --help                        Show this usage information\n";
     print "    -d --debug                       Turn on debugging\n";
@@ -54,121 +55,11 @@ print_usage_info
     print "    -i --import                      Import a new package/source tree\n";
     print "    -p --prepare                     Prepare a working tree\n";
     print "    -M --merge                       Merge one or more raw files into an SPM\n";
+    print "    -a --apply                       Apply changes in the working tree as a patch to the SPM\n";
+    print "    -m --mod --modify                Upload modifications to the master repository\n";
     print "    -n --name <name>                 Specify the name of a package (-i) or patch (-a)\n";
     print "\n";
     exit(AVALON_SUCCESS);
-}
-
-# Return the files in a particular directory
-sub
-find_files
-{
-    my $dir = $_[0];
-    my @files;
-
-    @files = &grepdir(sub {-f "$dir/$_" && $_ !~ /^\./}, $dir);
-    foreach my $f (0..$#files) {
-	$files[$f] = "$dir/$files[$f]";
-    }
-    return @files;
-}
-
-# Return the subdirectories in a particular directory
-sub
-find_subdirs
-{
-    my $dir = $_[0];
-    my @subdirs;
-
-    @subdirs = &grepdir(sub {-d "$dir/$_" && $_ !~ /^\./}, $dir);
-    foreach my $f (0..$#subdirs) {
-	$subdirs[$f] = "$dir/$subdirs[$f]";
-    }
-    return @subdirs;
-}
-
-# Create temporary working space in /var/tmp
-sub
-create_temp_space
-{
-    my ($pkg, $type) = @_;
-    my ($dir, $d);
-    my @dirlist;
-
-    $dir = "$TMP_DIR/$pkg";
-    &nuke_tree($dir);
-    &mkdirhier($dir) || return "";
-    if ($type eq "SPM") {
-	@dirlist = ("S", "P", "F");
-    } elsif ($type eq "build") {
-	@dirlist = ("BUILD", "SOURCES", "SRPMS", "RPMS", "SPECS");
-    }
-    foreach $d (@dirlist) {
-	if (!&mkdirhier("$dir/$d")) {
-	    eprint "Creation of $dir/$d failed -- $!\n";
-	    return "";
-	}
-    }
-    return $dir;
-}
-
-# Clean up temp space
-sub
-clean_temp_space
-{
-    return &nuke_tree($TMP_DIR);
-}
-
-# Generic wrapper to grab command output
-sub
-run_cmd
-{
-    my ($prog, $params, $show_output) = @_;
-    my ($err, $msg, $line, $cmd) = undef;
-    my @output;
-    local *CMD;
-
-    $cmd = "$prog $params";
-
-    dprint "About to run $cmd\n";
-    if (!open(CMD, "$cmd 2>&1 |")) {
-        return (-1, "Execution of \"$cmd\" failed -- $!");
-    }
-    while (<CMD>) {
-        chomp($line = $_);
-        push @output, $line;
-        if ($show_output) {
-            print "$show_output$line\n";
-        } else {
-            dprint "From $prog -> $line\n";
-        }
-    }
-    close(CMD);
-    $err = $? >> 8;
-    dprint "\"$cmd\" returned $err\n";
-    return ($err, @output);
-}
-
-# Wrapper for Avalon commands specifically
-sub
-run_av_cmd
-{
-    my ($prog, $params, $show_output) = @_;
-    my ($err, $msg, $line, $cmd) = undef;
-    my (@output, @tmp);
-
-    $params = "--debug $params" if ($debug);
-    @output = &run_cmd($prog, $params, $show_output);
-    $err = shift @output;
-    if ($err) {
-        my @tmp;
-
-        @tmp = grep(/^\w+:\s*error:\s*(\S.*)$/i, @output);
-        if (scalar(@tmp)) {
-            $msg = $tmp[$#tmp];
-        }
-    }
-    return ($err, ($show_output ? $msg : @output));
 }
 
 # Import a package
@@ -176,7 +67,7 @@ sub
 import_package
 {
     my ($pkgfile, $name) = @_;
-    my ($err, $msg, $cmd, $pwd, $tmpdir, $rpmcmd, $pkg, $ver, $rel, $spec, $tag);
+    my ($err, $msg, $cmd, $pwd, $tmpdir, $rpmcmd, $pkg, $ver, $rel, $spec, $tag, $specdata);
     my (@contents, @srcs, @patches, @tmp);
 
     $pwd = &getcwd();
@@ -210,7 +101,8 @@ import_package
         }
         $spec = $tmp[0];
         # Get a list of all source and patch files
-        if (!&parse_spec_file($spec)) {
+        $specdata = &parse_spec_file($spec);
+        if (!defined($specdata->{SPECFILE})) {
             eprint "Unable to parse spec file.\n";
             return AVALON_COMMAND_FAILED;
         }
@@ -269,9 +161,9 @@ import_package
 }
 
 sub
-prepare_tree
+prepare_tree($$)
 {
-    my $pkg = $_[0];
+    my ($pkg, $external) = @_;
     my ($pwd, $pkgdir, $cmd, $err, $msg, $spec, $tmpdir, $rpmcmd, $tmp);
     my (@srcs, @patches, @tmp);
 
@@ -290,7 +182,7 @@ prepare_tree
     }
     # Create the working directory
     &nuke_tree($WORK_DIR);
-    if (!mkdir($WORK_DIR)) {
+    if (!&mkdirhier($WORK_DIR)) {
         eprint "Unable to create working directory -- $!\n";
         return AVALON_SYSTEM_ERROR;
     }
@@ -304,12 +196,16 @@ prepare_tree
     if (! $spec) {
 	return AVALON_SYSTEM_ERROR;
     }
-    print "Creating working directory $pkgdir/$WORK_DIR....\n";
+    print "Creating working directory $pkgdir/$WORK_DIR....\n" if ($external);
     $rpmcmd = "--define \"_topdir $tmpdir\" --define \"_builddir $pkgdir/$WORK_DIR\" -bp $spec";
     @tmp = &run_cmd("rpm", $rpmcmd, 0);
     if (($err = shift @tmp) != AVALON_SUCCESS) {
         eprint "Creation of working directory failed -- $tmp[$#tmp]\n";
+    } elsif ($external) {
+        print "You may now chdir to ", ($pkg ? "$pkg/$WORK_DIR" : $WORK_DIR), " to make changes.\n";
+        print "Use \"avpatch -n <patch_name>\" to generate a patch when done.\n";
     }
+
     chdir($pwd);
     return $err;
 }
@@ -318,21 +214,95 @@ sub
 gen_patch($$)
 {
     my ($pkg, $patch) = @_;
-    my ($old_wd, $new_wd, $err);
+    my ($old_wd, $new_wd, $err, $line_cnt, $pwd);
     my @output;
+    local *PATCH;
 
-    $old_wd = ($pkg ? "$pkg/$WORK_DIR" : $WORK_DIR);
+    if ($pkg) {
+        $pwd = &getcwd();
+        if (!chdir($pkg)) {
+            eprint "Unable to chdir to $pkg -- $!\n";
+            return AVALON_SYSTEM_ERROR;
+        }
+    }
+
+    $old_wd = $WORK_DIR;
     $new_wd = $old_wd . "+patched";
 
-    if (! &mv($old_wd, $new_wd)) {
+    # First, rename the old working directory
+    if (-d $new_wd) {
+        # Looks like it's already been renamed.
+        wprint "Patched working tree $new_wd exists.  I'll assume it's the right one.\n";
+        if (-d $old_wd) {
+            &nuke_tree($old_wd);
+        }
+    } elsif (! &mv($old_wd, $new_wd)) {
+        eprint "Unable to move $old_wd to $new_wd -- $!\n";
+        return AVALON_SYSTEM_ERROR;
     }
-    if (($err = &prepare_tree($pkg)) != AVALON_SUCCESS) {
+    # Then create a new one using the routine above
+    if (($err = &prepare_tree("", 0)) != AVALON_SUCCESS) {
+        return $err;
     }
 
+    # Now diff the two trees and save the output
     @output = run_cmd("diff", "-Nur $old_wd $new_wd", 0);
-    if (($err = shift @output) != AVALON_SUCCESS) {
+    if (($err = shift @output) == 2) {
+        eprint "Unable to generate patch file -- $output[$#output].\n";
+        return AVALON_SYSTEM_ERROR;
     }
 
+    # If the patch directory doesn't exist, create it.
+    if (! -d "P") {
+        my @tmp;
+
+        if (! &mkdirhier("P")) {
+            return AVALON_SYSTEM_ERROR;
+        }
+        @tmp = &run_av_cmd("revtool", "-a P", 0);
+        if (($err = shift @tmp) != AVALON_SUCCESS && $err != AVALON) {
+            print @tmp;
+            eprint "Addition of directory P failed.\n";
+            return $err;
+        }
+    }
+
+    # Finally, process the output to save the patch
+    if (!open(PATCH, ">P/$patch")) {
+        eprint "Unable to open P/$patch for writing -- $!\n";
+        return AVALON_SYSTEM_ERROR;
+    }
+    foreach my $line (@output) {
+        if ($line =~ /^(diff|---|\+\+\+|\*\*\*)/) {
+            $line =~ s/$old_wd\///;
+            $line =~ s/\Q$new_wd\E\//avalon_patched_/;
+        }
+        if ($line =~ /^[-I=Rrd\+\s@\*\\]/) {
+            print PATCH "$line\n";
+            $line_cnt++;
+        } else {
+            dprint "Extra line in diff:  $line";
+        }
+    }
+    close(PATCH);
+    print "Created P/$patch ($line_cnt lines).\n";
+
+    # Add the new patch file
+    @output = &run_av_cmd("revtool", "-a P/$patch", 0);
+    if (($err = shift @output) != AVALON_SUCCESS && $err != AVALON_DUPLICATE) {
+        print @output;
+        eprint "Addition of P/$patch failed.\n";
+        return $err;
+    } else {
+        print "Patch added and ready for commit.\n";
+    }
+
+    # Cleanup
+    &nuke_tree($old_wd);
+    mv($new_wd, $old_wd);
+    chdir($pwd) if ($pwd);
+
+    return AVALON_SUCCESS;
 }
 
 sub
@@ -382,7 +352,7 @@ merge_file($$)
             $dest = "";
         } else {
             $dest = "$type/";
-            if (! -d $type && !mkdir($type)) {
+            if (! -d $type && !&mkdirhier($type)) {
                 eprint "Unable to create directory $type -- $!\n";
                 return AVALON_SYSTEM_ERROR;
             }
@@ -414,7 +384,6 @@ main
     # Set up the basic variables
     $progname = "srctool";
     $version = "1.0";
-    &print_usage_info() if (!scalar(@ARGV));
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "i|import", "p|prepare", "m|mod|modify",
@@ -426,7 +395,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.13 $ created on $Date: 2001/04/12 07:52:32 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.14 $ created on $Date: 2001/04/17 03:20:47 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -477,11 +446,11 @@ main
 	    foreach $f (@flist) {
 		my $err;
 
-		$err = &prepare_tree($f);
+		$err = &prepare_tree($f, 1);
 		return $err if ($err);
 	    }
 	} else {
-	    return &prepare_tree("");
+	    return &prepare_tree("", 1);
 	}
     } elsif ($0 =~ /avmerge$/ || $opt_M) {
         my $pkg;

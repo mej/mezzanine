@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.63 2001/04/04 09:36:56 mej Exp $
+# $Id: revtool,v 1.64 2001/04/17 03:20:46 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -154,6 +154,9 @@ talk_to_cvs_server
                 eprint "You do not have write access to the master repository.\n";
                 $err = AVALON_ACCESS_DENIED;
                 last;
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: no repository/) {
+                eprint "There is no CVS repository here.\n";
+                $err = AVALON_NO_SOURCES;
             } elsif ($line =~ /^cvs server: cannot find module .(\S+). /) {
                 push @not_found, $1;
                 $err = AVALON_FILE_NOT_FOUND;
@@ -171,6 +174,9 @@ talk_to_cvs_server
                      || $line =~ /^cvs \S+: warning: new-born \S+ has disappeared$/) {
                 eprint "$opt_t is not a valid tag for this file/module\n";
                 $err = AVALON_INVALID_TAG;
+            } elsif ($line =~ /^cvs server: (.+) already exists/ || $line =~ /^cvs server: (.+) has already been entered/) {
+                eprint "$1 already exists.  No need to add it.\n";
+                $err = AVALON_DUPLICATE;
             } elsif ($line =~ /^cvs server: nothing known about/) {
                 $line =~ s/^cvs server: nothing known about//;
                 if ($type eq "add") {
@@ -884,7 +890,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.63 $ created on $Date: 2001/04/04 09:36:56 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.64 $ created on $Date: 2001/04/17 03:20:46 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
