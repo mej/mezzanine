@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.45 2004/06/24 03:01:07 mej Exp $
+# $Id: srctool,v 1.46 2004/07/25 03:01:39 mej Exp $
 #
 
 use strict;
@@ -207,59 +207,59 @@ import_package
 		return MEZZANINE_SYNTAX_ERROR;
 	    }
 	}
+    }
 
-        if ($local_mode) {
-            printf("You requested local mode.  To add this tree to SCM, you will need to import it by hand%s.\n",
-                   (($name) ? (" (mzimport -n $name)") : ("")));
+    if ($local_mode) {
+        printf("You requested local mode.  To add this tree to SCM, you will need to import it by hand%s.\n",
+               (($name) ? (" (mzimport -n $name)") : ("")));
+    } else {
+        my $module;
+        my $tmp;
+
+        if ($pkgfile) {
+            # Must be a directory.
+            chdir($pkgfile);
+        }
+
+        ($tag = $name) =~ tr/a-z/A-Z/;
+        $tag =~ s/\./_/g;
+        $scm->propset("target_tag", $tag);
+        $tag =~ s/-[^-]*$//;
+        $scm->propset("source_tag", $tag);
+        $scm->propset("use_standard_ignore", 0);
+
+        if ($OPTION{"path"} && -d "$pwd/$OPTION{path}") {
+            # Relative path exists, so parse in terms of
+            # the current directory and SCM context.
+            chdir("$pwd/$OPTION{path}");
+            $tmp = $scm->relative_path();
+        } elsif (! $OPTION{"path"}) {
+            # No path.  Check for relative path in current repo.
+            $tmp = $scm->relative_path();
         } else {
-            my $module;
-            my $tmp;
+            # Supplied path doesn't exist, so take it as gospel.
+            $tmp = $OPTION{"path"};
+        }
+        if (length($tmp) > 1) {
+            $module = "$tmp/$pkg";
+        }
 
-            if ($pkgfile) {
-                # Must be a directory.
-                chdir($pkgfile);
-            }
+        chdir($pwd);
+        if (! $scm->propget("repository")) {
+            $scm->detect_repository();
+        }
 
-            ($tag = $name) =~ tr/a-z/A-Z/;
-            $tag =~ s/\./_/g;
-            $scm->propset("target_tag", $tag);
-            $tag =~ s/-[^-]*$//;
-            $scm->propset("source_tag", $tag);
-            $scm->propset("use_standard_ignore", 0);
+        chdir($tmpdir);
+        $err = $scm->imprt($module);
+        chdir($pwd);
 
-            if ($OPTION{"path"} && -d "$pwd/$OPTION{path}") {
-                # Relative path exists, so parse in terms of
-                # the current directory and SCM context.
-                chdir("$pwd/$OPTION{path}");
-                $tmp = $scm->relative_path();
-            } elsif (! $OPTION{"path"}) {
-                # No path.  Check for relative path in current repo.
-                $tmp = $scm->relative_path();
-            } else {
-                # Supplied path doesn't exist, so take it as gospel.
-                $tmp = $OPTION{"path"};
-            }
-            if (length($tmp) > 1) {
-                $module = "$tmp/$pkg";
-            }
+        # FIXME:  Needed?
+        $scm->propset("source_tag", "");
+        $scm->propset("target_tag", "");
 
-            chdir($pwd);
-            if (! $scm->propget("repository")) {
-                $scm->detect_repository();
-            }
-
-            chdir($tmpdir);
-            $err = $scm->imprt($module);
-            chdir($pwd);
-
-            # FIXME:  Needed?
-            $scm->propset("source_tag", "");
-            $scm->propset("target_tag", "");
-
-            if ($err != MEZZANINE_SUCCESS) {
-                eprintf("Import of %s failed.\n", (($pkgfile) ? ($pkgfile) : (".")));
-                return $err;
-            }
+        if ($err != MEZZANINE_SUCCESS) {
+            eprintf("Import of %s failed.\n", (($pkgfile) ? ($pkgfile) : (".")));
+            return $err;
         }
     }
     return MEZZANINE_SUCCESS;
@@ -810,7 +810,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.45 $ created on $Date: 2004/06/24 03:01:07 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.46 $ created on $Date: 2004/07/25 03:01:39 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();
