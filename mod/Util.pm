@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.27 2004/02/14 03:17:09 mej Exp $
+# $Id: Util.pm,v 1.28 2004/03/01 03:10:04 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -41,15 +41,15 @@ BEGIN {
     @ISA         = ('Exporter');
 
     @EXPORT = ('$debug', '$progname', '$mz_uid', '$mz_gid',
-               '&debug_get', '&debug_set', '&file_user',
-               '&file_group', '&file_owner', '&get_timestamp',
-               '&fatal_error', '&dprintf', '&dprint', '&eprintf',
-               '&eprint', '&wprintf', '&wprint', '&handle_signal',
-               '&handle_fatal_signal', '&handle_warning',
-               '&show_backtrace', '&print_args', '&mkdirhier',
-               '&nuke_tree', '&move_files', '&copy_files',
-               '&copy_tree', '&basename', '&dirname', '&grepdir',
-               '&limit_files', '&xpush', '&cat_file',
+               '&debug_get', '&debug_set', '&print_version',
+               '&file_user', '&file_group', '&file_owner',
+               '&get_timestamp', '&fatal_error', '&dprintf',
+               '&dprint', '&eprintf', '&eprint', '&wprintf',
+               '&wprint', '&handle_signal', '&handle_fatal_signal',
+               '&handle_warning', '&show_backtrace', '&print_args',
+               '&mkdirhier', '&nuke_tree', '&move_files',
+               '&copy_files', '&copy_tree', '&basename', '&dirname',
+               '&grepdir', '&limit_files', '&xpush', '&cat_file',
                '&parse_rpm_name', '&should_ignore', '&touch_file',
                '&subst_file', '&MEZZANINE_SUCCESS',
                '&MEZZANINE_FATAL_ERROR', '&MEZZANINE_SYNTAX_ERROR',
@@ -91,6 +91,7 @@ $mz_gid =~ s/\s+.*$//;
 ### Function prototypes
 sub debug_get();
 sub debug_set($);
+sub print_version($$$$);
 sub file_user($);
 sub file_group($);
 sub file_owner($$$);
@@ -186,6 +187,22 @@ sub
 debug_set($)
 {
     $debug = $_[0];
+}
+
+sub
+print_version($$$$)
+{
+    my ($progname, $version, $author, $rcs_info) = @_;
+
+    $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
+    $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
+    $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
+    print "\n";
+    print "$progname $version by $author\n";
+    print "Copyright (c) 2000-2004, $author\n";
+    print "  ($rcs_info)\n";
+    print "\n";
+    exit MEZZANINE_SUCCESS;
 }
 
 sub
@@ -471,6 +488,8 @@ move_files
         # We'll need to add the filename to the dest each time
         $dest .= '/' if ($dest !~ /\/$/);
         $addname = 1;
+    } elsif (! -l $dest) {
+        unlink($dest);
     }
     dprint "Moving ", join(' ', @flist), " to $dest.\n";
     foreach my $f (@flist) {
@@ -516,6 +535,8 @@ copy_files
         # We'll need to add the filename to the dest each time
         $dest .= '/' if ($dest !~ /\/$/);
         $addname = 1;
+    } elsif (! -l $dest) {
+        unlink($dest);
     }
     dprint "Copying ", join(' ', @flist), " to $dest.\n";
     foreach my $f (grep(-f $_, @flist)) {

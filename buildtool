@@ -23,13 +23,12 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.173 2004/02/14 03:17:09 mej Exp $
+# $Id: buildtool,v 1.174 2004/03/01 03:10:04 mej Exp $
 #
 
 # Include the Perl Modules we need
-require POSIX;
-require Getopt::Long;
-use Cwd;
+use POSIX;
+use Getopt::Long;
 use Mezzanine::Util;
 use Mezzanine::RevCtl;
 use Mezzanine::PkgVars;
@@ -38,10 +37,38 @@ use Mezzanine::Pkg;
 use Mezzanine::Build;
 use Mezzanine::Prod;
 
+# Options variables
+our ($opt_h, $opt_d, $opt_v, $opt_q, $opt_Q, $opt_D, $opt_l, $opt_P,
+     $opt_t, $opt_C, $opt_U, $opt_T, $opt_L, $opt_s, $opt_i, $opt_H,
+     $opt_u, $opt_b, $opt_hi, $opt_ii, $opt_ir, $opt_ic, $opt_nocache,
+     $opt_clean);
+my @valid_opts = ("h|help", "v|version", "d|debug", "q|quiet",
+                  "Q|really-quiet|silent", "s|srcdir=s@",
+                  "p|prod|product|prodfile=s", "D|dir|tree=s",
+                  "l|log=s", "P|parallel:s", "t|target=s",
+                  "C|cflags=s", "T|tag=s", "nocache", "clean:s",
+                  "U|user=s", "L|location=s", "i|instroot|jail=s",
+                  "H|hints=s", "hi|hint-installer=s",
+                  "ii|instroot-init=s", "ir|instroot-reset=s",
+                  "ic|instroot-copy=s", "u|user=s");
+
+# Program variables
+my ($progname, $version, $author, $ret) = ("buildtool", "3.0", "Michael Jennings <mej\@eterm.org>", MEZZANINE_SUCCESS);
+
+my $GLOBAL_LOG = 0;  # Overall log file for product build
+my $verbosity = 2;  # Logging verbosity
+my $global_user;  # Build user
+my $global_tree;  # Repository to use
+my $global_tag;  # Tag to get packages with
+my $buildtree_layout = "mej";  # The layout style to use for the build tree.
+
+
 # Print usage information
 sub
 print_usage_info
 {
+    my ($leader, $underbar);
+
     print "\n";
     $leader = "$progname $version Usage Information";
     $underbar = $leader;
@@ -67,6 +94,7 @@ print_usage_info
     print "    -i --instroot --jail <dir>       Specify chroot jail to build in\n";
     print "    -H --hints <file_or_dir>         Specify location of pre-build hints or hint files\n";
     print "    -u --user <userid>               Build packages as <userid> instead of current user\n";
+    print "    -b --buildtree <style>           Use the specified layout for the build tree\n";
     print "       --hi --hint-installer <prog>  Specify the mechanism used to install the hints\n";
     print "       --ii --instroot-init <cmd>    Command used to initialize chroot jail\n";
     print "       --ir --instroot-reset <cmd>   Command used to reset chroot jail\n";
@@ -481,9 +509,21 @@ parallel_build
     my %child_pkg;
 
     # Create the directories for building this product
-    $builddir = &make_build_dir(&getcwd());
-    $logdir = &make_log_dir($builddir);
-    &pkgvar_topdir($builddir);
+    if ($buildtree_layout eq "orc") {
+        $builddir = &make_build_dir((($ENV{"MEZZANINE_BUILDDIR"}) ?
+                                     ($ENV{"MEZZANINE_BUILDDIR"}) :
+                                     (&getcwd() . "/build.mezz")));
+        $logdir = $builddir;
+        &pkgvar_topdir($builddir);
+    } else {
+        $builddir = &make_build_dir((($ENV{"MEZZANINE_BUILDDIR"}) ?
+                                     ($ENV{"MEZZANINE_BUILDDIR"}) :
+                                     (&getcwd() . "/build.mezz")));
+        $logdir = &make_log_dir((($ENV{"MEZZANINE_LOGDIR"}) ?
+                                 ($ENV{"MEZZANINE_LOGDIR"}) : ("$builddir/logs")));
+        &pkgvar_topdir($builddir);
+    }
+
     # Need to do this here for parallel builds because it's not parallel-safe.  Race condition. :(
     &prepare_build_tree();
 
@@ -505,6 +545,16 @@ parallel_build
 
             # Spawn child processes until we fill up our allotment ($num_cpus)
             $pkg = shift @packages;
+            if ($buildtree_layout eq "orc") {
+                my $dirname;
+
+                $dirname = sprintf("/%s-%s-%s", $pkg, %pkgs->{$pkg}{"VERSION"},
+                                   $pkgs->{$pkg}{"RELEASE"});
+                $builddir .= $dirname;
+                &make_build_dir($builddir);
+                $logdir = $builddir;
+                &pkgvar_topdir($builddir);
+            }
             $logfile = "$logdir/$pkg.log";
             $pid = &build_package_forked($pkg, $logfile);
             push @children, $pid;
@@ -575,9 +625,21 @@ build_product
     my @packages = @_;
     my $builddir;
 
-    $builddir = &make_build_dir(&getcwd());
-    $logdir = &make_log_dir($builddir);
-    &pkgvar_topdir($builddir);
+    # Create the directories for building this product
+    if ($buildtree_layout eq "orc") {
+        $builddir = &make_build_dir((($ENV{"MEZZANINE_BUILDDIR"}) ?
+                                     ($ENV{"MEZZANINE_BUILDDIR"}) :
+                                     (&getcwd() . "/build.mezz")));
+        $logdir = $builddir;
+        &pkgvar_topdir($builddir);
+    } else {
+        $builddir = &make_build_dir((($ENV{"MEZZANINE_BUILDDIR"}) ?
+                                     ($ENV{"MEZZANINE_BUILDDIR"}) :
+                                     (&getcwd() . "/build.mezz")));
+        $logdir = &make_log_dir((($ENV{"MEZZANINE_LOGDIR"}) ?
+                                 ($ENV{"MEZZANINE_LOGDIR"}) : ("$builddir/logs")));
+        &pkgvar_topdir($builddir);
+    }
 
     if (! $opt_nocache) {
         &scan_rpm_dirs();
@@ -591,6 +653,16 @@ build_product
     foreach my $pkg (@packages) {
         my %preserve_pkg_vars = &pkgvar_get_all();
 
+        if ($buildtree_layout eq "orc") {
+            my $dirname;
+
+            $dirname = sprintf("/%s-%s-%s", $pkg, %pkgs->{$pkg}{"VERSION"},
+                               $pkgs->{$pkg}{"RELEASE"});
+            $builddir .= $dirname;
+            &make_build_dir($builddir);
+            $logdir = $builddir;
+            &pkgvar_topdir($builddir);
+        }
         &build_single_package($pkg);
         &pkgvar_reset(%preserve_pkg_vars);
     }
@@ -644,25 +716,12 @@ main
 {
     my $srcdir;
 
-    # Set up the basic variables
-    $progname = "buildtool";
-    $version = "3.0";
+    #
+    # Initialization
+    #
     umask 022;
-    $ret = MEZZANINE_SUCCESS;
-
-    # No input.
     open(STDIN, "</dev/null");
-
-    @valid_opts = ("h|help", "v|version", "d|debug", "q|quiet",
-                   "Q|really-quiet|silent", "s|srcdir=s@",
-                   "p|prod|product|prodfile=s", "D|dir|tree=s",
-                   "l|log=s", "P|parallel:s", "t|target=s",
-                   "C|cflags=s", "T|tag=s", "nocache", "clean:s",
-                   "U|user=s", "L|location=s", "i|instroot|jail=s",
-                   "H|hints=s", "hi|hint-installer=s",
-                   "ii|instroot-init=s", "ir|instroot-reset=s",
-                   "ic|instroot-copy=s", "u|user=s");
-
+    open(STDERR, ">&STDOUT");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -670,42 +729,45 @@ main
     # Options Handling
     #
     if ($opt_v) {
-        # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.173 $ created on $Date: 2004/02/14 03:17:09 $ by $Author: mej $ ';
-
-        $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
-        $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
-        $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
-        print "\n";
-	print "$progname $version by Michael Jennings <mej\@eterm.org>\n";
-        print "Copyright (c) 2000-2001, Michael Jennings\n";
-        print "  ($rcs_info)\n";
-        print "\n";
-	return MEZZANINE_SUCCESS;
+        &print_version($progname, $version, $author,
+                       'CVS Revision $Revision: 1.174 $ created on $Date: 2004/03/01 03:10:04 $ by $Author: mej $ ');
+        # Never returns
     }
     if ($opt_h) {
 	&print_usage_info();   # Never returns
     }
+
+    # Set basic options
     &debug_set($opt_d);
-    $GLOBAL_LOG = 0;
-    open(STDERR, ">&STDOUT");
+    if ($opt_Q) {
+        $verbosity = 0;
+    } elsif ($opt_q) {
+        $verbosity = 1;
+    }
+    $global_user = $opt_U;
+    $global_tree = $opt_D;
+    $global_tag = $opt_T;
+    $buildtree_layout = (($opt_b) ? ($opt_b) : ("mej"));
+    &pkgvar_cleanup((($opt_clean) ? ($opt_clean) : ("build")));
+    &pkgvar_target($opt_t);
+
+    # Open log file, if any.
     if ($opt_l) {
-        if (!open(LOGFILE, ">$opt_l")) {
-            eprint "Unable to open $opt_l -- $!\n";
+        my $log_filename = $opt_l;
+
+        if (-e $log_filename) {
+            rename($log_filename, "$log_filename.prev");
+        }
+        if (!open(LOGFILE, ">$log_filename")) {
+            eprint "Unable to open $log_filename -- $!\n";
         } else {
             $GLOBAL_LOG = \*LOGFILE;
-            #system("chattr +S $opt_l");  # Try to set sync on the log file, fail silently
+            #system("chattr +S $log_filename");  # Try to set sync on the log file, fail silently
             open(STDOUT, ">&LOGFILE");
             select LOGFILE; $| = 1;
         }
     }
     select STDOUT; $| = 1;
-    $verbosity = ($opt_Q ? 0 : ($opt_q ? 1 : 2));
-    $global_user = $opt_U;
-    $global_tree = $opt_D;
-    $global_tag = $opt_T;
-    &pkgvar_cleanup($opt_clean);
-    &pkgvar_target($opt_t);
 
     # Handle hint file/directory specification
     if ($opt_H) {
@@ -739,11 +801,16 @@ main
         $prod = $prodname = &basename(&getcwd());
     }
     if (scalar(@opt_s) && ! $prod) {
-        # This must happen *before* the instroot stuff below.
+        # If we don't have a product name, but we do have one or more
+        # SRPM directories to look at, we need to auto-generated the
+        # prod file.  NOTE:  This must happen *before* the instroot
+        # stuff below. 
         $prod = "autoprod-1.0";
     }
 
-    # This must happen after $prod is set but before $opt_s is handled.
+    # Handle specification of a global value for the LOCATIONS product
+    # variable.  This must happen after $prod is set but before $opt_s
+    # is handled.
     if ($opt_L) {
         my $locations = $opt_L;
 
@@ -762,11 +829,13 @@ main
         &assign_product_variable($prod, "LOCATIONS", $locations);
     }
 
-    # This must happen after $prod is set but before $opt_s is handled.
+    # Set the build user if needed.  This must happen after $prod is
+    # set but before $opt_s is handled.
     if ($opt_u) {
         &assign_product_variable($prod, "BUILDUSER", $opt_u);
     }
 
+    # Figure out the installroot stuff.
     if ($opt_i) {
         my ($instroot, $instroot_init, $instroot_reset, $instroot_copy) = ($opt_i, $opt_ii, $opt_ir, $opt_ic);
 
@@ -798,6 +867,7 @@ main
         }
     }
 
+    # *Now* we can look at our SRPM directories.
     if (scalar(@opt_s)) {
         # This must happen *after* the instroot stuff above.
         foreach my $srcdir (@opt_s) {
@@ -810,12 +880,8 @@ main
         }
     }
 
+    # Set the buildroot for the overall build.
     &pkgvar_buildroot($ENV{"MEZZANINE_BUILDROOT"});
-
-    if (! $opt_clean) {
-        $opt_clean = "build";
-    }
-    dprint "Cleaning:  $opt_clean\n";
 
     #
     # Signal handling
@@ -837,13 +903,28 @@ main
     # Environment modifications
     #
     $ENV{"LANG"} = "C" if (! $ENV{"LANG"});
-    $ENV{MAKE} = "make";  # Make sure we don't parallel build, because it doesn't work.
-    $ENV{CFLAGS} = ($opt_C ? $opt_C : "-O2 -march=pentiumpro");
+    if ($ENV{"MEZZANINE_MAKE"}) {
+        $ENV{"MAKE"} = $ENV{"MEZZANINE_MAKE"};
+    } else {
+        # Parallel product builds and make -jN don't get along well.
+        $ENV{"MAKE"} = "make";
+    }
+    if ($opt_C) {
+        $ENV{"CFLAGS"} = $opt_C;
+    } elsif ($ENV{"MEZZANINE_CFLAGS"}) {
+        $ENV{"CFLAGS"} = $ENV{"MEZZANINE_CFLAGS"};
+    } else {
+        $ENV{"CFLAGS"} = "-O2 -march=pentium";
+    }
+    if ($ENV{"MEZZANINE_PATH"}) {
+        $ENV{"PATH"} = $ENV{"MEZZANINE_PATH"};
+    } else {
+        $ENV{"PATH"} = "/usr/build/bin:/usr/local/build/bin:/usr/lib/qt-1.45/bin:/usr/lib/qt-2.1.0/bin"
+            . ":/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/X11R6/bin:/usr/kerberos/sbin"
+            . ":/usr/kerberos/bin:.";
+    }
     delete $ENV{LD_RUN_PATH};  # Don't hard code any RPATH's into binaries
     delete $ENV{LD_LIBRARY_PATH};  # Make glibc happy
-    $ENV{PATH} = "/usr/build/bin:/usr/local/build/bin:/usr/lib/qt-1.45/bin:/usr/lib/qt-2.1.0/bin"
-                  . ":/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/X11R6/bin:/usr/kerberos/sbin"
-                  . ":/usr/kerberos/bin:.";
 
     # Parse the product definition files to figure out what the heck we need to build. :)
     if ((substr($prod, 0, 8) ne "autoprod") && !&parse_prod_file($prod, 0, 0)) {

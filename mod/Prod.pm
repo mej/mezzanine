@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.20 2004/01/26 20:46:10 mej Exp $
+# $Id: Prod.pm,v 1.21 2004/03/01 03:10:04 mej Exp $
 #
 
 package Mezzanine::Prod;
@@ -86,19 +86,13 @@ END {
 sub
 make_build_dir
 {
-    my $dir = shift;
-    my $builddir;
+    my $builddir = shift;
 
     # Create a build area for ourselves.
-    if (defined($ENV{MEZZANINE_BUILDDIR})) {
-        $builddir = $ENV{MEZZANINE_BUILDDIR};
-    } else {
-        $builddir = $dir . "/build.mezz";
-    }
     if (-f $builddir) {
         &nuke_tree($builddir);
     }
-    if (!(-d $builddir || mkdir($builddir, 0755))) {
+    if (!(-d $builddir || &mkdirhier($builddir, 0755))) {
         &fatal_error("Unable to create build directory -- $!\n");
     }
     if (!chdir($builddir)) {
@@ -112,18 +106,12 @@ make_build_dir
 sub
 make_log_dir
 {
-    my $dir = shift;
-    my $logdir;
+    my $logdir = shift;
 
-    if (defined($ENV{MEZZANINE_LOGDIR})) {
-        $logdir = $ENV{MEZZANINE_LOGDIR};
-    } else {
-        $logdir = $dir . "/logs.mezz";
-    }
     if (-f $logdir) {
         &nuke_tree($logdir);
     }
-    if (!(-d $logdir || mkdir($logdir, 0755))) {
+    if (!(-d $logdir || &mkdirhier($logdir, 0755))) {
         &fatal_error("Unable to create log directory -- $!\n");
     }
     dprint "Chose log directory $logdir\n";
@@ -141,6 +129,8 @@ get_var_name
 
     if ($var =~ /^REV/ || $var eq "TAG") {
         $var = "TAG";
+    } elsif ($var =~ /^EPOCH/) {
+        $var = "EPOCH";
     } elsif ($var =~ /^REL/) {
         $var = "RELEASE";
     } elsif ($var =~ /^VER/) {
@@ -149,8 +139,10 @@ get_var_name
         $var = "LOCATIONS";
     } elsif ($var =~ /^SOURCE/) {
         $var = "SRCS";
-    } elsif ($var =~ /^(ARCH|TARGET)/) {
+    } elsif ($var =~ /^ARCH/) {
         $var = "ARCH";
+    } elsif ($var =~ /^TARGET/) {
+        $var = "TARGET";
     } elsif ($var =~ /^CVS(DIR|ROOT)/) {
         $var = "REPOSITORY";
     } elsif ($var =~ /^((CH|INST)ROOT|JAIL)([_A-Z]*)$/) {
@@ -388,6 +380,7 @@ parse_product_entry
                 $pkgvars{VERSION} = $tmp;
             }
         }
+        $pkgvars{"ARCH"} = $arch;
         $filename = "$name-$pkgvars{VERSION}-$pkgvars{RELEASE}.$arch.rpm";
 
         if (defined($pkgvars{BINS})) {

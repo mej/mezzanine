@@ -316,3 +316,11 @@ Fixed minor buildtool bug.
 Added perlpkg to assist with packaging perl modules and their
 dependencies.
 ----------------------------------------------------------------------
+Sun Feb 29 22:09:18 2004                        Michael Jennings (mej)
+
+Fixed placement of newly-generated patches for SPM's.
+
+Fixed overwriting of old packages with new ones in pkgtool.
+
+Added code for alternative build/log tree layout.
+----------------------------------------------------------------------

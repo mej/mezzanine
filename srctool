@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.37 2004/01/30 23:18:11 mej Exp $
+# $Id: srctool,v 1.38 2004/03/01 03:10:04 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -233,7 +233,7 @@ prepare_tree($$)
     @tmp = &run_cmd("rpmbuild", $params, 0);
     if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
         eprint "Creation of working directory failed -- $tmp[$#tmp]\n";
-    } else {
+    } elsif ($command eq "prep") {
         print "You may now chdir to ", ($pkgdir eq $pwd ? $WORK_DIR : "$pkg/$WORK_DIR"), " to make changes.\n";
         print "Use \"mzpatch -n <patch_name>\" to generate a patch when done.\n";
     }
@@ -345,6 +345,8 @@ gen_patch($$)
                 return $err;
             }
         }
+    } elsif (-d "P") {
+        $patchdir = "P/";
     } else {
         $patchdir = "";
     }
@@ -657,7 +659,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.37 $ created on $Date: 2004/01/30 23:18:11 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.38 $ created on $Date: 2004/03/01 03:10:04 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -698,6 +700,7 @@ main
     $SIG{TTOU} = \&handle_fatal_signal;
 
     if ($0 =~ /mzimport$/ || $opt_i) {
+        $command = "import";
         if ($opt_f) {
             $import_as_pdr = 1;
         }
@@ -713,6 +716,7 @@ main
 	    return &import_package();
 	}
     } elsif ($0 =~ /mzprep$/ || $opt_p) {
+        $command = "prep";
 	if (scalar(@flist)) {
 	    foreach $f (@flist) {
 		my $err;
@@ -727,6 +731,7 @@ main
     } elsif ($0 =~ /mzmerge$/ || $opt_M) {
         my $pkg;
 
+        $command = "merge";
         if ($opt_f) {
             $import_as_pdr = 1;
         }
@@ -754,6 +759,7 @@ main
     } elsif ($0 =~ /mzpatch$/ || $opt_a) {
         my ($pkg, $patch);
 
+        $command = "patch";
         if (! $pkg) {
             $pkg = ".";
             &pkgvar_filename($pkg);
@@ -784,6 +790,7 @@ main
         &pkgvar_name($patch);
         return &gen_patch();
     } elsif ($0 =~ /mzclean$/ || $opt_c) {
+        $command = "clean";
 	if (scalar(@flist)) {
 	    foreach $f (@flist) {
 		my $err;
@@ -796,6 +803,7 @@ main
 	    return &clean_package();
 	}
     } elsif ($0 =~ /mz(re)?sync$/ || $opt_r) {
+        $command = "sync";
 	if (scalar(@flist)) {
 	    foreach $f (@flist) {
 		my $err;
@@ -808,6 +816,7 @@ main
 	    return &sync_package();
 	}
     } elsif ($0 =~ /mzmv$/ || $opt_move) {
+        $command = "move";
 	if (scalar(@flist) > 1) {
             $err = &move_package_files(@flist);
             return $err if ($err);
