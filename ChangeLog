@@ -215,3 +215,8 @@ Tue Dec  2 17:18:35 2003                        Michael Jennings (mej)
 
 Tasty new FAQ stuff.
 ----------------------------------------------------------------------
+Thu Dec  4 17:23:37 2003                        Michael Jennings (mej)
+
+Rounding out the FAQ (so far).  Plus a minor fix to rebuild packages
+using mzbuild.
+----------------------------------------------------------------------

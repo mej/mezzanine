@@ -632,25 +632,19 @@
           you just need to supply one more piece of information.
         </para>
         <para>
-          You see, if you have an SRPM, &MZ; can determine the 
+          You see, if you have an SRPM, &MZ; can determine the package
+          name and version from the filename.  It doesn't currently go
+          digging inside the directory tree for spec files, though, so
+          you have to supply that information when you import a
+          directory tree.  So, assuming you're in the top-level
+          directory of what you want to check in, the command is:
         </para>
+        <screen>
+          mzimport -n pile-sarnet-1.0.7
+        </screen>
         <para>
-          
-        </para>
-        <para>
-          
-        </para>
-        <para>
-          
-        </para>
-        <para>
-          
-        </para>
-        <para>
-          
-        </para>
-        <para>
-          
+          (If you're not in that directory, simply add the path to it
+          at the end of the command line above.)
         </para>
       </answer>
     </qandaentry>
@@ -660,22 +654,83 @@
       </question>
       <answer>
         <para>
-          
+          This is where &MZ; really shines.  Without it, generating a
+          patch involves installing the SRPM, untarring the source,
+          applying all the other patches, patching the source,
+          repeating steps 2 and 3 in another location, generating a
+          diff between the two, putting it in the right place, adding
+          it to the spec file as a patch, and building from the spec
+          file and sources again.  A long, tedious process.
+          Thankfully, &MZ; automates much of it.
         </para>
         <para>
-          
+          The first step is to download the SRPM and import it, or do
+          whatever you need to do to make it into an SPM.  And if you
+          imported it, you'll want to check it out again so you can
+          work on the copy of it that's under SCM.  For the rest of
+          this section, I'll assume you're not using local mode
+          (<userinput>-L</userinput>); if you are, make sure to add
+          that option to the <filename>mzpatch</filename> command
+          also.
         </para>
         <para>
-          
+          First, <filename>cd</filename> into your SCM's top directory
+          (the one that contains the F, P, and S subdirectories).
+          Then run <filename>mzprep</filename>.  This will create a
+          fully-patched version of the unarchived source in a
+          directory called <filename>work</filename>.  Make your
+          changes to the source in that directory.
         </para>
         <para>
-          
+          Once you've made your changes, you'll want to turn them into
+          a patch.  Run <filename>mzpatch -n &lt;patch&gt;</filename>,
+          where &lt;patch&gt; is the name you want your new patch to
+          have.  &MZ; will generate the patch and place it in the
+          <filename>P</filename> directory for you.  Then, all you
+          have to do is add it to the spec file!  (Don't forget the
+          <userinput>%patch -p1</userinput> macro, and to update the
+          release number!)
         </para>
         <para>
-          
+          When you've updated the spec file, the
+          <filename>mzbuild</filename> command will allow you to build
+          the package with your new patch included.  If it works,
+          you'll get a new set of packages in the top-level SPM
+          directory.  If needed, use <filename>mzput</filename> to
+          commit your changes (after testing the packages first, of
+          course).  And you're done!
         </para>
         <para>
-          
+          For the sake of furthering this discussion, let's say your
+          patch doesn't quite work the way you wanted it to.  If you
+          re-run <filename>mzprep</filename>, you'll get a new working
+          tree with your patch already applied.  Make whatever
+          alterations you need to, then regenerate the patch using the
+          command <filename>mzpatch -n &lt;patch_num&gt;</filename>,
+          where &lt;patch_num&gt; is the patch number you assigned to
+          your patch in the spec file.  &MZ; will automatically
+          re-generate the patch for you, merging your previous changes
+          with the new ones.
+        </para>
+        <para>
+          A complete example:
+        </para>
+        <screen>
+          mzget pile-sarnet
+          cd pile-sarnet
+          mzprep
+          ...make code changes...
+          mzpatch -n pile-sarnet-1.0.7-somebody_screwed_up.patch
+          ...edit spec file to put in Patch1000...
+          mzbuild
+          mzprep
+          ...make more changes...
+          mzpatch -n 1000
+          mzbuild
+        </screen>
+        <para>
+          (Please note that the stuff enclosed in ellipses ("...") are
+          editorial comments, NOT commands.)
         </para>
       </answer>
     </qandaentry>
@@ -685,22 +740,12 @@
       </question>
       <answer>
         <para>
-          
-        </para>
-        <para>
-          
-        </para>
-        <para>
-          
-        </para>
-        <para>
-          
-        </para>
-        <para>
-          
-        </para>
-        <para>
-          
+          As mentioned in the previous example, if you're inside the
+          package directory, simply running
+          <filename>mzbuild</filename> will do the trick.  If not, or
+          if the package you want to build is an SRPM or something,
+          simply give the path to the package (e.g., <filename>mzbuild
+          pile-sarnet-1.0.7-3.src.rpm</filename>).
         </para>
       </answer>
     </qandaentry>

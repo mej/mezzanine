@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.15 2003/11/30 20:12:00 mej Exp $
+# $Id: RPM.pm,v 1.16 2003/12/04 20:53:24 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -106,7 +106,7 @@ rpm_form_command
             $cmd .= " --target=\"" . &pkgvar_architecture() . "\"";
         }
     } elsif ($type eq "install") {
-        if (&pkgvar_instroot()) {
+        if (&pkgvar_instroot() && !(&pkgvar_topdir())) {
             $cmd .= " --root=\"" . &pkgvar_instroot() . "\"";
         }
     }
