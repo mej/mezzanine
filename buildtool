@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.88 2000/07/13 19:50:12 mej Exp $
+# $Id: buildtool,v 1.89 2000/07/14 00:04:41 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1787,7 +1787,7 @@ build_process
 {
     # Perform the build in stages, checking after each one to see if we should stop
     &do_bootstrap_stage() if ($start_stage eq "s");
-    return if ($end_stage eq "s");
+    return if ($end_stage eq "s" || $#packages == -1);
 
     if ($master) {
         &parallel_build() if ("scexbp" =~ /$start_stage/);
@@ -1833,7 +1833,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.88 $ created on $Date: 2000/07/13 19:50:12 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.89 $ created on $Date: 2000/07/14 00:04:41 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

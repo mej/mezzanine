@@ -647,3 +647,11 @@ Thu Jul 13 12:57:55 2000                        Michael Jennings (mej)
 
 Smarter tag assumptions.
 ----------------------------------------------------------------------
+Thu Jul 13 17:11:22 2000                        Michael Jennings (mej)
+
+Because I forgot a product file, the build tried to make assumptions
+that turned out to be incorrect.  So when the parallel build routine
+was called, there were no packages left in the package list.  Rather
+than giving up, it just sat there spinning like crazy.  This fixes
+that. :-)
+----------------------------------------------------------------------
