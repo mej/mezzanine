@@ -904,3 +904,7 @@ Wed Nov  1 12:36:26 2000                        Michael Jennings (mej)
 
 I could've sworn I fixed that ages ago.
 ----------------------------------------------------------------------
+Tue Nov  7 00:42:02 2000                        Michael Jennings (mej)
+
+Fixed a bug in the handling of the -P option.
+----------------------------------------------------------------------

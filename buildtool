@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.107 2000/10/31 23:07:40 mej Exp $
+# $Id: buildtool,v 1.108 2000/11/07 09:25:26 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1874,7 +1874,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.107 $ created on $Date: 2000/10/31 23:07:40 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.108 $ created on $Date: 2000/11/07 09:25:26 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1931,11 +1931,11 @@ main
     if ($opt_master) {
         $slave = 1;
         $master = 0;
-    } elsif ($opt_P) {
+    } elsif (defined($opt_P)) {
         $master = 1;
         $slave = 0;
         $num_cpus = &count_cpus();
-        if ($opt_P != 1) {
+        if ($opt_P) {
             my ($mult, $add);
 
             $opt_P =~ m/^(?:[Xx]([\d.]+))?([-+][\d.]+)?$/;
@@ -1948,6 +1948,7 @@ main
         $slave = 0;
         $num_cpus = 1;
     }
+    dprint "Using $num_cpus parallel processes.\n";
     if ($opt_D && -d $opt_D) {
         $basedir = $opt_D;
     } elsif ($ENV{BASE_DIR} && $ENV{BASE_DIR} =~ /^\// && -d $ENV{BASE_DIR}) {
