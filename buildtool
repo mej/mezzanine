@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.108 2000/11/07 09:25:26 mej Exp $
+# $Id: buildtool,v 1.109 2000/11/07 18:30:44 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -520,18 +520,11 @@ initial_setup
     }
     mkdir($buildroot, 0775);
 
-    &setup_macros();
     $rpmmacros = "$basedir/rpmmacros";
     if (!(-f $rpmmacros && -s _)) {
         # Create basic rpmmacros
         open(RPMMACROS, ">$rpmmacros") || &fatal_error("Cannot create $rpmmacros -- $!\n");
         print RPMMACROS "\%_topdir           $builddir\n";
-        print RPMMACROS "\%distribution      $prods->{$prod}{DISTRIBUTION}\n" if ($prods->{$prod}{DISTRIBUTION});
-        print RPMMACROS "\%packager          $prods->{$prod}{PACKAGER}\n" if ($prods->{$prod}{PACKAGER});
-        print RPMMACROS "\%vendor            $prods->{$prod}{VENDOR}\n" if ($prods->{$prod}{VENDOR});
-        foreach $macro (sort keys %macros_hash) {
-            print RPMMACROS "$macro   $macros_hash{$macro}\n";
-        }
         close(RPMMACROS);
     }
     $rpmrc = "$basedir/rpmrc";
@@ -860,7 +853,7 @@ parse_product_entry
     # variable for the current package, see if it has a value for the parent product
     # of that package.  If not, try the parent product of that product, and continue
     # going back through the product hierarchy until we find a value or run out.
-    foreach $pkgvar ("REVISION", "LOCATIONS", "RPMCMD", "TAR", "ZIP", "STAGES", "CVSROOT", "ARCH") {
+    foreach $pkgvar ("REVISION", "LOCATIONS", "RPMCMD", "TAR", "ZIP", "STAGES", "CVSROOT", "ARCH", "MACROS") {
         if (! $pkgs->{$name}{$pkgvar}) {
             my ($pkg, $val) = undef;
 
@@ -1050,6 +1043,16 @@ build_pkgs
     $cmd = "$pkgtool $prog -b -R \"/usr/lib/rpm/rpmrc:$rpmrc\" --root \"$buildroot/$pkg-root\" -s $specfile";
     if ($pkgs->{$pkg}{TAGFILE}) {
         $cmd .= " --tagfile $pkgs->{$pkg}{TAGFILE}";
+    }
+    if ($pkgs->{$pkg}{MACROS}) {
+        my @macro_list = split(",", $pkgs->{$pkg}{MACROS});
+        my $macro;
+
+        foreach $macro (@macro_list) {
+            my ($name, $value) = split(":", $macro);
+
+            $cmd .= " --define '$name $value'";
+        }
     }
     dprint "About to run \"$cmd\"\n";
     if (!open(PKGTOOL, "$cmd </dev/null 2>&1 |")) {
@@ -1858,7 +1861,7 @@ main
 {
     # Set up the basic variables
     $progname = "buildtool";
-    $version = "1.3";
+    $version = "2.0";
 
     # No input.
     open(STDIN, "</dev/null");
@@ -1874,7 +1877,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.108 $ created on $Date: 2000/11/07 09:25:26 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.109 $ created on $Date: 2000/11/07 18:30:44 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1889,7 +1892,7 @@ main
     if ($opt_h) {
 	&print_usage_info();   # Never returns
         # This is a really silly way to shut up the "used only once" warnings.
-        $opt_h = $opt_P = $opt_Q = $opt_p = $opt_q = $opt_v = 0;
+        $opt_h = $opt_P = $opt_Q = $opt_p = $opt_q = $opt_v = $opt_nocache = 0;
     }
     $debug = $opt_d;
     $revtool = "revtool" . ($opt_d ? " --debug" : "");

@@ -908,3 +908,7 @@ Tue Nov  7 00:42:02 2000                        Michael Jennings (mej)
 
 Fixed a bug in the handling of the -P option.
 ----------------------------------------------------------------------
+Tue Nov  7 09:46:47 2000                        Michael Jennings (mej)
+
+Improved macro support to allow per-package macros.
+----------------------------------------------------------------------
