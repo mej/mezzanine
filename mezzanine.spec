@@ -34,7 +34,7 @@ for i in *tool ; do
 done
 (
   cd $RPM_BUILD_ROOT%{prefix}/bin
-  for i in get co put ci import query info add new rm purge rtag tag reset login ; do
+  for i in get co put ci import info add new rm purge rtag tag reset login ; do
     ln revtool av$i
   done
   ln buildtool avbuild

@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: build_system_design.txt,v 1.7 2001/01/24 18:10:15 mej Exp $
+#  $Id: build_system_design.txt,v 1.8 2001/01/30 02:01:09 mej Exp $
 #
 ########################################################################
 
@@ -170,6 +170,17 @@ creates products from their component packages based on the
 information in those files.  It will utilize the other Avalon
 components to perform this task.
 
+Product files are designed to be a very powerful engine for describing
+products in terms of their components -- packages and other products.
+For example, a RedHat-based distribution could be divided into the OS
+and the Powertools.  The OS could be further subdivided into a minimal
+package set and server/workstation package sets.  Each high-level
+product file simply references the sub-products and packages which
+compose it; buildtool handles the task of recursing through product
+files until a complete list of packages is made.  This facilitates the
+creation of layered products while encouraging cooperative reuse of
+the underlying packages.
+
 The sole purpose of buildtool is to create products from individual
 packages.  However, it should be as flexible as possible in doing so,
 leaving as much flexibility in the hands of the developer as it can.
@@ -178,9 +189,9 @@ Specifically, builds should be distributable and parallelizable.
 2.6.  Additional Utilities
 --------------------------
 
-Over time, extemporaneous tools will be added to Avalon as specific
-needs arise.  These tools are not a part of the build system proper,
-since they are not specifically a part of managing generic software
+Over time, extraneous tools will be added to Avalon as specific needs
+arise.  These tools are not a part of the build system proper, since
+they are not specifically a part of managing generic software
 products, but are nonetheless used in the ongoing maintenance of the
 distribution specifically.
 
@@ -199,11 +210,11 @@ Existing utilities which fall into this category include:
 The fundamental purpose of the Build System is to automate the
 creation and management of software products.  Every task performed by
 Avalon could be done by hand instead.  However, part of the purpose of
-the Avalon toolkit is to automate complex process and hide the details
-of their implementation from the end user.  That said, those who
-design and maintain the Build System need to know how things actually
-work in case something goes wrong, be it with the back-end system
-itself or one of the Avalon tools.
+the Avalon toolkit is to automate complex processes and hide the
+details of their implementation from the end user.  That said, those
+who design and maintain the Build System need to know how things
+actually work in case something goes wrong, be it with the back-end
+system itself or one of the Avalon tools.
 
 3.1.  Server Setup
 ------------------
@@ -238,8 +249,8 @@ Naturally, the "build" user/group should be created first, along with
 the /cvs directory, and the following should be added to
 /etc/services:
 
-cvspserver        2401/tcp                        # CVS client/server operations
-cvspserver        2401/udp                        # CVS client/server operations
+cvspserver        2401/tcp         # CVS client/server operations
+cvspserver        2401/udp         # CVS client/server operations
 
 The /cvs directory should be owned by build:build with permissions
 2775.  A cron job may be employed to maintain appropriate ownerships
@@ -458,3 +469,35 @@ think. **)
 4.5.2.  Generating/Syncing Web Sites
 ------------------------------------
 
+5.  TOOL SUMMARY
+----------------
+
+All the Avalon tools and tool aliases are listed here along with brief
+descriptions of their purpose.  This will assist in providing a
+high-level glimpse at basic tool usage.
+
+ - buildtool -- Drives all product/package builds
+    - avbuild -- Simply an alias for buildtool; does not invoke any
+                 particular functionality.
+
+ - pkgtool -- Handles all package file manipulation
+    - avrpm -- Simply an alias for pkgtool
+
+ - revtool -- Handles all direct interaction with the master
+              repository
+    - avlogin -- Login to the master repository (revtool -l)
+    - avget -- Retrieve files from the master repository (revtool -g)
+    - avput -- Store changed files in the master repository (revtool -p)
+    - avadd -- Add files to the master repository (revtool -a)
+    - avrm -- Remove files from the master repository (revtool -r)
+    - avtag -- Tag files or modules (revtool -t)
+    - avrtag -- Tag the master repository (revtool -T)
+    - avreset -- Clear all sticky attributes (revtool -g --reset)
+
+ - srctool -- High-level manipulation of source and package
+              modules
+    - avimport -- Import new package or source tree (srctool -i)
+    - avprep -- Prepare a source package module for active development
+                (srctool -p)
+    - avmod -- Generate a new patch file from modifications made to an
+               avprep'd tree (srctool -m)
