@@ -585,3 +585,9 @@ Wed Jul 28 18:19:31 2004                        Michael Jennings (mej)
 
 Doh.
 ----------------------------------------------------------------------
+Thu Jul 29 13:56:59 2004                        Michael Jennings (mej)
+
+Added some more debugging for examining package placement.
+
+Remove instroots once building is finished.
+----------------------------------------------------------------------

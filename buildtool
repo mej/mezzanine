@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.194 2004/07/28 22:20:51 mej Exp $
+# $Id: buildtool,v 1.195 2004/07/29 17:58:49 mej Exp $
 #
 
 use strict;
@@ -655,7 +655,7 @@ place_package_files
                 # No match.  Try next location.
                 next if ($file !~ $regex);
             }
-            dprint "Match found.\n";
+            dprint "Match found for $file:  $stop$regex ($dest).\n";
 
             if ($dest) {
                 # If the destination does not contain a filename, add the filename portion of
@@ -667,8 +667,9 @@ place_package_files
                     ($tmp = $file) =~ s/^.*\/([^\/]+)$/$1/;
                     $dest = "$dest/$tmp";
                 }
-                # If it exists, delete it
+                # If it exists, delete it.
                 if (-e $dest) {
+                    dprint "$dest exists; removing.\n";
                     &nuke_tree($dest);
                 }
                 # Then link it
@@ -677,7 +678,7 @@ place_package_files
                     if (exists($!{"EXDEV"}) && ($!{"EXDEV"})) {
                         # Cross-device link attempt.  Copy instead.
                         if (&copy_files($file, $dest) != 1) {
-                            &fail_package($pkg, "Unable to create $dest as a link to $file -- $!");
+                            &fail_package($pkg, "Unable to copy $file to $dest -- $!");
                             return MEZZANINE_SYSTEM_ERROR;
                         } else {
                             dprint "Can't link across devices; had to copy.\n";
@@ -874,6 +875,13 @@ parallel_build
         }
         # End of loop.  Time to spawn the next child.
     }
+
+    # Remove chroot jail images no longer needed.
+    foreach my $ir (@instroot_pool) {
+        $ir->remove();
+    }
+    @instroot_pool = ();
+
     &cleanup_build_tree();
     if ($num_built > 0) {
         return $num_built;
@@ -1011,7 +1019,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.194 $ created on $Date: 2004/07/28 22:20:51 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.195 $ created on $Date: 2004/07/29 17:58:49 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();

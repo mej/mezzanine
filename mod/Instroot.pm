@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Instroot.pm,v 1.3 2004/07/28 21:40:21 mej Exp $
+# $Id: Instroot.pm,v 1.4 2004/07/29 17:58:49 mej Exp $
 #
 
 package Mezzanine::Instroot;
@@ -167,6 +167,14 @@ release_clean
 
     #dprint "$self->{PATH}:  Releasing (unused).\n";
     return ($self->{"STATUS"} = "available");
+}
+
+sub
+remove
+{
+    my $self = shift;
+
+    return &nuke_tree($self->{"PATH"});
 }
 
 ### Private functions
