@@ -416,3 +416,7 @@ Converted buildtool to use new init/option style.
 
 Added skeleton for new source code management (SCM) mechanism.
 ----------------------------------------------------------------------
+Thu Apr  8 17:40:49 2004                        Michael Jennings (mej)
+
+Correct hint filename for new package name scheme.
+----------------------------------------------------------------------

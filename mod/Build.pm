@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.35 2004/04/07 18:24:40 mej Exp $
+# $Id: Build.pm,v 1.36 2004/04/08 21:41:07 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -267,9 +267,15 @@ install_hints($)
     }
 
     if (-d $hints) {
-        $hints = "$hints/" . &pkgvar_name();
+        if (&pkgvar_type() eq "rpm") {
+            my @tmp = &parse_rpm_name(&pkgvar_filename());
+            $hints = "$hints/$tmp[0]";
+        } else {
+            $hints = "$hints/" . &pkgvar_name();
+        }
         if (! -e $hints) {
-            dprintf("No hints file for package %s.\n", &pkgvar_name());
+            dprintf("No hints file (%s) for %s package %s.\n",
+                    $hints, &pkgvar_type(), &pkgvar_name());
             return "";
         }
     }
