@@ -21,13 +21,14 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.7 2001/08/02 19:45:17 mej Exp $
+# $Id: Prod.pm,v 1.8 2001/08/14 00:00:24 mej Exp $
 #
 
 package Avalon::Prod;
 
 BEGIN {
     use Exporter   ();
+    use Cwd;
     use Avalon::Util;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
@@ -139,43 +140,20 @@ get_var_name
     # Variable names are all uppercase because they are struct members.
     $var =~ tr/[a-z]/[A-Z]/;
 
-    if ($var =~ /^REL/) {
+    if ($var =~ /^REV/ || $var eq "TAG") {
+        $var = "TAG";
+    } elsif ($var =~ /^REL/) {
         $var = "RELEASE";
     } elsif ($var =~ /^VER/) {
         $var = "VERSION";
     } elsif ($var =~ /^LOC/) {
         $var = "LOCATIONS";
+    } elsif ($var =~ /^SOURCE/) {
+        $var = "SRCS";
+    } elsif ($var =~ /^(ARCH|TARGET)/) {
+        $var = "ARCH";
     }
     return $var;
-}
-
-# Supply the branch tag prefix
-sub
-branch_tag_prefix
-{
-    return "VA-";
-}
-
-# Convert a package name/version to a release tag
-sub
-pkg_to_release_tag
-{
-    my ($pkg_name, $pkg_version) = @_;
-    my $tag;
-
-    $tag = "$pkg_name-$pkg_version";
-    $tag =~ tr/[a-z]/[A-Z]/;
-    $tag =~ s/[^-A-Z0-9]/_/g;
-    return $tag;
-}
-
-# Convert a package name/version to a branch tag
-sub
-pkg_to_branch_tag
-{
-    my ($pkg_name, $pkg_version) = @_;
-
-    return (&branch_tag_prefix() . &pkg_to_release_tag($pkg_name, $pkg_version));
 }
 
 # Locate the product file for a particular product
@@ -185,7 +163,15 @@ find_product_file
     my ($prodname, $prodver) = @_;
     my $prodfile;
 
-    dprint "find_product_file($prodname, ", ($prodver ? $prodver : ""), ")\n";
+    dprint &print_args(@_);
+
+    if (! $prodname) {
+        if (-f "prod.avalon") {
+            return "prod.avalon";
+        } else {
+            return 0;
+        }
+    }
 
     if ($prodver) {
         # Try the whole product ID.
@@ -219,6 +205,7 @@ parse_product_entry
     my (%pkgvars, @inp);
     my $prod;
 
+    dprint &print_args(@_);
     if ($prodname) {
         if ($prodver) {
             $prod = "$prodname-$prodver";
@@ -229,7 +216,6 @@ parse_product_entry
     } else {
         $prod = $prodname = $prodver = 0;
     }
-    dprint "parse_product_entry(\"$line\", \"$prodname\", \"$prodver\")\n";
     undef %pkgvars;
     undef $module;
     undef $type;
@@ -470,85 +456,139 @@ sub
 parse_prod_file($$$)
 {
     my ($prodname, $prodver, $parent_prod) = @_;
-    my ($prodfile, $skip_to_name, $skip_to_next_ver, $found, $line);
+    my ($prodfile, $pkg, $found, $line);
     my $prod = $prodname;
-    local *PROD;
+    my $PROD;
 
     # First, find the product file and open it.
-    dprint "parse_prod_file($prodname, ", ($prodver ? $prodver : ""), ", ", ($parent_prod ? $parent_prod : ""), ")\n";
+    dprint &print_args(@_);
     if (!($prodfile = &find_product_file($prodname, $prodver))) {
         dprint "find_product_file() failed.  Returning 0.\n";
         return 0;
     }
     dprint "Found product file \"$prodfile\"\n";
-    open(PROD, "$prodfile") || return 0;
+    open($PROD, "$prodfile") || return 0;
 
-    # Ignore everything until we encounter a product name
-    ($skip_to_name, $skip_to_next_ver, $found) = (1, 0, 0); 
-    while (<PROD>) {
+    if ($prodname) {
+        $prodname = &skip_to_name($PROD, $prodname);
+        return 0 if (! $prodname);
+    } else {
+        $pkg = &basename(&getcwd());
+    }
+    if ($prodver) {
+        $prodver = &skip_to_version($PROD, $prodver);
+        return 0 if (! $prodver);
+    }
+
+    if (! $pkg) {
+        $prod = "$prodname-$prodver";
+        $found = 1;
+        push @products, $prod;
+        if ($parent_prod) {
+            $prods->{$prod}{PRODUCT} = $parent_prod;
+            dprint "Parent product of $prod is $prods->{$prod}{PRODUCT}.\n";
+        } elsif ($prods->{$prodname}{PRODUCT}) {
+            $prods->{$prod}{PRODUCT} = $prods->{$prodname}{PRODUCT};
+            dprint "Parent product of $prod is $prods->{$prod}{PRODUCT}.\n";
+        }
+    }
+
+    while (<$PROD>) {
         chomp($line = $_);
         dprint "Parsing $prodfile:  \"$line\"\n";
         $line =~ s/^\s*(.*\S)\s*$/$1/;  # Strip leading and trailing whitespace
         next if ($line =~ /^\#/ || $line !~ /\S/);
-        next if ($skip_to_name && $line !~ /^name\s*:/i);
-        next if ($skip_to_next_ver && $line !~ /^ver(sion)?\s*:/i);
-        if ($line =~ /^name\s*:/) {
-            $line =~ s/^[^:]+:\s*//;
-            $prodname = $line;
-            $skip_to_name = 0;
-            $skip_to_next_ver = 1;
-            next;
-        } elsif ($line =~ /^ver(sion)?\s*:/) {
-            if ($skip_to_next_ver) {
-                $line =~ s/^[^:]+:\s*//;
-                next if ($prodver && $line ne $prodver);
-                # Found it!
-                if ($prodver) {
-                    dprint "Found product version match.  Time to parse the product.\n";
-                } else {
-                    dprint "No product version given.  Using first entry:  $line\n";
-                    $prodver = $line;
-                }
-                $prod = "$prodname-$prodver";
-                ($found, $skip_to_next_ver) = (1, 0);
-                push @products, $prod;
-                if ($parent_prod) {
-                    $prods->{$prod}{PRODUCT} = $parent_prod;
-                    dprint "Parent product of $prod is $prods->{$prod}{PRODUCT}.\n";
-                } elsif ($prods->{$prodname}{PRODUCT}) {
-                    $prods->{$prod}{PRODUCT} = $prods->{$prodname}{PRODUCT};
-                    dprint "Parent product of $prod is $prods->{$prod}{PRODUCT}.\n";
-                }
+        if ($line =~ /^name\s*:/i || $line =~ /^ver(sion)?\s*:/i) {
+            if ($pkg) {
                 next;
             } else {
-                # New version.  Time to quit.
                 last;
             }
-        } else {
-            dprint "Checking \"$line\" for product variables.\n";
-            if ($line !~ /^(prod|mod|s?rpm|ima?ge?)/i && $line =~ /^([^ \t:]+)\s*:\s*(\S+.*)$/) {
-                my ($var, $val);
-
-                # The regexp above should only match var:value (a product variable)
-                ($var, $val) = ($1, $2);
-                $var = &get_var_name($var);
-                dprint "Product variable for $prod:  $var -> $val\n";
-                $prods->{$prod}{$var} = $val;
-            } elsif (!($skip_to_name || $skip_to_next_ver)) {
-                my $tmp;
-
-                dprint "Calling parse_product_entry()...\n";
-                $tmp = &parse_product_entry($line, $prodname, $prodver);
-                dprint "parse_product_entry() returned $tmp\n";
+        }
+        dprint "Checking \"$line\" for product variables.\n";
+        if ($line !~ /^(prod|mod|s?rpm|ima?ge?)/i && $line =~ /^([^ \t:]+)\s*:\s*(\S+.*)$/) {
+            if ($pkg) {
+                &assign_package_variable($pkg, $1, $2);
+            } else {
+                &assign_product_variable($prod, $1, $2);
             }
+        } else {
+            dprint "parse_product_entry() returned ", &parse_product_entry($line, $prodname, $prodver), "\n";
         }
     }
-    dprint "Closing file $prodfile and returning $found\n";
-    close(PROD);
-    return ($found);
+    dprint "Closing file $prodfile\n";
+    close($PROD);
+    return (1);
 }
 
 ### Private functions
 
+sub
+skip_to_name
+{
+    my ($PROD, $prodname) = @_;
+
+    while (<$PROD>) {
+        my $line;
+
+        chomp($line = $_);
+        dprint "Parsing $prodfile:  \"$line\"\n";
+        $line =~ s/^\s*(.*\S)\s*$/$1/;  # Strip leading and trailing whitespace
+        next if ($line =~ /^\#/ || $line !~ /\S/);
+        if ($line =~ /^name\s*:/i) {
+            $line =~ s/^[^:]+:\s*//;
+            return $line;
+        }
+    }
+    return "";
+}
+
+sub
+skip_to_version
+{
+    my ($PROD, $prodver) = @_;
+
+    while (<$PROD>) {
+        my $line;
+
+        chomp($line = $_);
+        dprint "Parsing $prodfile:  \"$line\"\n";
+        $line =~ s/^\s*(.*\S)\s*$/$1/;  # Strip leading and trailing whitespace
+        next if ($line =~ /^\#/ || $line !~ /\S/);
+        if ($line =~ /^ver(sion)?\s*:/i) {
+            $line =~ s/^[^:]+:\s*(\S+)\s*$/$1/;
+            next if ($prodver && $line ne $prodver);
+            # Found it!
+            if ($prodver) {
+                dprint "Found product version match.  Time to parse the product.\n";
+            } else {
+                dprint "No product version given.  Using first entry:  $line\n";
+                $prodver = $line;
+            }
+            return $prodver;
+        }
+    }
+    return "";
+}
+
+sub
+assign_product_variable
+{
+    my ($prod, $var, $val) = @_;
+
+    $var = &get_var_name($var);
+    dprint "Product variable for $prod:  $var -> $val\n";
+    $prods->{$prod}{$var} = $val;
+}
+
+sub
+assign_package_variable
+{
+    my ($pkg, $var, $val) = @_;
+
+    $var = &get_var_name($var);
+    dprint "Package variable for $pkg:  $var -> $val\n";
+    $pkgs->{$pkg}{$var} = $val;
+}
 
 1;

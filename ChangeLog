@@ -1356,3 +1356,8 @@ Thu Aug  9 23:02:59 2001                        Michael Jennings (mej)
 
 Haha!  "avbuild" works again! :)
 ----------------------------------------------------------------------
+Mon Aug 13 17:02:57 2001                        Michael Jennings (mej)
+
+Packages can now have their own product files which are picked up by
+the build.
+----------------------------------------------------------------------

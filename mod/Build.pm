@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.12 2001/08/09 22:04:46 mej Exp $
+# $Id: Build.pm,v 1.13 2001/08/14 00:00:24 mej Exp $
 #
 
 package Avalon::Build;
@@ -35,6 +35,7 @@ BEGIN {
     use Avalon::RPM;
     use Avalon::Deb;
     use Avalon::Tar;
+    use Avalon::Prod;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
@@ -167,18 +168,15 @@ get_source_list
     my ($specfile, $module, $srcs) = @_;
     my @srcs;
 
+    dprint &print_args(@_);
+
     if ($module && (!chdir($module))) {
         return AVALON_BAD_MODULE;
-    }
-    if ($destdir && $destdir !~ /\/$/) {
-        $destdir .= "/";
     }
     &parse_spec_file($specfile) if ($specfile);
 
     if ($srcs) {
         @srcs = split(/[\s,]/, $srcs);
-    } elsif (-s "avalon.srcs") {
-        @srcs = &parse_srcs_file("avalon.srcs");
     } else {
         my $fname;
 
@@ -213,6 +211,8 @@ create_source_file
     my ($src_files, $tarball, $destdir, $tar, $zip) = @_;
     my $cmd;
     local *CMD;
+
+    dprint &print_args(@_);
 
     $destdir .= '/' if (substr($destdir, -1, 1) ne '/');
     if ($tarball) {
@@ -500,6 +500,7 @@ build_fst
     my (@srcs, @tmp);
 
     dprint &print_args(@_);
+    $pkg = &basename(&getcwd()) if ($pkg eq ".");
 
     # Look for the build instructions (spec file, debian/ directory, etc.)
     if ($target_format eq "rpms") {
@@ -520,7 +521,8 @@ build_fst
         return (AVALON_SYSTEM_ERROR, "Unable to copy $specfile to $topdir/SPECS/ -- $!\n", undef);
     }
     # Get ready to build, figure out what sources we need, and create them all.
-    @srcs = &get_source_list($specfile, ".", undef);
+    &parse_prod_file();
+    @srcs = &get_source_list($specfile, ".", $pkgs->{$pkg}{SRCS});
     dprint @srcs, "\n";
     $ret = &create_source_files("$topdir/SOURCES", "", "", \@srcs);
     if ($ret != AVALON_SUCCESS) {

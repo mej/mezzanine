@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.12 2001/07/31 22:23:00 mej Exp $
+# $Id: Pkg.pm,v 1.13 2001/08/14 00:00:24 mej Exp $
 #
 
 package Avalon::Pkg;
@@ -29,6 +29,7 @@ package Avalon::Pkg;
 BEGIN {
     use Exporter   ();
     use Avalon::Util;
+    use Avalon::RevCtl;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
@@ -228,31 +229,22 @@ parse_srcs_file($)
 sub
 fetch_package
 {
-    my ($module, $filename, $tag, $cvsroot, $opts) = @_;
+    my ($module, $filename, $tag, $repository, $opts) = @_;
     my ($err, $msg, $line) = undef;
     my $missing = 0;
     local *REVTOOL;
 
     $filename = "" if (!defined($filename));
     $tag = "" if (!defined($tag));
-    $cvsroot = "" if (!defined($cvsroot));
+    $repository = "" if (!defined($repository));
     $opts = "" if (!defined($opts));
-    dprint "Getting $filename", ($module ? " (in $module) " : ""), ($cvsroot ? " from $cvsroot" : ""),
+    dprint "Getting $filename", ($module ? " (in $module) " : ""), ($repository ? " from $repository" : ""),
            ($tag ? " using $tag" : ""), ($opts ? " and extra options $opts" : ""), ".\n";
     if (! ($filename = &get_package_path($module, $filename))) {
         return (AVALON_BAD_PACKAGE, "Could not determine what package(s)/module(s) to retrieve.");
     }
-    if ($cvsroot) {
-        $cvsroot = "-D $cvsroot";
-    }
-    if ($tag) {
-        if ($tag =~ /^head$/i) {
-            $tag = "";
-        } else {
-            $tag = "-t $tag";
-        }
-    }
-
+    &set_repository($repository);
+    &set_tag(($tag eq head ? "" : $tag));
     foreach my $f (split(' ', $filename)) {
         if (!(-d $f) && !(-f $f && -s _)) {
             $missing = 1;
@@ -263,23 +255,11 @@ fetch_package
         return (AVALON_DUPLICATE, undef);
     }
 
-    $cmd = (&debug_get() ? "revtool -d" : "revtool") . " -l $cvsroot $tag $opts -g $filename";
-    if (!open(REVTOOL, "$cmd 2>&1 |")) {
-        return (AVALON_COMMAND_FAILED, "Execution of \"$cmd\" failed -- $!");
+    if (&login_to_master()) {
+        $err = &update_from_master($filename);
+        return ($err, "");
     }
-    while (<REVTOOL>) {
-        chomp($line = $_);
-        dprint "$line\n";
-        next if ($line =~ /^\[debug:/);
-        # Check the output for errors
-        if ($line =~ /^revtool:\s*Error/) {
-            ($msg = $line) =~ s/^revtool:\s*Error:\s*//;
-        }
-    }
-    close(REVTOOL);
-    $err = $? >> 8;
-    dprint "\"$cmd\" returned $err\n" if ($err != AVALON_SUCCESS);
-    return ($err, ($msg ? $msg : "Unknown error"));
+    return (AVALON_BAD_LOGIN, "Login failure");
 }
 
 ### Private functions

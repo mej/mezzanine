@@ -1,0 +1,1 @@
+srcs: *tool&pkgsort&mod&README&ChangeLog&doc&*.spec:avalon.tar.gz

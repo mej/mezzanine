@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.1 2001/08/09 20:05:17 mej Exp $
+# $Id: RevCtl.pm,v 1.2 2001/08/14 00:00:24 mej Exp $
 #
 
 package Avalon::RevCtl;
@@ -304,7 +304,7 @@ login_to_master
         $found = 0;
         while (<CVSPASS>) {
             chomp($line = $_);
-            if ($line =~ /^$login/) {
+            if ($line =~ /^$repository/) {
                 $found = 1;
                 last;
             }
@@ -316,7 +316,7 @@ login_to_master
         }
     }
     if (-t STDIN) {
-        $cmd = "/bin/sh -c \"cvs -d $login login\"";
+        $cmd = "/bin/sh -c \"cvs -d $repository login\"";
         $err = &talk_to_server("login", $cmd);
         if ($err) {
             return 0;
@@ -324,7 +324,7 @@ login_to_master
     } else {
         dprint "Performing automated login with an empty password.\n";
         open(CVSPASS, ">> $ENV{HOME}/.cvspass");
-        print CVSPASS "$login A\n";
+        print CVSPASS "$repository A\n";
         close(CVSPASS);
     }
     return 1;
