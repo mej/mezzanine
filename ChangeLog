@@ -855,3 +855,7 @@ Thu Sep 28 16:02:12 2000                        Michael Jennings (mej)
 
 Fixes to cdtool.  This one works.
 ----------------------------------------------------------------------
+Thu Sep 28 21:16:55 2000                        Michael Jennings (mej)
+
+New script to sync engr web/FTP site with grendel builds.
+----------------------------------------------------------------------
