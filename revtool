@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 #
 # revtool -- Source Code Revision Control Tool
 # 
@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.6 2000/05/06 06:50:54 mej Exp $
+# $Id: revtool,v 1.7 2000/05/06 06:55:01 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -90,7 +90,7 @@ commit_to_master {
     $username = $ENV{"LOGNAME"};
     @pw_info = getpwnam($username);
     $fullname = $pw_info[6];
-    print LOGFILE scalar localtime, "\t", ($fullname ? "$fullname ($username)" : "$username"), "\n\n";
+    printf LOGFILE "%-20s%50s\n\n", scalar localtime, ($fullname ? "$fullname ($username)" : "$username");
     close(LOGFILE);
     print "Please edit your commit message now...\n";
     system($ENV{"EDITOR"} ? $ENV{"EDITOR"} : "vi", $logfile);
@@ -176,10 +176,8 @@ main {
 BEGIN {
 
     # Set up the basic variables
-    $start_time = time;
     $progname = "RevTool";
     $version = "0.1.0";
-    chomp($hostname = `hostname`);
 
     # See the Getopt::Mixed man page for details on the syntax of this line
     $valid_opts = "h help>h v version>v d debug>d g p a r t=s i=s k=s";

@@ -1,18 +1,22 @@
 ----------------------------------------------------------------------
-Fri May  5 23:38:07 2000	Michael Jennings (mej)
+Fri May  5 23:38:07 2000                        Michael Jennings (mej)
 
 Added commit support to revtool with automatic log file creation and
 automatic updating of the ChangeLog.
 ----------------------------------------------------------------------
-Fri May  5 23:44:04 2000	Michael Jennings (mej)
+Fri May  5 23:44:04 2000                        Michael Jennings (mej)
 
 Added ChangeLog to CVS and added add/remove support to revtool.
 ----------------------------------------------------------------------
-Fri May  5 23:47:49 2000	Michael Jennings (mej)
+Fri May  5 23:47:49 2000                        Michael Jennings (mej)
 
 Hopefully the ChangeLog will update properly this time.
 ----------------------------------------------------------------------
-Fri May  5 23:50:47 2000	Michael Jennings (mej)
+Fri May  5 23:50:47 2000                        Michael Jennings (mej)
 
 Longer lines needed.
+----------------------------------------------------------------------
+Fri May  5 23:54:48 2000                            Michael Jennings (mej)
+
+A bit of reformatting on the ChangeLog.
 ----------------------------------------------------------------------
