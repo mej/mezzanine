@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.19 2000/07/21 19:18:45 mej Exp $
+# $Id: pkgtool,v 1.20 2000/07/28 18:51:17 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -588,8 +588,8 @@ gen_diff
         if ($line =~ /^Index: (\S+)$/) {
             my @tmp;
 
-            ($fname = $1) =~ s/^$module\///;
-            @tmp = grep(($fname eq $_) || ($fname =~ /^$_\//), @src_files);
+            ($fname = $1) =~ s/^\Q$module\E\///;
+            @tmp = grep(($fname eq $_) || ($fname =~ /^\Q$_\E\//), @src_files);
             if ($#tmp < 0) {
                 # Not a source file.  Ignore it.
                 dprint "Ignoring patch to $fname\n";
@@ -600,7 +600,7 @@ gen_diff
                 $ignore = 0;
             }
         } elsif ($line =~ /^(diff|---|\+\+\+|\*\*\*)/) {
-            $line =~ s/$module\/$fname/$fname/g;
+            $line =~ s/\Q$module\/$fname\E/$fname/g;
         }
         next if ($ignore);
 
@@ -1085,7 +1085,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.19 $ created on $Date: 2000/07/21 19:18:45 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.20 $ created on $Date: 2000/07/28 18:51:17 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
