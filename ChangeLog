@@ -502,3 +502,7 @@ Thu Jun 24 18:25:35 2004                        Michael Jennings (mej)
 
 Fixed logic error with "mzput -x"
 ----------------------------------------------------------------------
+Thu Jun 24 18:30:52 2004                        Michael Jennings (mej)
+
+Another logic error. :(
+----------------------------------------------------------------------
