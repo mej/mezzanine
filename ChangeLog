@@ -533,3 +533,8 @@ Tue Jun 20 19:56:03 2000                        Michael Jennings (mej)
 
 Make sure the directories exist before trying to use them.
 ----------------------------------------------------------------------
+Wed Jun 21 16:02:47 2000                        Michael Jennings (mej)
+
+Fixed the tagging/importing code.  Just a few small bugs.  Everything
+looks to be in working order now.
+----------------------------------------------------------------------

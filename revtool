@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.31 2000/06/20 23:00:46 mej Exp $
+# $Id: revtool,v 1.32 2000/06/21 22:53:14 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -305,8 +305,7 @@ update_from_master
     my ($tag, $err, $tries, $line, $cmd, $file, $mode);
     my (@conflicts, @not_found, @removed, @co, @up);
 
-    # The tag options only apply to gets we're doing because of -g, not -p
-    if ($opt_t && $opt_g) {
+    if ($opt_t) {
         $tag = "-r $opt_t";
     }
     dprint "File list is \"$file_list\", tag is \"$tag\"\n";
@@ -658,12 +657,12 @@ tag_local_sources
     #   3. Tags must contain only uppercase characters and hyphens.  Note that this rule is more
     #      restrictive than CVS's own rules but is enforced for standards compliance.
     if (($opt_b && $tag !~ /^([A-Z]+)-$mod_tag-/) || (! $opt_b && $tag !~ /^$mod_tag-/)
-        || $tag !~ /^[-A-Z]+$/) {
+        || $tag !~ /^[-A-Z0-9]+$/) {
         eprint "Tag \"$tag\" is not valid for module $module\n";
         return REVTOOL_INVALID_TAG;
     }
 
-    $cmd = sprintf("/bin/sh -c \"cvs $cvsroot tag -F ", ($opt_b ? "-b " : ""), "$tag $file_list\"");
+    $cmd = "/bin/sh -c \"cvs $cvsroot tag -F " . ($opt_b ? "-b " : "") . "$tag $file_list\"";
 
     for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
         $err = 0;
@@ -724,9 +723,10 @@ import_vendor_sources
         $module = $_[0];
     } else {
         chomp($module = `pwd`);
+        $module =~ s/^.*\/([^\/]+)$/$1/;
     }
     ($vendor_tag = $module) =~ tr/[a-z]/[A-Z]/;
-    $vendor_tag =~ s/[^-A-Z]/-/g;
+    $vendor_tag =~ s/[^-A-Z0-9]/-/g;
     if ($tag) {
         $release_tag = $tag;
     } elsif ($rtag) {
@@ -744,7 +744,7 @@ import_vendor_sources
     #   1. The release tag must start with the package name and a hyphen, e.g. KERNEL-
     #   2. Tags must contain only uppercase characters and hyphens.  Note that this rule is more
     #      restrictive than CVS's own rules but is enforced for standards compliance.
-    if ($release_tag !~ /^$vendor_tag-/ || $release_tag !~ /^[-A-Z]+$/) {
+    if ($release_tag !~ /^$vendor_tag-/ || $release_tag !~ /^[-A-Z0-9]+$/) {
         eprint "Release tag \"$tag\" is not valid for module $module\n";
         return REVTOOL_INVALID_TAG;
     }
@@ -753,8 +753,8 @@ import_vendor_sources
     $version =~ tr/[A-Z]/[a-z]/;
     $msg = "Import of $module $version";
 
-    $cmd = sprintf("/bin/sh -c \"cvs $cvsroot import ", ($opt_k ? "-k $opt_k " : ""),
-                   ($opt_x ? "-I! " : ""), "-m '$msg' $module $vendor_tag $release_tag");
+    $cmd = "/bin/sh -c \"cvs $cvsroot import " . ($opt_k ? "-k $opt_k " : "") . ($opt_x ? "-I! " : "")
+            . "-m '$msg' $module $vendor_tag $release_tag\"";
 
     for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
         $err = 0;
@@ -765,7 +765,7 @@ import_vendor_sources
         }
         while (<CMD>) {
             chomp($line = $_);
-            dprint "$line\n";
+            print "$line\n";
             # Read the output
             if ($line =~ /^cvs \w+: cannot find password/) {
                 eprint "You must login to the repository first.\n";
@@ -828,7 +828,7 @@ tag_repository_sources
 
     if (-d "CVS") {
         chomp($module = &cat_file("CVS/Repository"));
-    } elsif ($_[0] && -d "$_[0]/CVS") {
+    } elsif ($_[0]) {
         $module = $_[0];
     } else {
         eprint "I don't see any CVS sources to tag here....\n";
@@ -841,13 +841,13 @@ tag_repository_sources
     #   2. Non-branch tags are the same, but without the branch key at the beginning, e.g. KERNEL-
     #   3. Tags must contain only uppercase characters and hyphens.  Note that this rule is more
     #      restrictive than CVS's own rules but is enforced for standards compliance.
-    if (($opt_b && $tag !~ /^([A-Z]+)-$mod_tag-/) || (! $opt_b && $tag !~ /^$mod_tag-/)
-        || $tag !~ /^[-A-Z]+$/) {
-        eprint "Tag \"$tag\" is not valid for module $module\n";
+    if (($opt_b && $rtag !~ /^([A-Z]+)-$mod_tag-/) || (! $opt_b && $rtag !~ /^$mod_tag-/)
+        || $rtag !~ /^[-A-Z0-9]+$/) {
+        eprint "Tag \"$rtag\" is not valid for module $module\n";
         return REVTOOL_INVALID_TAG;
     }
 
-    $cmd = sprintf("/bin/sh -c \"cvs $cvsroot rtag -F ", ($opt_b ? "-b " : ""), "$tag $file_list\"");
+    $cmd = "/bin/sh -c \"cvs $cvsroot rtag -F " . ($opt_b ? "-b " : "") . "$rtag $file_list\"";
 
     for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
         $err = 0;
@@ -914,6 +914,10 @@ main
         } elsif ($query eq "l") {
             # Query file log
         }
+    } elsif ($mode eq "tag") {
+        &tag_local_sources(@ARGV);
+    } elsif ($mode eq "rtag") {
+        &tag_repository_sources(@ARGV);
     } else {
         if ($opt_addlist) {
             $addlist = $opt_addlist;
@@ -948,13 +952,6 @@ main
                 }
             }
         }
-        if (! $opt_g) {
-            if ($tag) {
-                &tag_local_sources();
-            } elsif ($rtag) {
-                &tag_repository_sources();
-            }
-        }
     }
 }
 
@@ -972,13 +969,12 @@ BEGIN {
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "g|get", "p|put", "a|add", "r|remove",
-                   "q|query=s", "R|recurse", "t|tag=s", "i|import=s", "k=s", "D|dir=s",
+                   "q|query=s", "R|recurse", "t|tag=s", "i|import", "k=s", "D|dir=s",
                    "x|exclusive", "addlist=s", "remlist=s", "T|rtag=s", "l|login", "b|branch");
 
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
     $debug = $opt_d;
-    $binary = $opt_b;
     if ($opt_i) {
         $mode = "import";
     } elsif ($opt_q) {
@@ -1002,6 +998,7 @@ BEGIN {
     $cvsroot = "-d $opt_D" if ($opt_D);
     $tag = $opt_t;
     $rtag = $opt_T;
+    dprint "Debugging is on, mode is $mode, CVSROOT is $cvsroot, tag is $tag, rtag is $rtag\n";
     if ($opt_l) {
         if ($opt_D) {
             $login = $opt_D;
@@ -1013,7 +1010,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.31 $ created on $Date: 2000/06/20 23:00:46 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.32 $ created on $Date: 2000/06/21 22:53:14 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
