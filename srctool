@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.35 2003/11/30 20:12:00 mej Exp $
+# $Id: srctool,v 1.36 2004/01/28 16:12:43 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -39,6 +39,8 @@ use Mezzanine::PkgVars;
 use Mezzanine::RPM;
 use Mezzanine::Src;
 use Mezzanine::Pkg;
+
+my $import_as_pdr = 0;
 
 # Print usage information
 sub
@@ -64,6 +66,7 @@ print_usage_info
     print "    -n --name <name>                 Specify the name of a package (-i) or patch (-a)\n";
     print "    -D --dir <repository>            Specify the repository to use\n";
     print "    -L --local                       Local mode; do not talk to the master server\n";
+    print "    -f --flat --pdr                  Import as a PDR (all files in top dir) rather than an SPM\n";
     print "\n";
     exit(MEZZANINE_SUCCESS);
 }
@@ -89,12 +92,20 @@ import_package
 
         print "Importing $pkgfile into $pkg tree....\n\n";
 
-        # Create temp space for importing SPM
-        $tmpdir = &create_temp_space($pkg, "SPM");
-        if (! $tmpdir) {
-            return MEZZANINE_SYSTEM_ERROR;
+        # Create temp space for importing.
+        if ($import_as_pdr) {
+            $tmpdir = &create_temp_space($pkg, "PDR");
+            if (! $tmpdir) {
+                return MEZZANINE_SYSTEM_ERROR;
+            }
+            &convert_srpm_to_pdr($pkgfile, $tmpdir);
+        } else {
+            $tmpdir = &create_temp_space($pkg, "SPM");
+            if (! $tmpdir) {
+                return MEZZANINE_SYSTEM_ERROR;
+            }
+            &convert_srpm_to_spm($pkgfile, $tmpdir);
         }
-        &convert_srpm_to_spm($pkgfile, $tmpdir);
 
         $tag = "$pkg-$ver-$rel";
         if ($local_mode) {
@@ -401,7 +412,11 @@ merge_file($$)
     dprint "Merging $new_file ($type) into $pkg\n";
     if ($type eq 'R') {
         # Merge in new files from an SRPM.
-        &convert_srpm_to_spm($new_file, ".");
+        if ($import_as_pdr) {
+            &convert_srpm_to_pdr($new_file, ".");
+        } else {
+            &convert_srpm_to_spm($new_file, ".");
+        }
         print "You will need to run 'mzsync' next.\n";
     } else {
         my @output;
@@ -608,7 +623,7 @@ main
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "i|import", "p|prepare",
                    "m|merge", "r|resync", "a|apply|patch", "move", "n|name=s",
-                   "c|clean", "D|dir|repository=s", "L|local");
+                   "c|clean", "D|dir|repository=s", "L|local", "f|flat|pdr");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -616,7 +631,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.35 $ created on $Date: 2003/11/30 20:12:00 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.36 $ created on $Date: 2004/01/28 16:12:43 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -657,6 +672,9 @@ main
     $SIG{TTOU} = \&handle_fatal_signal;
 
     if ($0 =~ /mzimport$/ || $opt_i) {
+        if ($opt_f) {
+            $import_as_pdr = 1;
+        }
 	if (scalar(@flist)) {
 	    foreach $f (@flist) {
 		my $err;
@@ -683,6 +701,9 @@ main
     } elsif ($0 =~ /mzmerge$/ || $opt_M) {
         my $pkg;
 
+        if ($opt_f) {
+            $import_as_pdr = 1;
+        }
         foreach my $f (@flist) {
             if (-d $f) {
                 $pkg = $f;

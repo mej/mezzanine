@@ -293,3 +293,7 @@ Fixed build as other user for SRPM's.
 
 Cleaned up some debugging output.
 ----------------------------------------------------------------------
+Wed Jan 28 11:11:26 2004                        Michael Jennings (mej)
+
+Added support for importing PDR's.
+----------------------------------------------------------------------

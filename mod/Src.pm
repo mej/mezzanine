@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.15 2004/01/26 22:15:24 mej Exp $
+# $Id: Src.pm,v 1.16 2004/01/28 16:12:43 mej Exp $
 #
 
 package Mezzanine::Src;
@@ -42,11 +42,13 @@ BEGIN {
     $VERSION     = 2.1;
 
     @ISA         = ('Exporter');
-    # Exported functions go here
-    @EXPORT      = ('$WORK_DIR', '$TMP_DIR', 
-                    '&find_files', '&find_subdirs', '&generate_symlink_file',
-                    '&install_spm_files', '&create_temp_space', '&clean_temp_space',
-                    '&convert_srpm_to_spm', '&run_cmd', '&run_mz_cmd');
+
+    @EXPORT = ('$WORK_DIR', '$TMP_DIR', '&find_files',
+               '&find_subdirs', '&generate_symlink_file',
+               '&install_spm_files', '&create_temp_space',
+               '&clean_temp_space', '&convert_srpm_to_spm',
+               '&convert_srpm_to_pdr', '&run_cmd', '&run_mz_cmd');
+
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -71,7 +73,8 @@ sub generate_symlink_file($);
 sub install_spm_files($);
 sub create_temp_space($$);
 sub clean_temp_space();
-sub convert_srpm_to_spm($);
+sub convert_srpm_to_spm($$);
+sub convert_srpm_to_pdr($$);
 sub run_cmd($$$);
 sub run_mz_cmd($$$);
 
@@ -196,6 +199,8 @@ create_temp_space($$)
     &mkdirhier($dir) || return "";
     if ($type eq "SPM") {
 	@dirlist = ("S", "P", "F");
+    } elsif ($type eq "PDR") {
+	@dirlist = ();
     } elsif ($type eq "build") {
 	@dirlist = ("BUILD", "SOURCES", "SRPMS", "RPMS", "SPECS");
     }
@@ -270,6 +275,26 @@ convert_srpm_to_spm($)
     return MEZZANINE_SUCCESS;
 }
 
+sub
+convert_srpm_to_pdr($)
+{
+    my ($pkgfile, $destdir) = @_;
+    my ($err, $msg, $rpmcmd, $spec, $specdata);
+    my (@srcs, @patches, @tmp);
+
+    # Install the SRPM into the temporary directory
+    &pkgvar_filename($pkgfile);
+    $destdir = &getcwd() if ($destdir =~ /^\.\/?$/);
+    &pkgvar_parameters("--define '_sourcedir $destdir' --define '_specdir $destdir'");
+    ($err, $msg) = &package_install();
+    &pkgvar_parameters("");
+    if ($err != MEZZANINE_SUCCESS) {
+        eprint "Unable to install $pkgfile\n";
+        return MEZZANINE_COMMAND_FAILED;
+    }
+    return MEZZANINE_SUCCESS;
+}
+
 # Generic wrapper to grab command output
 sub
 run_cmd($$$)
@@ -287,6 +312,7 @@ run_cmd($$$)
     }
     while (<CMD>) {
         chomp($line = $_);
+        $line =~ s/^.*\r//g;
         push @output, $line;
         if ($show_output) {
             print "$show_output$line\n";
