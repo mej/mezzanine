@@ -195,3 +195,8 @@ The "doc++" name was screwing up one of my regexp's because '+' is a
 metacharacter.  Hopefully this will fix it.  We'll find out in about
 16 hours.... =P
 ----------------------------------------------------------------------
+Mon May 22 19:21:47 2000                        Michael Jennings (mej)
+
+Added initial product files for 6.2.2.  These will change quite a bit
+over time, of course. :-)
+----------------------------------------------------------------------
