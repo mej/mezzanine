@@ -638,3 +638,9 @@ Note when packages were skipped rather than just saying they built.
 Check for updates to packages that were previously broken before
 refusing to rebuild them.
 ----------------------------------------------------------------------
+Thu Sep 30 17:59:31 2004                        Michael Jennings (mej)
+
+Fixed diffs of CRLF-delimited files.
+
+Changed default timeout to 900 seconds.
+----------------------------------------------------------------------

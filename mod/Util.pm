@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.43 2004/09/14 22:06:33 mej Exp $
+# $Id: Util.pm,v 1.44 2004/09/30 21:59:55 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -935,8 +935,8 @@ run_cmd($$$)
     local *CMD;
 
     if (!defined($timeout)) {
-        # Wait 5 minutes by default.
-        $timeout = 300;
+        # Wait 15 minutes by default.
+        $timeout = 900;
     }
     if (ref($params)) {
         my $tmp = "";
@@ -971,8 +971,8 @@ run_cmd($$$)
             last;
         }
         chomp($line = $_);
-        $line =~ s/^.*\r//g;
         push @output, $line;
+        $line =~ s/^.*\r//g;
         if ($show_output) {
             print "$show_output$line\n";
         } else {
