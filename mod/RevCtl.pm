@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.19 2003/12/30 23:02:55 mej Exp $
+# $Id: RevCtl.pm,v 1.20 2004/03/31 02:11:36 mej Exp $
 #
 
 package Mezzanine::RevCtl;
@@ -38,7 +38,18 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('&revctl_reset', '&revctl_system', '&revctl_command', '&revctl_repository', '&revctl_keyword_expansion', '&revctl_recursion', '&revctl_branching', '&revctl_sticky_clear', '&revctl_exclusive', '&revctl_strict_tagging', '&revctl_tag', '&revctl_rtag', '&check_tag', '&login_to_master', 'do_changelog_entry', '&make_repository_path', '&commit_to_master', '&update_from_master', '&add_new_files', '&delete_old_files', '&query_status', '&query_log', '&query_annotation', '&query_diff', '&query_release_diff', '&tag_local_sources', '&tag_repository_sources', '&import_vendor_sources');
+    @EXPORT = ('&revctl_reset', '&revctl_system', '&revctl_command',
+               '&revctl_repository', '&revctl_keyword_expansion',
+               '&revctl_recursion', '&revctl_branching',
+               '&revctl_sticky_clear', '&revctl_exclusive',
+               '&revctl_strict_tagging', '&revctl_tag',
+               '&revctl_rtag', '&check_tag', '&login_to_master',
+               '&do_changelog_entry', '&make_repository_path',
+               '&commit_to_master', '&update_from_master',
+               '&add_new_files', '&delete_old_files', '&query_status',
+               '&query_log', '&query_annotation', '&query_diff',
+               '&query_release_diff', '&tag_local_sources',
+               '&tag_repository_sources', '&import_vendor_sources');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -51,6 +62,53 @@ use vars ('@EXPORT_OK');
 ### Initialize exported package variables
 
 # Constants
+%REVCTL_CMDS = (
+                "cvs" => {
+                    "command" => "cvs",
+                    "repository" => "",
+
+                    # Options
+                    "binary_file" => "-kb",
+                    "source_file" => "-kkv",
+                    "regular_file" => "-ko",
+                    "recursive" => "-R",
+                    "non_recursive" => "",
+                    "get_from_branch" => "-r",
+                    "get_from_tag" => "-r",
+                    "get_from_date" => "-D",
+                    "merge_from_branch" => "-j",
+                    "merge_from_tag" => "-j",
+                    "merge_to_branch" => "-j",
+                    "merge_to_tag" => "-j",
+                    "create_branch" => "-b",
+                    "sticky_clear" => "-A",
+                    "exclusive" => "-I!",
+
+                    # Commands
+                    #"login" => "login",
+                    "get_new" => "checkout",
+                    "get_update" => "update",
+                    "put" => "commit",
+                    "" => "",
+                    "" => "",
+                    "" => "",
+                    "" => "",
+                    "" => "",
+                    "" => "",
+
+                    # Bookkeeping
+                    "control_dir" => "CVS",
+                    "" => "",
+                    "" => "",
+                    "" => "",
+                    "" => "",
+                    "" => "",
+                    "" => "",
+                    "" => ""
+                },
+                "svn" => {
+                }
+               );
 
 ### Initialize private global variables
 $revctl_system = "cvs";
@@ -99,6 +157,7 @@ sub import_vendor_sources($);
 sub talk_to_server($$);
 sub talk_to_cvs_server($$);
 sub talk_to_bk_server($$);
+sub talk_to_svn_server($$);
 
 ### Module cleanup
 END {
@@ -153,7 +212,11 @@ revctl_repository
     my $param = $_[0];
 
     if (defined($param)) {
-        $repository = ($param ? "-d $param" : "");
+        if ($revctl_system eq "cvs") {
+            $repository = ($param ? "-d $param" : "");
+        } else {
+            $repository = ($param ? $param : "");
+        }
     }
     return $repository;
 }
@@ -164,7 +227,11 @@ revctl_keyword_expansion
     my $param = $_[0];
 
     if (defined($param)) {
-        $keyword = ($param ? "-k$param" : "-ko");
+        if ($revctl_system eq "cvs") {
+            $keyword = ($param ? "-k$param" : "-ko");
+        } else {
+            $keyword = "";
+        }
     }
     return $keyword;
 }
@@ -175,7 +242,11 @@ revctl_recursion
     my $param = $_[0];
 
     if (defined($param)) {
-        $recurse = ($param ? "-R" : "");
+        if ($revctl_system eq "cvs") {
+            $recurse = ($param ? "-R" : "");
+        } else {
+            $recurse = ($param ? "" : "--non-recursive");
+        }
     }
     return $recurse;
 }
@@ -186,7 +257,11 @@ revctl_branching
     my $param = $_[0];
 
     if (defined($param)) {
-        $branch = ($param ? "-b" : "");
+        if ($revctl_system eq "cvs") {
+            $branch = ($param ? "-b" : "");
+        } else {
+            $branch = ($param ? $param : "");
+        }
     }
     return $branch;
 }
@@ -197,7 +272,11 @@ revctl_sticky_clear
     my $param = $_[0];
 
     if (defined($param)) {
-        $reset = ($param ? "-A" : "");
+        if ($revctl_system eq "cvs") {
+            $reset = ($param ? "-A" : "");
+        } else {
+            $reset = "";
+        }
     }
     return $reset;
 }
@@ -208,7 +287,11 @@ revctl_exclusive
     my $param = $_[0];
 
     if (defined($param)) {
-        $exclusive = ($param ? '-I!' : "");
+        if ($revctl_system eq "cvs") {
+            $exclusive = ($param ? '-I!' : "");
+        } else {
+            $exclusive = "";
+        }
     }
     return $exclusive;
 }
@@ -290,13 +373,23 @@ make_repository_path
         $login = $proto;
     } else {
         $login = "";
-        $login .= ":$proto:" if ($proto);
-        if ($user) {
-            $login .= $user;
-        } else {
-            $login .= "anonymous";
+        if ($revctl_system eq "cvs") {
+            $login .= ":$proto:" if ($proto);
+            if ($user) {
+                $login .= $user;
+            } else {
+                $login .= "anonymous";
+            }
+            $login .= '@' . ($host ? $host : "localhost") . ':' . ($path ? $path : "/cvs");
+        } elsif ($revctl_system eq "svn") {
+            if ($proto) {
+                $login .= "$proto://";
+            }
+            if ($user) {
+                $login .= "$user@";
+            }
+            $login .= ($host ? $host : "localhost") . ($path ? $path : "/svn");
         }
-        $login .= '@' . ($host ? $host : "localhost") . ':' . ($path ? $path : "/cvs");
     }
     return $login;
 }
@@ -305,37 +398,39 @@ make_repository_path
 sub
 login_to_master
 {
-    my ($login, $cmd, $line, $err, $found);
-    local *CVSPASS;
-
     dprint &print_args(@_);
 
-    if (open(CVSPASS, "$ENV{HOME}/.cvspass")) {
-        $found = 0;
-        while (<CVSPASS>) {
-            chomp($line = $_);
-            if ($line =~ /^$repository/) {
-                $found = 1;
-                last;
+    if ($revctl_system eq "cvs") {
+        my ($login, $cmd, $line, $err, $found);
+        local *CVSPASS;
+
+        if (open(CVSPASS, "$ENV{HOME}/.cvspass")) {
+            $found = 0;
+            while (<CVSPASS>) {
+                chomp($line = $_);
+                if ($line =~ /^$repository/) {
+                    $found = 1;
+                    last;
+                }
+            }
+            close(CVSPASS);
+            if ($found) {
+                dprint "Login not required.\n";
+                return 1;
             }
         }
-        close(CVSPASS);
-        if ($found) {
-            dprint "Login not required.\n";
-            return 1;
+        if (-t STDIN) {
+            $cmd = "/bin/sh -c \"cvs $repository login\"";
+            $err = &talk_to_server("login", $cmd);
+            if ($err) {
+                return 0;
+            }
+        } else {
+            dprint "Performing automated login with an empty password.\n";
+            open(CVSPASS, ">> $ENV{HOME}/.cvspass");
+            print CVSPASS "$repository A\n";
+            close(CVSPASS);
         }
-    }
-    if (-t STDIN) {
-        $cmd = "/bin/sh -c \"cvs -d $repository login\"";
-        $err = &talk_to_server("login", $cmd);
-        if ($err) {
-            return 0;
-        }
-    } else {
-        dprint "Performing automated login with an empty password.\n";
-        open(CVSPASS, ">> $ENV{HOME}/.cvspass");
-        print CVSPASS "$repository A\n";
-        close(CVSPASS);
     }
     return 1;
 }
@@ -348,11 +443,19 @@ find_module_changelog
 
     $pwd = &getcwd();
     $rel_dir = &basename($pwd);
-    $repo = &cat_file("CVS/Repository");
-    while ((! -e "ChangeLog") && $repo && ($repo =~ /\//)) {
-        chdir("..");
-        $rel_dir = &basename(&getcwd()) . "/$rel_dir";
+
+    if ($revctl_system eq "cvs") {
         $repo = &cat_file("CVS/Repository");
+        while ((! -e "ChangeLog") && $repo && ($repo =~ /\//)) {
+            chdir("..");
+            $rel_dir = &basename(&getcwd()) . "/$rel_dir";
+            $repo = &cat_file("CVS/Repository");
+        }
+    } elsif ($revctl_system eq "svn") {
+        while ((! -e "ChangeLog") && (-d ".svn")) {
+            chdir("..");
+            $rel_dir = &basename(&getcwd()) . "/$rel_dir";
+        }
     }
     if (-e "ChangeLog") {
         $rel_dir =~ s!^[^/]*/!!;
@@ -453,7 +556,7 @@ commit_to_master
 
     dprint &print_args(@_);
 
-    $cmd = "/bin/sh -c \"cvs $repository commit $tag -F $logfile " . join(' ', @_) . "\"";
+    $cmd = "/bin/sh -c \"$revctl_cmd $repository commit $tag -F $logfile " . join(' ', @_) . "\"";
     return &talk_to_server("put", $cmd);
 }
 
@@ -478,8 +581,8 @@ update_from_master
             $co .= " $file";
         }
     }
-    $cmd{up} = "/bin/sh -c \"cvs $repository update $reset -Pd $tag $up\"" if ($up || ! $co);
-    $cmd{co} = "/bin/sh -c \"cvs $repository checkout $reset $tag $co\"" if ($co);
+    $cmd{up} = "/bin/sh -c \"$revctl_cmd $repository update $reset -Pd $tag $up\"" if ($up || ! $co);
+    $cmd{co} = "/bin/sh -c \"$revctl_cmd $repository checkout $reset $tag $co\"" if ($co);
 
     $err = &talk_to_server("get", $cmd{co}) if ($cmd{co});
     $err = &talk_to_server("get", $cmd{up}) if ($cmd{up} && ! $err);
@@ -525,7 +628,7 @@ add_new_files
     if (!scalar(@_)) {
         return MEZZANINE_BAD_ADDITION;
     }
-    $cmd = "/bin/sh -c \"cvs $repository add $keyword " . join(' ', @_) . "\"";
+    $cmd = "/bin/sh -c \"$revctl_cmd $repository add $keyword " . join(' ', @_) . "\"";
     return &talk_to_server("add", $cmd);
 }
 
@@ -540,7 +643,7 @@ delete_old_files
     if (!scalar(@_)) {
         return MEZZANINE_BAD_REMOVAL;
     }
-    $cmd = "/bin/sh -c \"cvs $repository remove -f $recurse " . join(' ', @_) . "\"";
+    $cmd = "/bin/sh -c \"$revctl_cmd $repository remove -f $recurse " . join(' ', @_) . "\"";
     return &talk_to_server("remove", $cmd);
 }
 
@@ -552,7 +655,7 @@ query_status
 
     dprint &print_args(@_);
 
-    $cmd = "/bin/sh -c \"cvs $repository status -v " . join(' ', @_) . "\"";
+    $cmd = "/bin/sh -c \"$revctl_cmd $repository status -v " . join(' ', @_) . "\"";
     return &talk_to_server("query_status", $cmd);
 }
 
@@ -563,7 +666,7 @@ query_log
 
     dprint &print_args(@_);
 
-    $cmd = "/bin/sh -c \"cvs $repository log " . join(' ', @_) . "\"";
+    $cmd = "/bin/sh -c \"$revctl_cmd $repository log " . join(' ', @_) . "\"";
     return &talk_to_server("query_log", $cmd);
 }
 
@@ -575,7 +678,7 @@ query_annotation
     dprint &print_args(@_);
 
     $tag = ($tag ? "-r $tag -f" : "");
-    $cmd = "/bin/sh -c \"cvs $repository annotate $tag " . join(' ', @_) . "\"";
+    $cmd = "/bin/sh -c \"$revctl_cmd $repository annotate $tag " . join(' ', @_) . "\"";
     return &talk_to_server("query_annotation", $cmd);
 }
 
@@ -589,7 +692,7 @@ query_diff
     ($t1, $t2) = split(/\s+/, $tag);
     $tag = "-r $t1" if ($t1);
     $tag .= " -r $t2" if ($t2);
-    $cmd = "/bin/sh -c \"cvs $repository diff -N -R -u $tag " . join(' ', @_) . "\"";
+    $cmd = "/bin/sh -c \"$revctl_cmd $repository diff -N -R -u $tag " . join(' ', @_) . "\"";
     return &talk_to_server("query_diff", $cmd);
 }
 
@@ -603,7 +706,7 @@ query_release_diff
     ($t1, $t2) = split(/\s+/, $tag);
     $tag = "-r $t1" if ($t1);
     $tag .= " -r $t2" if ($t2);
-    $cmd = "/bin/sh -c \"cvs $repository rdiff -N -R -u $tag " . join(' ', @_) . "\"";
+    $cmd = "/bin/sh -c \"$revctl_cmd $repository rdiff -N -R -u $tag " . join(' ', @_) . "\"";
     return &talk_to_server("query_rdiff", $cmd);
 }
 
@@ -616,7 +719,7 @@ tag_local_sources
     dprint &print_args(@_);
 
     ($t = $tag) =~ s/^-r //;
-    $cmd = "/bin/sh -c \"cvs $repository tag -F $branch $t " . join(' ', @_) . "\"";
+    $cmd = "/bin/sh -c \"$revctl_cmd $repository tag -F $branch $t " . join(' ', @_) . "\"";
     return &talk_to_server("tag", $cmd);
 }
 
@@ -629,7 +732,7 @@ tag_repository_sources
     dprint &print_args(@_);
 
     ($t = $tag) =~ s/^-r //;
-    $cmd = "/bin/sh -c \"cvs $repository rtag -F $branch $t " . join(' ', @_) . "\"";
+    $cmd = "/bin/sh -c \"$revctl_cmd $repository rtag -F $branch $t " . join(' ', @_) . "\"";
     return &talk_to_server("rtag", $cmd);
 }
 
@@ -657,7 +760,7 @@ import_vendor_sources
     $rtag =~ s/[^-_A-Z0-9]/_/g;
     return MEZZANINE_INVALID_TAG if (! &check_tags($module));
 
-    $cmd = "/bin/sh -c \"cvs $repository import $keyword $exclusive -m 'Import of $module' $module $tag $rtag\"";
+    $cmd = "/bin/sh -c \"$revctl_cmd $repository import $keyword $exclusive -m 'Import of $module' $module $tag $rtag\"";
     $tag = "-r $tag";
     $rtag = "-r $rtag";
     return &talk_to_server("import", $cmd);
@@ -672,6 +775,8 @@ talk_to_server
 {
     if ($revctl_system eq "cvs") {
         return &talk_to_cvs_server(@_);
+    } elsif ($revctl_system eq "svn") {
+        return &talk_to_svn_server(@_);
     } elsif ($revctl_system eq "bk") {
         return &talk_to_bk_server(@_);
     }
@@ -832,6 +937,153 @@ talk_to_bk_server
     my ($type, $cmd) = @_;
 
     return MEZZANINE_UNSPECIFIED_ERROR;
+}
+
+sub
+talk_to_svn_server
+{
+    my ($type, $cmd) = @_;
+    my ($err, $tries, $line);
+    my (@tags, @links, @ignores, @not_found, @removed, @conflicts);
+
+    dprint &print_args(@_);
+
+    for ($tries = 0; (($tries == 0) || ($err == -1)); $tries++) {
+        $err = 0;
+        if (!open(CMD, "$cmd 2>&1 |")) {
+            eprint "Execution of \"$cmd\" failed -- $!";
+            return MEZZANINE_COMMAND_FAILED;
+        }
+        while (<CMD>) {
+            chomp($line = $_);
+            if ($line =~ /^cvs \w+: Diffing/) {
+                dprint "$line\n";
+            } else {
+                print "$line\n";
+            }
+
+            # The following routines do output checking for fatal errors,
+            # non-fatal (retryable) errors, and expected command output
+
+            # First, fatal errors
+            if ($line =~ /^cvs \w+: cannot find password/) {
+                eprint "You must login to the repository first.\n";
+                $err = MEZZANINE_BAD_LOGIN;
+                last;
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: authorization failed: server \S+ rejected access/) {
+                eprint "Your userid or password was not valid\n";
+                $err = MEZZANINE_BAD_LOGIN;
+                last;
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: \S+ requires write access to the repository/) {
+                eprint "You do not have write access to the master repository.\n";
+                $err = MEZZANINE_ACCESS_DENIED;
+                last;
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: no repository/) {
+                eprint "There is no CVS repository here.\n";
+                $err = MEZZANINE_NO_SOURCES;
+            } elsif ($line =~ /^cvs server: cannot find module .(\S+). /) {
+                push @not_found, $1;
+                $err = MEZZANINE_FILE_NOT_FOUND;
+            } elsif ($line =~ /^cvs server: warning: (.+) is not \(any longer\) pertinent/
+                     || $line =~ /^cvs server: warning: newborn (\S+) has disappeared/) {
+                push @removed, $1;
+                if ($cmd =~ /\Q$1\E/) {
+                    # It's only an error if the removed file was specifically requested in the get
+                    $err = MEZZANINE_FILE_REMOVED;
+                }
+            } elsif ($line =~ /^C (.+)$/) {
+                push @conflicts, $1;
+                $err = MEZZANINE_CONFLICT_FOUND;
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: no such tag/
+                     || $line =~ /^cvs \S+: warning: new-born \S+ has disappeared$/) {
+                eprint "$tag is not a valid tag for this file/module\n";
+                $err = MEZZANINE_INVALID_TAG;
+            } elsif ($line =~ /^cvs server: (.+) already exists/ || $line =~ /^cvs server: (.+) has already been entered/) {
+                eprint "$1 already exists.  No need to add it.\n";
+                $err = MEZZANINE_DUPLICATE;
+            } elsif ($line =~ /^cvs server: nothing known about/) {
+                $line =~ s/^cvs server: nothing known about//;
+                if ($type eq "add") {
+                    eprint "You tried to add a file which does not exist locally ($line).\n";
+                    $err = MEZZANINE_BAD_ADDITION;
+                } else {
+                    eprint "You tried to remove a file which does not exist in the repository ($line).\n";
+                    $err = MEZZANINE_BAD_REMOVAL;
+                }
+
+            # Retryable errors
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
+                if ($tries < 10) {
+                    $err = -1;
+                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
+                    sleep 3;
+                } else {
+                    eprint "The CVS server was unreachable.\n";
+                    $err = MEZZANINE_NO_SERVER;
+                    last;
+                }
+            } elsif ($line =~ /^Unknown host (\S+)\.$/) {
+                if ($tries < 10) {
+                    $err = -1;
+                    print "I can't seem to resolve $1.  I'll wait a bit and try again.\n";
+                    sleep 3;
+                } else {
+                    eprint "The CVS server name ($1) does not resolve.\n";
+                    $err = MEZZANINE_NO_SERVER;
+                    last;
+                }
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/
+                     || $line =~ /^cvs \[\w+ aborted\]: end of file from server/) {
+                if ($tries < 10) {
+                    $err = -1;
+                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
+                    sleep 3;
+                } else {
+                    eprint "The CVS server kept crashing.\n";
+                    $err = MEZZANINE_SERVER_CRASH;
+                    last;
+                }
+
+            # Expected output
+            } elsif ($line =~ /^I (.+)$/) {
+                push @ignores, $1;
+            } elsif ($line =~ /^L (.+)$/) {
+                push @links, $1;
+            }
+        }
+        close(CMD);
+        dprint "\"$cmd\" returned $?\n" if ($?);
+    }
+    if ($err == 0 && $? != 0 && $type !~ /^query_r?diff$/) {
+        eprint "An unknown error must have occured, because the command returned $?\n";
+        $err = MEZZANINE_UNSPECIFIED_ERROR;
+    }
+    if ($err) {
+        if ($#conflicts != -1) {
+            eprint "The following files had conflicts:  ", join(" ", @conflicts), "\n";
+        }
+        if ($#not_found != -1) {
+            eprint "The following files/modules were not found in the repository:  ", join(" ", @not_found), "\n";
+        }
+    } else {
+        if ($type eq "query_tags") {
+            if ($#tags >= 0) {
+                print @tags;
+            } else {
+                print "No tags found.\n";
+            }
+        }
+    }
+    if ($#removed != -1) {
+        print "The following files/modules were removed from the repository:  ", join(" ", @removed), "\n";
+    }
+    if ($#links >= 0) {
+        print "The following symbolic links were ignored (not imported):  ", join(" ", @links), "\n";
+    }
+    if ($#ignores >= 0) {
+        print "The following files were ignored (not imported):  ", join(" ", @ignores), "\n";
+    }
+    return ($err);
 }
 
 1;

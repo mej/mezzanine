@@ -381,3 +381,11 @@ Tue Mar 30 18:56:35 2004                        Michael Jennings (mej)
 
 Fixes for older systems.
 ----------------------------------------------------------------------
+Tue Mar 30 21:04:18 2004                        Michael Jennings (mej)
+
+This was the start of subversion support, but I decided I really
+didn't care too much for the design.  But I thought I'd check this in
+anyway since it doesn't seem to break anything.  But I'm going to
+implement the revision control backend in a new and completely
+different way to (hopefully) be a lot easier to extend.
+----------------------------------------------------------------------
