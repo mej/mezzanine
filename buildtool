@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.123 2001/03/20 03:45:36 mej Exp $
+# $Id: buildtool,v 1.124 2001/03/22 00:37:19 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -421,7 +421,7 @@ get_package_stages
     } elsif ($type eq "rpm") {
         return "sbp";
     } elsif ($type eq "module") {
-        return "scp";
+        return "scbp";
     } elsif ($type eq "image") {
         return "s";
     } else {
@@ -1324,7 +1324,7 @@ do_component_stage
                 next;
             }
             # Find matches to pkg-*-*.src.rpm in the SRPMS directory
-            @tmp = &grepdir(/^$pkg-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/, "$builddir/SRPMS");
+            @tmp = &grepdir(sub {/^$pkg-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/}, "$builddir/SRPMS");
             if (scalar(@tmp) > 0) {
                 # Keep the first one
                 $srpm = $tmp[0];
@@ -1510,6 +1510,9 @@ do_build_stage
         }
         nprint "$progname:  Starting build stage for the \"$pkg\" package....  (${\(&get_timestamp())})\n";
 
+        if (! chdir("$builddir/$pkgs->{$pkg}{MODULE}")) {
+            return (BUILDTOOL_PACKAGE_FAILED, "Could not chdir into $builddir/$pkgs->{$pkg}{MODULE} -- $!", 0);
+        }
         if (defined($pkgs->{$pkg}{BINS})) {
             my ($arch, $rpm);
 
@@ -1601,6 +1604,7 @@ do_build_stage
         }
         nprint "$progname:  Build stage for \"$pkg\" is complete.  (${\(&get_timestamp())})\n";
     }
+    chdir($builddir);
     qprint "$progname:  Build stage is now complete.  (${\(&get_timestamp())})\n";
 }
 
@@ -1918,7 +1922,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.123 $ created on $Date: 2001/03/20 03:45:36 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.124 $ created on $Date: 2001/03/22 00:37:19 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.59 2001/03/20 03:45:36 mej Exp $
+# $Id: revtool,v 1.60 2001/03/22 00:37:19 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -897,22 +897,27 @@ BEGIN {
     # Set the mode, first based on executable name...
     if ($0 =~ /(get|co|checkout)$/) {
         $mode = "get";
+        $opt_g = 1;
     } elsif ($0 =~ /(put|ci|commit|checkin)$/) {
         $mode = "put";
+        $opt_p = 1;
     } elsif ($0 =~ /import$/) {
         $mode = "import";
     } elsif ($0 =~ /(ask|query|info)$/) {
         $mode = "query";
     } elsif ($0 =~ /(add|new)$/) {
         $mode = "add";
+        $opt_a = 1;
     } elsif ($0 =~ /(rm|remove|kill|nuke|purge)$/) {
         $mode = "remove";
+        $opt_r = 1;
     } elsif ($0 =~ /rtag$/) {
         $mode = "rtag";
     } elsif ($0 =~ /(tag|label|mark)$/) {
         $mode = "tag";
     } elsif ($0 =~ /reset$/) {
         $mode = "reset";
+        $opt_reset = 1;
     } elsif ($0 =~ /login$/) {
         $mode = "login";
     # ...then on command line options
@@ -954,7 +959,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.59 $ created on $Date: 2001/03/20 03:45:36 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.60 $ created on $Date: 2001/03/22 00:37:19 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
