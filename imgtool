@@ -1,0 +1,450 @@
+#!/usr/bin/perl -w
+#
+# imgtool -- Tool for generating disk images from package lists
+# 
+# Copyright (C) 2000, Craig Ross and Michael Jennings
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies of the Software, its documentation and marketing & publicity
+# materials, and acknowledgment shall be given in the documentation, materials
+# and software packages that this Software was used.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+# $Id: imgtool,v 1.1 2000/08/24 05:10:45 mej Exp $
+#
+
+# Include the Perl Modules we need
+require POSIX;
+require Getopt::Long;
+
+# Constants
+#
+# Return codes for pkgtool
+sub PKGTOOL_SUCCESS()           {0;}
+sub PKGTOOL_FATAL_ERROR()       {1;}
+sub PKGTOOL_SYNTAX_ERROR()      {2;}
+sub PKGTOOL_COMMAND_FAILED()    {3;}
+
+sub PKGTOOL_MISSING_FILES()     {10;}
+sub PKGTOOL_SPEC_ERRORS()       {11;}
+sub PKGTOOL_DEPENDENCIES()      {12;}
+sub PKGTOOL_ARCH_MISMATCH()     {13;}
+sub PKGTOOL_BUILD_FAILURE()     {14;}
+sub PKGTOOL_BAD_MODULE()        {15;}
+
+sub PKGTOOL_TERMINATED()        {50;}
+sub PKGTOOL_CRASHED()           {60;}
+sub PKGTOOL_UNSPECIFIED_ERROR   {127;}
+
+# Return codes for imgtool
+sub IMGTOOL_SUCCESS()           {0;}
+sub IMGTOOL_FATAL_ERROR()       {1;}
+sub IMGTOOL_SYNTAX_ERROR()      {2;}
+sub IMGTOOL_COMMAND_FAILED()    {3;}
+
+sub IMGTOOL_TERMINATED()        {50;}
+sub IMGTOOL_CRASHED()           {60;}
+sub IMGTOOL_UNSPECIFIED_ERROR   {127;}
+
+# Print usage information
+sub
+print_usage_info
+{
+    print "\n";
+    $leader = "$progname $version Usage Information";
+    $underbar = $leader;
+    $underbar =~ s/./-/g;
+    print "$leader\n$underbar\n";
+    print "\n";
+    print "  Syntax:   imgtool [ options ]\n";
+    print "\n";
+    print "    -h --help                        Show this usage information\n";
+    print "    -d --debug                       Turn on debugging\n";
+    print "    -v --version                     Show version and copyright\n";
+    print "    -i --image                       Specify the image directory\n";
+    print "    -D --dir <directory>             Specify one or more directories from which to take packages\n";
+    print "    -a --archive <file>              Create an archive (tarball) of the image when finished\n";
+    print "    -l --list <file>                 Take the package list from \"file\" instead of the command line\n";
+    print "    -t --test                        Test dependencies but do not install packages\n";
+    print "    -k --keep                        Keep the existing root image and add to it\n";
+    print "\n";
+    exit(IMGTOOL_SUCCESS);
+}
+
+# Generate timestamp for debugging/log file
+sub
+get_timestamp
+{
+    return POSIX::strftime("%A, %d %B %Y %H:%M:%S %Z", localtime);
+}
+
+# Report a fatal error
+sub
+fatal_error
+{
+    my $msg = "$progname:  FATAL:  $_[0]";
+
+    print STDERR $msg;
+    exit(IMGTOOL_FATAL_ERROR);
+}
+
+# Debugging output
+sub
+dprintf
+{
+    return if (! $debug);
+    print "[debug:$progname] ";
+    printf @_;
+}
+sub
+dprint
+{
+    my @dbg;
+    my ($f, $l, $s);
+
+    return if (! $debug);
+    @dbg = caller(1);
+    ($f, $l, $s) = @dbg[1, 2, 3];
+    $f =~ s/^.*\/([^\/]+)$/$1/;
+    print "[$f/$l/$s()] ", @_;
+}
+
+# Print an error
+sub
+eprintf
+{
+    print "$progname:  Error:  ";
+    printf @_;
+}
+sub
+eprint
+{
+    print "$progname:  Error:  ", @_;
+}
+
+# Handle a terminate signal
+sub
+handle_signal
+{
+    my $sig = $_[0];
+
+    eprint "Someone sent me a SIG$sig asking me to exit, so I shall.\n";
+    close($GLOBAL_LOG) if ($GLOBAL_LOG);
+    exit IMGTOOL_TERMINATED;
+}
+
+# Handle a fatal signal
+sub
+handle_fatal_signal
+{
+    my $sig = $_[0];
+
+    eprint "Caught fatal signal SIG$sig.  Cleaning up and aborting...\n";
+    close($GLOBAL_LOG) if ($GLOBAL_LOG);
+    exit IMGTOOL_CRASHED;
+}
+
+# Handle a perl warning
+sub
+handle_warning
+{
+    dprint @_;
+}
+
+# Make a directory hierarchy
+sub
+mkdirhier
+{
+    my $dir = $_[0];
+    my @dirs = split("/", $dir);
+    my $path = "";
+
+    dprint "mkdirhier($dir) called.\n";
+    foreach $dir (@dirs) {
+        $path .= "$dir/";
+        if (! -d $path) {
+            dprint "mkdirhier() creating \"$path\"\n";
+            mkdir($path, 0755) || eprint("Unable to create $path -- $!\n");
+        }
+    }
+    dprint "Something went wrong in mkdirhier()!\n" if (! -d $_[0]);
+}
+
+# Emulate rm -rf
+sub
+nuke_tree
+{
+    my $path = $_[0];
+    my @files;
+    local *DIR;
+
+    if ((-d $path) && !(-l $path)) {
+        opendir(DIR, $path) || return 0;
+        @files = readdir(DIR);
+        closedir(DIR);
+        foreach $f (@files) {
+            if ($f ne "." && $f ne "..") {
+                &nuke_tree("$path/$f");
+            }
+        }
+        dprint "Removing directory $path\n";
+        rmdir $path || return 0;
+    } else {
+        dprint "Unlinking $path\n";
+        unlink($path) || return 0;
+    }
+    return 1;
+}
+
+sub
+get_package_list
+{
+    my $filename = $_[0];
+    my ($line, $flags);
+    my @pkgs;
+    local *LISTFILE;
+
+    open(LISTFILE, $filename) || return @pkgs;
+    dprint "Reading package list from $filename\n";
+    while (<LISTFILE>) {
+        $flags = 0;
+        chomp($line = $_);
+        # Skip comments and empty lines
+        next if ($line =~ /^\#/ || $line =~ /^\s*$/);
+
+        # These lines strip leading and trailing whitespace, then grab the contents of
+        # the line before any intervening spaces but after any slashes.
+        $line =~ s/^\s+//;
+        $line =~ s/\s+$//;
+        $line =~ s/^.*\///g;
+        dprint "Looking at $line\n";
+        if ($line =~ /^\S+\s+(-\S+.*)$/) {
+            $flags = $1;
+        }
+        $line =~ s/^(\S+)\s+.*$/$1/;
+
+        # Skip lines with colons (product variables from product files)
+        next if ($line =~ /:/);
+
+        # If we get here, what remains is a package
+        dprint "Got package:  $line\n";
+        push @pkgs, $line;
+        if ($flags) {
+            $flags{$line} = $flags;
+            dprint "Set flags for $line to $flags{$line}\n";
+        }
+    }
+    close(LISTFILE);
+    return @pkgs;
+}
+
+sub
+find_packages
+{
+    my @pkgs = @_;
+    my (@contents, @rpms);
+    local *DIR;
+
+    foreach $dir (@pkgdirs) {
+        my @tmp;
+
+        opendir(DIR, "$dir") || return @rpms;
+        @tmp = grep($_ =~ /(i386|noarch)\.rpm$/, readdir(DIR));
+        closedir(DIR);
+        push @contents, @tmp;
+        foreach $tmp (@tmp) {
+            $path{$tmp} = $dir;
+        }
+    }
+
+    foreach $rpm (@contents) {
+        my ($pkg, $ver, $rel);
+
+        $rpm =~ m/^([^\/]+)-([^-\/]+)-([^-\/]+)$/;
+        ($pkg, $ver, $rel) = ($1, $2, $3);
+        if (!defined($rpm_name{$pkg})) {
+            $rpm_name{$pkg} = $rpm;
+        } elsif ($rpm ne $rpm_name{$pkg}) {
+            eprint "Multiple RPM's found for $pkg:  $rpm (new) vs. $rpm_name{$pkg} (old)\n";
+            if (-t) {
+                my $ans;
+
+                print "Shall I replace the old one with the new one?\n";
+                chomp($ans = <STDIN>);
+                if ($ans =~ /^\s*y(es)?\s*$/i) {
+                    print "Using $rpm for $pkg\n";
+                    $rpm_name{$pkg} = $rpm;
+                } else {
+                    print "Ignoring $rpm\n";
+                }
+            } else {
+                print "I will ignore $rpm\n";
+            }
+        }
+    }
+}
+
+sub
+install_packages
+{
+    my @pkgs = @_;
+    my ($line, $cmd, $rpm, $prog);
+    local *CMD;
+
+    if (! $keep) {
+        &nuke_tree($imagedir);
+        &mkdirhier("$imagedir/var/lib/rpm");
+        system("rpm --initdb --root=$imagedir");
+    }
+
+    foreach $pkg (@pkgs) {
+        if (!defined($rpm_name{$pkg})) {
+            eprint "No package found for $pkg!\n";
+            next;
+        }
+        if ($global_flags || $flags{$pkg}) {
+            $prog = "--program='rpm " . ($global_flags ? $global_flags : "") . ($flags{$pkg} ? $flags{$pkg} : "") . "'";
+        } else {
+            $prog = "";
+        }
+        $rpm = $rpm_name{$pkg};
+        $cmd = "pkgtool $prog --root=$imagedir -ip $path{$rpm}/$rpm";
+
+        open(CMD, "$cmd 2>&1 |") || &fatal_error("Unable to execute pkgtool -- $!\n");
+        print "Installing $pkg ($rpm) from $path{$rpm} into $imagedir....\n";
+        dprint "$cmd\n";
+        while (<CMD>) {
+            chomp($line = $_);
+            if ($line =~ /^\[/) {
+                dprint "$line\n";
+            } elsif ($line !~ /successfully installed/) {
+                eprint "$line\n";
+            }
+        }
+        close(CMD);
+        if ($? != PKGTOOL_SUCCESS) {
+            &fatal_error("Install of $rpm failed (error $?).\n");
+        }
+    }
+    return IMGTOOL_SUCCESS;
+}
+
+sub
+archive_image
+{
+    my $filename = $_[0];
+    my ($line, $cmd, $prog);
+    local *CMD;
+
+    chdir($imagedir);
+    if ($filename =~ /\.(tar\.|t)(gz|Z)$/) {
+        $cmd = "tar --numeric-owner --use-compress-program=gzip -Pcf $filename .";
+    } elsif ($filename =~ /\.(tar\.|t)\.bz2?$/) {
+        $cmd = "tar --numeric-owner --use-compress-program=bzip2 -Pcf $filename .";
+    }
+
+    open(CMD, "$cmd 2>&1 |") || &fatal_error("Unable to execute \"$cmd\" -- $!\n");
+    print "Creating archive file $filename from $imagedir....\n";
+    dprint "$cmd\n";
+    while (<CMD>) {
+        chomp($line = $_);
+        if ($line =~ /^tar:/) {
+            eprint "$line\n";
+        }
+    }
+    close(CMD);
+    if ($?) {
+        &fatal_error("Creation of archive file failed.\n");
+    }
+}
+
+# main() here is basically the same as main() in C
+sub
+main
+{
+    # Set up the basic variables
+    $progname = "imgtool";
+    $version = "1.0";
+
+    # See the Getopt::Long man page for details on the syntax of this line
+    @valid_opts = ("h|help", "v|version", "d|debug", "i|image=s", "D|dir=s", "a|archive=s",
+                   "l|list=s", "t|test", "k|keep");
+    Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
+    Getopt::Long::GetOptions(@valid_opts);
+
+    # Post-parse the options stuff
+    select STDOUT; $| = 1;
+    if ($opt_v) {
+        # Do not edit this variable.  It is updated automatically by CVS when you commit
+        my $rcs_info = 'CVS Revision $Revision: 1.1 $ created on $Date: 2000/08/24 05:10:45 $ by $Author: mej $ ';
+
+        $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
+        $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
+        $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
+        print "\n";
+	print "$progname $version by Michael Jennings <mej\@eterm.org>\n";
+        print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
+        print "  ($rcs_info)\n";
+        print "\n";
+	return IMGTOOL_SUCCESS;
+    } elsif ($opt_h) {
+	&print_usage_info();   # Never returns
+        # This is a really silly way to shut up the "used only once" warnings.
+        $opt_h = $opt_v = $opt_k = $opt_t = 0;
+    }
+
+    $debug = ($opt_d ? $opt_d : 0);
+    $imagedir = ($opt_i ? $opt_i : ($ENV{"IMAGE_DIR"} ? $ENV{"IMAGE_DIR"} : ""));
+    if ($imagedir eq "") {
+        chomp($imagedir = `/bin/pwd`);
+        $imagedir .= "/img";
+    }
+    if ($opt_D) {
+        @pkgdirs = split(/[:\s]/, $opt_D);
+    } else {
+        @pkgdirs = glob('$ENV{BUILD_DIR}/RPMS/*');
+    }
+    $keep = ($opt_k ? 1 : 0);
+    $global_flags = ($opt_t ? "--justdb --noscripts --notriggers" : 0);
+    $archive = ($opt_a ? $opt_a : 0);
+    if ($opt_l) {
+        @pkgs = &get_package_list($opt_l);
+    } else {
+        @pkgs = @ARGV;
+    }
+
+    # Signal handling
+    $SIG{HUP} = 'IGNORE';
+    $SIG{INT} = \&handle_signal;
+    $SIG{TERM} = \&handle_signal;
+    $SIG{QUIT} = \&handle_fatal_signal;
+    $SIG{ILL} = \&handle_fatal_signal;
+    $SIG{ABRT} = \&handle_fatal_signal;
+    $SIG{FPE} = \&handle_fatal_signal;
+    $SIG{SEGV} = \&handle_fatal_signal;
+    $SIG{BUS} = \&handle_fatal_signal;
+    $SIG{TSTP} = \&handle_fatal_signal;
+    $SIG{TTIN} = \&handle_fatal_signal;
+    $SIG{TTOU} = \&handle_fatal_signal;
+    $SIG{__WARN__} = \&handle_warning;
+
+    &find_packages(@pkgs);
+    &install_packages(@pkgs);
+    &archive_image($archive) if ($archive);
+    return IMGTOOL_SUCCESS;
+}
+
+exit &main();
