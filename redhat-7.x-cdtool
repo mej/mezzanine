@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 21 July 2000
 #
-# $Id: redhat-7.x-cdtool,v 1.9 2001/04/23 22:23:34 mej Exp $
+# $Id: redhat-7.x-cdtool,v 1.10 2001/04/26 21:00:39 mej Exp $
 #
 
 PATH=/bin:/usr/bin:/sbin:/usr/sbin
@@ -78,6 +78,10 @@ if [ $IMAGE -eq 1 ]; then
     rm -f $NET.sh
     grep '^Binary' $NET.patch | awk '{print "cp -af "$5" "$3}' > $NET.sh
     sh $NET.sh
+
+    for i in RedHat/base dosutils images ; do
+        test -d $NET/$i && (cd $NET ; tar --exclude CVS -cf - $i) | (cd $CD1 ; tar -xf -)
+    done
 fi
 
 # Generate the hdlist for network-based installs
