@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: CVS.pm,v 1.6 2004/06/28 16:59:17 mej Exp $
+# $Id: CVS.pm,v 1.7 2004/07/13 19:59:42 mej Exp $
 #
 
 package Mezzanine::SCM::CVS;
@@ -56,6 +56,7 @@ my %DEFAULT_VALUES = (
                       "operation" => "",
 
                       # Options
+                      "local_mode" => 0,
                       "recursion" => 1,
                       "file_type" => "auto",
                       "keyword_expansion" => "auto",
@@ -185,6 +186,10 @@ login()
     local *CVSPASS;
 
     dprint &print_args(@_);
+    if ($self->{"local_mode"}) {
+        dprint "Local mode active.  Not logging in.\n";
+        return 1;
+    }
 
     $repository = $self->{"repository"};
     if (! $repository || ($repository !~ /^:pserver:/)) {
@@ -344,6 +349,10 @@ get(@)
     my $err;
 
     dprint &print_args(@_);
+    if ($self->{"local_mode"}) {
+        dprint "Local mode active.  Not performing get() operation.\n";
+        return MEZZANINE_SUCCESS;
+    }
 
     if (!scalar(@files)) {
         push @files, '.';
@@ -399,6 +408,10 @@ put($@)
 
     $author = &create_changelog_author("");
     $entry = &create_changelog_entry($log, $author, "");
+    if (!defined($entry)) {
+        return MEZZANINE_BAD_LOG_ENTRY;
+    }
+
     if ($self->{"update_changelog"}) {
         my $rel_dir = &find_module_changelog();
 
@@ -420,6 +433,10 @@ put($@)
     }
     push @params, "-m", $entry;
 
+    if ($self->{"local_mode"}) {
+        dprint "Local mode active.  Not performing put() operation.\n";
+        return MEZZANINE_SUCCESS;
+    }
     push @params, $self->get_standard_tag_params(0);
     push @params, (($self->{"recursion"}) ? ("-R") : ("-l"));
     return $self->talk_to_server("put", @params, @files);
@@ -430,6 +447,12 @@ add(@)
 {
     my ($self, @files) = @_;
     my @params = ("add");
+
+    dprint &print_args(@_);
+    if ($self->{"local_mode"}) {
+        dprint "Local mode active.  Not performing add() operation.\n";
+        return MEZZANINE_SUCCESS;
+    }
 
     if (!scalar(@files)) {
         return MEZZANINE_BAD_ADDITION;
@@ -450,6 +473,12 @@ remove()
 {
     my ($self, @files) = @_;
     my @params = ("remove", "-f");
+
+    dprint &print_args(@_);
+    if ($self->{"local_mode"}) {
+        dprint "Local mode active.  Not performing remove() operation.\n";
+        return MEZZANINE_SUCCESS;
+    }
 
     if (!scalar(@files)) {
         return MEZZANINE_BAD_REMOVAL;
@@ -552,6 +581,10 @@ tag()
     my @params = ("tag");
 
     dprint &print_args(@_);
+    if ($self->{"local_mode"}) {
+        dprint "Local mode active.  Not performing tag() operation.\n";
+        return MEZZANINE_SUCCESS;
+    }
 
     if (! $self->{"source_tag"}) {
         return MEZZANINE_INVALID_TAG;
@@ -574,6 +607,10 @@ merge()
     my @params;
 
     dprint &print_args(@_);
+    if ($self->{"local_mode"}) {
+        dprint "Local mode active.  Not performing tag() operation.\n";
+        return MEZZANINE_SUCCESS;
+    }
 
     if (!scalar(@files)) {
         push @files, '.';
@@ -643,6 +680,12 @@ imprt()
         }
         push @params, "-m", sprintf("Import of %s", &basename($module));
         push @params, $module, $vendor_tag, $release_tag;
+
+        if ($self->{"local_mode"}) {
+            dprint "Local mode active.  Not performing imprt() operation.\n";
+            return MEZZANINE_SUCCESS;
+        }
+
         $err = $self->talk_to_server("import", @params);
         chdir($cwd);
     }

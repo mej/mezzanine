@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: specgen,v 1.4 2004/05/10 14:47:00 mej Exp $
+# $Id: specgen,v 1.5 2004/07/13 19:59:42 mej Exp $
 #
 
 use strict;
@@ -215,7 +215,7 @@ scan_package(\%)
         my $topdir = shift @filelist;
 
         # Find top-level source directory name.
-        if (!scalar(grep { $_ !~ /^$topdir/ } @filelist)) {
+        if (!scalar(grep { $_ !~ /^\Q$topdir\E/ } @filelist)) {
             if ($topdir ne "$href->{NAME}-$href->{VERSION}") {
                 $href->{"SETUP"} = "-n $topdir";
             }
@@ -235,7 +235,7 @@ scan_package(\%)
                          "FAQ", "NEWS", "MANUAL", "CHANGES", "ChangeLog",
                          "WHATSNEW", "ReleaseNotes", "RELNOTES", "doc", "dox") {
             dprint "Checking for $doc.\n";
-            $href->{"DOCFILES"} .= ' ' . join(' ', grep { $_ =~ /^$doc/ && $_ !~ /\// } @filelist);
+            $href->{"DOCFILES"} .= ' ' . join(' ', grep { $_ =~ /^\Q$doc\E/ && $_ !~ /\// } @filelist);
         }
         $href->{"DOCFILES"} =~ s/^\s*//;
         $href->{"DOCFILES"} =~ s/\s+/ /g;
@@ -369,7 +369,7 @@ main
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.4 $ created on $Date: 2004/05/10 14:47:00 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.5 $ created on $Date: 2004/07/13 19:59:42 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || !scalar(@ARGV)) {
 	&print_usage_info();
     }

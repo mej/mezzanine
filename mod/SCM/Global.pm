@@ -194,24 +194,25 @@ edit_changelog_message($$$)
     my (@stat_info_before, @stat_info_after, @contents);
     local *TMPFILE;
 
-    $banner = "# Mezzanine -- Creating ChangeLog entry.\n"
+    $banner = "\n\n#######################################################################\n"
+        . "#  Cols:  1         2         3         4         5         6         7\n"
+        . "#1234567890123456789012345678901234567890123456789012345678901234567890\n"
+        . "#\n"
+        . "# Mezzanine -- Creating ChangeLog entry.\n"
         . "#\n"
         . "# Author:  $author\n"
         . "#\n"
-        . "# Enter message below.  Lines starting with '#' will be removed.  Note\n"
-        . "# that column 70 is the right margin; use the numbers below as a guide.\n"
-        . "#\n"
-        . "#         1         2         3         4         5         6         7\n"
-        . "#1234567890123456789012345678901234567890123456789012345678901234567890\n"
-        . "#######################################################################\n";
+        . "# Enter message above.  This banner (and below) will be removed.  Note\n"
+        . "# that column 70 is the right margin; use the numbers above as a guide.\n"
+        . "#######################################################################";
 
     if (!open(TMPFILE, ">$temp_logfile_name")) {
         return ($message, "Unable to open $temp_logfile_name -- $!");
     }
-    print TMPFILE "$banner\n";
     if ($message) {
-        print TMPFILE "$message\n";
+        print TMPFILE "$message";
     }
+    print TMPFILE "$banner\n";
     close(TMPFILE);
     @stat_info_before = stat($temp_logfile_name);
 
@@ -231,15 +232,17 @@ edit_changelog_message($$$)
     close(TMPFILE);
     unlink($temp_logfile_name, "$temp_logfile_name~");
 
-    for (my $i = 0; $i < scalar(@contents); $i++) {
-        if ((($i == 0) && ($contents[$i] =~ /^\s*$/))
-            || ($contents[$i] =~ /^\s*\#/)) {
-            splice(@contents, $i, 1);
-            $i--;
-        }
-    }
+    #for (my $i = 0; $i < scalar(@contents); $i++) {
+    #    if ((($i == 0) && ($contents[$i] =~ /^\s*$/))
+    #        || ($contents[$i] =~ /^\s*\#/)) {
+    #        splice(@contents, $i, 1);
+    #        $i--;
+    #    }
+    #}
     $message = join("", @contents);
-    $message =~ s/\s+$//m;
+    $message =~ s/[\n]+\#{10,}.*$//gs;
+    $message =~ s/[ \t]+$//mg;
+    dprint "Changelog message is:\n$message\n";
     return "$message\n";
 }
 
@@ -259,7 +262,14 @@ create_changelog_entry($$$$)
     }
     $entry = &create_changelog_header($author, $format);
     if (! $message) {
-        $message = &edit_changelog_message($message, $author, $format);
+        my @tmp;
+
+        @tmp = &edit_changelog_message($message, $author, $format);
+        $message = $tmp[0];
+        if ($tmp[1]) {
+            eprint "$tmp[1]\n";
+            return undef;
+        }
     }
     if (substr($message, -1, 1) ne "\n") {
         $message .= "\n";
@@ -274,7 +284,14 @@ create_changelog_entry_brief($$$$)
     my ($message, $author, $format) = @_;
 
     if (! $message) {
-        $message = &edit_changelog_message();
+        my @tmp;
+
+        @tmp = &edit_changelog_message($message, $author, $format);
+        $message = $tmp[0];
+        if ($tmp[1]) {
+            eprint "$tmp[1]\n";
+            return undef;
+        }
     }
     return $message;
 }

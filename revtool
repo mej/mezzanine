@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.86 2004/06/28 16:59:17 mej Exp $
+# $Id: revtool,v 1.87 2004/07/13 19:59:42 mej Exp $
 #
 
 use strict;
@@ -76,6 +76,7 @@ print_usage_info
     print "    -x --exclusive           Only commit specified file(s) (or, with no args, don't append ChangeLog)\n";
     print "       --reset               Reset sticky tags, dates, etc. in the current module\n";
     print "       --blind               Do not update before committing (may result in conflicts, use carefully)\n";
+    print "    -L --local               Do not interact with the repository (local mode)\n";
     print "       --savecfg             Save configuration settings for future use\n";
     print "\n";
     exit(0);
@@ -87,18 +88,18 @@ main
 {
     my ($scm, $mode, $retval);
 
-    &mezz_init("revtool", "3.0", "help|h", "version|v", "debug|d",
+    &mezz_init("revtool", "3.0", "help|h", "version|v", "debug|d!",
                "get|g", "put|p", "add|a", "remove|r", "recurse|R!",
                "tag|source-tag|t=s", "import|i", "info|query|I",
                "diff", "stat|status", "log", "annotate|ann|blame",
                "keyword|k=s", "dir|D=s", "exclusive|x!", "init",
                "ttag|target-tag|T=s", "login|l!", "branch|b!",
                "reset!", "blind!", "merge", "message|m=s",
-               "protocol|P=s", "init", "savecfg!");
+               "protocol|P=s", "init", "savecfg!", "local|L!");
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.86 $ created on $Date: 2004/06/28 16:59:17 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.87 $ created on $Date: 2004/07/13 19:59:42 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
@@ -195,7 +196,8 @@ main
                   "recursion" => $OPTION{"recurse"},
                   "reset" => $OPTION{"reset"},
                   "source_tag" => $OPTION{"tag"},
-                  "target_tag" => $OPTION{"ttag"}
+                  "target_tag" => $OPTION{"ttag"},
+                  "local_mode" => $OPTION{"local"}
                  );
     if (defined($OPTION{"exclusive"})) {
         if ($mode eq "import") {

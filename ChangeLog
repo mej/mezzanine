@@ -524,3 +524,11 @@ Mon Jun 28 12:56:50 2004                        Michael Jennings (mej)
 
 Tag/branch/revision-related stuff should be working now.
 ----------------------------------------------------------------------
+Tue Jul 13 15:58:01 2004                        Michael Jennings (mej)
+
+Fixed regexp quoting error in specgen.
+
+Reworked banner and spacing in commit message to be a little more
+friendly and seamless.  Also fixed the gratuitous removal of blank
+lines in the message.
+----------------------------------------------------------------------
