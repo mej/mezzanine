@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.102 2000/09/26 23:32:22 mej Exp $
+# $Id: buildtool,v 1.103 2000/09/27 02:22:06 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -345,7 +345,7 @@ get_var_name
     $var =~ tr/[a-z]/[A-Z]/;
 
     # Commonly shortened variables
-    if ($var =~ /^REV/ || $var =~ /^TAG/) {
+    if ($var =~ /^REV/ || $var eq "TAG") {
         $var = "REVISION";
     } elsif ($var =~ /^REL/) {
         $var = "RELEASE";
@@ -474,14 +474,23 @@ place_file
 sub
 setup_macros
 {
+    my @macro;
+
+    foreach $prod (grep(defined($prods->{$_}{MACROS}), @products)) {
+        push @macros, split(",", $prods->{$prod}{MACROS});
+    }
     foreach $pkg (grep(defined($pkgs->{$_}{MACROS}), @packages)) {
-        my @macros = split(",", $pkgs->{$pkg}{MACROS});
+        push @macros, split(",", $pkgs->{$pkg}{MACROS});
+    }
 
-        foreach $macro (@macros) {
-            my ($name, $expr) = split(/:/, $macro, 2);
+    foreach $macro (@macros) {
+        my ($name, $expr) = split(/:/, $macro, 2);
 
-            $name =~ s/^\%?\{?(\w+)\}?$/\%$1/;
-            dprint "Macro:  $name -> $expr\n";
+        $name =~ s/^\%?\{?(\w+)\}?$/\%$1/;
+        dprint "Macro:  $name -> $expr\n";
+        if (defined($macros_hash{$name})) {
+            eprint "Duplicate macro $name.\n";
+        } else {
             $macros_hash{$name} = $expr;
         }
     }
@@ -1032,6 +1041,9 @@ build_pkgs
     $target = ($main::target ? " --target=$main::target" : ($pkgs->{$pkg}{ARCH} ? " --target=$pkgs->{$pkg}{ARCH}" : ""));
     $prog = "-P '$prog$target'";
     $cmd = "$pkgtool $prog -b -R \"/usr/lib/rpm/rpmrc:$rpmrc\" --root \"$buildroot/$pkg-root\" -s $specfile";
+    if ($pkgs->{$pkg}{TAGFILE}) {
+        $cmd .= " --tagfile $pkgs->{$pkg}{TAGFILE}";
+    }
     dprint "About to run \"$cmd\"\n";
     if (!open(PKGTOOL, "$cmd </dev/null 2>&1 |")) {
         return (1, "Execution of \"$cmd\" failed -- $!", undef);
@@ -1098,6 +1110,9 @@ gen_sources
     $htag = ($htag ? "-t $htag" : "");
     $cmd = ("$pkgtool $prog -g -R \"/usr/lib/rpm/rpmrc:$rpmrc\" --root \"$buildroot/$pkg-root\""
             . " -s $specfile -D $builddir/SOURCES $srcs $htag $rtag");
+    if ($pkgs->{$pkg}{TAGFILE}) {
+        $cmd .= " --tagfile $pkgs->{$pkg}{TAGFILE}";
+    }
     dprint "About to run \"$cmd\"\n";
     if (!open(PKGTOOL, "$cmd </dev/null 2>&1 |")) {
         return (1, "Execution of \"$cmd\" failed -- $!", undef);
@@ -1852,7 +1867,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.102 $ created on $Date: 2000/09/26 23:32:22 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.103 $ created on $Date: 2000/09/27 02:22:06 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

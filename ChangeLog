@@ -835,3 +835,9 @@ Tue Sep 26 16:50:44 2000                        Michael Jennings (mej)
 Enhancements to revtool from Chip Salzenberg <chip@valinux.com>.  This
 closes patch ID's 2-5.
 ----------------------------------------------------------------------
+Tue Sep 26 19:40:16 2000                        Michael Jennings (mej)
+
+buildtool now supports a TAGFILE variable to specify an alternative
+tagfile.  I also tweaked some old code I'd forgotten I had which will
+hopefully work to handle RPM macros.
+----------------------------------------------------------------------
