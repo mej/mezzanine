@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: build_system_design.txt,v 1.8 2001/01/30 02:01:09 mej Exp $
+#  $Id: build_system_design.txt,v 1.9 2001/01/31 21:31:16 mej Exp $
 #
 ########################################################################
 
@@ -181,9 +181,19 @@ files until a complete list of packages is made.  This facilitates the
 creation of layered products while encouraging cooperative reuse of
 the underlying packages.
 
+For instance, an embedded solution product such as VANA (VA NetAttach)
+requires a basic operating system from which to build, but the
+maintainers of VANA should not have to duplicate the effort of the
+distribution team by maintaining their own OS packages.  Therefore,
+the VANA product file can reference the base OS as a sub-product and
+add/replace packages from it as needed.  This way, VANA automatically
+incorporates the latest distribution work with no additional effort on
+the part of the VANA maintainers, who can thus focus their attention
+and expertise where it is most appropriate:  VANA itself.
+
 The sole purpose of buildtool is to create products from individual
 packages.  However, it should be as flexible as possible in doing so,
-leaving as much flexibility in the hands of the developer as it can.
+leaving as much power in the hands of the developer as it can.
 Specifically, builds should be distributable and parallelizable.
 
 2.6.  Additional Utilities
