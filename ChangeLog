@@ -813,3 +813,8 @@ Wed Sep 13 16:53:11 2000                        Michael Jennings (mej)
 
 pkgsort is now fully working.  Just in time too.
 ----------------------------------------------------------------------
+Wed Sep 20 12:06:25 2000                        Michael Jennings (mej)
+
+Added a cache, faster dependency checking, and handling for multi-
+level circular dependencies.
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgsort,v 1.5 2000/09/13 23:55:09 mej Exp $
+# $Id: pkgsort,v 1.6 2000/09/20 18:47:28 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -273,6 +273,7 @@ find_packages
     foreach $rpm (@contents) {
         my ($srpm, $spkg, $pkg, $ver, $rel);
 
+        next if ($have_cache{"$path{$rpm}/$rpm"});
         $rpm =~ m/^([^\/]+)-([^-\/]+)-([^-\/]+)\.\w+\.rpm$/;
         $pkg = $1;
         $srpm = &get_srpm_for_rpm($rpm);
@@ -346,6 +347,7 @@ pkg_depends_on
 sub
 pkg_add_dep
 {
+    return if ($_[0] eq $_[1]);
     push @{$requires{$_[0]}}, $_[1] if (! &pkg_depends_on($_[0], $_[1], 1));
     xpush @{$what_requires{$_[1]}}, $_[0];
 }
@@ -403,6 +405,7 @@ query_packages
         foreach $rpm (@{$rpm_list{$pkg}}) {
             $cmd = "pkgtool -qd -p $path{$rpm}/$rpm";
 
+            next if ($have_cache{"$path{$rpm}/$rpm"});
             open(CMD, "$cmd 2>&1 |") || &fatal_error("Unable to execute pkgtool -- $!\n");
             if ($debug) {
                 dprint "$cmd\n";
@@ -420,7 +423,6 @@ query_packages
                     $line =~ s/^\w+:  \s*//;
                     $line =~ s/\s+[-=<>lteqng]+\s+\S+$//;
                     $line =~ s/^\s+//;  $line =~ s/\s+$//;
-                    next if ($pkg eq $line);
                     &pkg_add_dep($pkg, $line);
                 } else {
                     eprint "$line\n";
@@ -441,12 +443,10 @@ query_packages
             my $file = $provides{$pkg}[$i];
             my $found = 0;
 
-            foreach $p (@pkgs) {
-                if (&pkg_depends_on($p, $file)) {
-                    dprint "Found package $p which requires $file\n";
-                    $found = 1;
-                    last;
-                }
+            if (scalar(@{$what_requires{$file}})) {
+                dprint "Found package $what_requires{$file}[0] which requires $file\n";
+                $found = 1;
+                last;
             }
             if ($found) {
                 $i++;  # Keep this one and go on to the next one.
@@ -461,23 +461,84 @@ query_packages
             delete $provides{$pkg};
         }
     }
+}
 
-    if ($debug) {
-        foreach $pkg (sort keys %provides) {
-            dprint "Package $pkg provides:  ", join(", ", @{$provides{$pkg}}), "\n";
-        }
-        foreach $pkg (sort keys %requires) {
-            dprint "Package $pkg requires:  ", join(", ", @{$requires{$pkg}}), "\n";
-        }
+sub
+write_cache
+{
+    my @pkgs = @_;
+    local *CACHE;
 
-        foreach $cap (sort keys %what_provides) {
-            dprint "Packages providing $cap:  ", join(", ", @{$what_provides{$cap}}), "\n";
+    open(CACHE, ">$ENV{HOME}/.pkgsort.cache") || return;
+    foreach $pkg (@pkgs) {
+        print CACHE "S:$pkg/$src_package{$pkg}/$src_rpm{$src_package{$pkg}}/$src_version{$pkg}/$src_release{$pkg}\n";
+        foreach $rpm (@{$rpm_list{$pkg}}) {
+            @s = stat("$path{$rpm}/$rpm");
+
+            print CACHE "F:$pkg:$path{$rpm}/$rpm:$s[9]\n";
         }
-        foreach $pkg (sort keys %what_requires) {
-            dprint "Packages requiring $pkg:  ", join(", ", @{$what_requires{$pkg}}), "\n";
+        print "P:$pkg/", join("/", @{$provides{$pkg}}), "\n";
+        print "R:$pkg/", join("/", @{$requires{$pkg}}), "\n";
+    }
+    close(CACHE);
+}
+
+sub
+read_cache
+{
+    my ($line, $pkg, $skip, $dep);
+    my (@inp, @fstat);
+    local *CACHE;
+
+    open(CACHE, "<$ENV{HOME}/.pkgsort.cache") || return;
+    $skip = 0;
+    while (<CACHE>) {
+        chomp($line = $_);
+        next if ($skip && $line !~ /^S/);
+        if ($line =~ /^S:([^\/]+)\//) {
+            $skip = 0;
+            $pkg = $1;
+            @inp = split("/", $line);
+            dprint "Found cache data for $pkg\n";
+            $src_package{$pkg} = $inp[1];
+            $src_rpm{$inp[1]} = $inp[2];
+            $src_version{$pkg} = $inp[3];
+            $src_release{$pkg} = $inp[4];
+            xpush @{$bin_packages{$inp[1]}}, $pkg;
+        } elsif ($line =~ /^F:/) {
+            @inp = split(":", $line);
+            $pkg = $inp[1];
+            if (!(@fstat = stat($inp[2])) || ($fstat[9] > $inp[3])) {
+                dprint "Cache data for $inp[2] ($pkg) is outdated.\n";
+                delete $src_version{$pkg};
+                delete $src_release{$pkg};
+                $skip = 1;
+            } else {
+                $have_cache{$inp[2]} = 1;
+            }
+            $inp[1] =~ m/^(.*)\/([^\/]+)$/;
+            $rpm = $2;
+            ($path{$2}, $rpm) = ($1, $2);
+            xpush @{$rpm_list{$pkg}}, $rpm;
+        } elsif ($line =~ /^P:([^\/]+)\//) {
+            $pkg = $1;
+            @inp = split("/", $line);
+            shift @inp;
+            dprint "Package $pkg provides:  ", join(", ", @inp), "\n";
+            foreach $dep (@inp) {
+                &pkg_add_cap($pkg, $dep);
+            }
+        } elsif ($line =~ /^R:([^\/]+)\//) {
+            $pkg = $1;
+            @inp = split("/", $line);
+            shift @inp;
+            dprint "Package $pkg requires:  ", join(", ", @inp), "\n";
+            foreach $dep (@inp) {
+                &pkg_add_dep($pkg, $dep);
+            }
         }
     }
-    return PKGSORT_SUCCESS;
+    close(CACHE);
 }
 
 sub
@@ -617,6 +678,11 @@ verify_list
                 my $tmp;
 
                 dprint "Dependency order error:  $pkgs[$i] ($i) depends on $pkgs[$j] ($j)\n";
+                if (defined($dep_error{"$pkgs[$i]/$pkgs[$j]"})) {
+                    eprint "Multi-level circular dependency detected.  Crap.\n";
+                    return (0, @pkgs);
+                }
+                $dep_error{"$pkgs[$i]/$pkgs[$j]"} = 1;
                 $changes++;
                 $tmp = splice(@pkgs, $j, 1);
                 splice(@pkgs, $i, 0, $tmp);
@@ -700,7 +766,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.5 $ created on $Date: 2000/09/13 23:55:09 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.6 $ created on $Date: 2000/09/20 18:47:28 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -778,11 +844,13 @@ main
     $SIG{TTOU} = \&handle_fatal_signal;
     $SIG{__WARN__} = \&handle_warning;
 
+    &read_cache();
     @pkgs = &find_packages(@pkgs);
     if ($sort_method eq "p" || $sort_method eq "d") {
         &query_packages(@pkgs);
     }
     @pkgs = &sort_packages(@pkgs);
+    &write_cache(@pkgs);
     &show_packages(@pkgs);
     return PKGSORT_SUCCESS;
 }
