@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.14 2002/02/26 20:14:21 mej Exp $
+# $Id: RevCtl.pm,v 1.15 2002/02/26 20:16:35 mej Exp $
 #
 
 package Mezzanine::RevCtl;
@@ -405,14 +405,17 @@ do_changelog_entry
 
     $rel_dir = &find_module_changelog();
     dprint "Got relative directory \"$rel_dir\"\n";
-    if ($rel_dir && ($rel_dir ne ".") && scalar(@ARGV)) {
-        my @tmp = @ARGV;
+    if ($rel_dir && ($rel_dir ne ".")) {
+        if (scalar(@ARGV)) {
+            my @tmp = @ARGV;
 
-        dprint "Checking relative paths for arguments...\n";
-        @ARGV = ();
-        foreach my $tmp (@tmp) {
-            dprint "Updating argument path:  $tmp -> $rel_dir/$tmp\n";
-            push @ARGV, "$rel_dir/$tmp";
+            @ARGV = ();
+            foreach my $tmp (@tmp) {
+                dprint "Updating argument path:  $tmp -> $rel_dir/$tmp\n";
+                push @ARGV, "$rel_dir/$tmp";
+            }
+        } else {
+            push @ARGV, $rel_dir;
         }
     }
     if (! -f "ChangeLog") {
