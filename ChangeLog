@@ -638,3 +638,8 @@ Wed Jul 12 16:10:43 2000                        Michael Jennings (mej)
 
 Minor buglet of no consequence.
 ----------------------------------------------------------------------
+Wed Jul 12 16:50:15 2000                        Michael Jennings (mej)
+
+Doh!  Stupid omission on my part.  This should work much better for
+recursive product parsing.
+----------------------------------------------------------------------

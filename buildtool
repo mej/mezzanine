@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.86 2000/07/12 23:02:55 mej Exp $
+# $Id: buildtool,v 1.87 2000/07/12 23:42:47 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -543,7 +543,7 @@ sub
 find_product_file
 {
     my ($prodname, $prodver) = @_;
-    my $prod = "$prodname-$prodver";
+    my $prod = ($prodver ? "$prodname-$prodver" : $prodname);
     my $prodfile;
     my @contents;
     local *PRODFILE;
@@ -719,6 +719,7 @@ parse_product_entry
         } elsif ($name =~ /^(\S+)-((?:\d|us|a|alpha|b|beta)[^-]+)$/) {
             ($pname, $pver) = ($1, $2);
         } else {
+            $pname = $name;
             $pver = 0;
         }
 
@@ -844,7 +845,7 @@ parse_prod_file
 {
     my ($prodname, $prodver) = @_;
     my ($prodfile, $skip_to_name, $skip_to_next_ver, $found, $line);
-    my $prod = "$prodname-$prodver";
+    my $prod = $prodname;
     local *PROD;
 
     dprint "parse_prod_file($prodname, $prodver)\n";
@@ -886,8 +887,8 @@ parse_prod_file
                 } else {
                     dprint "parse_prod_file():  No product version given.  Using first entry:  $line\n";
                     $prodver = $line;
-                    $prod = "$prodname-$prodver";
                 }
+                $prod = "$prodname-$prodver";
                 ($found, $skip_to_next_ver) = (1, 0);
                 push @products, $prod;
                 next;
@@ -1796,7 +1797,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.86 $ created on $Date: 2000/07/12 23:02:55 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.87 $ created on $Date: 2000/07/12 23:42:47 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1831,21 +1832,23 @@ main
     $verbosity = ($opt_Q ? 0 : ($opt_q ? 1 : 2));
     $target = ($opt_t ? $opt_t : 0);
     $start_stage = ($opt_B ? $opt_B : "s");
-    if (index("scexbpia", $start_stage) == -1) {
+    if (index("Zscexbpia", $start_stage) == -1) {
         eprint "Bad start stage \"$start_stage\".  Assuming \"s\".\n";
         $start_stage = "s";
     }
     $end_stage = ($opt_b ? $opt_b : "p");
-    if (index("scexbpia", $end_stage) == -1) {
-        eprint "Bad end stage \"$end_stage\".  Assuming \"p\".\n";
-        $end_stage = "p";
-    } elsif (index("scexbpia", $start_stage) > index("scexbpia", $end_stage)) {
-        # FIXME:  This means people couldn't use, say, -Bx -be.  Oh well.
-        eprint "End stage \"$end_stage\" comes before start stage \"$start_stage\".\n";
-        $start_stage = "s";
-        $end_stage = "p";
+    if ($end_stage ne "Z") {
+        if (index("scexbpia", $end_stage) == -1) {
+            eprint "Bad end stage \"$end_stage\".  Assuming \"p\".\n";
+            $end_stage = "p";
+        } elsif (index("scexbpia", $start_stage) > index("scexbpia", $end_stage)) {
+            # FIXME:  This means people couldn't use, say, -Bx -be.  Oh well.
+            eprint "End stage \"$end_stage\" comes before start stage \"$start_stage\".\n";
+            $start_stage = "s";
+            $end_stage = "p";
+        }
+        dprint "Building stages \"$start_stage\" through \"$end_stage\"\n";
     }
-    dprint "Building stages \"$start_stage\" through \"$end_stage\"\n";
     if ($opt_master) {
         $slave = 1;
         $master = 0;
