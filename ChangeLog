@@ -299,3 +299,10 @@ Wed Jun  7 15:23:09 2000                        Michael Jennings (mej)
 
 Head branch for the howto package.
 ----------------------------------------------------------------------
+Wed Jun  7 17:15:05 2000                        Michael Jennings (mej)
+
+Well, the code for the last 3 stages is complete, in that all the
+pieces are in place.  We still need to test and debug them of course,
+which is going to require some more CVS-fu and product file magic on
+my part.  Stay tuned.
+----------------------------------------------------------------------

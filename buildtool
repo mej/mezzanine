@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.40 2000/06/07 02:48:04 mej Exp $
+# $Id: buildtool,v 1.41 2000/06/08 00:04:24 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -284,6 +284,7 @@ spawn_cmd
             $slave = 1;
             $master = 0;
             $opt_master = 0;
+            $opt_b = "p" if ($opt_b eq "i" || $opt_b eq "a");
             close $GLOBAL_LOG if ($GLOBAL_LOG);
             open(STDOUT, ">/dev/null");
             open(STDIN, "</dev/null");
@@ -333,6 +334,8 @@ get_var_name
         $var = "PATCHES";
     } elsif ($var =~ /^LOC/) {
         $var = "LOCATIONS";
+    } elsif ($var =~ /^DESC/) {
+        $var = "DESCRIPTION";
     }
     return $var;
 }
@@ -343,12 +346,14 @@ get_package_stages
 {
     my $type = $_[0];
 
-    if ($type eq "rpm") {
-        return "sbpia";
+    if ($type eq "srpm") {
+        return "sbpa";
+    } elsif ($type eq "rpm") {
+        return "sbpa";
     } elsif ($type eq "module") {
-        return "scpia";
+        return "scpa";
     } elsif ($type eq "image") {
-        return "sa";
+        return "sia";
     } else {
         return "scebpia";
     }
@@ -356,12 +361,121 @@ get_package_stages
 
 # Find the proper location within the image for an output file
 sub
-get_package_location
+place_file
 {
     my ($pkg, $file) = @_;
-    my ($wildcard, $location);
+    my $found = 0;
 
-    
+    dprint "place_file(\"$pkg\", \"$file\") called.\n";
+    foreach $location (split(",", $pkgs->{$pkg}{LOCATIONS})) {
+        my ($regex, $stop, $dest, $image, $subdir);
+
+        # Format is:  /regexp/.path  where . is some delimiter character that
+        # tells us whether to check other locations or stop once we match.
+        dprint "Testing location \"$location\"\n";
+        if ($location !~ m/^\/([^\/]+)\/(.)(\S+)$/) {
+            eprint "Location specifier \"$location\" is invalid.\n";
+            next;
+        }
+        ($regex, $stop, $dest) = ($1, $2, $3);
+        next if ($file !~ $regex);  # No match.  Try next location
+        dprint "Match found.\n";
+        ($image = $dest) =~ s/^([^\/]+)\/.*$/$1/;
+        if (!defined($pkgs->{$image}{TYPE}) || ($pkgs->{$image}{TYPE} ne "image")) {
+            qprint "Warning:  Destination \"$dest\" is not a package of type \"image\".\n";
+        }
+        if (substr($dest, -3, 3) ne substr($file, -3, 3)) {
+            my $tmp;
+
+            ($tmp = $file) =~ s/^.*\/([^\/]+)$/$1/;
+            $dest = "$dest/$tmp";
+        }
+        dprint "Linking $dest to $file\n";
+        if (!link($file, $dest)) {
+            &fail_package($pkg, "package accumulation", "Unable to hard-link to $file from $dest -- $!\n");
+            return $found;
+        }
+        $found++;
+        last if ($stop eq "=");
+        dprint "Non-exclusive match.  Continuing on....\n";
+    }
+    return $found;
+}
+
+# Do the initial directory/file creation stuff.  Used to be in the
+# bootstrap stage, but it's not parallel-safe.
+sub
+initial_setup
+{
+    if (! -d "$builddir") {
+        # There is a race condition here in the parallel build.
+        if (!mkdir("$builddir", 0755)) {
+            &fatal_error("Cannot create $builddir -- $!\n");
+        }
+        foreach $dir ("BUILD", "SRPMS", "RPMS", "SPECS", "SOURCES") {
+            mkdir("$builddir/$dir", 0755);
+        }
+    }
+    if (-f "$ENV{HOME}/.rpmmacros" && -s _) {
+        $rpmmacros = "$ENV{HOME}/.rpmmacros";
+    } else {
+        $rpmmacros = "$basedir/rpmmacros";
+        if (!(-f "$basedir/rpmmacros" && -s _)) {
+            # Create basic rpmmacros
+            open(RPMMACROS, ">$rpmmacros") || &fatal_error("Cannot create $rpmmacros -- $!\n");
+            print RPMMACROS "\%_topdir        $builddir\n";
+            print RPMMACROS "\%distribution   $prods->{$prod}{DISTRIBUTION}\n" if ($prods->{$prod}{DISTRIBUTION});
+            print RPMMACROS "\%packager       $prods->{$prod}{PACKAGER}\n" if ($prods->{$prod}{PACKAGER});
+            print RPMMACROS "\%vendor         $prods->{$prod}{VENDOR}\n" if ($prods->{$prod}{VENDOR});
+            close(RPMMACROS);
+        }
+    }
+    if (-f "$ENV{HOME}/.rpmrc" && -s _) {
+        $rpmrc = "$ENV{HOME}/.rpmrc";
+    } else {
+        $rpmrc = "$basedir/rpmrc";
+        if (!(-f "$basedir/rpmrc" && -s _)) {
+            # Create basic rpmrc
+            open(RPMRC, ">$rpmrc") || &fatal_error("Cannot create $rpmrc -- $!\n");
+            print RPMRC "optflags:   i386 $ENV{CFLAGS}\n";
+            print RPMRC "optflags:   i486 $ENV{CFLAGS}\n";
+            print RPMRC "optflags:   i586 $ENV{CFLAGS}\n";
+            print RPMRC "optflags:   i686 $ENV{CFLAGS}\n";
+            print RPMRC "macrofiles: /usr/lib/rpm/macros:/usr/lib/rpm/%{_target}/macros:/etc/rpm/macros.specspo:",
+                         "/etc/rpm/macros:/etc/rpm/%{_target}/macros:~/.rpmmacros:$rpmmacros\n";
+            close(RPMRC);
+        }
+    }
+}
+
+# Emulate rm -rf
+sub
+nuke_tree
+{
+    my $path = $_[0];
+    my @files;
+    local *DIR;
+
+    if (-d $path) {
+        opendir(DIR, $path) || return 0;
+        @files = readdir(DIR);
+        closedir(DIR);
+        foreach $f (@files) {
+            if (-d "$path/$f") {
+                &nuke_tree("$path/$f") || return 0;
+            } else {
+                dprint "Unlinking $path/$f\n";
+                # Not yet
+                # unlink("$path/$f") || return 0;
+            }
+        }
+        dprint "Removing directory $path\n";
+        #rmdir $path || return 0;
+    } else {
+        dprint "Unlinking $path/$f\n";
+        # unlink("$path/$f") || return 0;
+    }
+    return 1;
 }
 
 # Locate the product file for a particular product
@@ -652,7 +766,7 @@ parse_product_entry
         $pkgs->{$name}{STAGES} = &get_package_stages($type);
     }
     push @packages, $name;
-    $pkgs->{$name}{PRODUCT} = $prod;
+    $pkgs->{$name}{PRODUCT} = ($prod ? $prod : "unknown-product");
     dprint "parse_product_entry():  Parent product of $name set to $prod.  I'm done, returning 1.\n";
     return 1;
 }
@@ -888,42 +1002,6 @@ do_bootstrap_stage
     }
 
     qprint "$progname:  Entering the bootstrap stage.  (${\(&get_timestamp())})\n";
-    if (! -d "$builddir") {
-        mkdir("$builddir", 0755) || &fatal_error("Cannot create $builddir -- $!\n");
-        foreach $dir ("BUILD", "SRPMS", "RPMS", "SPECS", "SOURCES") {
-            mkdir("$builddir/$dir", 0755);
-        }
-    }
-    if (-f "$ENV{HOME}/.rpmmacros" && -s _) {
-        $rpmmacros = "$ENV{HOME}/.rpmmacros";
-    } else {
-        $rpmmacros = "$basedir/rpmmacros";
-        if (!(-f "$basedir/rpmmacros" && -s _)) {
-            # Create basic rpmmacros
-            open(RPMMACROS, ">$rpmmacros") || &fatal_error("Cannot create $rpmmacros -- $!\n");
-            print RPMMACROS "\%_topdir        $builddir\n";
-            print RPMMACROS "\%distribution   $prods->{$prod}{DISTRIBUTION}\n" if ($prods->{$prod}{DISTRIBUTION});
-            print RPMMACROS "\%packager       $prods->{$prod}{PACKAGER}\n" if ($prods->{$prod}{PACKAGER});
-            print RPMMACROS "\%vendor         $prods->{$prod}{VENDOR}\n" if ($prods->{$prod}{VENDOR});
-            close(RPMMACROS);
-        }
-    }
-    if (-f "$ENV{HOME}/.rpmrc" && -s _) {
-        $rpmrc = "$ENV{HOME}/.rpmrc";
-    } else {
-        $rpmrc = "$basedir/rpmrc";
-        if (!(-f "$basedir/rpmrc" && -s _)) {
-            # Create basic rpmrc
-            open(RPMRC, ">$rpmrc") || &fatal_error("Cannot create $rpmrc -- $!\n");
-            print RPMRC "optflags:   i386 $ENV{CFLAGS}\n";
-            print RPMRC "optflags:   i486 $ENV{CFLAGS}\n";
-            print RPMRC "optflags:   i586 $ENV{CFLAGS}\n";
-            print RPMRC "optflags:   i686 $ENV{CFLAGS}\n";
-            print RPMRC "macrofiles: /usr/lib/rpm/macros:/usr/lib/rpm/%{_target}/macros:/etc/rpm/macros.specspo:",
-                         "/etc/rpm/macros:/etc/rpm/%{_target}/macros:~/.rpmmacros:$rpmmacros\n";
-            close(RPMRC);
-        }
-    }
     foreach $pkg (@p) {
         if ($pkgs->{$pkg}{STAGES} !~ /s/) {
             nprint "$progname:  Skipping bootstrap stage for the \"$pkg\" package.\n";
@@ -985,8 +1063,7 @@ do_compose_stage
     qprint "$progname:  Entering the compose stage.  (${\(&get_timestamp())})\n";
     chomp($cwd = `pwd`);
 
-    # No compose stage for package files since they're *already* package files....
-    foreach $pkg (grep $pkgs->{$_}{TYPE} eq "module", @p) {
+    foreach $pkg (@p) {
         if ($pkgs->{$pkg}{STAGES} !~ /c/) {
             nprint "$progname:  Skipping compose stage for the \"$pkg\" package.\n";
             next;
@@ -1342,14 +1419,6 @@ do_package_stage
 
     qprint "$progname:  Entering the package accumulation stage.  (${\(&get_timestamp())})\n";
 
-    # FIXME:  The prod files should specify this
-    #if (! -d "$basedir/$prod") {
-    #    mkdir("$basedir/$prod", 0755) || &fatal_error("Cannot create $basedir/$prod -- $!\n");
-    #    foreach $dir ("SRPMS", "RPMS") {
-    #        mkdir("$basedir/$prod/$dir", 0755);
-    #    }
-    #}
-    
     foreach $pkg (@p) {
         if ($pkgs->{$pkg}{STAGES} !~ /p/) {
             nprint "$progname:  Skipping package accumulation stage for the \"$pkg\" package.\n";
@@ -1394,17 +1463,16 @@ do_package_stage
         }
         dprint "Output files for $pkg:  ", join(" ", @outfiles), "\n";
 
-        # For now, just punt here.
-        next;
-
         # Move each RPM into the appropriate place
         foreach $rpm (@outfiles) {
-            ($path = $rpm) =~ s/^\S+\/(S?RPMS\/)/$1/;  # Get only the names of the subdirectories
-            $path =~ s/\/([^\/]+)$//;
-            $path = "$basedir/$prod/$path";
-            dprint "Path is \"$path\"\n";
-            &mkdirhier("$path");
-            system("cp $rpm $path/");
+            my $found;
+
+            $found = &place_file($pkg, $rpm);
+            if ($found == 0) {
+                qprint "Warning:  No location found matching $rpm\n";
+            } else {
+                dprint "Found $found locations for $rpm\n";
+            }
         }
         nprint "$progname:  Package accumulation stage for \"$pkg\" is complete.\n";
     }
@@ -1415,6 +1483,8 @@ sub
 do_iso_stage
 {
     my @p;
+    my ($cmd, $desc, $label, $iso, $prod, $line, $err);
+    local *MKHYBRID;
 
     if ($#_ >= 0) {
         @p = @_;
@@ -1430,6 +1500,40 @@ do_iso_stage
         }
         nprint "$progname:  Starting ISO image stage for the \"$pkg\" package....\n";
 
+        $prod = $pkgs->{$pkg}{PRODUCT};
+        if ($pkgs->{$pkg}{DESCRIPTION}) {
+            $desc = $pkgs->{$pkg}{DESCRIPTION};
+        } else {
+            $desc = $prod;
+        }
+        if ($pkgs->{$pkg}{LABEL}) {
+            $label = $pkgs->{$pkg}{LABEL};
+        } else {
+            ($label = $prod) =~ s/-/_/g;
+        }
+        if ($pkgs->{$pkg}{ISO}) {
+            $iso = $pkgs->{$pkg}{ISO};
+        } else {
+            $iso = "$prod.iso";
+        }
+
+        $cmd = "mkhybrid -o $iso -a -A \"$desc\" -V \"$label\" -r -h -j -J -v $pkg";
+        dprint "About to run \"$cmd\"\n";
+        if (!open(MKHYBRID, "$cmd </dev/null 2>&1 |")) {
+            &fail_package($pkg, "iso", "Execution of \"$cmd\" failed -- $!");
+            next;
+        }
+        $err = 0;
+        while (<MKHYBRID>) {
+            chomp($line = $_);
+            nprint "$line\n";
+        }
+        close(MKHYBRID);
+        dprint "\"$cmd\" returned $?\n";
+        if ($? != 0 && $err == 0) {
+            &fail_package($pkg, "iso", "Unhandled error from mkhybrid");
+        }
+
         nprint "$progname:  ISO image stage for \"$pkg\" is complete.\n";
     }
     qprint "$progname:  ISO image stage is now complete.  (${\(&get_timestamp())})\n";
@@ -1438,24 +1542,24 @@ do_iso_stage
 sub
 do_cleanup_stage
 {
-    my @p;
-
-    if ($#_ >= 0) {
-        @p = @_;
-    } else {
-        @p = @packages;
-    }
-
     qprint "$progname:  Entering the cleanup stage.  (${\(&get_timestamp())})\n";
-    foreach $pkg (@p) {
+    foreach $pkg (@packages) {
         if ($pkgs->{$pkg}{STAGES} !~ /a/) {
             nprint "$progname:  Skipping cleanup stage for the \"$pkg\" package.\n";
             next;
         }
         nprint "$progname:  Starting cleanup stage for the \"$pkg\" package....\n";
 
+        # Cleanup time.  First the module directory if it still exists.
+        if (-d $pkgs->{$pkg}{MODULE}) {
+            &nuke_tree($pkgs->{$pkg}{MODULE}) || qprint "Warning:  Cleanup of $pkg failed -- $!\n";
+        }
         nprint "$progname:  Cleanup stage for \"$pkg\" is complete.\n";
     }
+    foreach $f ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SPECS", "$basedir/rpmrc", "$basedir/rpmmacros") {
+        &nuke_tree($f) || qprint "Warning:  Removal of $f failed -- $!\n";
+    }
+
     qprint "$progname:  Cleanup stage is now complete.  (${\(&get_timestamp())})\n";
 }
 
@@ -1548,7 +1652,7 @@ parallel_build
                 @tmp = <ERRLOG>;
                 close(ERRLOG);
                 chomp($line = $tmp[$#tmp]);
-                if ($line =~ /^$progname:  Error:  Package \S+ failed at the [a-z ]+ stage:  (.*)$/) {
+                if ($line =~ /^$progname:  Error:  Package \S+ failed at the ([a-z ]+) stage:  (.*)$/) {
                     &fail_package($pkg, $1, $2);
                 } else {
                     $line =~ s/^\w+:  (Error:  )?\s*//;
@@ -1559,6 +1663,12 @@ parallel_build
         # End of loop.  Time to spawn the next child.
     }
     qprint "$progname:  Parallel build complete.  (${\(&get_timestamp())})\n";
+
+    # Finish up the non-parallelized stages.
+    if ($opt_b eq "i" || $opt_b eq "a") {
+        &do_iso_stage();
+        &do_cleanup_stage() if ($opt_b eq "a");
+    }
 }
 
 # This routine does the actual build process
@@ -1604,7 +1714,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.40 $ created on $Date: 2000/06/07 02:48:04 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.41 $ created on $Date: 2000/06/08 00:04:24 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1710,6 +1820,7 @@ main
     dprint "Products to be built:  ", join(" ", @products), "\n";
 
     if ($opt_b ne "Z") {  # -dbZ, a.k.a. How To Debug the Parser :-)
+        &initial_setup();
         if ($master) {
             &parallel_build();
             &summarize_failures();
