@@ -585,3 +585,10 @@ Still working on pkgtool.  I just want to sync up before Chip and I
 get too far apart. :-)  I fixed a few more use vs. require mishaps
 like the one Chip fixed in revtool.
 ----------------------------------------------------------------------
+Fri Jun 30 19:27:02 2000                        Michael Jennings (mej)
+
+pkgtool can now generate sources and packages from a module.  The only
+remaining issue is that some moron decided it would be a good idea to
+stick a gzipped patch into an SRPM.  So I've got to add support for
+that.  But it's almost there.
+----------------------------------------------------------------------

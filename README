@@ -4,7 +4,7 @@
 #  Written by:  Michael Jennings
 #               Ted T'so
 #
-#  $Id: README,v 1.10 2000/06/27 20:13:35 mej Exp $
+#  $Id: README,v 1.11 2000/07/01 02:19:04 mej Exp $
 #
 ########################################################################
 
@@ -542,3 +542,45 @@ you do?
 
 5.  STANDARDS AND CONVENTIONS
 -----------------------------
+
+5.1.  Changing a Package
+------------------------
+
+Any packages that we obtain from an external source, and do NOT modify
+in any way, can be placed directly into revision control in its native
+package format.  However, if any changes whatsoever are made by you to
+a package, and you intend for those changes to be incorporated into
+the load, you must "own" that package.  You then "own" that package
+going forward until such time as a package can be obtained externally
+which no longer requires modification (i.e., somebody made a package
+which includes your changes, either as a patch or in the vendor
+source).
+
+The owner of a package has the following responsibilities:
+
+ - You must import the module properly.  If you make an error, you
+   must request that the build server administrators remove the module
+   you imported so that you can import it again, and you must redo the
+   import from scratch.
+ - You must make sure that the module builds correctly via the build
+   system in any state in which you commit it to revision control.
+   This only applies if a product file refers to the branch and/or tag
+   under which you make the commit.
+ - Changes made by others to the module are their responsibility, but
+   you must make sure that the overall integrity of the module is
+   preserved.
+ - As the original package vendor releases new versions of the
+   package, you are responsible for ultimately choosing whether or not
+   to go with the new versions or stay with the old.  If you choose
+   the former, you are also responsible for importing the new vendor
+   source and merging the existing patches into the new branch.
+ - Bugs will be filed by others in the company via Engineering
+   SourceForge.  Any bugs filed against the package you own are
+   ultimately your responsibility, although you may delegate them to
+   others.
+ - If you write a patch to fix a bug in the original vendor source,
+   this patch should be submitted via appropriate channels to the
+   original author(s).  Likewise, any problems you fix in the actual
+   build process (e.g., the spec file) should be submitted to the
+   original packager or package vendor (e.g., RedHat), in a more or
+   less timely manner as approved by management. :-)

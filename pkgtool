@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.7 2000/06/29 23:38:21 mej Exp $
+# $Id: pkgtool,v 1.8 2000/07/01 02:19:04 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -133,16 +133,20 @@ sub
 dprintf
 {
     return if (! $debug);
-    print "[debug:$progname] " if (! $slave);
-    printf @_ if (! $slave);
+    print "[debug:$progname] ";
+    printf @_;
 }
 sub
 dprint
 {
+    my @dbg;
+    my ($f, $l, $s);
+
     return if (! $debug);
-    if (! $slave) {
-        print "[debug:$progname] ", @_;
-    }
+    @dbg = caller(1);
+    ($f, $l, $s) = @dbg[1, 2, 3];
+    $f =~ s/^.*\/([^\/]+)$/$1/;
+    print "[$f/$l/$s()] ", @_;
 }
 
 # Print an error
@@ -185,6 +189,25 @@ sub
 handle_warning
 {
     dprint @_;
+}
+
+sub
+should_ignore
+{
+    my $fname = $_[0];
+
+    # Ignore revision control goop
+    return 1 if ($fname =~ /^(CVS|SCCS|RCS|BitKeeper)$/);
+    # Ignore the revtool-generated ChangeLog
+    return 1 if ($fname =~ /^[Cc]hanges?\.?[Ll]og$/);
+    # Ignore dotfiles
+    return 1 if ($fname =~ /^\./);
+    # Ignore spec files
+    return 1 if ($fname =~ /\.spec(\.in)?$/);
+    # Ignore the debian/ directory
+    return 1 if ($fname =~ /^debian$/ && -d $fname);
+
+    return 0;
 }
 
 # Add a %define
@@ -403,6 +426,44 @@ fetch_package
 }
 
 sub
+update_to_tag
+{
+    my ($tag, $src_files) = @_;
+    my ($err, $msg, $cmd, $line) = undef;
+    my (@new_files);
+    local *REVTOOL;
+
+    $cmd = "revtool -gt $tag" . ($src_files ? " $src_files" : "");
+    dprint "About to run $cmd\n";
+    if (!open(REVTOOL, "$cmd 2>&1 |")) {
+        $err = REVTOOL_COMMAND_FAILED;
+        $msg = "Execution of \"$cmd\" failed -- $!";
+        last;
+    }
+    while (<REVTOOL>) {
+        chomp($line = $_);
+        if ($debug) {
+            dprint "From revtool -> $line\n";
+        }
+        next if ($line =~ /^\[debug:/);
+        # Check the output for errors
+        if ($line =~ /^U (\S+)$/) {
+            push @new_files, $1;
+        } elsif ($line =~ /is not a valid tag/) {
+            eprint "$tag does not seem to be valid for this package.\n";
+            last;
+        } elsif ($line =~ /^revtool:\s*Error/) {
+            ($msg = $line) =~ s/^revtool:\s*Error:\s*//;
+            eprint "$msg\n";
+        }
+    }
+    close(REVTOOL);
+    $err = $?;
+    dprintf "Command returned $err (%d)\n", $err >> 8;
+    return @new_files;
+}
+
+sub
 create_source_file
 {
     my ($src_files, $tarball, $destdir, $tar, $zip) = @_;
@@ -410,18 +471,24 @@ create_source_file
     local *CMD;
 
     if ($tarball) {
+        print "Generating $tarball...\n";
         if ($tar) {
             $cmd = $tar;
         } else {
             if (! $zip) {
-                if ($src =~ /(gz|Z)$/) {
+                if ($tarball =~ /(gz|Z)$/) {
                     $zip = "gzip";
-                } elsif ($src =~ /\.bz2$/) {
+                } elsif ($tarball =~ /\.bz2$/) {
                     $zip = "bzip2";
                 }
             }
+            if ($zip) {
+                $zip = " --use-compress-program=$zip";
+            } else {
+                $zip = " ";
+            }
             $cmd = "tar --exclude CVS --exclude RCS --exclude BitKeeper --exclude SCCS"
-                   . " --use-compress-program=$zip -cf ${destdir}$tarball $src_files";
+                   . "$zip -cf ${destdir}$tarball $src_files";
         }
         dprint "Creating $tarball:  $cmd\n";
         unlink($tarball);
@@ -434,7 +501,7 @@ create_source_file
             print "tar output -> $line\n";
         }
         close(CMD);
-        dprint "\"$cmd\" returned $?\n";
+        dprint "Command returned $?\n";
         if ($?) {
             eprint "Creation of vendor source tarball $tarball failed\n";
             return PKGTOOL_BUILD_FAILURE;
@@ -442,6 +509,7 @@ create_source_file
     } else {
         my $rc;
 
+        print "Copying $src_files to $destdir.\n";
         $rc = system("cp -f $src_files $destdir") >> 8;
         if ($rc) {
             eprint "Unable to copy $src_files to $destdir -- $!\n";
@@ -449,6 +517,85 @@ create_source_file
         }
     }
     return PKGTOOL_SUCCESS;
+}
+
+# Return the contents of a file as a string
+sub
+cat_file
+{
+    my $filename = $_[0];
+    my $contents = "";
+
+    open(FF, "$filename") || return undef;
+    while (<FF>) {
+        $contents .= $_;
+    }
+    return $contents;
+}
+
+sub
+gen_diff
+{
+    my ($module, $src_files, $prev_tag, $tag, $patch) = @_;
+    my ($cmd, $line_cnt, $ignore, $fname);
+    my @src_files;
+    local (*CMD, *PATCH);
+
+    @src_files = split(" ", $src_files);
+    if (!open(PATCH, ">$patch")) {
+        eprint "Unable to write to patch file $patch -- $!\n";
+        return PKGTOOL_BUILD_FAILURE;
+    }
+    $cmd = "revtool -qD -t '$prev_tag $tag' $module";
+    dprint "About to run \"$cmd\"\n";
+    if (!open(CMD, "$cmd 2>/dev/null |")) {
+        eprint "Execution of \"$cmd\" failed -- $!\n";
+        return PKGTOOL_COMMAND_FAILED;
+    }
+    $line_cnt = $ignore = 0;
+    while (<CMD>) {
+        chomp($line = $_);
+        next if ($line =~ /^revtool/);
+        if ($line =~ /^Index: (\S+)$/) {
+            my @tmp;
+
+            ($fname = $1) =~ s/^$module\///;
+            @tmp = grep(($fname eq $_) || ($fname =~ /^$_\//), @src_files);
+            if ($#tmp < 0) {
+                # Not a source file.  Ignore it.
+                dprint "Ignoring patch to $fname\n";
+                $ignore = 1;
+            } else {
+                # A source file.  Include it.
+                dprint "Now diffing $fname\n";
+                $ignore = 0;
+            }
+        } elsif ($line =~ /^(diff|---|\+\+\+|\*\*\*)/) {
+            $line =~ s/$module\/$fname/$fname/g;
+        }
+        next if ($ignore);
+
+        if ($line =~ /^[-I=Rrd+\s@\*]/) {
+            print PATCH "$line\n";
+            $line_cnt++;
+        } else {
+            dprint "Extra line in diff:  $line\n";
+        }
+    }
+    close(CMD);
+    close(PATCH);
+    print "Generated $patch ($line_cnt lines).\n";
+    dprint "\"$cmd\" returned $?\n";
+    return PKGTOOL_SUCCESS;
+}
+
+sub
+touch_file
+{
+    my $file = $_[0];
+    local *TMP;
+
+    open(TMP, ">$file") && close(TMP);
 }
 
 sub
@@ -667,15 +814,18 @@ sub
 rpm_generate_source_files
 {
     my ($specfile, $module, $srcs, $head_tag, $release_tag) = @_;
-    my ($err, $msg, $src_files, $tarball, $modname);
+    my ($err, $msg, $src_files, $tarball, $modname, $tag_prefix, $prev_tag);
     my (@contents, @tags, @srcs, @all_srcs);
     local (*DIR, *CMD);
 
-    # The first step is to examine the module directory to find
-    # the names of the vendor source files/directories and the spec file.
-    ($modname = $module) =~ s/^.*\/([^\/]+)$/$1/;
+    $tag_prefix = $release_tag;
     if (! chdir($module)) {
         return PKGTOOL_BAD_MODULE;
+    }
+    if (-f "CVS/Repository") {
+        chomp($modname = &cat_file("CVS/Repository"));
+    } else {
+        ($modname = $module) =~ s/^.*\/([^\/]+)$/$1/;
     }
     if ($destdir && $destdir !~ /\/$/) {
         $destdir .= "/";
@@ -692,16 +842,7 @@ rpm_generate_source_files
         my $fname;
 
         foreach $fname (@contents) {
-            # Ignore revision control goop
-            next if ($fname =~ /^(CVS|SCCS|RCS|BitKeeper)$/);
-            # Ignore the revtool-generated ChangeLog
-            next if ($fname =~ /^[Cc]hanges?\.?[Ll]og$/);
-            # Ignore dotfiles
-            next if ($fname =~ /^\./);
-            # Ignore spec files
-            next if ($fname =~ /\.spec(\.in)?$/);
-            # Ignore the debian/ directory
-            next if ($fname =~ /^debian$/ && -d $fname);
+            next if (&should_ignore($fname));
             if (-d $fname) {
                 push @srcs, "$fname:$fname.tar.gz";
             } else {
@@ -732,17 +873,29 @@ rpm_generate_source_files
         }
         dprint "Real Tags:  ", join(" ", @tags), "\n";
         for ($i = 1; $i <= $#tags; $i++) {
-            if ($tags[$i] =~ /^$release_tag-PATCH-(\d+)$/) {
+            if ($tags[$i] =~ /^$tag_prefix-PATCH-(\d+)$/) {
                 my $num = $1;
 
                 $last_tag{$patch{$num}} = $tags[$i - 1];
                 dprint "Previous tag for patch $num ($patch{$num}) is $last_tag{$patch{$num}}\n";
-            } elsif ($tags[$i] =~ /^$release_tag-SOURCE-(\d+)$/) {
+            } elsif ($tags[$i] =~ /^$tag_prefix-SOURCE-(\d+)$/) {
                 my $num = $1;
 
                 $last_tag{$source{$num}} = $tags[$i - 1];
                 dprint "Previous tag for source $num ($source{$num}) is $last_tag{$source{$num}}\n";
-            }
+            } elsif ($tags[$i] =~ /^(.*)-(SOURCE|PATCH)-\d+$/) {
+                my $tmp = $1;
+                my @tmp;
+
+                # It's trying to be a valid tag.  Maybe we can help it along.
+                @tmp = grep($_ =~ /^$tmp/, @tags);
+                if ($#tmp > ($#tags / 2)) {
+                    # More than half of the tags start with this.  Somebody screwed up.  Let's help.
+                    $tag_prefix = $tmp;
+                    print "$progname:  Warning:  Incorrect tag prefix detected.  Using $tag_prefix instead of $release_tag.\n";
+                    $i = 0;
+                }
+            }                
         }
         #($err, $msg) = &fetch_package("revtool -gt $release_tag $modname");
         #if ($err) {
@@ -772,7 +925,7 @@ rpm_generate_source_files
                 if (($tarball && $source{$num} =~ /$tarball$/)
                     || (! $tarball && $src_files =~ /^(.*\s+)?$source{$num}(\s+.*)?$/)) {
                     dprint "Undefining source $num\n";
-                    undef $source{$num};
+                    delete $source{$num};
                 }
             }
             @sources = sort {$a <=> $b} keys %source;
@@ -783,23 +936,53 @@ rpm_generate_source_files
         #&nuke_tree($modname) if (-d $modname);
 
         # At this point, we've generated all the source files which are initially available
-        # in the original import of the module.  The rest we have to generate using diffs.
+        # in the original import of the module.  Now update to generate other sources.
+
+        $src_files = join(" ", @all_srcs);  # For generating diffs
+
+        $prev_tag = "";
         foreach $num (@sources) {
             my $source = $source{$num};
-            my ($tag, $prev_tag);
+            my ($tag, $files);
+            my @new_files;
 
-            dprint "Generating diff for source $num ($source)\n";
-            $tag = "$release_tag-SOURCE-$num";
-            $prev_tag = $last_tag{$tag};
-
-
+            dprint "Generating source $num ($source)\n";
+            $tag = "$tag_prefix-SOURCE-$num";
+            if (!defined $last_tag{$source{$num}}) {
+                eprint "No tag exists for $source ($tag).  I'll create an empty file for it, but this may cause problems.\n";
+                &touch_file("$destdir$source");
+                next;
+            }
+            &update_to_tag($last_tag{$source{$num}}) if ($prev_tag ne $last_tag{$source{$num}});
+            @new_files = &update_to_tag($tag);
+            @new_files = grep(! &should_ignore($_), @new_files);
+            $prev_tag = $tag;
+            next if ($#new_files < 0);
+            $files = join(" ", @new_files);
+            $err = &create_source_file($files, ($source =~ /\.tar(\.[A-Za-z0-9]+)?$/ ? $source : 0), $destdir, $tar, $zip);
+            if ($err) {
+                return $err;
+            }
         }
+
+        # For patches, diff between the two tags to generate the patch files.
         foreach $num (@patches) {
             my $patch = $patch{$num};
+            my ($tag, $prev_tag);
 
             dprint "Generating diff for patch $num ($patch)\n";
+            $tag = "$tag_prefix-PATCH-$num";
+            if (!defined $last_tag{$patch{$num}}) {
+                eprint "No tag exists for $patch{$num} ($tag).  I'll create an empty file for it, but this may cause problems.\n";
+                &touch_file("$destdir$patch{$num}");
+                next;
+            }
+            $prev_tag = $last_tag{$patch{$num}};
+            $err = &gen_diff($modname, $src_files, $prev_tag, $tag, "$destdir$patch{$num}");
+            if ($err) {
+                return $err;
+            }
         }
-
     } else {
         # Just sources.  Do it like we always have.
         foreach $src (@srcs) {
@@ -828,14 +1011,14 @@ main
     @valid_opts = ("h|help", "v|version", "d|debug", "b|build", "i|install", "c|contents",
                    "g|generate", "o|sources:s", "p|package=s", "s|specfile|scripts=s", "m|module=s",
                    "r|release-tag=s", "t|head-tag=s", "P|program=s", "R|rcfile=s", "tar=s", "zip=s",
-                   "tagfile=s");
+                   "tagfile=s", "D|destdir=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.7 $ created on $Date: 2000/06/29 23:38:21 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.8 $ created on $Date: 2000/07/01 02:19:04 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
