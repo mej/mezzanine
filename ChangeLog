@@ -306,3 +306,7 @@ pieces are in place.  We still need to test and debug them of course,
 which is going to require some more CVS-fu and product file magic on
 my part.  Stay tuned.
 ----------------------------------------------------------------------
+Thu Jun  8 14:36:37 2000                        Michael Jennings (mej)
+
+Fixed a couple small oversights on my part.
+----------------------------------------------------------------------

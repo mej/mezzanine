@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.41 2000/06/08 00:04:24 mej Exp $
+# $Id: buildtool,v 1.42 2000/06/08 21:25:53 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -347,7 +347,7 @@ get_package_stages
     my $type = $_[0];
 
     if ($type eq "srpm") {
-        return "sbpa";
+        return "sebpa";
     } elsif ($type eq "rpm") {
         return "sbpa";
     } elsif ($type eq "module") {
@@ -461,6 +461,7 @@ nuke_tree
         @files = readdir(DIR);
         closedir(DIR);
         foreach $f (@files) {
+            next if ($f eq "." || $f eq "..");
             if (-d "$path/$f") {
                 &nuke_tree("$path/$f") || return 0;
             } else {
@@ -1620,9 +1621,9 @@ parallel_build
         }
         nprint "$progname:  Currently building:  $line\n";
         $done = $idx - $#children - 1;
-        $left = $#p + 1 - $done;
+        $left = $#p + 1 - $done - $num_cpus;
         $failed = $#failed_pkgs + 1;
-        nprint "$progname:  $done packages completed ($failed failed), $left to go.\n";
+        nprint "$progname:  $done packages completed ($failed failed), $num_cpus building, $left in queue.\n";
 
         # Wait for a child to die
         $pid = waitpid(-1, 0);
@@ -1714,7 +1715,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.41 $ created on $Date: 2000/06/08 00:04:24 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.42 $ created on $Date: 2000/06/08 21:25:53 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
