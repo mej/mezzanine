@@ -875,3 +875,8 @@ Tue Oct 10 18:10:05 2000                        Michael Jennings (mej)
 
 Force copy so that we overwrite old symlinks.
 ----------------------------------------------------------------------
+Thu Oct 12 23:45:22 2000                        Michael Jennings (mej)
+
+Wow, haven't had a buildtool bug in awhile.  This allows for
+whitespace between the package type specifier and the package name.
+----------------------------------------------------------------------
