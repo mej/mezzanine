@@ -25,13 +25,16 @@ build-stamp:
 	(cd doc ; \
 	for i in *.sgml ; do \
 	  FNAME=`echo $$i | sed 's/\.sgml//'` ; \
-	  jade -t sgml -i html -d mezzanine.dsl \
+	  jade -o $${FNAME}.html -t sgml -i html -d mezzanine.dsl \
 	    -D /usr/lib/sgml/stylesheet/dsssl/docbook/nwalsh \
 	    -V "%stylesheet%=$${FNAME}.css" \
 	    -V "%root-filename%=$${FNAME}" \
 	    -V nochunks -V rootchunk \
 	    $$i ; \
 	done ; \
+	test -f t1.html && mv -f t1.html FAQ.html ; \
+	test -f book1.html && mv -f book1.html manual.html ; \
+	ls -Fla *.html ; \
 	rm -f book[0-9]*.html t[0-9]*.html c[0-9]*.html x[0-9]*.html)
 
 	touch build-stamp
