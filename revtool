@@ -23,11 +23,11 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.36 2000/06/27 22:00:15 chip Exp $
+# $Id: revtool,v 1.37 2000/06/29 23:06:21 chip Exp $
 #
 
 # Include the Perl Modules we need
-use POSIX;
+use POSIX 'strftime';
 use Getopt::Long;
 
 # Constants
@@ -94,8 +94,7 @@ print_usage_info
 sub
 get_timestamp
 {
-    $ts = POSIX::strftime("%A, %d %B %Y %H:%M:%S %Z", localtime);
-    return $ts;
+    strftime("%A, %d %B %Y %H:%M:%S %Z", localtime);
 }
 
 # Debugging output
@@ -104,7 +103,8 @@ dprintf
 {
     return if (! $debug);
     print "[debug:$progname] ";
-    printf @_;
+    my $fmt = shift;
+    printf $fmt, @_;
 }
 sub
 dprint
@@ -117,7 +117,8 @@ sub
 eprintf
 {
     print STDERR "$progname:  Error:  ";
-    printf STDERR @_;
+    my $fmt = shift;
+    printf STDERR $fmt, @_;
 }
 sub
 eprint
@@ -1348,7 +1349,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.36 $ created on $Date: 2000/06/27 22:00:15 $ by $Author: chip $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.37 $ created on $Date: 2000/06/29 23:06:21 $ by $Author: chip $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
