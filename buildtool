@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.64 2000/06/16 18:48:30 mej Exp $
+# $Id: buildtool,v 1.65 2000/06/16 19:00:35 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1754,6 +1754,7 @@ build_process
 
     if ($master) {
         &parallel_build();
+        return if ($end_stage eq "p");
     } else {
         &do_compose_stage() if ("sc" =~ /$start_stage/);
         return if ($end_stage eq "c");
@@ -1770,6 +1771,8 @@ build_process
 
     &do_iso_stage() if ("scexbpi" =~ /$start_stage/);
     return if ($end_stage eq "i");
+
+    return;  # This is only temporary.  I'm trying to fix a bug.
 
     &do_cleanup_stage();
 }
@@ -1794,7 +1797,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.64 $ created on $Date: 2000/06/16 18:48:30 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.65 $ created on $Date: 2000/06/16 19:00:35 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1812,6 +1815,18 @@ main
         $opt_h = $opt_P = $opt_Q = $opt_p = $opt_q = $opt_v = 0;
     }
     $debug = $opt_d;
+    $GLOBAL_LOG = 0;
+    if ($opt_l) {
+        if (!open(LOGFILE, ">$opt_l")) {
+            eprint "Unable to open $opt_l -- $!\n";
+        } else {
+            $GLOBAL_LOG = \*LOGFILE;
+            #system("chattr +S $opt_l");  # Try to set sync on the log file, fail silently
+            open(STDERR, ">&LOGFILE");
+            select LOGFILE; $| = 1;
+        }
+    }
+    select STDOUT; $| = 1;
     $verbosity = ($opt_Q ? 0 : ($opt_q ? 1 : 2));
     $target = ($opt_t ? $opt_t : 0);
     $start_stage = ($opt_B ? $opt_B : "s");
@@ -1829,6 +1844,7 @@ main
         $start_stage = "s";
         $end_stage = "p";
     }
+    dprint "Building stages \"$start_stage\" through \"$end_stage\"\n";
     if ($opt_master) {
         $slave = 1;
         $master = 0;
@@ -1841,18 +1857,6 @@ main
         $slave = 0;
         $num_cpus = 1;
     }
-    $GLOBAL_LOG = 0;
-    if ($opt_l) {
-        if (!open(LOGFILE, ">$opt_l")) {
-            eprint "Unable to open $opt_l -- $!\n";
-        } else {
-            $GLOBAL_LOG = \*LOGFILE;
-            #system("chattr +S $opt_l");  # Try to set sync on the log file, fail silently
-            open(STDERR, ">&LOGFILE");
-            select LOGFILE; $| = 1;
-        }
-    }
-    select STDOUT; $| = 1;
     if ($opt_D) {
         $basedir = $opt_D;
     } elsif ($ENV{BASE_DIR} && $ENV{BASE_DIR} =~ /^\//) {
