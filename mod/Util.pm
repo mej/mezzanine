@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.26 2004/01/30 23:18:11 mej Exp $
+# $Id: Util.pm,v 1.27 2004/02/14 03:17:09 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -51,10 +51,10 @@ BEGIN {
                '&copy_tree', '&basename', '&dirname', '&grepdir',
                '&limit_files', '&xpush', '&cat_file',
                '&parse_rpm_name', '&should_ignore', '&touch_file',
-               '&MEZZANINE_SUCCESS', '&MEZZANINE_FATAL_ERROR',
-               '&MEZZANINE_SYNTAX_ERROR', '&MEZZANINE_SYSTEM_ERROR',
-               '&MEZZANINE_COMMAND_FAILED', '&MEZZANINE_DUPLICATE',
-               '&MEZZANINE_FILE_NOT_FOUND',
+               '&subst_file', '&MEZZANINE_SUCCESS',
+               '&MEZZANINE_FATAL_ERROR', '&MEZZANINE_SYNTAX_ERROR',
+               '&MEZZANINE_SYSTEM_ERROR', '&MEZZANINE_COMMAND_FAILED',
+               '&MEZZANINE_DUPLICATE', '&MEZZANINE_FILE_NOT_FOUND',
                '&MEZZANINE_FILE_OP_FAILED',
                '&MEZZANINE_ACCESS_DENIED', '&MEZZANINE_BAD_ADDITION',
                '&MEZZANINE_BAD_LOG_ENTRY', '&MEZZANINE_BAD_LOGIN',
@@ -119,6 +119,7 @@ sub cat_file($);
 sub parse_rpm_name($);
 sub should_ignore($);
 sub touch_file($);
+sub subst_file($$@);
 
 ### Module cleanup
 END {
@@ -336,6 +337,9 @@ handle_signal(@)
     my $sig = $_[0];
 
     eprint "Someone sent me a SIG$sig asking me to exit, so I shall.\n";
+    if (&debug_get()) {
+        &show_backtrace();
+    }
     exit MEZZANINE_TERMINATED;
 }
 
@@ -710,6 +714,26 @@ touch_file
 
     open(TMP, ">$file") && close(TMP);
     chown($mz_uid, $mz_gid, $file);
+}
+
+sub
+subst_file($$@)
+{
+    my $filename = shift;
+    my $delim = shift;
+    my %vars = @_;
+    my $contents;
+    local *DATAFILE;
+
+    open(DATAFILE, $filename) || return undef;
+    $contents = join("", <DATAFILE>);
+    close(DATAFILE);
+
+    foreach my $var (keys(%vars)) {
+        $filename =~ s/$delim$var$delim/$vars{$var}/eg;
+        $contents =~ s/$delim$var$delim/$vars{$var}/eg;
+    }
+    return ($filename, $contents);
 }
 
 1;

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.172 2004/01/30 23:18:11 mej Exp $
+# $Id: buildtool,v 1.173 2004/02/14 03:17:09 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -671,7 +671,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.172 $ created on $Date: 2004/01/30 23:18:11 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.173 $ created on $Date: 2004/02/14 03:17:09 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -751,7 +751,7 @@ main
             $locations = '/.*/=' . $locations;
             dprint "Got global location \"$locations\".\n";
         } elsif ($locations !~ m,/[^/]+/[\@=],) {
-            if (&mkdir($locations, 0775)) {
+            if (&mkdirhier($locations, 0775)) {
                 dprint "Created location $locations.\n";
                 $locations = "/.*/=$locations";
             } else {

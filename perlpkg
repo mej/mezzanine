@@ -1,0 +1,340 @@
+#!/usr/bin/perl -w
+#
+# perlpkg -- Tool for packaging perl modules.
+# 
+# Copyright (C) 2001, Michael Jennings
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies of the Software, its documentation and marketing & publicity
+# materials, and acknowledgment shall be given in the documentation, materials
+# and software packages that this Software was used.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+# $Id: perlpkg,v 1.1 2004/02/14 03:17:09 mej Exp $
+#
+
+use strict;
+use vars '$progname', '$version', '$opt_v', '$opt_h', '$opt_d', '$opt_t', '$opt_s';
+use CPAN;
+use POSIX;
+use Getopt::Long;
+use Mezzanine::Util;
+
+my ($SAVE_STDIN, $SAVE_STDOUT, $SAVE_STDERR);
+my %distributions;
+my @tried;
+my ($templates_dir, $template, $save_pwd);
+
+# Print usage information
+sub
+print_usage_info
+{
+    my ($leader, $underbar);
+
+    print "\n";
+    $leader = "$progname $version Usage Information";
+    $underbar = $leader;
+    $underbar =~ s/./-/g;
+    print "$leader\n$underbar\n";
+    print "\n";
+    print "  Syntax:   perlpkg [ options ]\n";
+    print "\n";
+    print "    -h --help                        Show this usage information\n";
+    print "    -d --debug                       Turn on debugging\n";
+    print "    -v --version                     Show version and copyright\n";
+    print "    -s --search                      Search only; don't build anything\n";
+    print "    -t --template                    Use specified template file/directory\n";
+    print "\n";
+    exit(MEZZANINE_SUCCESS);
+}
+
+# WAY TOO SLOW
+#sub
+#create_cpan_dist_list()
+#{
+#    foreach my $dist (CPAN::Shell->expand("Distribution", "/./")) {
+#        my @tmp = split(/\s+/, $dist->as_glimpse());
+#        my $file = $tmp[1];
+#
+#        print $SAVE_STDERR "Got distribution:  $file\n";
+#        @{$distributions{$file}{"MODLIST"}} = $dist->containsmods();
+#    }
+#}
+
+sub
+create_cpan_list()
+{
+    foreach my $mod (CPAN::Shell->expand("Module", "/./")) {
+        my @tmp = split(/\s+/, $mod->as_glimpse());
+        my $name = $tmp[1];
+        my $file = $mod->cpan_file();
+
+        #print $SAVE_STDERR "Got module:  $name ($file)\n";
+        push @{$distributions{$file}{"MODLIST"}}, $name;
+    }
+}
+
+sub
+build(@)
+{
+    my @distributions = @_;
+
+    foreach my $file (@distributions) {
+        my $dist_obj = CPAN::Shell->expand("Distribution", $file);
+        my $href;
+
+        next if (!defined($dist_obj));
+        if (scalar(grep($_ eq $file, @tried))) {
+            print $SAVE_STDOUT "Skipping $file; already tried.\n";
+            next;
+        } elsif (&basename($file) =~ /^perl-[\d\.]+\.(t|tar\.)(gz|bz2?)$/) {
+            print $SAVE_STDOUT "Something requires newer Perl; aborting!\n";
+            last;
+        }
+        print $SAVE_STDOUT "Building $file:  ";
+        print $SAVE_STDOUT "downloading...";
+        $dist_obj->get();
+
+        print $SAVE_STDOUT "building...";
+        $dist_obj->make();
+        $href = $dist_obj->prereq_pm();
+        push @tried, $file;
+        if ($href) {
+            my @deps;
+
+            print $SAVE_STDOUT "deps found.\n";
+            foreach my $dep (keys(%{$href})) {
+                push @deps, grep { grep { $_ =~ $dep } @{$distributions{$_}{"MODLIST"}} } keys(%distributions);
+            }
+            &build(@deps);
+            print $SAVE_STDOUT "Resuming $file...building...";
+            $dist_obj->make();
+        }
+        print $SAVE_STDOUT "testing...";
+        $dist_obj->test();
+        print $SAVE_STDOUT "cleaning...";
+        $dist_obj->clean();
+        print $SAVE_STDOUT "done.\n";
+    }
+}
+
+sub
+package_perl_dist(@)
+{
+    my @distributions = @_;
+
+    if (! -f "$templates_dir/$template") {
+        print $SAVE_STDERR "Error:  Cannot package; template " . &getcwd() . " $templates_dir/$template not found.\n";
+        return;
+    }
+
+    foreach my $file (@distributions) {
+        my $filepath = "$CPAN::Config->{keep_source_where}/authors/id/$file";
+        my ($pkgname, $distname, $version, $specfile, $modname);
+        my %vars;
+        my @tmp;
+        local *SPECFILE;
+
+        if (! -f $filepath) {
+            print $SAVE_STDERR "Error:  $filepath not found.\n";
+            next;
+        }
+        if (&basename($file) !~ /^(.+)-([^-]+)\.(t|tar\.)(gz|bz2?)$/) {
+            print $SAVE_STDERR "Error:  $file unparseable.\n";
+            next;
+        } else {
+            $distname = $1;
+            $version = $2;
+            $pkgname = "perl-" . $distname;
+            ($modname = $distname) =~ s/-/::/g;
+        }
+
+        if (! &mkdirhier($pkgname)) {
+            print $SAVE_STDERR "Error:  Unable to create $pkgname -- $!\n";
+            next;
+        }
+        if (! &copy_files($filepath, $pkgname)) {
+            print $SAVE_STDERR "Error:  Unable to copy $filepath to $pkgname -- $!\n";
+            next;
+        }
+
+        # Assign variables.
+        $vars{"DISTNAME"} = $distname;
+        $vars{"MODULE"} = $pkgname;
+        $vars{"VERSION"} = $version;
+        $vars{"VENDORSUFFIX"} = "%{?_vendorsuffix:%{_vendorsuffix}}%{!?_vendorsuffix:%{_vendor}}";
+        $vars{"PACKAGER"} = "%{?_packager:%{_packager}}%{!?_packager:%{_vendor}}";
+        $vars{"VENDOR"} = "%{?_vendorinfo:%{_vendorinfo}}%{!?_vendorinfo:%{_vendor}}";
+        $vars{"DISTRIBUTION"} = "%{?_distribution:%{_distribution}}%{!?_distribution:%{_vendor}}";
+        $vars{"MODULENAME"} = $modname;
+        $vars{"DISTFILE"} = &basename($file);
+        $vars{"BUILDARCH"} = "noarch";
+        $vars{"CHANGELOG"} = sprintf("* %s Mezzanine <mezzanine\@kainx.org>\n- %s\n",
+                                     POSIX::strftime("%a %b %d %Y", localtime()),
+                                     "PDR auto-generated from CPAN by $progname");
+
+        @tmp = &subst_file("$templates_dir/$template", '@', %vars);
+        $specfile = &basename(shift @tmp);
+        if (!open(SPECFILE, ">$pkgname/$specfile")) {
+            print $SAVE_STDERR "Error:  Unable to write $pkgname/$specfile -- $!\n";
+            next;
+        }
+        print SPECFILE join("", @tmp);
+        close(SPECFILE);
+        print $SAVE_STDOUT "Package $pkgname created.\n";
+    }
+}
+
+# main() here is basically the same as main() in C
+sub
+main
+{
+    my @valid_opts;
+    my @distributions;
+    local (*SAVE_STDIN, *SAVE_STDOUT, *SAVE_STDERR);
+
+    # Save file descriptors
+    open(SAVE_STDIN, "<&STDIN");
+    open(SAVE_STDOUT, ">&STDOUT");
+    open(SAVE_STDERR, ">&STDERR");
+    $SAVE_STDIN = \*SAVE_STDIN;
+    $SAVE_STDOUT = \*SAVE_STDOUT;
+    $SAVE_STDERR = \*SAVE_STDERR;
+
+    # Signal handling
+    $SIG{HUP} = 'IGNORE';
+    $SIG{INT} = \&handle_signal;
+    $SIG{TERM} = \&handle_signal;
+    $SIG{QUIT} = \&handle_fatal_signal;
+    $SIG{ILL} = \&handle_fatal_signal;
+    $SIG{ABRT} = \&handle_fatal_signal;
+    $SIG{FPE} = \&handle_fatal_signal;
+    $SIG{SEGV} = \&handle_fatal_signal;
+    $SIG{BUS} = \&handle_fatal_signal;
+    $SIG{TSTP} = \&handle_fatal_signal;
+    $SIG{TTIN} = \&handle_fatal_signal;
+    $SIG{TTOU} = \&handle_fatal_signal;
+
+    # Set up the basic variables
+    $progname = "perlpkg";
+    $version = "0.1";
+    #&print_usage_info() if (!scalar(@ARGV));
+    umask 022;
+
+    # See the Getopt::Long man page for details on the syntax of this line
+    @valid_opts = ("h|help", "v|version", "d|debug", "s|search", "t|template=s");
+    Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
+    Getopt::Long::GetOptions(@valid_opts);
+
+    # Post-parse the options stuff
+    select STDOUT; $| = 1;
+    if ($opt_v) {
+        # Do not edit this variable.  It is updated automatically by CVS when you commit
+        my $rcs_info = 'CVS Revision $Revision: 1.1 $ created on $Date: 2004/02/14 03:17:09 $ by $Author: mej $ ';
+
+        $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
+        $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
+        $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
+        print "\n";
+	print "$progname $version by Michael Jennings <mej\@eterm.org>\n";
+        print "Copyright (c) 2001, Michael Jennings\n";
+        print "  ($rcs_info)\n";
+        print "\n";
+	return MEZZANINE_SUCCESS;
+    } elsif ($opt_h) {
+	&print_usage_info();   # Never returns
+    }
+    &debug_set($opt_d);
+    open(STDIN, "</dev/null");
+    if (!&debug_get()) {
+        open(STDOUT, ">/dev/null");
+        open(STDERR, ">/dev/null");
+    }
+    $save_pwd = &getcwd();
+    if ($opt_t) {
+        if (-d $opt_t) {
+            $templates_dir = $opt_t;
+        } elsif (-f $opt_t) {
+            $template = &basename($opt_t);
+            $templates_dir = &dirname($opt_t);
+        }
+    }
+    if (! $template) {
+        $template = 'perl-@DISTNAME@.spec';
+    }
+    if (! $templates_dir) {
+        foreach my $dir (@INC, $save_pwd) {
+            if (-f "$dir/Mezzanine/templates/$template") {
+                $templates_dir = "$dir/Mezzanine/templates";
+                last;
+            } elsif (-f "$dir/templates/$template") {
+                $templates_dir = "$dir/templates";
+                last;
+            }
+        }
+    }
+
+
+    print $SAVE_STDOUT "Searching CPAN, please wait....\n";
+    if (($ARGV[0] =~ /\//) || ($ARGV[0] =~ /-/)) {
+        &create_cpan_list();
+        @distributions = grep { $_ =~ $ARGV[0] } keys(%distributions);
+    } else {
+        &create_cpan_list();
+        @distributions = grep { grep { $_ =~ $ARGV[0] } @{$distributions{$_}{"MODLIST"}} } keys(%distributions);
+    }
+
+    if ($opt_s || scalar(@distributions) != 1) {
+        if (scalar(@distributions) > 1) {
+            print $SAVE_STDOUT "Distributions which contain $ARGV[0]:\n";
+            foreach my $dist (sort(@distributions)) {
+                my @mods = grep { $_ =~ $ARGV[0] } @{$distributions{$dist}{"MODLIST"}};
+
+                printf $SAVE_STDOUT "%-40s (%s)\n", &basename($dist),
+                    ((!scalar(@mods))
+                     ? ("none")
+                     : ((scalar(@mods) > 3)
+                        ? ("$mods[0], $mods[1], $mods[2], ...")
+                        : (join(", ", @mods))
+                        )
+                    );
+            }
+        } elsif (scalar(@distributions)) {
+            my $dist = $distributions[0];
+
+            print $SAVE_STDOUT "Distribution $dist contains:\n";
+            foreach my $mod (@{$distributions{$dist}{"MODLIST"}}) {
+                print $SAVE_STDOUT "     $mod\n";
+            }
+        } else {
+            print $SAVE_STDOUT "Nothing found for $ARGV[0].\n";
+        }
+        return MEZZANINE_SUCCESS;
+    }
+
+    &build(@distributions);
+    print $SAVE_STDOUT "Downloaded the following:\n";
+    foreach my $file (sort(@tried)) {
+        print $SAVE_STDOUT "     $file\n";
+    }
+
+    chdir($save_pwd);
+    &package_perl_dist(@tried);
+
+    return MEZZANINE_SUCCESS;
+}
+
+exit &main();

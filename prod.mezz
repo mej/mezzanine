@@ -1,1 +1,1 @@
-srcs: *tool&pkgsort&mod&doc&debian&*.spec:mezzanine.tar.gz
+srcs: *tool&perlpkg&pkgsort&mod&doc&debian&templates&*.spec:mezzanine.tar.gz

@@ -1,7 +1,7 @@
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
 Version: 1.6
-Release: 0.14
+Release: 0.16
 Copyright: BSD
 Group: Development/Tools
 Source: %{name}.tar.gz
@@ -36,22 +36,25 @@ for i in *.sgml ; do
 done
 
 %install
-PERL_DIR=`perl -V | perl -ne 'if (/\@INC/) {$inc = 1;}
-                                  elsif ($inc && m!/site_perl/?$! && m!^\s*/usr/lib(.*)$!)
-                                    {print "$1\n";}'`
+%define perl_vendorlib %(eval "`perl -V:installvendorlib`"; echo $installvendorlib)
+
 rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT%{_bindir}
-mkdir -p $RPM_BUILD_ROOT%{_libdir}${PERL_DIR}/Mezzanine $RPM_BUILD_ROOT%{_libdir}/perl5/Mezzanine
+mkdir -p $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine
 mkdir -p $RPM_BUILD_ROOT%{_mandir}/man1
+mkdir -p $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine/templates
 
-for i in *tool pkgsort ; do
+for i in *tool pkgsort perlpkg ; do
   install -m 755 $i $RPM_BUILD_ROOT%{_bindir}/
 done
 
-for i in mod/*.pm ; do
-  install -m 644 $i $RPM_BUILD_ROOT%{_libdir}${PERL_DIR}/Mezzanine/
+for i in templates/* ; do
+  install -m 644 $i $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine/templates/
 done
-ln -s %{_libdir}${PERL_DIR}/Mezzanine $RPM_BUILD_ROOT%{_libdir}/perl5/Mezzanine
+
+for i in mod/*.pm ; do
+  install -m 644 $i $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine/
+done
 
 for i in doc/man/*.1 ; do
   install -m 644 $i $RPM_BUILD_ROOT%{_mandir}/man1/
@@ -84,5 +87,5 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-, root, root)
 %doc doc/*.html doc/*.sgml
 %{_bindir}/*
-%{_libdir}/*
+%{perl_vendorlib}/*
 %{_mandir}/*

@@ -309,3 +309,10 @@ Fixed mzprep and mzpatch for PDR's.
 
 Added module inclusion (and --help info) for buildtool's -s option.
 ----------------------------------------------------------------------
+Fri Feb 13 22:16:37 2004                        Michael Jennings (mej)
+
+Fixed minor buildtool bug.
+
+Added perlpkg to assist with packaging perl modules and their
+dependencies.
+----------------------------------------------------------------------
