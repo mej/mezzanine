@@ -479,3 +479,8 @@ Fri Jun 16 13:28:08 2000                        Michael Jennings (mej)
 
 Changes to architectures for some packages to match what 6.2.1 had.
 ----------------------------------------------------------------------
+Sat Jun 17 10:20:48 2000                        Michael Jennings (mej)
+
+Pre-scan the existing binary RPM's before parallelizing.  Otherwise,
+even an incremental build takes over 2 hours. :(
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.66 2000/06/16 20:07:34 mej Exp $
+# $Id: buildtool,v 1.67 2000/06/17 17:11:16 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -419,6 +419,8 @@ place_file
 sub
 initial_setup
 {
+    my @contents;
+
     if (! -d "$builddir") {
         if (!mkdir("$builddir", 0755)) {
             &fatal_error("Cannot create $builddir -- $!\n");
@@ -469,6 +471,14 @@ initial_setup
         }
     }
     chdir("$builddir");
+
+    # Pre-scan all the binary RPM's for future use in possibly parallel processes.
+    dprint "Scanning binary RPM's in $builddir/RPMS for their corresponding SRPM's.\n";
+    @contents = glob("$builddir/RPMS/*/*.rpm");
+    foreach $rpm (@contents) {
+        dprint "Checking $rpm\n";
+        $srpm_of_rpm{$rpm} = `rpm -qp $rpm --queryformat \"%{SOURCERPM}\"`;
+    }
 }
 
 # Emulate rm -rf
@@ -1508,9 +1518,6 @@ do_package_stage
                         $srpm = $srpm_of_rpm{$rpm};
                     } else {
                         $srpm = `rpm -qp $rpm --queryformat \"%{SOURCERPM}\"`;
-                        if ($? != 0) {
-                            # FIXME:  What to do here?
-                        }
                         $srpm_of_rpm{$rpm} = $srpm;
                     }
                     if ($srpm =~ /^\Q$pkg-\E\S*\Q$version-$release\E\.(?:no)?src\.rpm$/) {
@@ -1795,7 +1802,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.66 $ created on $Date: 2000/06/16 20:07:34 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.67 $ created on $Date: 2000/06/17 17:11:16 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
