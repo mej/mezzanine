@@ -175,3 +175,7 @@ Fri May 19 17:29:14 2000                        Michael Jennings (mej)
 Implemented a fairly sophisticated product file finder along with
 product variable fallbacks for package variables.
 ----------------------------------------------------------------------
+Fri May 19 17:52:23 2000                        Michael Jennings (mej)
+
+Product files for RedHat stuff.
+----------------------------------------------------------------------
