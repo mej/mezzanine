@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgsort,v 1.8 2000/09/25 18:22:43 mej Exp $
+# $Id: pkgsort,v 1.9 2000/09/28 05:08:46 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -413,6 +413,9 @@ consistency_check
     foreach $cap (keys %what_provides) {
         if (scalar(@{$what_provides{$cap}}) > 1) {
             @{$conflicts{$cap}} = @{$what_provides{$cap}};
+            foreach $pkg (@{$conflicts{$cap}}) {
+                $force{$pkg} = 1;
+            }
             $oops = 1;
         }
     }
@@ -521,13 +524,12 @@ write_cache
 
     open(CACHE, ">$ENV{HOME}/.pkgsort.cache") || return;
     foreach $pkg (@pkgs) {
-        print CACHE "N:$pkg\n";
+        print CACHE "S:$pkg|$src_package{$pkg}|$src_rpm{$src_package{$pkg}}|$src_version{$pkg}|$src_release{$pkg}\n";
         foreach $rpm (@{$rpm_list{$pkg}}) {
             @s = stat("$path{$rpm}/$rpm");
 
-            print CACHE "F:$path{$rpm}/$rpm:$s[9]\n";
+            print CACHE "F:$pkg:$path{$rpm}/$rpm:$s[9]\n";
         }
-        print CACHE "S:$pkg|$src_package{$pkg}|$src_rpm{$src_package{$pkg}}|$src_version{$pkg}|$src_release{$pkg}\n";
         print CACHE "P:$pkg|", join("|", @{$provides{$pkg}}), "\n" if (defined($provides{$pkg}));
         print CACHE "R:$pkg|", join("|", @{$requires{$pkg}}), "\n" if (defined($requires{$pkg}));
     }
@@ -645,18 +647,10 @@ cmp_packages_by_relation
             # Package 2 doesn't depend on package 1, so package 1 > package 2
             return 1;
         } else {
-            my $n = $pkg1 cmp $pkg2;
-            my $s;
-            my ($lib_cnt1, $lib_cnt2);
+            my ($n, $lib_cnt1, $lib_cnt2);
 
-            # Doh!  We have a circular dependency.  Note it, then sort alphabetically.
+            # Doh!  We have a circular dependency.
             dprint "Circular dependency detected between $pkg1 and $pkg2.\n";
-            if ($n <= 0) {
-                $s = "$pkg1/$pkg2";
-            } else {
-                $s = "$pkg2/$pkg1";
-            }
-            xpush @circular_deps, $s;
 
             # Now here's the hard part.  What to do about circular dependencies.  First,
             # let's see if one supplies libs and the other doesn't or supplies less.
@@ -664,14 +658,92 @@ cmp_packages_by_relation
             $lib_cnt1 = grep($_ =~ /^lib/, @{$provides{$pkg1}});
             $lib_cnt2 = grep($_ =~ /^lib/, @{$provides{$pkg2}});
             if ($lib_cnt1 != $lib_cnt2) {
-                return ($lib_cnt2 <=> $lib_cnt1);
+                $n = $lib_cnt2 <=> $lib_cnt1;
+            } else {
+                # Doh!  They both provide the same number of libs, probably none.  What next?
+                $n = &cmp_packages_by_dep_count($pkg1, $pkg2);
             }
-
-            # Doh!  They both provide the same number of libs, probably none.  What next?
-            return &cmp_packages_by_dep_count($pkg1, $pkg2);
+            if ($n <= 0) {
+                $nodeps{$pkg1} = 1;
+            }
+            if ($n >= 0) {
+                $nodeps{$pkg2} = 1;
+            }
         }
     }
     return 0;
+}
+
+# The dependency sorter works kind of like an insertion sort.  It plucks packages off
+# the list one at a time and places them in a new list in sorted order.  By sorted order,
+# I mean that it searches through the new list until it finds the first package which
+# depends on it.  This location is stored while the rest of the list is searched for any
+# packages the current package requires.  If there are none, it inserts itself into the
+# list just before the package that requires it.  If one or more dependencies occur later
+# in the list, it will insert itself immediately after the last one.
+sub
+dep_sort
+{
+    my @pkgs = @_;
+    my @old_pkgs = @pkgs;
+    my ($i, $ftr, $last_dep, $deps, $loc, $new_loc, $pkg, $cnt);  # $ftr stands for "first that requires"
+
+    $cnt = scalar(@old_pkgs);
+
+    foreach $pkg (@old_pkgs) {
+        $ftr = $last_dep = $loc = -1;
+        $deps = scalar(@{$requires{$pkg}});
+
+        for ($i = 0; $i < $cnt; $i++) {
+            if ($pkgs[$i] eq $pkg) {
+                $loc = $i;
+                next;
+            }
+            if ($deps && &pkg_depends_on($pkg, $pkgs[$i])) {
+                $last_dep = $i;
+                $deps--;
+            }
+            if ($ftr != -1 && &pkg_depends_on($pkgs[$i], $pkg)) {
+                $ftr = $i;
+            }
+        }
+
+        if ($loc == -1) {
+            &fatal_error("$pkg not found in list.  This can't happen!\n");
+        }
+        if ($ftr == -1) {
+            # Nothing requires it, so put it at the end.
+            $new_loc = -1;
+        } elsif ($last_dep == $ftr) {
+            # Circular dependency
+            if ((&cmp_packages_by_relation($pkg, $pkgs[$ftr])) <= 0) {
+                $new_loc = $ftr;
+            } else {
+                $new_loc = $ftr + 1;
+            }
+        } elsif ($last_dep > $ftr) {
+            # Something that requires it appears before its own dependencies are satisfied.
+            dprint "Sequence error, $last_dep > $ftr.\n";
+            $new_loc = $last_dep + 1;
+        } else {
+            # This is how we like things to go.
+            $new_loc = $ftr;
+        }
+        dprint "Sorting on $pkg:  loc $loc, ftr $ftr, last_dep $last_dep, new_loc $new_loc\n";
+        next if ($new_loc == $loc);
+        if ($new_loc > $loc) {
+            $new_loc--;
+        }
+        # Remove it from where it is.
+        splice(@pkgs, $loc, 1);
+        # And put it where it goes.
+        if ($new_loc == -1) {
+            push @pkgs, $pkg;
+        } else {
+            splice(@pkgs, $new_loc, 0, $pkg);
+        }
+    }
+    return @pkgs;
 }
 
 sub
@@ -696,13 +768,15 @@ sort_packages
 
         # Then brute-force check and fix the list until no changes are made
         if ($sort_method eq "d") {
-            do {
-                $loop_start = (times)[0];
-                ($changes, @pkgs) = &verify_list(@pkgs);
-                $loop_end = (times)[0];
-                $n++;
-                dprint "Verify pass #$n took ", $loop_end - $loop_start, " seconds.\n";
-                } while ($changes);
+#            do {
+#                $loop_start = (times)[0];
+#                ($changes, @pkgs) = &verify_list(@pkgs);
+#                $loop_end = (times)[0];
+#                $n++;
+#                dprint "Verify pass \#$n took ", $loop_end - $loop_start, " seconds.\n";
+#            } while ($changes);
+            @pkgs = &dep_sort(@pkgs);
+            &mark_list(@pkgs);
         }
     } elsif ($sort_method eq "a") {
         @pkgs = sort {$src_package{$a} cmp $src_package{$b}} @pkgs;
@@ -717,6 +791,22 @@ sort_packages
     dprint "Complete sort operation took ", $func_end - $func_start, " seconds and $n passes.\n";
 
     return @pkgs;
+}
+
+sub
+mark_list
+{
+    my @pkgs = @_;
+    my ($i, $j);
+
+    for ($i = 0; $i <= $#pkgs; $i++) {
+        for ($j = $i + 1; $j <= $#pkgs; $j++) {
+            if (&cmp_packages_by_relation($pkgs[$i], $pkgs[$j]) > 0) {
+                dprint "Dependency order error:  $pkgs[$i] ($i) depends on $pkgs[$j] ($j)\n";
+                $nodeps{$pkgs[$i]} = 1;
+            }
+        }
+    }
 }
 
 sub
@@ -785,7 +875,10 @@ show_packages
         foreach $pkg (@pkgs) {
             my $flag = "";
 
-            if (grep($_ =~ /^\Q$pkg\E\// || $_ =~ /\/\Q$pkg\E$/, @circular_deps)) {
+            if ($force{$pkg}) {
+                $flag .= " --force";
+            }
+            if ($nodeps{$pkg}) {
                 $flag .= " --nodeps";
             }
             if ($output_format eq "names") {
@@ -807,6 +900,7 @@ main
     # Set up the basic variables
     $progname = "pkgsort";
     $version = "1.0";
+    undef %dep_error;
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "D|dir=s", "l|list=s",
@@ -818,7 +912,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.8 $ created on $Date: 2000/09/25 18:22:43 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.9 $ created on $Date: 2000/09/28 05:08:46 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

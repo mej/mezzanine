@@ -845,3 +845,9 @@ Wed Sep 27 15:10:10 2000                        Michael Jennings (mej)
 
 More contributions from Chip Salzenberg <chip@valinux.com>
 ----------------------------------------------------------------------
+Wed Sep 27 22:26:52 2000                        Michael Jennings (mej)
+
+New dependency sort algorithm for pkgsort.  I won't be able to test it
+tonight due to the kernel builds and such, so who knows if it works or
+not.  :-)
+----------------------------------------------------------------------
