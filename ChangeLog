@@ -924,3 +924,7 @@ Tue Nov  7 16:57:00 2000                        Michael Jennings (mej)
 
 Wrong quotes.
 ----------------------------------------------------------------------
+Thu Nov  9 15:32:57 2000                        Michael Jennings (mej)
+
+Don't let trailing whitespace trip us up.
+----------------------------------------------------------------------

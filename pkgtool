@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.27 2000/10/19 05:49:12 mej Exp $
+# $Id: pkgtool,v 1.28 2000/11/09 23:33:26 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -274,6 +274,8 @@ parse_spec_file
         next if ($line =~ /^\s*\#/ || $line =~ /^\s*$/);
         $oldline = $line;
         $line = &replace_defines($oldline);
+        $line =~ s/^\s+//;
+        $line =~ s/\s+$//;
         if ($oldline ne $line) {
             dprint "Parsing from $specfile, line $.: \"$oldline\" -> \"$line\"\n";
         } else {
@@ -289,7 +291,7 @@ parse_spec_file
                 $pkg = "$packages[0]-$param";
                 push @packages, $pkg;
             }
-        } elsif ((! $stage) && $line =~ /^\s*(\w+)\s*:\s*(.*)$/) {
+        } elsif ((! $stage) && $line =~ /^\s*(\w+)\s*:\s*(.*)\s*$/) {
             my ($var, $value) = ($1, $2);
 
             $var =~ tr/[A-Z]/[a-z]/;
@@ -1037,16 +1039,18 @@ rpm_generate_source_files
         #closedir(DIR);
 
         # Generate all the source files that already exist
+        dprint "Beginning initial source file generation....\n";
         &update_to_tag($release_tag) if ($release_tag);
         foreach $src (@srcs) {
             my @tmp;
 
             ($src_files, $tarball) = split(":", $src);
             @tmp = split(/[\&\s]+/, $src_files);
+            dprint "\"$src_files\", \"$tarball\", ", join(" ", @tmp), "\n";
             @all_srcs = (@all_srcs, @tmp);
             @tmp = grep(-e $_, @tmp);
             next if ($#tmp < 0);
-            dprint "\@tmp contains $#tmp + 1 elements:  ", join(" ", @tmp), "\n";
+            dprint "\@tmp contains ", scalar(@tmp), " elements:  ", join(" ", @tmp), "\n";
             $src_files = join(" ", @tmp);
             if (&check_for_source_files($src_files, $tarball, $destdir)) {
                 dprint "Not creating ", ($tarball ? $tarball : "\"$src_files\""), " -- Already exists.\n";
@@ -1076,6 +1080,7 @@ rpm_generate_source_files
         $src_files = join(" ", @all_srcs);  # For generating diffs
 
         $prev_tag = "";
+        dprint "Beginning final source file generation....\n";
         foreach $num (@sources) {
             my $source = $source{$num};
             my ($tag, $files);
@@ -1166,7 +1171,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.27 $ created on $Date: 2000/10/19 05:49:12 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.28 $ created on $Date: 2000/11/09 23:33:26 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
