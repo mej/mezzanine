@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.24 2000/06/06 04:49:49 mej Exp $
+# $Id: revtool,v 1.25 2000/06/06 05:15:45 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -257,6 +257,9 @@ update_from_master
             push @co, $file;
         }
     }
+    if ($#up == -1 && $#co == -1) {
+        @up = (" ");
+    }
 
     foreach $mode (0, 1) {
         my ($flist, $subcmd);
@@ -452,12 +455,8 @@ delete_old_files
                 last;
             } elsif ($line =~ /^cvs server: nothing known about/) {
                 $line =~ s/^cvs server: nothing known about//;
-                eprint "You tried to add the file $line, but it does not exist in this directory.\n";
-                $err = REVTOOL_BAD_ADDITION;
-            } elsif ($line =~ /^cvs server: \S+ already exists, with version number/) {
-                $line =~ s/^cvs server: (\S+) already exists, with version number (\S+)$/$1 (version $2)/;
-                eprint "The following file which you tried to add already exists in the repository:  $line.\n";
-                $err = REVTOOL_BAD_ADDITION;
+                eprint "You tried to remove the file $line, but it does not exist in the repository.\n";
+                $err = REVTOOL_BAD_REMOVAL;
             } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
                 if ($tries < 10) {
                     $err = -1;
@@ -490,6 +489,78 @@ delete_old_files
     return ($err);
 }
 
+# List tags
+sub
+list_tags
+{
+    my @files = @_;
+    my ($file_list, $cmd, $err, $tries, $line);
+    my @tags;
+
+    $file_list = join(" ", @files);
+    $cmd = sprintf("/bin/sh -c \"cvs $cvsroot status -v $file_list\"", ($opt_R ? "-R" : ""));
+
+    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
+        $err = 0;
+        dprint "About to run $cmd\n";
+        if (!open(CMD, "$cmd 2>&1 |")) {
+            eprint "Execution of \"$cmd\" failed -- $!";
+            return REVTOOL_COMMAND_FAILED;
+        }
+        while (<CMD>) {
+            chomp($line = $_);
+            dprint "$line\n";
+            # Check the output for tags or errors
+            if ($line =~ /^\s*Existing Tags:\s*$/) {
+                my $tmp;
+
+                while (($tmp = <CMD>) !~ /^\s*$/) {
+                    last if ($tmp =~ /^\s*No Tags Exist\s*$/);
+                    $tmp =~ s/\s*(\S+)\s*$/$1/;
+                    push @tags, $tmp;
+                }
+                last;
+            } elsif ($line =~ /^cvs \w+: cannot find password/) {
+                eprint "You must login to the repository first.\n";
+                $err = REVTOOL_BAD_LOGIN;
+                last;
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
+                if ($tries < 10) {
+                    $err = -1;
+                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
+                    sleep 3;
+                } else {
+                    eprint "The CVS server was unreachable.\n";
+                    $err = REVTOOL_NO_SERVER;
+                    last;
+                }
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
+                if ($tries < 10) {
+                    $err = -1;
+                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
+                    sleep 3;
+                } else {
+                    eprint "The CVS server kept crashing.\n";
+                    $err = REVTOOL_SERVER_CRASH;
+                    last;
+                }
+            }
+        }
+        close(CMD);
+        dprint "\"$cmd\" returned $?\n";
+    }
+    if ($err == 0 && $? != 0) {
+        eprint "An unknown error must have occured, because the command returned $?\n";
+        $err = REVTOOL_UNSPECIFIED_ERROR;
+    }
+    if ($#tags >= 0) {
+        print "Tags:  ", join(" ", @tags), "\n";
+    } else {
+        print "No tags found.\n";
+    }
+    return $err;
+}
+
 # Tag the sources
 sub
 tag_local_sources
@@ -515,36 +586,44 @@ tag_repository_sources
 sub
 main
 {
-    if ($opt_addlist) {
-        $addlist = $opt_addlist;
-    } elsif ($opt_a) {
-        $addlist = join(" ", @ARGV);
-        @ARGV = ();
+    if ($query) {
+        if ($query eq "t") {
+            &list_tags(@ARGV);
+        } elsif ($query eq "s") {
+            # Query file stats
+        }
     } else {
-        $addlist = 0;
-    }
-    if ($opt_remlist) {
-        $remlist = $opt_remlist;
-    } elsif ($opt_r && !$opt_a) {
-        $remlist = join(" ", @ARGV);
-        @ARGV = ();
-    } else {
-        $remlist = 0;
-    }
-    if ($addlist) {
-        &add_new_files($addlist);
-    }
-    if ($remlist) {
-        &delete_old_files($remlist);
-    }
-    if ($opt_g) {
-        $retval = &update_from_master(@ARGV);
-    } elsif ($opt_p) {
-        if (!($retval = &update_from_master($opt_x ? @ARGV : undef))) {
-            if ($opt_x) {
-                &commit_to_master(@ARGV, ($addlist ? $addlist : undef), ($remlist ? $remlist : undef));
-            } else {
-                &commit_to_master();
+        if ($opt_addlist) {
+            $addlist = $opt_addlist;
+        } elsif ($opt_a) {
+            $addlist = join(" ", @ARGV);
+            @ARGV = ();
+        } else {
+            $addlist = 0;
+        }
+        if ($opt_remlist) {
+            $remlist = $opt_remlist;
+        } elsif ($opt_r && !$opt_a) {
+            $remlist = join(" ", @ARGV);
+            @ARGV = ();
+        } else {
+            $remlist = 0;
+        }
+        if ($addlist) {
+            &add_new_files($addlist);
+        }
+        if ($remlist) {
+            &delete_old_files($remlist);
+        }
+        if ($opt_g) {
+            $retval = &update_from_master(@ARGV);
+        } elsif ($opt_p) {
+            if (!($retval = &update_from_master($opt_x ? @ARGV : undef))) {
+                if ($opt_x) {
+                    &commit_to_master(@ARGV, ($addlist ? $addlist : undef), ($remlist ? $remlist : undef));
+                } else {
+                    &commit_to_master();
+                }
             }
         }
     }
@@ -564,16 +643,34 @@ BEGIN {
 
     # See the Getopt::Mixed man page for details on the syntax of this line
     $valid_opts = "h help>h v version>v d debug>d g get>g p put>p a add>a r remove>r"
-                  . " R recurse>R t=s tag>t i=s import>i k=s D=s dir>D x exclusive>x"
-                  . " addlist=s remlist=s";
+                  . " q=s query>q R recurse>R t=s tag>t i=s import>i k=s D=s dir>D"
+                  . " x exclusive>x addlist=s remlist=s T=s rtag>T";
 
     Getopt::Mixed::getOptions($valid_opts);
     $debug = $opt_d;
     $binary = $opt_b;
+    if ($opt_i) {
+        $mode = "import";
+    } elsif ($opt_q) {
+        $mode = "query";
+        $query = $opt_q;
+    } elsif ($opt_p) {
+        $mode = "put";
+    } elsif ($opt_g) {
+        $mode = "get";
+    } elsif ($opt_a) {
+        $mode = "add";
+    } elsif ($opt_r) {
+        $mode = "remove";
+    } elsif ($opt_t) {
+        $mode = "tag";
+    } elsif ($opt_T) {
+        $mode = "rtag";
+    }
     $cvsroot = "-d $opt_D" if ($opt_D);
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.24 $ created on $Date: 2000/06/06 04:49:49 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.25 $ created on $Date: 2000/06/06 05:15:45 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -276,3 +276,8 @@ pkgtool now parses spec files and gets the sources, patches, and
 header variables correct.  It also handles %define'd macros properly
 AFAICT.  Theoretically, it should even handle recursive ones.
 ----------------------------------------------------------------------
+Mon Jun  5 22:26:40 2000                        Michael Jennings (mej)
+
+Fixed a bug with revtool -g and added the ability to query for a list
+of tags on a file (revtool -qt).  pkgtool will need this.
+----------------------------------------------------------------------
