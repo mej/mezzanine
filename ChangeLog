@@ -480,3 +480,8 @@ Fri Jun 18 14:09:59 2004                        Michael Jennings (mej)
 When importing new packages from SRPM's, always include an initial
 ChangeLog entry.  Hopefully this is it for 1.7 final.
 ----------------------------------------------------------------------
+Tue Jun 22 19:03:03 2004                        Michael Jennings (mej)
+
+Here's 1.7-2.  One minor fix which only involved the actual commit
+message in the "cvs log."
+----------------------------------------------------------------------

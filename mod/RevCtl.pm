@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.24 2004/06/18 18:13:38 mej Exp $
+# $Id: RevCtl.pm,v 1.25 2004/06/22 23:03:42 mej Exp $
 #
 
 package Mezzanine::RevCtl;
@@ -565,13 +565,23 @@ do_changelog_entry($$)
         }
     }
 
+    if (!open(LOGFILE, ">$logfile")) {
+        wprint "Unable to rewrite $logfile -- $!\n";
+        return "";
+    }
+    
     printf CL "%-25s%45s\n\n", $datestamp, $author;
+    printf LOGFILE "%-25s%45s\n\n", $datestamp, $author;
     print CL join("", @contents);
+    print LOGFILE join("", @contents);
     if (substr($contents[$#contents], -1, 1) ne "\n") {
         print CL "\n";
+        print LOGFILE "\n";
     }
     print CL "----------------------------------------------------------------------\n";
+    print LOGFILE "----------------------------------------------------------------------\n";
     close(CL);
+    close(LOGFILE);
     return $logfile;
 }
 
