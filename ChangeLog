@@ -617,3 +617,7 @@ Mon Jul 10 12:14:34 2000                        Michael Jennings (mej)
 
 Cleaned up a minor uninitialized variable warning.
 ----------------------------------------------------------------------
+Mon Jul 10 16:08:56 2000                        Michael Jennings (mej)
+
+Added --reset flag for resetting sticky options.
+----------------------------------------------------------------------

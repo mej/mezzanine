@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.40 2000/07/08 03:04:54 mej Exp $
+# $Id: revtool,v 1.41 2000/07/10 23:00:59 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -79,6 +79,7 @@ print_usage_info
     print "    -i --import              Import a new set of sources, or update the vendor branch for a package\n";
     print "    -T --rtag <tag>          Tag one or more complete modules directly\n";
     print "    -t --tag <tag>           Specify a symbolic tag for an operation, or tag local sources\n";
+    print "       --ptag <tag>          Specify a product tag (overrides tag checking so use with care)\n";
     print "    -b --branch              When performing a tag, make it a branch tag\n";
     print "    -l --login               Perform a login to the repository\n";
     print "    -R --recurse             Operate recursively (this is the default for some commands)\n";
@@ -87,6 +88,7 @@ print_usage_info
     print "    -x --exclusive           Only commit the specified files\n";
     print "       --addlist \"files\"     Specify which files to add so that adds and removes can coincide\n";
     print "       --remlist \"files\"     Specify which files to remove so that adds and removes can coincide\n";
+    print "       --reset               Reset sticky tags, dates, etc. in the current module\n";
     print "\n";
     exit(0);
 }
@@ -337,7 +339,9 @@ update_from_master
     my ($tag, $err, $tries, $line, $cmd, $file, $mode);
     my (@conflicts, @not_found, @removed, @co, @up);
 
-    if ($opt_t) {
+    if ($opt_reset) {
+        $tag = "-A";
+    } elsif ($opt_t) {
         $tag = "-r $opt_t";
     }
     dprint "File list is \"$file_list\", tag is \"$tag\"\n";
@@ -1278,7 +1282,7 @@ main
         if ($remlist) {
             &delete_old_files($remlist);
         }
-        if ($opt_g) {
+        if ($opt_g || $opt_reset) {
             $retval = &update_from_master(@ARGV);
         } elsif ($opt_p) {
             if (!($retval = &update_from_master($opt_x ? @ARGV : undef))) {
@@ -1308,7 +1312,7 @@ BEGIN {
     @valid_opts = ("h|help", "v|version", "d|debug", "g|get", "p|put", "a|add", "r|remove",
                    "q|query=s", "R|recurse", "t|tag=s", "i|import", "k=s", "D|dir=s",
                    "x|exclusive", "addlist=s", "remlist=s", "T|rtag=s", "l|login", "b|branch",
-                   "ptag");
+                   "ptag", "reset");
 
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
@@ -1332,6 +1336,8 @@ BEGIN {
         $mode = "tag";
     } elsif ($opt_T || $opt_b) {
         $mode = "rtag";
+    } elsif ($opt_reset) {
+        $mode = "reset";
     } elsif ($opt_l) {
         $mode = "login";
     }
@@ -1350,7 +1356,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.40 $ created on $Date: 2000/07/08 03:04:54 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.41 $ created on $Date: 2000/07/10 23:00:59 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
