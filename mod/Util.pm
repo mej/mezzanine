@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.19 2002/02/18 18:48:53 mej Exp $
+# $Id: Util.pm,v 1.20 2003/06/18 19:12:49 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -189,6 +189,9 @@ dprintf(@)
     return if (! $debug);
     $format = shift;
     (undef, undef, undef, $s) = caller(1);
+    if (!defined($s)) {
+        $s = "MAIN";
+    }
     (undef, $f, $l) = caller(0);
     $f =~ s/^.*\/([^\/]+)$/$1/;
     $s =~ s/^\w+:://g;
@@ -203,6 +206,9 @@ dprint(@)
 
     return if (! $debug);
     (undef, undef, undef, $s) = caller(1);
+    if (!defined($s)) {
+        $s = "MAIN";
+    }
     (undef, $f, $l) = caller(0);
     $f =~ s/^.*\/([^\/]+)$/$1/;
     $s =~ s/\w+:://g;

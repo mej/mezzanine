@@ -188,3 +188,10 @@ Mon Jun  2 14:47:13 2003                        Michael Jennings (mej)
 
 Forgot a ) too.
 ----------------------------------------------------------------------
+Wed Jun 18 16:58:23 2003                        Michael Jennings (mej)
+
+Fixed handling of top-level warning/debug messages.
+
+Updated uptool to do automated version checking using a Perl version
+of my LibAST version comparison function.
+----------------------------------------------------------------------

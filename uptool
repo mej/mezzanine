@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: uptool,v 1.14 2003/06/02 17:06:11 mej Exp $
+# $Id: uptool,v 1.15 2003/06/18 19:12:49 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -86,7 +86,7 @@ get_remote_listing($$)
             push @{$rpkgs->{$pkg}{REL}}, $parts[2];
             push @{$rpkgs->{$pkg}{ARCH}}, $parts[3];
             push @{$rpkgs->{$pkg}{FILES}}, $fname;
-            dprint "Adding remote package $pkg:  $fname\n";
+            #dprint "Adding remote package $pkg:  $fname\n";
         }
     }
     return @flist;
@@ -101,7 +101,7 @@ get_local_listing($)
     if ($path !~ /^\//) {
         $path = &getcwd() . $path;
     }
-    dprint "Looking for files matching $match in $path\n";
+    #dprint "Looking for files matching $match in $path\n";
     @flist = &grepdir(sub { /$match/ }, $path);
     foreach my $fname (@flist) {
         my $pkg;
@@ -114,7 +114,7 @@ get_local_listing($)
         push @{$lpkgs->{$pkg}{REL}}, $parts[2];
         push @{$lpkgs->{$pkg}{ARCH}}, $parts[3];
         push @{$lpkgs->{$pkg}{FILES}}, $fname;
-        dprint "Adding local package $pkg:  $fname\n";
+        #dprint "Adding local package $pkg:  $fname\n";
     }
     return @flist;
 }
@@ -176,29 +176,39 @@ compare_lists($$)
         print "Checking $pkg...\n";
 
         # Find the most recent version of that package on the remote site.
-        for ($rpm = 0, $i = 1; $i < scalar(@remote_list); $i++) {
-            my ($v1, $v2);
+        for ($rpm = 0, $i = 0; $i < scalar(@remote_list); $i++) {
+            my ($v1, $v2, $x);
 
             $v1 = "$rpkgs->{$pkg}{VER}[$rpm]-$rpkgs->{$pkg}{REL}[$rpm]";
             $v2 = "$rpkgs->{$pkg}{VER}[$i]-$rpkgs->{$pkg}{REL}[$i]";
-            if (&rpm_compare_versions($v1, $v2)) {
+            dprint "Comparing $v1 and $v2.\n";
+            $x = &rpm_compare_versions($v1, $v2);
+            if ($x) {
+                dprintf("\&rpm_compare_versions():  $v1 %s $v2\n",
+                        (($x > 0) ? ('>') : ('<')));
                 $rpm = $i;
-            } elsif (0 && &compare_packages($rpm, $remote_list[$i])) {
-                $rpm = $remote_list[$i];
+#            } elsif (&compare_packages($rpm, $remote_list[$i])) {
+#                dprint "\&rpm_compare_versions():  $v1 == $v2\n";
+#                $rpm = $i;
+            } else {
+                dprint "\&rpm_compare_versions():  $v1 == $v2\n";
             }
         }
 
+        dprint "Chose $remote_list[$rpm].\n";
         for ($i = 0; $i < scalar(@remote_list); $i++) {
-            if (($rpkgs->{$pkg}{VER}[$i] eq $rpkgs->{$pkg}{REL}[$rpm])
-                && ($rpkgs->{$pkg}{VER}[$i] eq $rpkgs->{$pkg}{REL}[$rpm])) {
+            if (($rpkgs->{$pkg}{VER}[$i] eq $rpkgs->{$pkg}{VER}[$rpm])
+                && ($rpkgs->{$pkg}{REL}[$i] eq $rpkgs->{$pkg}{REL}[$rpm])) {
                 xpush @tmp, $rpkgs->{$pkg}{FILES}[$i];
             }
         }
 
         # Now, download all the matching files.
+        dprint "File list for $pkg:  ", join(", ", @tmp), "\n";
         foreach $rpm (@tmp) {
             # If we have it, continue.
             if (defined($lpkgs->{$pkg}) && grep(/^\Q$rpm\E$/, @{$lpkgs->{$pkg}{FILES}})) {
+                dprint "Not downloading $rpm (", join(", ", @{$lpkgs->{$pkg}{FILES}}), ").  Next!\n";
                 next;
             }
 
@@ -341,7 +351,9 @@ fetch_updates(@)
         &show_cmds($dir);
         print " ; ";
     }
-    print "true\n";
+    if ($pkgcnt > 0) {
+        print "true\n";
+    }
 
     print "Update complete.  Found $pkgcnt outdated/missing packages.\n";
     return 1;
@@ -368,7 +380,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.14 $ created on $Date: 2003/06/02 17:06:11 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.15 $ created on $Date: 2003/06/18 19:12:49 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
