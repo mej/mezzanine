@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: imgtool,v 1.1 2000/08/24 05:10:45 mej Exp $
+# $Id: imgtool,v 1.2 2000/12/12 22:56:05 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -305,6 +305,7 @@ install_packages
     local *CMD;
 
     if (! $keep) {
+        print "Cleaning old image tree....\n";
         &nuke_tree($imagedir);
         &mkdirhier("$imagedir/var/lib/rpm");
         system("rpm --initdb --root=$imagedir");
@@ -389,7 +390,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.1 $ created on $Date: 2000/08/24 05:10:45 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.2 $ created on $Date: 2000/12/12 22:56:05 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -946,3 +946,7 @@ Thu Nov 16 16:18:07 2000                        Michael Jennings (mej)
 Several small bug fixes and improvements I've made over the past
 couple days.
 ----------------------------------------------------------------------
+Tue Dec 12 14:53:22 2000                        Michael Jennings (mej)
+
+Make sure to remove $LD_RUN_PATH.
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.113 2000/11/16 23:18:47 mej Exp $
+# $Id: buildtool,v 1.114 2000/12/12 22:56:05 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1873,7 +1873,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.113 $ created on $Date: 2000/11/16 23:18:47 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.114 $ created on $Date: 2000/12/12 22:56:05 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1990,6 +1990,7 @@ main
     # Environment modifications
     $ENV{MAKE} = "make";  # Make sure we don't parallel build, because it doesn't work.
     $ENV{CFLAGS} = ($opt_C ? $opt_C : "-O2 -march=pentium");
+    $ENV{LD_RUN_PATH} = "";  # Don't hard code any RPATH's into binaries
     $ENV{LD_LIBRARY_PATH} = "";  # Make glibc happy
     $ENV{PATH} = "/usr/build/bin:/usr/local/build/bin:/usr/lib/qt-1.45/bin:/usr/lib/qt-2.1.0/bin"
                   . ":/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/X11R6/bin:/usr/kerberos/sbin"

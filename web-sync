@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 28 Sept 2000
 #
-# $Id: web-sync,v 1.5 2000/11/16 23:18:47 mej Exp $
+# $Id: web-sync,v 1.6 2000/12/12 22:56:05 mej Exp $
 #
 
 if [ ! -z "$SUDO_USER" ]; then
@@ -40,8 +40,11 @@ for i in $* ; do
         rm -f RPMS/*.rpm
         (cd cd ; find . \( -name '*.rpm' -a ! -name '*src.rpm' \) -exec cp -a {} ../RPMS/ \;)
         echo "*** Creating SRPMS directory ***"
-        rm -f SRPMS/*.rpm
-        (cd cd ; find . -name '*src.rpm' -exec cp -a {} ../SRPMS/ \;)
+        if [ "$j" = "os" ]; then
+            $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-$j-srpms/SRPMS/ $LOCAL_DIR/$i/$j/SRPMS/
+        else
+            $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-$j-srpms/Powertools/SRPMS/ $LOCAL_DIR/$i/$j/SRPMS/
+        fi
         echo "*** Fixing ownerships and permissions ***"
         $CHOWN_CMD RPMS SRPMS iso
         $CHMOD_CMD RPMS SRPMS iso
