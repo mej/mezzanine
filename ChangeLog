@@ -90,3 +90,8 @@ Wed May 10 21:04:23 2000                        Michael Jennings (mej)
 Fixes to the stuff that happened last night are done, along with the
 explode stage.
 ----------------------------------------------------------------------
+Wed May 10 21:09:43 2000                        Michael Jennings (mej)
+
+Fixed a tiny bug in revtool that kept the new product file from being
+added properly.  Doh!
+----------------------------------------------------------------------

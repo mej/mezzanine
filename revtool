@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.14 2000/05/11 03:56:57 mej Exp $
+# $Id: revtool,v 1.15 2000/05/11 04:02:29 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -145,6 +145,7 @@ commit_to_master
     close(CL);
     close(LOGFILE);
     $command = sprintf("/bin/sh -c \"cvs $cvsroot commit %s -F $logfile $file_list\"", ($opt_t ? "-r $opt_t" : ""));
+    dprint "About to run $command\n";
     $rc = system($command) >> 8;
     unlink $logfile;
     return ($rc);
@@ -183,6 +184,7 @@ add_new_files
     }
     $file_list = join(" ", @files);
     $command = sprintf("/bin/sh -c \"cvs $cvsroot add %s $file_list\"", ($opt_k ? "-k$opt_k" : ""));
+    dprint "About to run $command\n";
     $rc = system($command) >> 8;
     return ($rc);
 }
@@ -202,6 +204,7 @@ delete_old_files
     }
     $file_list = join(" ", @files);
     $command = sprintf("/bin/sh -c \"cvs $cvsroot remove -f %s $file_list\"", ($opt_R ? "-R" : ""));
+    dprint "About to run $command\n";
     $rc = system($command) >> 8;
     return ($rc);
 }
@@ -234,14 +237,16 @@ main
     if ($opt_addlist) {
         $addlist = $opt_addlist;
     } elsif ($opt_a) {
-        $addlist = @ARGV;
+        $addlist = join(" ", @ARGV);
+        @ARGV = ();
     } else {
         $addlist = 0;
     }
     if ($opt_remlist) {
         $remlist = $opt_remlist;
     } elsif ($opt_r && !$opt_a) {
-        $remlist = @ARGV;
+        $remlist = join(" ", @ARGV);
+        @ARGV = ();
     } else {
         $remlist = 0;
     }
