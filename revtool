@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.3 2000/05/06 06:38:21 mej Exp $
+# $Id: revtool,v 1.4 2000/05/06 06:44:26 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -114,6 +114,30 @@ update_from_master {
 
 }
 
+# Add new files
+sub
+add_new_files {
+    my @files = @_;
+    my ($file_list, $command, $rc);
+
+    $file_list = join(" ", @files);
+    $command = sprintf("/bin/sh -c \"cvs add %s $file_list\"", ($opt_k ? "-k$opt_k" : ""));
+    $rc = system($command) >> 8;
+    return ($rc);
+}
+
+# Delete old files
+sub
+delete_old_files {
+    my @files = @_;
+    my ($file_list, $command, $rc);
+
+    $file_list = join(" ", @files);
+    $command = sprintf("/bin/sh -c \"cvs remove -f %s $file_list\"", ($opt_R ? "-R" : ""));
+    $rc = system($command) >> 8;
+    return ($rc);
+}
+
 # Tag the sources
 sub
 tag_local_sources {
@@ -136,6 +160,11 @@ tag_repository_sources {
 sub
 main {
 
+    if ($opt_a) {
+        &add_new_files(@ARGV);
+    } elsif ($opt_r) {
+        &delete_old_files(@ARGV);
+    }
     if ($opt_g) {
         &update_from_master();
     }
@@ -153,7 +182,7 @@ BEGIN {
     chomp($hostname = `hostname`);
 
     # See the Getopt::Mixed man page for details on the syntax of this line
-    $valid_opts = "h help>h v version>v d debug>d g p t=s i=s r=s";
+    $valid_opts = "h help>h v version>v d debug>d g p a r t=s i=s k=s";
 
     Getopt::Mixed::getOptions($valid_opts);
     $debug = $opt_d;
