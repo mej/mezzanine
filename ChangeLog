@@ -506,3 +506,7 @@ Mon Jun 19 21:20:59 2000                        Michael Jennings (mej)
 Switched to using Getopt::Long to avoid needing the extra Perl module.
 The option syntax should be exactly the same.
 ----------------------------------------------------------------------
+Mon Jun 19 21:54:11 2000                        Michael Jennings (mej)
+
+Spec file for Avalon.
+----------------------------------------------------------------------
