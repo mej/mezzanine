@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.24 2003/12/30 23:02:55 mej Exp $
+# $Id: Build.pm,v 1.25 2003/12/31 19:40:25 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -191,6 +191,15 @@ prepare_build_tree
     mkdir($buildroot, 0775);
     xpush @my_dirs, $buildroot;
     dprint "I created:  ", join(" ", @my_dirs), "\n";
+
+    if ($instroot) {
+        my $ret;
+
+        $ret = &install_hints();
+        if ($ret) {
+            wprint "Hint installation failed:  $ret\n";
+        }
+    }
 
     return ($name, $topdir, $buildroot);
 }

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.16 2003/12/31 11:53:50 mej Exp $
+# $Id: Prod.pm,v 1.17 2003/12/31 19:40:25 mej Exp $
 #
 
 package Mezzanine::Prod;
@@ -412,13 +412,19 @@ parse_product_entry
         }
         return 0;
     }
+
     # Now that we've got the name/version/release in their final forms, set up the data structures.
     $pkgs->{$name}{"TYPE"} = $type;
     $pkgs->{$name}{"MODULE"} = $module;
     $pkgs->{$name}{"FILENAME"} = ($filename ? $filename : $module);
-    $pkgs->{$name}{"INSTROOT"} = &pkgvar_instroot();
+    $pkgs->{$name}{"INSTROOT"} = &pkgvar_get("instroot");
+    $pkgs->{$name}{"INSTROOT_INIT"} = &pkgvar_get("instroot_init");
+    $pkgs->{$name}{"INSTROOT_RESET"} = &pkgvar_get("instroot_reset") || $pkgs->{$name}{"INSTROOT_INIT"};
+    $pkgs->{$name}{"INSTROOT_COPY"} = &pkgvar_get("instroot_copy") || $pkgs->{$name}{"INSTROOT_RESET"};
+    $pkgs->{$name}{"HINTS"} = &pkgvar_get("hints");
+    $pkgs->{$name}{"HINT_INSTALLER"} = &pkgvar_get("hint_installer");
     dprint "New package:  $name (module $pkgs->{$name}{MODULE}, "
-        . "filename $pkgs->{$name}{FILENAME}) is a $pkgs->{$name}{TYPE}\n";
+        . "filename $pkgs->{$name}{FILENAME}) is a(n) $pkgs->{$name}{TYPE}\n";
     foreach $pkgvar (keys %pkgvars) {
         if ($pkgvars{$pkgvar} !~ /^$/) {
             $pkgs->{$name}{$pkgvar} = $pkgvars{$pkgvar};
