@@ -1,6 +1,6 @@
 %define name     avalon
 %define ver      2.0
-%define rel      0.10
+%define rel      0.11
 %define prefix   /usr
 
 Summary: Avalon -- The VA Software Engineering Build System
@@ -15,7 +15,7 @@ Packager: Michael Jennings <mej@valinux.com>
 Vendor: VA Linux Systems (http://www.valinux.com/)
 Docdir: %{prefix}/doc
 URL: http://www.valinux.com/
-Requires: perl
+Requires: perl, perl-libnet
 
 %description
 Avalon is a collection of tools, written primarily in Perl, which
