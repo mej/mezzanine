@@ -1265,3 +1265,10 @@ can take alternative CVSROOT's.  (Fixes bug #1047.)
 Added a -f/--force option to imgtool.  The default behavior is now to
 exit if a failure occurs.  (Fixes bug #1249.)
 ----------------------------------------------------------------------
+Thu Jun 14 12:43:56 2001                        Michael Jennings (mej)
+
+That "feature" has pissed me off for the last time.  From now on, SRPM
+packages we plan to build will be completely exploded no matter what.
+Doing it the other way wasted far too much time and was designed for
+a purpose for which no one ever uses it.
+----------------------------------------------------------------------

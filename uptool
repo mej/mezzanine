@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: uptool,v 1.7 2001/05/02 21:56:10 mej Exp $
+# $Id: uptool,v 1.8 2001/06/14 19:48:08 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -302,12 +302,13 @@ fetch_updates(@)
     print "Closing session...\n";
     $session->quit();
 
+    $pkgcnt = 0;
     foreach my $dir (keys %adds) {
         $pkgcnt += scalar(@{$adds{$dir}});
         &show_cmds($dir);
     }
 
-    print "Update complete.  Found $pkgcnt out-dated/missing packages.\n";
+    print "Update complete.  Found $pkgcnt outdated/missing packages.\n";
     return 1;
 }
 
@@ -331,7 +332,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.7 $ created on $Date: 2001/05/02 21:56:10 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.8 $ created on $Date: 2001/06/14 19:48:08 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

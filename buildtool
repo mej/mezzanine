@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.141 2001/06/08 23:40:49 mej Exp $
+# $Id: buildtool,v 1.142 2001/06/14 19:48:08 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1264,24 +1264,6 @@ do_component_stage
             # package we plan on actually building at some point.
             $pkgs->{$pkg}{SPECFILE} = "$builddir/SPECS/$specfile";
 
-            ### Check to make sure each file in the manifest is in the proper place.
-            $err = 0;
-            foreach $piece (@manifest) {
-                # FIXME:  Need to handle _topdir for people who did their own rpm* files.
-                if (($piece =~ /\.spec(\.in)?$/ && -f "$builddir/SPECS/$piece")
-                    || (-f "$builddir/SOURCES/$piece")) {
-                    next;
-                }
-                $err = 1;  # Something is missing.  We must explode this SRPM.
-                last;
-            }
-            ### If everything is there, skip this stage for this package.
-            if (! $err) {
-                nprint "$progname:  SRPM has already been completely exploded.\n";
-                nprint "$progname:  Component stage for \"$pkg\" is complete.\n";
-                next;
-            }
-
             ### Explode the SRPM into its components
             $cmd = "$pkgtool -P \"$rpm\" -R $rpmrc -ip $pkgs->{$pkg}{FILENAME}";
             dprint "About to run \"$cmd\"\n";
@@ -1799,7 +1781,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.141 $ created on $Date: 2001/06/08 23:40:49 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.142 $ created on $Date: 2001/06/14 19:48:08 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

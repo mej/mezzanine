@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 28 Sept 2000
 #
-# $Id: web-sync,v 1.13 2001/05/29 19:23:39 mej Exp $
+# $Id: web-sync,v 1.14 2001/06/14 19:48:08 mej Exp $
 #
 
 if [ ! -z "$SUDO_USER" ]; then
@@ -15,7 +15,7 @@ elif [ "x$USER" = "x" ]; then
 fi
 
 SCP_CMD="scp -C"
-RSYNC_CMD="rsync -av --exclude=CVS --exclude=.cvsignore --exclude=.buildtool.symlinks --delete --delete-excluded"
+RSYNC_CMD="rsync -av --exclude=CVS --exclude=.cvsignore --exclude=.*.symlinks --delete --delete-excluded"
 CHOWN_CMD="chown -R $USER:engr"
 CHMOD_CMD="chmod -R ug+w,a+r"
 
