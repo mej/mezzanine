@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.26 2000/05/24 22:32:23 mej Exp $
+# $Id: buildtool,v 1.27 2000/05/25 02:29:47 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -64,6 +64,7 @@ sub BUILDTOOL_SUCCESS()           {0;}
 sub BUILDTOOL_PACKAGE_FAILED()    {1;}
 sub BUILDTOOL_BAD_PRODUCT()       {2;}
 sub BUILDTOOL_FATAL_ERROR()       {3;}
+sub BUILDTOOL_CHILD_EXEC_FAILED() {4;}
 sub BUILDTOOL_TERMINATED()        {50;}
 sub BUILDTOOL_CRASHED()           {60;}
 
@@ -107,7 +108,7 @@ get_timestamp
 sub
 fatal_error
 {
-    my $msg = $_[0];
+    my $msg = "$progname:  FATAL:  $_[0]";
 
     print STDERR $msg;
     print $GLOBAL_LOG $msg if ($GLOBAL_LOG);
@@ -119,8 +120,8 @@ sub
 dprintf
 {
     return if (! $debug);
-    print "[debug:$progname] ";
-    printf @_;
+    print "[debug:$progname] " if (! $slave);
+    printf @_ if (! $slave);
     if ($GLOBAL_LOG) {
         print $GLOBAL_LOG "[debug:$progname] ";
         printf $GLOBAL_LOG @_;
@@ -130,7 +131,9 @@ sub
 dprint
 {
     return if (! $debug);
-    print "[debug:$progname] ", @_;
+    if (! $slave) {
+        print "[debug:$progname] ", @_;
+    }
     if ($GLOBAL_LOG) {
         print $GLOBAL_LOG "[debug:$progname] ", @_;
     }
@@ -160,40 +163,40 @@ eprint
 sub
 nprintf
 {
-    return if ($verbosity < 2);
-    printf @_;
     if ($GLOBAL_LOG) {
         printf $GLOBAL_LOG @_;
     }
+    return if ($verbosity < 2);
+    printf @_;
 }
 sub
 nprint
 {
-    return if ($verbosity < 2);
-    print @_;
     if ($GLOBAL_LOG) {
         print $GLOBAL_LOG @_;
     }
+    return if ($verbosity < 2);
+    print @_;
 }
 
 # Quiet print (i.e., print in -q mode but not in -Q mode)
 sub
 qprintf
 {
-    return if ($verbosity < 1);
-    printf @_;
     if ($GLOBAL_LOG) {
         printf $GLOBAL_LOG @_;
     }
+    return if ($verbosity < 1);
+    printf @_;
 }
 sub
 qprint
 {
-    return if ($verbosity < 1);
-    print @_;
     if ($GLOBAL_LOG) {
         print $GLOBAL_LOG @_;
     }
+    return if ($verbosity < 1);
+    print @_;
 }
 
 # Handle a terminate signal
@@ -202,8 +205,8 @@ handle_signal
 {
     my $sig = $_[0];
 
+    &summarize_failures() if ($#failed_pkgs >= 0);
     eprint "Someone sent me a SIG$sig asking me to exit, so I shall.\n";
-    &summarize_failures();
     close($GLOBAL_LOG) if ($GLOBAL_LOG);
     exit BUILDTOOL_TERMINATED;
 }
@@ -260,6 +263,32 @@ mkdirhier
         }
     }
     dprint "Something went wrong in mkdirhier()!\n" if (! -d $_[0]);
+}
+
+# Spawn a child, return its PID to the parent and exec the child
+sub
+spawn_cmd
+{
+    my $cmd = join(" ", @_);
+    my $pid;
+
+    dprint "spawn_cmd($cmd)...\n";
+    do {
+        if ($pid = fork()) {
+            # Parent
+            dprint "Child process is $pid\n";
+            return $pid;
+        } elsif (defined $pid) {
+            # Child
+            exec $cmd;
+            exit BUILDTOOL_CHILD_EXEC_FAILED;
+        } elsif ($! !~ /No more processes/ && $! !~ /Resource temporarily unavailable/) {
+            &fatal_error("fork() failed -- $!\n");
+        }
+        # Temporary failure
+        dprint "Failed temporarily -- $!\n";
+        sleep 5;
+    } while (1);
 }
 
 # Translate abbreviated variable names into their canonical forms
@@ -782,9 +811,15 @@ sub
 do_bootstrap_stage
 {
     my ($line, $err, $msg);
-    my @p = @packages;
+    my @p;
     local *RPMMACROS;
     local *RPMRC;
+
+    if ($#_ >= 0) {
+        @p = @_;
+    } else {
+        @p = @packages;
+    }
 
     qprint "$progname:  Entering the bootstrap stage.  (${\(&get_timestamp())})\n";
     if (! -d "$builddir") {
@@ -871,9 +906,15 @@ do_compose_stage
     my ($specfile, $target, $pn, $dir, $line, $src, $tarball, $cwd);
     my ($err, $msg, $srpm) = (0, 0, 0);
     my (@contents, @tmp, @dirs, @sfiles, @srcs);
-    my @p = @packages;
+    my @p;
     local *DIR;
     local *CMD;
+
+    if ($#_ >= 0) {
+        @p = @_;
+    } else {
+        @p = @packages;
+    }
 
     qprint "$progname:  Entering the compose stage.  (${\(&get_timestamp())})\n";
     chomp($cwd = `pwd`);
@@ -1041,8 +1082,14 @@ do_explode_stage
 {
     my ($cmd, $err, $msg, $line, $specfile, $rpm) = undef;
     my @manifest;
-    my @p = @packages;
+    my @p;
     local *RPM;
+
+    if ($#_ >= 0) {
+        @p = @_;
+    } else {
+        @p = @packages;
+    }
 
     qprint "$progname:  Entering the explode stage.  (${\(&get_timestamp())})\n";
 
@@ -1154,7 +1201,13 @@ do_build_stage
     my ($cmd, $line, $specfile, $rpm, $tmp, $target) = undef;
     my ($target_age, $orig_age, $spec_age);
     my ($err, $msg, $srpm) = (0, 0, 0);
-    my @p = @packages;
+    my @p;
+
+    if ($#_ >= 0) {
+        @p = @_;
+    } else {
+        @p = @packages;
+    }
 
     qprint "$progname:  Entering the build stage.  (${\(&get_timestamp())})\n";
 
@@ -1201,8 +1254,14 @@ do_package_stage
     my ($path, $version, $release);
     my @outfiles;
     my @contents;
-    my @p = @packages;
+    my @p;
     local *DIR;
+
+    if ($#_ >= 0) {
+        @p = @_;
+    } else {
+        @p = @packages;
+    }
 
     qprint "$progname:  Entering the package accumulation stage.  (${\(&get_timestamp())})\n";
 
@@ -1271,7 +1330,13 @@ do_package_stage
 sub
 do_iso_stage
 {
-    my @p = @packages;
+    my @p;
+
+    if ($#_ >= 0) {
+        @p = @_;
+    } else {
+        @p = @packages;
+    }
 
     qprint "$progname:  Entering the ISO image stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (@p) {
@@ -1289,7 +1354,13 @@ do_iso_stage
 sub
 do_cleanup_stage
 {
-    my @p = @packages;
+    my @p;
+
+    if ($#_ >= 0) {
+        @p = @_;
+    } else {
+        @p = @packages;
+    }
 
     qprint "$progname:  Entering the cleanup stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (@p) {
@@ -1325,15 +1396,79 @@ summarize_failures
     }
 }
 
+# This routine handles the role of "master buildtool"
+sub
+parallel_build
+{
+    my ($pid, $err, $idx, $pkg, $cmd, $var_string, $pname, $line, $nprocs);
+    my (@children, @vars);
+    my %child_pkg;
+    local *ERRLOG;
+
+    if (! -d "$basedir/logs") {
+        mkdir("$basedir/logs", 0755) || &fatal_error("Unable to mkdir $basedir/logs -- $!\n");
+    }
+    $idx = 0;
+    # Set $nprocs equal to the index within @children that should not be exceeded.
+    $nprocs = $num_cpus - 1;
+    do {
+        for (; $idx <= $#packages && $#children < $nprocs; $idx++) {
+            # Spawn a buildtool child process to handle the next package
+            $pkg = $packages[$idx];
+            $pname = "$pkgs->{$pkg}{TYPE}:$pkgs->{$pkg}{MODULE}/$pkgs->{$pkg}{FILENAME}";
+            $var_string = "";
+            foreach $var (keys %{$pkgs->{$pkg}}) {
+                next if ($var eq "TYPE");
+                $var_string .= "$var=$pkgs->{$pkg}{$var} ";
+            }
+            $cmd = "$buildtool --master $master_pid -Ql $builddir/logs/$pkg.log -p \"$pname $var_string\" </dev/null >/dev/null 2>&1";
+            $pid = &spawn_cmd($cmd);
+            push @children, $pid;
+            $child_pkg{$pid} = $pkg;
+        }
+
+        # Out of space for children for now.  Wait till one dies.
+        $pid = waitpid(-1, 0);
+        next if (! $child_pkg{$pid});
+        $pkg = $child_pkg{$pid};
+        $err = $? >> 8;
+        dprint "Child process $pid returned code $err\n";
+        if ($pid == -1) {
+            # This should never happen.
+            eprint "Ummm, waitpid() returned -1.  That wasn't very nice.  I'm offended.\n";
+            next;
+        }
+        @children = grep($_ != $pid, @children);
+        if ($err != BUILDTOOL_SUCCESS) {
+            if ($err == BUILDTOOL_CHILD_EXEC_FAILED) {
+                &fail_package($pkg, "pre-build", "exec() of child failed");
+            } else {
+                my @tmp;
+
+                # The last line of the logfile should give the error message
+                if (!open(ERRLOG, "$builddir/logs/$pkg.log")) {
+                    &fail_package($pkg, "???", "Child process returned $err but the log file is missing");
+                    next;
+                }
+                @tmp = <ERRLOG>;
+                close(ERRLOG);
+                chomp($line = $tmp[$#tmp]);
+                if ($line =~ /^$progname:  Error:  Package \S+ failed at the (\w+) stage:  (.*)$/) {
+                    &fail_package($pkg, $1, $2);
+                } else {
+                    $line =~ s/^\w+:  (Error:  )?\s*//;
+                    &fail_package($pkg, "???", "Child process exited with code $err -- $line");
+                }
+            }
+        }
+        # End of loop.  Time to spawn the next child.
+    } while ($#children >= 0);
+}
+
 # This routine does the actual build process
 sub
 build_process
 {
-    $ENV{MAKE} = "make";  # Make sure we don't parallel build, because it doesn't work.
-    $ENV{CFLAGS} = "-O2 -march=pentium";  # A bit of optimization, but not much.
-    $ENV{LD_LIBRARY_PATH} = "";  # Make glibc happy
-    $ENV{PATH} = "/usr/build/bin:/usr/local/build/bin:/usr/lib/qt-2.1.0/bin:/usr/lib/qt-1.45/bin:$ENV{PATH}";
-
     # Perform the build in stages, checking after each one to see if we should stop
     &do_bootstrap_stage();
     return if ($opt_b eq "s");
@@ -1433,6 +1568,12 @@ main
     $SIG{TTOU} = \&handle_fatal_signal;
     $SIG{__WARN__} = \&handle_warning;
 
+    # Environment modifications
+    $ENV{MAKE} = "make";  # Make sure we don't parallel build, because it doesn't work.
+    $ENV{CFLAGS} = "-O2 -march=pentium";  # A bit of optimization, but not much.
+    $ENV{LD_LIBRARY_PATH} = "";  # Make glibc happy
+    $ENV{PATH} = "/usr/build/bin:/usr/local/build/bin:/usr/lib/qt-2.1.0/bin:/usr/lib/qt-1.45/bin:$ENV{PATH}";
+
     # Try to parse the product name we were given into a name or a name-version combo
     $prod = $opt_p;
     if ($prod =~ /^(\S+)-((?:\d|us|a|alpha|b|beta)[^-]+)$/) {
@@ -1460,8 +1601,12 @@ main
     dprint "Products to be built:  ", join(" ", @products), "\n";
 
     if ($opt_b ne "Z") {  # -dbZ, a.k.a. How To Debug the Parser :-)
-        &build_process();
-        &summarize_failures();
+        if ($master) {
+            &parallel_build();
+            &summarize_failures();
+        } else {
+            &build_process();
+        }
     }
     close(LOGFILE) if ($GLOBAL_LOG);
     return (defined(@failed_pkgs) && $#failed_pkgs != -1) ? BUILDTOOL_PACKAGE_FAILED : BUILDTOOL_SUCCESS;
