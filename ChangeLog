@@ -601,3 +601,7 @@ Wed Jul  5 19:52:25 2000                        Michael Jennings (mej)
 
 Doh.  The -R option was broken for builds.
 ----------------------------------------------------------------------
+Thu Jul  6 18:40:55 2000                        Michael Jennings (mej)
+
+buildtool should now leave the source file generation to pkgtool.
+----------------------------------------------------------------------

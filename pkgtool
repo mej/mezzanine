@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.10 2000/07/06 02:43:59 mej Exp $
+# $Id: pkgtool,v 1.11 2000/07/07 01:32:40 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -474,6 +474,8 @@ create_source_file
         print "Generating $tarball...\n";
         if ($tar) {
             $cmd = $tar;
+            $cmd =~ s/\%f/$src_files/;
+            $cmd =~ s/\%t/$destdir$tarball/;
         } else {
             if (! $zip) {
                 if ($tarball =~ /(gz|Z)$/) {
@@ -821,14 +823,15 @@ rpm_generate_source_files
     my (@contents, @tags, @srcs, @all_srcs);
     local (*DIR, *CMD);
 
-    $tag_prefix = $release_tag;
-    if (! chdir($module)) {
+    if ($module && (!chdir($module))) {
         return PKGTOOL_BAD_MODULE;
     }
     if (-f "CVS/Repository") {
         chomp($modname = &cat_file("CVS/Repository"));
-    } else {
+    } elsif ($module) {
         ($modname = $module) =~ s/^.*\/([^\/]+)$/$1/;
+    } else {
+        return PKGTOOL_BAD_MODULE;
     }
     if ($destdir && $destdir !~ /\/$/) {
         $destdir .= "/";
@@ -838,6 +841,12 @@ rpm_generate_source_files
     closedir(DIR);
 
     &parse_spec_file($specfile) if ($specfile);
+
+    if (! $release_tag) {
+        ($release_tag = "$define{PACKAGE_NAME}-$define{PACKAGE_VERSION}") =~ tr/[a-z]/[A-Z]/;
+        $release_tag =~ s/[^-A-Z0-9]/-/g;
+    }
+    $tag_prefix = $release_tag;
 
     if ($srcs) {
         @srcs = split(/[\s,]/, $srcs);
@@ -1021,7 +1030,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.10 $ created on $Date: 2000/07/06 02:43:59 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.11 $ created on $Date: 2000/07/07 01:32:40 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.79 2000/07/05 23:56:43 mej Exp $
+# $Id: buildtool,v 1.80 2000/07/07 01:32:40 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -978,7 +978,7 @@ build_pkgs
     $prog = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
     $target = ($pkgs->{$pkg}{ARCH} ? " --target=$pkgs->{$pkg}{ARCH}" : ($main::target ? $main::target : ""));
     $prog = "-P '$prog$target'";
-    $cmd = "pkgtool $prog -b -R \"/usr/lib/rpm/rpmrc:$rpmrc\" --root \"$buildroot/$pkg-root\" -s $specfile";
+    $cmd = "$pkgtool $prog -b -R \"/usr/lib/rpm/rpmrc:$rpmrc\" --root \"$buildroot/$pkg-root\" -s $specfile";
     dprint "About to run \"$cmd\"\n";
     if (!open(PKGTOOL, "$cmd </dev/null 2>&1 |")) {
         return (1, "Execution of \"$cmd\" failed -- $!", undef);
@@ -1008,6 +1008,58 @@ build_pkgs
     }
     dprint "build_pkgs():  Returning $err, $msg, $srpm\n";
     return ($err, $msg, $srpm);
+}
+
+# Generate source files and patches using pkgtool
+sub
+gen_sources
+{
+    my ($pkg, $specfile) = @_;
+    my ($cmd, $prog, $line, $target, $srcs, $htag, $rtag, $tar, $zip);
+    my ($err, $msg) = (0, 0);
+    local *PKGTOOL;
+
+    $prog = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
+    $target = ($pkgs->{$pkg}{ARCH} ? " --target=$pkgs->{$pkg}{ARCH}" : ($main::target ? $main::target : ""));
+    $prog = "-P '$prog$target'";
+    $srcs = ($pkgs->{$pkg}{SRCS} ? "-o '$pkgs->{$pkg}{SRCS}'" : "");
+    if ($pkgs->{$pkg}{TAR}) {
+        $tar = $pkgs->{$pkg}{TAR};
+        $tar = "--tar '$tar'";
+    } elsif ($pkgs->{$pkg}{ZIP}) {
+        $zip = "--zip '$pkgs->{$pkg}{ZIP}'";
+    }
+    if ($pkgs->{$pkg}{REVISION}) {
+        ($rtag, $htag) = split(":", $pkgs->{$pkg}{REVISION});
+    } elsif ($pkgs->{$pkg}{VERSION}) {
+        $htag = "";
+        ($rtag = "$pkg-$pkgs->{$pkg}{VERSION}") =~ tr/[a-z]/[A-Z]/;
+        $rtag =~ s/[^-A-Z0-9]/-/g;
+    }
+    $rtag = "-r $rtag" if ($rtag);
+    $htag = "-t $htag" if ($htag);
+    $cmd = ("$pkgtool $prog -g -R \"/usr/lib/rpm/rpmrc:$rpmrc\" --root \"$buildroot/$pkg-root\""
+            . " -s $specfile -D $builddir/SOURCES $srcs $htag $rtag");
+    dprint "About to run \"$cmd\"\n";
+    if (!open(PKGTOOL, "$cmd </dev/null 2>&1 |")) {
+        return (1, "Execution of \"$cmd\" failed -- $!", undef);
+    }
+    $err = 0;
+    while (<PKGTOOL>) {
+        chomp($line = $_);
+        nprint "$line\n";
+        if ($line =~ /^pkgtool:\s+Error:\s+(.*)$/) {
+            $msg = $1;
+        }
+    }
+    close(PKGTOOL);
+    dprint "pkgtool returned $?\n";
+    if ($? != 0 && $err == 0) {
+        $err = $?;
+        $msg = "Unhandled RPM build error" if (! $msg);
+    }
+    dprint "gen_sources():  Returning $err, $msg\n";
+    return ($err, $msg);
 }
 
 #
@@ -1099,7 +1151,6 @@ do_compose_stage
     my (@contents, @tmp, @dirs, @sfiles, @srcs);
     my @p;
     local *DIR;
-    local *CMD;
 
     if ($#_ >= 0) {
         @p = @_;
@@ -1174,79 +1225,9 @@ do_compose_stage
             }
         }
 
-        undef @srcs;
-        if ($pkgs->{$pkg}{SRCS}) {
-            @srcs = split(",", $pkgs->{$pkg}{SRCS});
-        } else {
-            my $fname;
-
-            foreach $fname (@contents) {
-                next if ($fname =~ /^(CVS|SCCS|RCS|BitKeeper)$/);
-                next if ($fname =~ /^\./);
-                next if ($fname =~ /\.spec(\.in)?$/);
-                if (-d $fname) {
-                    push @srcs, "$fname:$fname.tar.gz";
-                } else {
-                    push @srcs, $fname;
-                }
-            }
-        }
-
-        foreach $src (@srcs) {
-            my ($src_files, $tarball) = split(":", $src);
-
-            $src_files =~ s/\&/ /g;
-            if ($tarball) {
-                my $zip;
-
-                if ($pkgs->{$pkg}{TAR}) {
-                    $cmd = $pkgs->{$pkg}{TAR};
-                    $cmd =~ s/\%f/$src_files/;
-                    $cmd =~ s/\%t/$builddir\/SOURCES\/$tarball/;
-                } else {
-                    if ($pkgs->{$pkg}{ZIP}) {
-                        $zip = "--use-compress-program=\"$pkgs->{$pkg}{ZIP}\"";
-                    } elsif ($src =~ /(gz|Z)$/) {
-                        $zip = "--use-compress-program=gzip";
-                    } elsif ($src =~ /\.bz2$/) {
-                        $zip = "--use-compress-program=bzip2";
-                    }
-                    $cmd = "tar --exclude CVS --exclude RCS --exclude BitKeeper --exclude SCCS --exclude .cvsignore"
-                            . " $zip -cf $builddir/SOURCES/$tarball $src_files";
-                }
-                dprint "Creating $tarball:  $cmd\n";
-                unlink($tarball);
-                if (!open(CMD, "$cmd 2>&1 |")) {
-                    &fail_package($pkg, "compose", "Execution of \"$cmd\" failed -- $!");
-                    $err = 1;
-                    last;
-                }
-                $err = 0;
-                while (<CMD>) {
-                    chomp($line = $_);
-                    nprint "tar output -> $line\n";
-                }
-                close(CMD);
-                dprint "\"$cmd\" returned $?\n";
-                if ($?) {
-                    &fail_package($pkg, "compose", "Creation of vendor source tarball $tarball from failed");
-                    $err = 1;
-                    last;
-                }
-            } else {
-                my $rc;
-
-                $src_files =~ s/\&/ /g;
-                dprint "Copying \"$src_files\" to $builddir/SOURCES/\n";
-                $rc = system("cp -f $src_files $builddir/SOURCES/") >> 8;
-                if ($rc) {
-                    &fail_package($pkg, "compose", "Unable to copy $src_files to $builddir/SOURCES/ -- $!");
-                    $err = 1;
-                    last;
-                }
-            }
-        }
+        ($err, $msg) = &gen_sources($pkg, $specfile);
         if ($err) {
+            &fail_package($pkg, "compose", "Creation of vendor source tarball $tarball from failed");
             next;
         }
 
@@ -1298,7 +1279,7 @@ do_explode_stage
         $rpm = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
 
         # Examine the SRPM and figure out everything it contains.
-        $cmd = "pkgtool -P \"$rpm\" -R $rpmrc -cp $pkgs->{$pkg}{FILENAME}";
+        $cmd = "$pkgtool -P \"$rpm\" -R $rpmrc -cp $pkgs->{$pkg}{FILENAME}";
         dprint "About to run \"$cmd\"\n";
         if (!open(PKGTOOL, "$cmd 2>&1 |")) {
             &fail_package($pkg, "explode", "Execution of \"$cmd\" failed -- $!");
@@ -1311,6 +1292,7 @@ do_explode_stage
         }
         while (<PKGTOOL>) {
             chomp($line = $_);
+            next if ($line =~ /^\[pkgtool\//);
             dprint "RPM contents -> $line\n";
             push @manifest, $line;  # Add the file to the manifest
             if ($line =~ /\.spec(\.in)?$/) {
@@ -1359,7 +1341,7 @@ do_explode_stage
         }
 
         # Explode the SRPM into its components
-        $cmd = "pkgtool -P \"$rpm\" -R $rpmrc -ip $pkgs->{$pkg}{FILENAME}";
+        $cmd = "$pkgtool -P \"$rpm\" -R $rpmrc -ip $pkgs->{$pkg}{FILENAME}";
         dprint "About to run \"$cmd\"\n";
         if (!open(PKGTOOL, "$cmd 2>&1 |")) {
             &fail_package($pkg, "explode", "Execution of \"$cmd\" failed -- $!");
@@ -1368,6 +1350,7 @@ do_explode_stage
         $err = 0;
         while (<PKGTOOL>) {
             chomp($line = $_);
+            next if ($line =~ /^\[pkgtool\//);
             nprint "$line\n";
             if ($line !~ /successfully installed\.?$/) {
                 # Any otheroutput from this command is an error.
@@ -1805,7 +1788,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.79 $ created on $Date: 2000/07/05 23:56:43 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.80 $ created on $Date: 2000/07/07 01:32:40 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1823,7 +1806,8 @@ main
         $opt_h = $opt_P = $opt_Q = $opt_p = $opt_q = $opt_v = 0;
     }
     $debug = $opt_d;
-    $revtool = sprintf("revtool%s", ($opt_d ? " --debug" : ""));
+    $revtool = "revtool" . ($opt_d ? " --debug" : "");
+    $pkgtool = "pkgtool" . ($opt_d ? " --debug" : "");
     $GLOBAL_LOG = 0;
     if ($opt_l) {
         if (!open(LOGFILE, ">$opt_l")) {
