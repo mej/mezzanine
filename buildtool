@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.33 2000/06/06 00:02:23 mej Exp $
+# $Id: buildtool,v 1.34 2000/06/06 00:07:59 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1590,6 +1590,7 @@ main
     if ($opt_v) {
 	print "$progname $version by Michael Jennings\n";
         print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
+        print "  (CVS Revision $Revision: 1.34 $ created on $Date: 2000/06/06 00:07:59 $ by $Author: mej $)\n";
 	return BUILDTOOL_SUCCESS;
     }
     if ($opt_h) {
