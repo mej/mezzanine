@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: todo_list.txt,v 1.7 2001/03/06 03:51:54 mej Exp $
+#  $Id: todo_list.txt,v 1.8 2001/03/13 04:57:35 mej Exp $
 #
 ########################################################################
 
@@ -23,8 +23,7 @@ New Tools [19/46]
     - Resync patches [2/5]
     - Add/remove/modify patches [4/7]
     - Detect existing module and compensate [1/4]
- - For generating distribution media (CD's, tarballs, etc.) [2/5]
- - For parallelized builds [2/5]
+ + For generating distribution media (CD's, tarballs, etc.) [2/5]
 
 
 buildtool Changes [13/21]
@@ -33,8 +32,7 @@ buildtool Changes [13/21]
  + Support for tarballs as packages [1/2]
  + Support for multiple binary RPM's (and an SRPM) for a single package [2/4]
  + Merge compose and explode/build stages [1/3]
- - Split off ISO stage and cleanup stage [1/2]
- - Break out parallelizer [1/2]
+ + Split off ISO stage and cleanup stage [1/2]
  + Support generic makefile for oddball packages [2/4]
  - Reorganize and clean up code, comment [4/5]
 
@@ -52,4 +50,5 @@ pkgtool Changes [1/2]
 Long-Term Wishlist
 ------------------
  - Driver program for distributed builds
+ - Driver program for parallel builds
  - Interactive help/guidance (helptool)

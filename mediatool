@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: mediatool,v 1.1 2001/03/06 03:51:54 mej Exp $
+# $Id: mediatool,v 1.2 2001/03/13 04:57:35 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -214,20 +214,32 @@ sub
 create_tarball
 {
     my ($tarball, $imagedir) = @_;
-    my ($line, $cmd, $prog, $cwd);
+    my ($line, $cmd, $prog, $cwd, $f);
     local *CMD;
 
     chomp($cwd = `pwd`);
     chdir($imagedir);
-    if ($tarball =~ /\.(tar\.|t)(gz|Z)$/) {
-        $cmd = "tar --numeric-owner --use-compress-program=gzip -Pcf $tarball .";
-    } elsif ($tarball =~ /\.(tar\.|t)\.bz2?$/) {
-        $cmd = "tar --numeric-owner --use-compress-program=bzip2 -Pcf $tarball .";
+    if ($tarball !~ /^\//) {
+        $tarball = "$cwd/$tarball";
+    }
+    if ($command) {
+        $cmd = $command . " $tarball";
+    } else {
+        $cmd = "tar --numeric-owner";
+        foreach $f (@excludes) {
+            $cmd .= " --exclude='$f'";
+        }
+        if ($tarball =~ /\.(tar\.|t)(gz|Z)$/) {
+            $cmd .= " --use-compress-program=gzip";
+        } elsif ($tarball =~ /\.(tar\.|t)\.bz2?$/) {
+            $cmd .= " --use-compress-program=bzip2";
+        }
+        $cmd .= "  -Pcf $tarball .";
     }
 
     open(CMD, "$cmd 2>&1 |") || &fatal_error("Unable to execute \"$cmd\" -- $!\n");
     print "Creating tarball $tarball from $imagedir....\n";
-    dprint "$cmd\n";
+    dprint "\nExecuting:  $cmd\n";
     while (<CMD>) {
         chomp($line = $_);
         if ($line =~ /^tar:/) {
@@ -249,10 +261,11 @@ create_iso
     my ($cmd, $ignore, $bootimg, $line, $err);
     local *MKHYBRID;
 
-    $bootimg = ($opt_boot ? "-b $opt_boot -c boot.cat" : "");
+    $bootimg = ($boot_image ? "-b $boot_image -c boot.cat" : "");
     $ignore = "-m CVS -m RCS -m BitKeeper -m SCCS -m .cvsignore -m '.avalon.*'";
     $cmd = "mkhybrid -o $iso -a $ignore $bootimg -T -r -J -v $imagedir";
     dprint "About to run \"$cmd\"\n";
+    print "Creating ISO image $iso from $imagedir....\n";
     if (!open(MKHYBRID, "$cmd </dev/null 2>&1 |")) {
         &fatal_error("Execution of \"$cmd\" failed -- $!");
     }
@@ -277,7 +290,7 @@ main
     $version = "1.0";
 
     # See the Getopt::Long man page for details on the syntax of this line
-    @valid_opts = ("h|help", "v|version", "d|debug", "i|iso=s@", "t|tar|tarball=s@",
+    @valid_opts = ("h|help", "v|version", "d|debug", "i|iso=s", "t|tar|tarball=s",
                    "x|exclude|ignore=s@", "boot=s", "c|cmd|command=s", "D|dir|directory=s@");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
@@ -286,7 +299,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.1 $ created on $Date: 2001/03/06 03:51:54 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.2 $ created on $Date: 2001/03/13 04:57:35 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -304,10 +317,16 @@ main
     }
 
     $debug = ($opt_d ? $opt_d : 0);
-    
-    if (scalar(@opt_i) + scalar(@opt_t) != scalar(@opt_D)) {
-        &fatal_error("Each media name must have exactly one source directory.\n");
+    if (scalar(@opt_D)) {
+        @dirs = @opt_D;
+    } else {
+        &fatal_error("No source directories specified.");
     }
+    $iso = ($opt_i ? $opt_i : 0);
+    $tarball = ($opt_t ? $opt_t : 0);
+    @excludes = (scalar(@opt_x) ? @opt_x : (".avalon.*", "CVS", "RCS", "SCCS", "BitKeeper", ".cvsignore"));
+    $boot_image = ($opt_boot ? $opt_boot : 0);
+    $command = ($opt_c ? $opt_c : 0);
 
     # Signal handling
     $SIG{HUP} = 'IGNORE';
@@ -323,6 +342,13 @@ main
     $SIG{TTIN} = \&handle_fatal_signal;
     $SIG{TTOU} = \&handle_fatal_signal;
     $SIG{__WARN__} = \&handle_warning;
+
+    if ($iso) {
+        &create_iso($iso, $dirs[0]);
+    }
+    if ($tarball) {
+        &create_tarball($tarball, $dirs[0]);
+    }
 
     return MEDIATOOL_SUCCESS;
 }
