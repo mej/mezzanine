@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.14 2001/08/14 19:32:33 mej Exp $
+# $Id: Pkg.pm,v 1.15 2001/08/15 00:52:02 mej Exp $
 #
 
 package Avalon::Pkg;
@@ -30,6 +30,9 @@ BEGIN {
     use Exporter   ();
     use Avalon::Util;
     use Avalon::RevCtl;
+    use Avalon::RPM;
+    use Avalon::Deb;
+    use Avalon::Tar;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
@@ -37,7 +40,7 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('$specdata', '&get_package_path', '&parse_spec_file', '&fetch_package', '&identify_package');
+    @EXPORT      = ('&pkgvar_name', '&pkgvar_filename', '&pkgvar_target', '&pkgvar_instructions', '&pkgvar_topdir', '&pkgvar_instroot', '&pkgvar_buildroot', '&pkgvar_architecture', '&pkgvar_parameters', '&pkgvar_command', '&pkgvar_rcfile', '&pkgvar_tar', '&pkgvar_zip', '&pkgvar_cleanup', '&get_package_path', '&fetch_package', '&identify_package', '&package_install', '&package_show_contents', '&package_query');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -48,15 +51,47 @@ use vars ('@EXPORT_OK');
 ### Private global variables
 
 ### Initialize exported package variables
-$specdata = 0;
 
 ### Initialize private global variables
+$pkg_name = "";
+$pkg_file = "";
+$pkg_target = "rpms";
+$pkg_srcs = "";
+$pkg_inst = "";
+$pkg_topdir = "";
+$pkg_instroot = "";
+$pkg_buildroot = "";
+$pkg_arch = "i386";
+$pkg_params = "";
+$pkg_cmd = "";
+$pkg_rcfile = "";
+$pkg_tar = "tar";
+$pkg_zip = "gzip";
+$pkg_cleanup = "none";
+%pkg_type = ();
 
 ### Function prototypes
+sub pkgvar_name($);
+sub pkgvar_filename($);
+sub pkgvar_target($);
+sub pkgvar_srcs(@);
+sub pkgvar_instructions($);
+sub pkgvar_topdir($);
+sub pkgvar_instroot($);
+sub pkgvar_buildroot($);
+sub pkgvar_architecture($);
+sub pkgvar_parameters($);
+sub pkgvar_command($);
+sub pkgvar_rcfile($);
+sub pkgvar_tar($);
+sub pkgvar_zip($);
+sub pkgvar_cleanup($);
 sub get_package_path($$);
-sub parse_spec_file($$);
 sub fetch_package($$$$$);
 sub identify_package($);
+sub package_install($);
+sub package_show_contents($);
+sub package_query($$);
 
 # Private functions
 sub add_define($$);
@@ -67,6 +102,175 @@ END {
 }
 
 ### Function definitions
+
+sub
+pkgvar_name
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        $pkg_name = ($param ?  $param : "");
+    }
+    return $pkg_name;
+}
+
+sub
+pkgvar_filename
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        if (defined($_[1])) {
+            $param = &get_package_path(@_);
+        }
+        $pkg_file = ($param ?  $param : "");
+    }
+    &identify_package() if (!$pkg_type{$pkg_file});
+    return $pkg_file;
+}
+
+sub
+pkgvar_target
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        $pkg_target = ($param ? $param : "rpms");
+    }
+    return $pkg_target;
+}
+
+sub
+pkgvar_srcs
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        $pkg_srcs = ($param ? $param : "");
+    }
+    return $pkg_srcs;
+}
+
+sub
+pkgvar_instructions
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        $pkg_inst = ($param ?  $param : "");
+    }
+    return $pkg_inst;
+}
+
+sub
+pkgvar_topdir
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        $pkg_topdir = ($param ? $param : "");
+    }
+    return $pkg_topdir;
+}
+
+sub
+pkgvar_instroot
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        $pkg_instroot = ($param ? $param : "");
+    }
+    return $pkg_instroot;
+}
+
+sub
+pkgvar_buildroot
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        $pkg_buildroot = ($param ? $param : "");
+    }
+    return $pkg_buildroot;
+}
+
+sub
+pkgvar_architecture
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        $pkg_arch = ($param ? $param : "i386");
+    }
+    return $pkg_arch;
+}
+
+sub
+pkgvar_parameters
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        $pkg_params = ($param ? $param : "");
+    }
+    return $pkg_params;
+}
+
+sub
+pkgvar_command
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        $pkg_cmd = ($param ? $param : "");
+    }
+    return $pkg_cmd;
+}
+
+sub
+pkgvar_rcfile
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        $pkg_rcfile = ($param ? $param : "");
+    }
+    return $pkg_rcfile;
+}
+
+sub
+pkgvar_tar
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        $pkg_tar = ($param ? $param : "tar");
+    }
+    return $pkg_tar;
+}
+
+sub
+pkgvar_zip
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        $pkg_zip = ($param ? $param : "gzip");
+    }
+    return $pkg_zip;
+}
+
+sub
+pkgvar_cleanup
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        $pkg_cleanup = ($param ? $param : "none");
+    }
+    return $pkg_cleanup;
+}
 
 # Convert a module and a filename to a full path
 sub
@@ -87,144 +291,26 @@ get_package_path
     }
 }
 
-# Parse spec file
-sub
-parse_spec_file($$)
-{
-    my ($specfile, $catalog) = @_;
-    my ($line, $oldline, $stage, $pkg);
-    local *SPECFILE;
-
-    if (! $specfile) {
-        return 0;
-    }
-
-    open(SPECFILE, $specfile) || return 0;
-    $stage = 0;
-    $specdata->{SPECFILE} = $specfile;
-    while (<SPECFILE>) {
-        chomp($line = $_);
-        next if ($line =~ /^\s*\#/ || $line =~ /^\s*$/);
-        $oldline = $line;
-        $line = &replace_defines($oldline);
-        $line =~ s/^\s+//;
-        $line =~ s/\s+$//;
-        push @{$specdata->{FILE}}, $line;
-        if ($oldline ne $line) {
-            dprint "Parsing from $specfile, line $.: \"$oldline\" -> \"$line\"\n";
-        } else {
-            dprint "Parsing from $specfile, line $.: \"$line\"\n";
-        }
-        if ($line =~ /^\%(prep|build|install|clean|changelog|trigger|triggerpostun|triggerun|triggerin|verifyscript)\s*$/
-            || $line =~ /^\%(package|preun|pre|postun|post|files|description)(\s+\w+)?$/) {
-            my $param = $2;
-
-            $stage = $1;
-            dprint "Switching to stage \"$stage\"\n";
-            if ($stage eq "package" && $param) {
-                $pkg = $specdata->{PKGS}[0] . "-$param";
-                push @{$specdata->{PKGS}}, $pkg;
-            }
-        } elsif ((! $stage) && $line =~ /^\s*(\w+)\s*:\s*(.*)\s*$/) {
-            my ($var, $value) = ($1, $2);
-
-            $var =~ tr/[A-Z]/[a-z]/;
-            if ($var eq "name") {
-                $pkg = $value;
-                @{$specdata->{PKGS}} = ($pkg);
-                &add_define("PACKAGE_NAME", $value);
-                &add_define("name", $value) if (! $specdata->{DEFINES}{"name"});
-            } elsif ($var =~ /^source(\d*)$/) {
-                my $key = ($1 ? $1 : "0");
-
-                $value =~ s/^.*\/([^\/]+)$/$1/;
-                $specdata->{SOURCE}{$key} = $value;
-                &add_define("SOURCE$key", $value);
-            } elsif ($var =~ /^patch(\d*)$/) {
-                my $key = ($1 ? $1 : "0");
-
-                $value =~ s/^.*\/([^\/]+)$/$1/;
-                $specdata->{PATCH}{$key} = $value;
-                &add_define("PATCH$key", $value);
-            } else {
-                $specdata->{HEADER}{$var} = $value;
-                if ($var eq "version") {
-                    &add_define("PACKAGE_VERSION", $value);
-                    &add_define("version", $value) if (! $specdata->{DEFINES}{"version"});
-                } elsif ($var eq "release") {
-                    &add_define("PACKAGE_RELEASE", $value);
-                    &add_define("release", $value) if (! $specdata->{DEFINES}{"release"});
-                }
-            }
-        } elsif ($line =~ /^%\s*define\s*(\w+)\s*(.*)$/) {
-            &add_define($1, $2);
-        }
-    }
-    close(SPECFILE);
-
-    @{$specdata->{SOURCES}} = sort {$a <=> $b} keys %{$specdata->{SOURCE}};
-    @{$specdata->{PATCHES}} = sort {$a <=> $b} keys %{$specdata->{PATCH}};
-    @{$specdata->{HEADERS}} = sort {uc($a) cmp uc($b)} keys %{$specdata->{HEADER}};
-
-    if ($catalog) {
-        foreach $src (@{$specdata->{SOURCES}}) {
-            print "S:$src:$specdata->{SOURCE}{$src}\n";
-        }
-        foreach $p (@{$specdata->{PATCHES}}) {
-            print "P:$p:$specdata->{PATCH}{$p}\n";
-        }
-        foreach $h (@{$specdata->{HEADERS}}) {
-            print "H:$h:$specdata->{HEADER}{$h}\n";
-        }
-    } elsif ($debug) {
-        dprint "Got the following sources:\n";
-        foreach $src (@{$specdata->{SOURCES}}) {
-            dprint "    Source $src -> $specdata->{SOURCE}{$src}\n";
-        }
-        dprint "Got the following patches:\n";
-        foreach $p (@{$specdata->{PATCHES}}) {
-            dprint "    Patch $p -> $specdata->{PATCH}{$p}\n";
-        }
-        dprint "Got the following header info:\n";
-        foreach $h (@{$specdata->{HEADERS}}) {
-            dprint "    $h -> $specdata->{HEADER}{$h}\n";
-        }
-    }
-    return $specdata;
-}
-
 # Use revtool to download a package from the master repository
 sub
 fetch_package
 {
-    my ($module, $filename, $tag, $repository, $opts) = @_;
     my ($err, $msg, $line) = undef;
     my $missing = 0;
     local *REVTOOL;
 
-    $filename = "" if (!defined($filename));
-    $tag = "" if (!defined($tag));
-    $repository = "" if (!defined($repository));
-    $opts = "" if (!defined($opts));
-    dprint "Getting $filename", ($module ? " (in $module) " : ""), ($repository ? " from $repository" : ""),
-           ($tag ? " using $tag" : ""), ($opts ? " and extra options $opts" : ""), ".\n";
-    if (! ($filename = &get_package_path($module, $filename))) {
-        return (AVALON_BAD_PACKAGE, "Could not determine what package(s)/module(s) to retrieve.");
-    }
-    &set_repository($repository);
-    &set_tag(($tag eq head ? "" : $tag));
-    foreach my $f (split(' ', $filename)) {
+    foreach my $f (split(' ', $pkg_file)) {
         if (!(-d $f) && !(-f $f && -s _)) {
             $missing = 1;
         }
     }
     if (! $missing) {
-        dprint "No need to retrieve:  $filename\n";
+        dprint "No need to retrieve:  $pkg_file\n";
         return (AVALON_DUPLICATE, undef);
     }
 
     if (&login_to_master()) {
-        $err = &update_from_master($filename);
+        $err = &update_from_master($pkg_file);
         return ($err, "");
     }
     return (AVALON_BAD_LOGIN, "Login failure");
@@ -234,18 +320,66 @@ fetch_package
 sub
 identify_package
 {
-    my $pkg_file = shift;
-    my $type = "";
-
     if (substr($pkg_file, -4, 4) eq ".rpm") {
-        $type = "rpm";
+        $pkg_type{$pkg_file} = "rpm";
     } elsif (substr($pkg_file, -4, 4) eq ".deb") {
-        $type = "deb";
+        $pkg_type{$pkg_file} = "deb";
     } elsif ($pkg_file =~ /\.(tar\.|t)?(gz|bz|bz2|Z)$/) {
-        $type = "tar";
+        $pkg_type{$pkg_file} = "tar";
     }
-    dprint "Identified $pkg_file as $type\n";
-    return $type;
+    dprint "Identified $pkg_file as $pkg_type{$pkg_file}\n";
+}
+
+sub
+package_install
+{
+    my $type;
+
+    if (! $pkg_file) {
+        return (AVALON_SYNTAX_ERROR, "You cannot install without specifying a package.\n");
+    }
+    if ($pkg_type{$pkg_file} eq "rpm") {
+        return &rpm_install($pkg_file);
+    } elsif ($pkg_type{$pkg_file} eq "deb") {
+        return &deb_install($pkg_file);
+    } elsif ($pkg_type{$pkg_file} eq "tar") {
+        return &tar_install($pkg_file);
+    }
+    return (AVALON_BAD_PACKAGE, "Unable to identify package $pkg_file.\n");
+}
+
+sub
+package_show_contents
+{
+    if (! $pkg_file) {
+        return (AVALON_SYNTAX_ERROR, "You cannot display contents without specifying a package.\n");
+    }
+    if ($pkg_type{$pkg_file} eq "rpm") {
+        return &rpm_show_contents($pkg_file);
+    } elsif ($pkg_type{$pkg_file} eq "deb") {
+        return &deb_show_contents($pkg_file);
+    } elsif ($pkg_type{$pkg_file} eq "tar") {
+        return &tar_show_contents($pkg_file);
+    }
+    return (AVALON_BAD_PACKAGE, "Unable to identify package $pkg_file.\n");
+}
+
+sub
+package_query
+{
+    my $query_type = $_[0];
+
+    if (! $pkg_file) {
+        return (AVALON_SYNTAX_ERROR, "You cannot query without specifying a package.\n");
+    }
+    if ($pkg_type{$pkg_file} eq "rpm") {
+        return &rpm_query($query_type);
+    } elsif ($pkg_type{$pkg_file} eq "deb") {
+        return &deb_query($query_type);
+    } elsif ($pkg_type{$pkg_file} eq "tar") {
+        return &tar_query($query_type);
+    }
+    return (AVALON_BAD_PACKAGE, "Unable to identify package $pkg_file.\n");
 }
 
 ### Private functions

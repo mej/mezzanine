@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.5 2001/08/14 19:32:33 mej Exp $
+# $Id: RPM.pm,v 1.6 2001/08/15 00:52:02 mej Exp $
 #
 
 package Avalon::RPM;
@@ -36,7 +36,7 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('&rpm_install', '&rpm_show_contents', '&rpm_query', '&rpm_generate_source_files', '&rpm_build');
+    @EXPORT      = ('$specdata', '&parse_spec_file', '&rpm_install', '&rpm_show_contents', '&rpm_query', '&rpm_generate_source_files', '&rpm_build');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -47,13 +47,15 @@ use vars ('@EXPORT_OK');
 ### Private global variables
 
 ### Initialize exported package variables
+$specdata = 0;
 
 # Constants
 
 ### Initialize private global variables
 
 ### Function prototypes
-sub rpm_install($);
+sub parse_spec_file();
+sub rpm_install(@);
 sub rpm_show_contents($);
 sub rpm_query($$);
 sub rpm_generate_source_files($$$$$$);
@@ -67,18 +69,114 @@ END {
 
 ### Function definitions
 
+# Parse spec file
+sub
+parse_spec_file
+{
+    my $specfile = &pkgvar_instructions();
+    my ($line, $oldline, $stage, $pkg);
+    local *SPECFILE;
+
+    if (! $specfile) {
+        return 0;
+    }
+
+    open(SPECFILE, $specfile) || return 0;
+    $stage = 0;
+    $specdata->{SPECFILE} = $specfile;
+    while (<SPECFILE>) {
+        chomp($line = $_);
+        next if ($line =~ /^\s*\#/ || $line =~ /^\s*$/);
+        $oldline = $line;
+        $line = &replace_defines($oldline);
+        $line =~ s/^\s+//;
+        $line =~ s/\s+$//;
+        push @{$specdata->{FILE}}, $line;
+        if ($oldline ne $line) {
+            dprint "Parsing from $specfile, line $.: \"$oldline\" -> \"$line\"\n";
+        } else {
+            dprint "Parsing from $specfile, line $.: \"$line\"\n";
+        }
+        if ($line =~ /^\%(prep|build|install|clean|changelog|trigger|triggerpostun|triggerun|triggerin|verifyscript)\s*$/
+            || $line =~ /^\%(package|preun|pre|postun|post|files|description)(\s+\w+)?$/) {
+            my $param = $2;
+
+            $stage = $1;
+            dprint "Switching to stage \"$stage\"\n";
+            if ($stage eq "package" && $param) {
+                $pkg = $specdata->{PKGS}[0] . "-$param";
+                push @{$specdata->{PKGS}}, $pkg;
+            }
+        } elsif ((! $stage) && $line =~ /^\s*(\w+)\s*:\s*(.*)\s*$/) {
+            my ($var, $value) = ($1, $2);
+
+            $var =~ tr/[A-Z]/[a-z]/;
+            if ($var eq "name") {
+                $pkg = $value;
+                @{$specdata->{PKGS}} = ($pkg);
+                &add_define("PACKAGE_NAME", $value);
+                &add_define("name", $value) if (! $specdata->{DEFINES}{"name"});
+            } elsif ($var =~ /^source(\d*)$/) {
+                my $key = ($1 ? $1 : "0");
+
+                $value =~ s/^.*\/([^\/]+)$/$1/;
+                $specdata->{SOURCE}{$key} = $value;
+                &add_define("SOURCE$key", $value);
+            } elsif ($var =~ /^patch(\d*)$/) {
+                my $key = ($1 ? $1 : "0");
+
+                $value =~ s/^.*\/([^\/]+)$/$1/;
+                $specdata->{PATCH}{$key} = $value;
+                &add_define("PATCH$key", $value);
+            } else {
+                $specdata->{HEADER}{$var} = $value;
+                if ($var eq "version") {
+                    &add_define("PACKAGE_VERSION", $value);
+                    &add_define("version", $value) if (! $specdata->{DEFINES}{"version"});
+                } elsif ($var eq "release") {
+                    &add_define("PACKAGE_RELEASE", $value);
+                    &add_define("release", $value) if (! $specdata->{DEFINES}{"release"});
+                }
+            }
+        } elsif ($line =~ /^%\s*define\s*(\w+)\s*(.*)$/) {
+            &add_define($1, $2);
+        }
+    }
+    close(SPECFILE);
+
+    @{$specdata->{SOURCES}} = sort {$a <=> $b} keys %{$specdata->{SOURCE}};
+    @{$specdata->{PATCHES}} = sort {$a <=> $b} keys %{$specdata->{PATCH}};
+    @{$specdata->{HEADERS}} = sort {uc($a) cmp uc($b)} keys %{$specdata->{HEADER}};
+
+    if ($debug) {
+        dprint "Got the following sources:\n";
+        foreach $src (@{$specdata->{SOURCES}}) {
+            dprint "    Source $src -> $specdata->{SOURCE}{$src}\n";
+        }
+        dprint "Got the following patches:\n";
+        foreach $p (@{$specdata->{PATCHES}}) {
+            dprint "    Patch $p -> $specdata->{PATCH}{$p}\n";
+        }
+        dprint "Got the following header info:\n";
+        foreach $h (@{$specdata->{HEADERS}}) {
+            dprint "    $h -> $specdata->{HEADER}{$h}\n";
+        }
+    }
+    return $specdata;
+}
+
 sub
 rpm_install
 {
-    my ($pkg_file, $topdir) = @_;
+    my ($pkg_file, $topdir, $params) = @_;
     my ($rpm, $cmd, $rc, $err, $msg);
     my (@failed_deps);
     local *RPM;
 
     $rpm = ($pkg_prog ? $pkg_prog : "rpm");
-    $rc = ($rcfile ? "--rcfile '/usr/lib/rpm/rpmrc:$rcfile'" : "");
     $topdir = ($topdir ? "--define '_topdir $topdir'" : "");
-    $cmd = "$rpm $rc $topdir" . ($rootdir ? " --root $rootdir " : " ") . "-U $pkg_file";
+    $params = "" if (! $params);
+    $cmd = "$rpm $params $topdir -U $pkg_file";
     if (!open(RPM, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }

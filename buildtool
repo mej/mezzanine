@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.152 2001/08/14 19:32:33 mej Exp $
+# $Id: buildtool,v 1.153 2001/08/15 00:52:02 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -196,23 +196,23 @@ download_packages
 
     nprint "Downloading packages, please wait..." if (! &debug_get());
     foreach $pkg (@packages) {
-        my ($files, $tag, $cvsroot);
+        my ($files, $tag, $repository);
 
         $err = 0;
         $files = &get_package_path($pkgs->{$pkg}{MODULE}, $pkgs->{$pkg}{FILENAME});
         if (defined($pkgs->{$pkg}{BINS})) {
             $files = join(' ', $files, @{$pkgs->{$pkg}{BINS}});
         }
-	# Set the proper CVSROOT and tag for the checkout.
+	# Set the proper REPOSITORY and tag for the checkout.
         if ($global_tree) {
-            $cvsroot = $global_tree;
-        } elsif ($pkgs->{$pkg}{CVSROOT}) {
-            $cvsroot = $pkgs->{$pkg}{CVSROOT};
+            $repository = $global_tree;
+        } elsif ($pkgs->{$pkg}{REPOSITORY}) {
+            $repository = $pkgs->{$pkg}{REPOSITORY};
         } else {
-            $cvsroot = "";
+            $repository = "";
         }
         if ($global_user) {
-            $cvsroot =~ s/\w+\@/$global_user\@/;
+            $repository =~ s/\w+\@/$global_user\@/;
         }
         if ($global_tag) {
             $tag = $global_tag;
@@ -223,7 +223,9 @@ download_packages
         }
 
         nprint "$pkg..." if (! &debug_get());
-        ($err, $msg) = &fetch_package("", $files, $tag, $cvsroot);
+        &revctl_set_repository($repository);
+        &revctl_set_tag(($tag eq head ? "" : $tag));
+        ($err, $msg) = &fetch_package("", $files, $tag, $repository);
         if ($err != AVALON_SUCCESS && $err != AVALON_DUPLICATE) {
             &fail_package($pkg, $msg);
             next;
@@ -486,7 +488,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.152 $ created on $Date: 2001/08/14 19:32:33 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.153 $ created on $Date: 2001/08/15 00:52:02 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

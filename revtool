@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.75 2001/08/09 20:05:17 mej Exp $
+# $Id: revtool,v 1.76 2001/08/15 00:52:02 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -152,7 +152,7 @@ main
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.75 $ created on $Date: 2001/08/09 20:05:17 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.76 $ created on $Date: 2001/08/15 00:52:02 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -168,16 +168,16 @@ main
 	&print_usage_info();   # Never returns
     }
 
-    &set_repository($opt_D);
-    &set_keyword_expansion($opt_k);
-    &set_recursion($opt_R);
-    &set_branching($opt_b);
-    &set_sticky_clear($opt_reset);
-    &set_exclusive($opt_x);
-    &set_tag($opt_t);
-    &set_rtag($opt_T);
-    dprint "Debugging is on, mode is $mode, CVSROOT is ${\(&set_repository())},"
-        . " tag is ${\(&set_tag())}, rtag is ${\(&set_rtag())}\n";
+    &revctl_set_repository($opt_D);
+    &revctl_set_keyword_expansion($opt_k);
+    &revctl_set_recursion($opt_R);
+    &revctl_set_branching($opt_b);
+    &revctl_set_sticky_clear($opt_reset);
+    &revctl_set_exclusive($opt_x);
+    &revctl_set_tag($opt_t);
+    &revctl_set_rtag($opt_T);
+    dprint "Debugging is on, mode is $mode, CVSROOT is ${\(&revctl_set_repository())},"
+        . " tag is ${\(&revctl_set_tag())}, rtag is ${\(&revctl_set_rtag())}\n";
 
     if ($opt_l) {
         &login_to_master();
@@ -200,10 +200,10 @@ main
             &query_release_diff(@ARGV);
         }
     } elsif ($mode eq "tag") {
-        &set_tag(shift @ARGV) if (! &set_tag());
+        &revctl_set_tag(shift @ARGV) if (! &revctl_set_tag());
         &tag_local_sources(@ARGV);
     } elsif ($mode eq "rtag") {
-        &set_rtag(shift @ARGV) if (! &set_rtag());
+        &revctl_set_rtag(shift @ARGV) if (! &revctl_set_rtag());
         &tag_repository_sources(@ARGV);
     } else {
         if ($opt_a) {
@@ -211,13 +211,13 @@ main
         } elsif ($opt_r) {
             &delete_old_files(@ARGV);
         }
-        if ($mode eq "get" || &set_sticky_clear()) {
+        if ($mode eq "get" || &revctl_set_sticky_clear()) {
             $retval = &update_from_master(@ARGV);
         } elsif ($mode eq "put") {
-            if ($opt_blind || !($retval = &update_from_master(&set_exclusive() ? @ARGV : undef))) {
+            if ($opt_blind || !($retval = &update_from_master(&revctl_set_exclusive() ? @ARGV : undef))) {
                 my $logfile;
 
-                if (&set_exclusive()) {
+                if (&revctl_set_exclusive()) {
                     $logfile = &do_changelog_entry(scalar(grep($_ eq "ChangeLog", @ARGV)));
                     if ($logfile) {
                         $retval = &commit_to_master($logfile, @ARGV);

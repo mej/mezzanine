@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.8 2001/08/14 00:00:24 mej Exp $
+# $Id: Prod.pm,v 1.9 2001/08/15 00:52:02 mej Exp $
 #
 
 package Avalon::Prod;
@@ -57,7 +57,7 @@ $failure = undef;
 
 ### Initialize private global variables
 $proddir = ".";
-@allvars = ("TAG", "CVSROOT", "LOCATIONS");
+@allvars = ("TAG", "REPOSITORY", "LOCATIONS");
 
 ### Function prototypes
 sub make_build_dir($);
@@ -152,6 +152,8 @@ get_var_name
         $var = "SRCS";
     } elsif ($var =~ /^(ARCH|TARGET)/) {
         $var = "ARCH";
+    } elsif ($var =~ /^CVS(DIR|ROOT)/) {
+        $var = "REPOSITORY";
     }
     return $var;
 }

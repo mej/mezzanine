@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.46 2001/08/14 19:32:33 mej Exp $
+# $Id: pkgtool,v 1.47 2001/08/15 00:52:02 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -60,6 +60,8 @@ print_usage_info
     print "    -p --package <file>              Specify the package filename\n";
     print "    -s --specfile --scripts <path>   Specify the spec file (or debian script directory) to use\n";
     print "    -m --module <name>               Specify the module name\n";
+    print "    -t --target <type>               Specify the package target type\n";
+    print "    -a --arch <architecture>         Specify the architecture(s) for which to build\n";
     print "    -P --program <cmd>               Specify the package management program to be used\n";
     print "    -R --rcfile <rcfile>             Specify an alternate rpmrc file\n";
     print "    -D --dir <directory>             Specify \"directory\" as the full path to the module\n";
@@ -85,7 +87,7 @@ main
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "b|build", "i|install", "c|contents", "q|query=s",
                    "o|sources:s", "p|package=s", "s|specfile|scripts=s", "m|module=s", "t|target=s",
-                   "P|program=s", "R|rcfile=s", "tar=s", "zip=s", "D|destdir=s", "r|root=s");
+                   "a|arch=s", "P|program=s", "R|rcfile=s", "tar=s", "zip=s", "D|destdir=s", "r|root=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -93,7 +95,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.46 $ created on $Date: 2001/08/14 19:32:33 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.47 $ created on $Date: 2001/08/15 00:52:02 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -128,17 +130,33 @@ main
     }
 
     &debug_set($opt_d);
-    $srcs = ($opt_o ? $opt_o : "");
-    $pkg_file = ($opt_p ? $opt_p : "");
-    $pkg_prog = ($opt_P ? $opt_P : "");
-    $specfile = ($script_dir = $opt_s ? $opt_s : "");
-    $module = ($opt_m ? $opt_m : "");
-    $target = ($opt_t ? $opt_t : "rpms");
-    $rcfile = ($opt_R ? $opt_R : "");
-    $tar = ($opt_tar ? $opt_tar : "");
-    $zip = ($opt_zip ? $opt_zip : "");
-    $destdir = ($opt_D ? $opt_D : "");
-    $rootdir = ($opt_r ? $opt_r : "");
+    &pkgvar_srcs($opt_o);
+    &pkgvar_filename($opt_p);
+    &pkgvar_command($opt_P);
+    &pkgvar_instructions($opt_s);
+    if ($opt_m) {
+        if ($pkg_file) {
+            $pkg_file = &pkgvar_filename($opt_m, $pkg_file);
+        } else {
+            $pkg_file = &pkgvar_filename($opt_m);
+        }
+        &pkgvar_topdir($opt_m);
+    }
+    &pkgvar_architecture($opt_a);
+    &pkgvar_target($opt_t);
+    &pkgvar_rcfile($opt_R);
+    &pkgvar_tar($opt_tar);
+    &pkgvar_zip($opt_zip);
+    &pkgvar_topdir($opt_D);
+    &pkgvar_instroot($opt_r);
+
+    if (!&pkgvar_filename()) {
+        if (scalar(@ARGV)) {
+            &pkgvar_filename(shift @ARGV);
+        } else {
+            &pkgvar_filename(".");
+        }
+    }
 
     # Signal handling
     $SIG{HUP} = 'IGNORE';
@@ -157,26 +175,12 @@ main
     if ($mode eq "build") {
         my ($pkg, $topdir, $buildroot);
 
-        if ($rootdir) {
-            $topdir = $rootdir;
-        }
-        if ($module) {
-            $pkg = $module;
-            $topdir = $module if (! $topdir);
-            ($err, $msg, $outfiles) = &build_package($pkg, $topdir, $buildroot, $target);
-        } elsif ((-f $specfile) && (! $pkg_file)) {
-            &prepare_build_tree($pkg, $topdir, $buildroot);
-            ($err, $msg, $outfiles) = &build_topdir($specfile, $topdir, $buildroot, $target);
+        &pkgvar_instroot(&getcwd()) if (! &pkgvar_instroot());
+        if ((-e &pkgvar_instructions()) && (! &pkgvar_filename())) {
+            &prepare_build_tree();
+            ($err, $msg, $outfiles) = &build_topdir();
         } else {
-            if ($pkg_file) {
-                $pkg = $pkg_file;
-            } elsif (scalar(@ARGV)) {
-                $pkg = shift @ARGV;
-            } else {
-                $pkg = ".";
-            }
-            $topdir = ((-d $pkg) ? &abs_path($pkg) : undef) if (! $topdir);
-            ($err, $msg, $outfiles) = &build_package($pkg, $topdir, $buildroot, $target);
+            ($err, $msg, $outfiles) = &build_package();
         }
         if ($err != AVALON_SUCCESS) {
             eprint "Package build failed:  $msg\n";
@@ -184,7 +188,7 @@ main
         }
         print "Package build succeeded.  Output files are:\n\n";
         foreach my $f (split(' ', $outfiles)) {
-            if (&copy_files($f, $topdir)) {
+            if (&copy_files($f, &pkgvar_instroot())) {
                 print &basename($f);
             } else {
                 print $f;
@@ -195,62 +199,29 @@ main
         print "\n";
         &cleanup_build_tree(($err ? "temp" : "build"));
     } elsif ($mode eq "install") {
-        my $type;
+        my @results;
 
-        if (! $pkg_file) {
-            eprint "You cannot perform an install without specifying a package.\n";
-            return AVALON_SYNTAX_ERROR;
+        @results = &package_install($pkg_file);
+        if (($err = shift @results) != AVALON_SUCCESS) {
+            eprint "Unable to install $pkg_file (error $err).\n";
         }
-        $type = &identify_package($pkg_file);
-        if ($type eq "rpm") {
-            ($err, $msg, $outfiles) = &rpm_install($pkg_file);
-        } elsif ($type eq "deb") {
-            ($err, $msg, $outfiles) = &deb_install($pkg_file);
-        } elsif ($type eq "tar") {
-            ($err, $msg, $outfiles) = &tar_install($pkg_file);
-        }
+        print join("", @results), "\n";
     } elsif ($mode eq "contents") {
-        my $type;
         my @results;
 
-        if (! $pkg_file) {
-            eprint "You cannot display contents without specifying a package.\n";
-            return AVALON_SYNTAX_ERROR;
-        }
-        $type = &identify_package($pkg_file);
-        if ($type eq "rpm") {
-            @results = &rpm_show_contents($pkg_file);
-        } elsif ($type eq "deb") {
-            @results = &deb_show_contents($pkg_file);
-        } elsif ($type eq "tar") {
-            @results = &tar_show_contents($pkg_file);
-        }
+        @results = &package_show_contents($pkg_file);
         if (($err = shift @results) != AVALON_SUCCESS) {
             eprint "Unable to examine contents of $pkg_file (error $err).\n";
-        } else {
-            print join("", @results), "\n";
         }
+        print join("", @results), "\n";
     } elsif ($mode eq "query") {
-        my $type;
         my @results;
 
-        if (! $specfile && ! $pkg_file) {
-            eprint "Please specify a spec file/script directory or a package file.\n";
-            return AVALON_SYNTAX_ERROR;
-        }
-        $type = &identify_package($pkg_file);
-        if ($type eq "rpm") {
-            @results = &rpm_query($pkg_file, $query_type);
-        } elsif ($type eq "deb") {
-            @results = &deb_query($pkg_file, $query_type);
-        } elsif ($type eq "tar") {
-            @results = &tar_query($pkg_file, $query_type);
-        }
+        @results = &package_query($pkg_file, $query_type);
         if (($err = shift @results) != AVALON_SUCCESS) {
-            eprint "Unable to examine contents of $pkg_file (error $err).\n";
-        } else {
-            print join("", @results), "\n";
+            eprint "Unable to query $pkg_file (error $err).\n";
         }
+        print join("", @results), "\n";
     }
     return $err;
 }

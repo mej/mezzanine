@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.2 2001/08/14 00:00:24 mej Exp $
+# $Id: RevCtl.pm,v 1.3 2001/08/15 00:52:02 mej Exp $
 #
 
 package Avalon::RevCtl;
@@ -37,7 +37,7 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('&set_revctl_system', '&set_repository', '&set_keyword_expansion', '&set_recursion', '&set_branching', '&set_sticky_clear', '&set_exclusive', '&set_strict_tagging', '&set_tag', '&set_rtag', '&check_tag', '&login_to_master', 'do_changelog_entry', '&make_repository_path', '&commit_to_master', '&update_from_master', '&add_new_files', '&delete_old_files', '&query_tags', '&query_status', '&query_logs', '&query_annotation', '&query_diff', '&query_release_diff', '&tag_local_sources', '&tag_repository_sources', '&import_vendor_sources');
+    @EXPORT      = ('&revctl_set_system', '&revctl_set_repository', '&revctl_set_keyword_expansion', '&revctl_set_recursion', '&revctl_set_branching', '&revctl_set_sticky_clear', '&revctl_set_exclusive', '&revctl_set_strict_tagging', '&revctl_set_tag', '&revctl_set_rtag', '&check_tag', '&login_to_master', 'do_changelog_entry', '&make_repository_path', '&commit_to_master', '&update_from_master', '&add_new_files', '&delete_old_files', '&query_tags', '&query_status', '&query_logs', '&query_annotation', '&query_diff', '&query_release_diff', '&tag_local_sources', '&tag_repository_sources', '&import_vendor_sources');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -64,16 +64,16 @@ $tag = "";
 $rtag = "";
 
 ### Function prototypes
-sub set_revctl_system($);
-sub set_repository($);
-sub set_keyword_expansion($);
-sub set_recursion($);
-sub set_branching($);
-sub set_sticky_clear($);
-sub set_exclusive($);
-sub set_strict_tagging($);
-sub set_tag($);
-sub set_rtag($);
+sub revctl_set_system($);
+sub revctl_set_repository($);
+sub revctl_set_keyword_expansion($);
+sub revctl_set_recursion($);
+sub revctl_set_branching($);
+sub revctl_set_sticky_clear($);
+sub revctl_set_exclusive($);
+sub revctl_set_strict_tagging($);
+sub revctl_set_tag($);
+sub revctl_set_rtag($);
 sub check_tag($$$);
 sub make_repository_path($$$$);
 sub login_to_master();
@@ -105,7 +105,7 @@ END {
 
 ### These functions set the private globals used by this module.
 sub
-set_revctl_system
+revctl_set_system
 {
     my $param = $_[0];
 
@@ -138,7 +138,7 @@ set_revctl_system
 }
 
 sub
-set_repository
+revctl_set_repository
 {
     my $param = $_[0];
 
@@ -149,7 +149,7 @@ set_repository
 }
 
 sub
-set_keyword_expansion
+revctl_set_keyword_expansion
 {
     my $param = $_[0];
 
@@ -160,7 +160,7 @@ set_keyword_expansion
 }
 
 sub
-set_recursion
+revctl_set_recursion
 {
     my $param = $_[0];
 
@@ -171,7 +171,7 @@ set_recursion
 }
 
 sub
-set_branching
+revctl_set_branching
 {
     my $param = $_[0];
 
@@ -182,7 +182,7 @@ set_branching
 }
 
 sub
-set_sticky_clear
+revctl_set_sticky_clear
 {
     my $param = $_[0];
 
@@ -193,7 +193,7 @@ set_sticky_clear
 }
 
 sub
-set_exclusive
+revctl_set_exclusive
 {
     my $param = $_[0];
 
@@ -204,7 +204,7 @@ set_exclusive
 }
 
 sub
-set_strict_tagging
+revctl_set_strict_tagging
 {
     my $param = $_[0];
 
@@ -215,7 +215,7 @@ set_strict_tagging
 }
 
 sub
-set_tag
+revctl_set_tag
 {
     my $param = $_[0];
 
@@ -226,7 +226,7 @@ set_tag
 }
 
 sub
-set_rtag
+revctl_set_rtag
 {
     my $param = $_[0];
 
