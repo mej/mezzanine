@@ -1223,3 +1223,13 @@ Wed May  9 14:31:54 2001                        Michael Jennings (mej)
 
 Oops.  Use the right makefile....
 ----------------------------------------------------------------------
+Fri May 11 09:03:16 2001                      Walt Drummond (drummond)
+
+o Changed .avalon.makefile to Makefile.avalon; hidden files in source
+  trees are evil.
+o Changed the logic in parse_product_entry() to assume modules if
+  $proddir isn't defined.
+o Have special_build() look for RPMs in a specific location rather
+  than parsing output of make.  This is more deterministic.
+o Added debugging prints for $prod, $basedir and $builddir
+----------------------------------------------------------------------

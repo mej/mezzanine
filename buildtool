@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.139 2001/05/09 21:32:05 mej Exp $
+# $Id: buildtool,v 1.140 2001/05/11 16:04:32 drummond Exp $
 #
 
 # Include the Perl Modules we need
@@ -529,21 +529,25 @@ parse_product_entry
         } elsif ($name =~ /\.(t?gz|Z|bz2)$/) {
             # Name ends with .tgz, .Z, .bz2, etc.  Tarball.
             $type = "tar";
-        } else {
+        } elsif ($proddir ne "") {
             my @contents = ();
-
+	    
             # Check to see if there is a product file for it
             @contents = &grepdir(sub {/^$name-?.*\.prod$/}, $proddir);
             # Product files win over modules because they contain more detail
             # about the package and are more likely to succeed.
             if ($#contents >= 0) {
-                $type = "product";
+		$type = "product";
                 ($name = $contents[0]) =~ s/\.prod$//;
             } else {
                 $type = "module";
             }
-        }
+	} else {
+	    dprint "Can't find anything useful, assuming a module\n";
+	    $type = "module";
+	}
     }
+
     if ($name =~ /\/.+$/) {
 	# If the name contains a / and at least *something* after it, split out the module name
 	# (the part before the /) and the actual package name (the part after the /).  Otherwise,
@@ -1132,7 +1136,7 @@ do_component_stage
 
         if ($pkgs->{$pkg}{TYPE} eq "module") {
             ### If there's a makefile, skip this stage.
-            if (-s "$builddir/$pkgs->{$pkg}{MODULE}/.avalon.makefile") {
+            if (-s "$builddir/$pkgs->{$pkg}{MODULE}/Makefile.avalon") {
                 nprint "$progname:  Avalon makefile exists, skipping component stage.\n";
                 next;
             }
@@ -1406,7 +1410,7 @@ do_build_stage
             }
         } elsif ($pkgs->{$pkg}{TYPE} eq "module") {
             ### If there's a makefile, use special_build() to build it.
-            if (-s "$builddir/$pkgs->{$pkg}{MODULE}/.avalon.makefile") {
+            if (-s "$builddir/$pkgs->{$pkg}{MODULE}/Makefile.avalon") {
                 ($err, $msg, $srpm) = &special_build($pkg);
                 dprint "do_build_stage():  special_build($pkg) returned $err, $msg, $srpm\n";
             } else {
@@ -1621,15 +1625,16 @@ sub
 special_build
 {
     my $pkg = $_[0];
-    my ($err, $msg, $srpm, $cmd, $make, $out_files);
+    my ($err, $msg, $srpm, $cmd, $make, $rpmdir);
     local *MAKE;
 
     if (! chdir("$builddir/$pkgs->{$pkg}{MODULE}")) {
         return (AVALON_PACKAGE_FAILED, "Could not chdir into $builddir/$pkgs->{$pkg}{MODULE} -- $!", 0);
     }
 
-    $make = ($pkgs->{$pkg}{MAKE} ? $pkgs->{$pkg}{MAKE} : "make -f .avalon.makefile");
-    $cmd = "$make BASE_DIR=$basedir BUILD_DIR=$builddir BUILD_ROOT=$buildroot RPMRC=$buildroot/$pkg-rpmrc";
+    $rpmdir = "$builddir/$pkgs->{$pkg}{MODULE}/RPMS";
+    $make = ($pkgs->{$pkg}{MAKE} ? $pkgs->{$pkg}{MAKE} : "make -f Makefile.avalon");
+    $cmd = "$make BASE_DIR=$basedir BUILD_DIR=$builddir BUILD_ROOT=$buildroot RPMRC=$buildroot/$pkg-rpmrc RPM_DIR=$rpmdir";
 
     dprint "About to run \"$cmd\"\n";
     if (!open(MAKE, "$cmd </dev/null 2>&1 |")) {
@@ -1641,8 +1646,6 @@ special_build
         nprint "$line\n";
         if ($line =~ /^make[^:]*:\s+\*\*\*\s+(.*)$/ && ! $msg) {
             $msg = $1;
-        } elsif ($line =~ /^Package files generated:\s+(.*)$/) {
-            $out_files = $1;
         }
     }
     close(MAKE);
@@ -1650,16 +1653,22 @@ special_build
     if ($? != 0 && $err == 0) {
         $err = $?;
         $msg = "Unhandled make error" if (! $msg);
+	return ($err, $msg, undef);
     }
 
-    if ($out_files) {
-        $pkgs->{$pkg}{OUTFILES} = $out_files;
-        if ($out_files =~ /src\.rpm/) {
-            ($srpm = $out_files) =~ s/^(.*\s+)?(\S+src\.rpm)(\s+.*)?$/$2/;
-        }
+    # Find the RPMs
+    @rpms = &grepdir(sub {/\.rpm$/}, $rpmdir);
+    if ($#rpms >= 0) {
+	foreach $i (@rpms) {
+	    $srpm = $rpmdir . "/" .$i if ($i =~ /\.src\.rpm$/);
+	    $pkgs->{$pkg}{OUTFILES} .= $rpmdir . "/" . $i . " ";
+	}
+	dprint "Found RPMS: $pkgs->{$pkg}{OUTFILES}\n";
+	dprint "Found SRPM: $srpm\n";
     } else {
+	dprint "No RPMS at $rpmdir\n";
         $err = AVALON_PACKAGE_FAILED;
-        $msg = "No output files reported by make";
+        $msg = "Make returned good return code, but no RPMs at $rpmdir";
     }
     chdir($builddir);
     return ($err, $msg, $srpm);
@@ -1790,7 +1799,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.139 $ created on $Date: 2001/05/09 21:32:05 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.140 $ created on $Date: 2001/05/11 16:04:32 $ by $Author: drummond $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1893,8 +1902,13 @@ main
     } else {
         my $cwd = &getcwd();
 
+	dprint "No product info on commnand-line\n";
+
         $prod = $prodname = &basename($cwd);
         $basedir = $builddir = &dirname($cwd);
+	dprint "prod = $prod\n";
+	dprint "basedir = $basedir\n";
+	dprint "builddir = $builddir\n";
     }
     $buildroot = ($ENV{BUILDROOT} ? $ENV{BUILDROOT} : "/var/tmp/buildtool.$$");
     qprint "$progname:  Building product:  $prodname", ($prodver ? " $prodver" : ""), "\n";
