@@ -455,3 +455,7 @@ Added instroot pool to buildtool to save copy/delete time.
 
 Moved some oft-used functionality to Util.pm.
 ----------------------------------------------------------------------
+Mon May 10 10:42:57 2004                        Michael Jennings (mej)
+
+Don't die on STOP signals.
+----------------------------------------------------------------------

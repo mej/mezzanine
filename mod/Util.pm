@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.36 2004/05/10 14:47:00 mej Exp $
+# $Id: Util.pm,v 1.37 2004/05/10 14:52:17 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -433,9 +433,9 @@ install_signal_handlers()
     $SIG{"FPE"} = \&handle_fatal_signal;
     $SIG{"SEGV"} = \&handle_fatal_signal;
     $SIG{"BUS"} = \&handle_fatal_signal;
-    $SIG{"TSTP"} = \&handle_fatal_signal;
-    $SIG{"TTIN"} = \&handle_fatal_signal;
-    $SIG{"TTOU"} = \&handle_fatal_signal;
+    #$SIG{"TSTP"} = \&handle_fatal_signal;
+    #$SIG{"TTIN"} = \&handle_fatal_signal;
+    #$SIG{"TTOU"} = \&handle_fatal_signal;
 }
 
 # Handle a perl warning
