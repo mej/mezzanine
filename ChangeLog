@@ -581,3 +581,7 @@ installer properly.
 Added timeout for subcommands so that hung processes don't plug up the
 pipes for too long.  Also allow passing of arrayref for params.
 ----------------------------------------------------------------------
+Wed Jul 28 18:19:31 2004                        Michael Jennings (mej)
+
+Doh.
+----------------------------------------------------------------------

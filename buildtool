@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.193 2004/07/28 21:40:21 mej Exp $
+# $Id: buildtool,v 1.194 2004/07/28 22:20:51 mej Exp $
 #
 
 use strict;
@@ -228,8 +228,8 @@ is_build_needed
             return 0;
         } else {
             dprintf("$srpm is older than $pkgfile:  %s < %s.\n",
-                    POSIX::strftime("%Y-%m-%d %H:%M:%S", $stat2[9]),
-                    POSIX::strftime("%Y-%m-%d %H:%M:%S", $stat1[9]));
+                    POSIX::strftime("%Y-%m-%d %H:%M:%S", localtime($stat2[9])),
+                    POSIX::strftime("%Y-%m-%d %H:%M:%S", localtime($stat1[9])));
         }
     }
     # Doh, gotta build this one.
@@ -1011,7 +1011,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.193 $ created on $Date: 2004/07/28 21:40:21 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.194 $ created on $Date: 2004/07/28 22:20:51 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
