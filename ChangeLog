@@ -710,3 +710,8 @@ Wed Jul 19 18:23:51 2000                        Michael Jennings (mej)
 
 Clean things up a touch in the log file.
 ----------------------------------------------------------------------
+Thu Jul 20 12:27:12 2000                        Michael Jennings (mej)
+
+I've been getting some weird intermittent failures due to temporary
+name resolution issues.  This should work around those.
+----------------------------------------------------------------------
