@@ -310,3 +310,12 @@ Thu Jun  8 14:36:37 2000                        Michael Jennings (mej)
 
 Fixed a couple small oversights on my part.
 ----------------------------------------------------------------------
+Thu Jun  8 15:11:42 2000                        Michael Jennings (mej)
+
+Dammit.  Forgot to account for Perl's -d operator behavior on
+symlinks.
+
+I also moved the howto module higher so it will start (and end)
+sooner, in theory.  Damn thing takes 15 minutes just to create and
+unarchive the source tarballs.
+----------------------------------------------------------------------
