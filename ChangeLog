@@ -1387,3 +1387,7 @@ Mon Aug 20 15:24:33 2001                        Michael Jennings (mej)
 Fixes to buildtool to sync up with the new pkgvar stuff.  It's now
 building....
 ----------------------------------------------------------------------
+Tue Aug 21 15:50:55 2001                        Michael Jennings (mej)
+
+Down to 3 failures on the build now.  Yeehaw. :)
+----------------------------------------------------------------------

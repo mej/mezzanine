@@ -55,8 +55,8 @@ $pkg_target = "rpms";
 $pkg_srcs = "";
 $pkg_inst = "";
 $pkg_topdir = "";
-$pkg_instroot = "";
-$pkg_buildroot = "";
+$pkg_instroot = "/var/tmp/avalon-instroot.$$";
+$pkg_buildroot = "/var/tmp/avalon-buildroot.$$";
 $pkg_arch = "i386";
 $pkg_params = "";
 $pkg_cmd = "";
@@ -210,7 +210,7 @@ pkgvar_instroot
     my $param = $_[0];
 
     if (defined($param)) {
-        $pkg_instroot = ($param ? $param : "");
+        $pkg_instroot = ($param ? $param : "/var/tmp/avalon-instroot.$$");
     }
     dprint "$pkg_instroot\n";
     return $pkg_instroot;
@@ -222,7 +222,7 @@ pkgvar_buildroot
     my $param = $_[0];
 
     if (defined($param)) {
-        $pkg_buildroot = ($param ? $param : "");
+        $pkg_buildroot = ($param ? $param : "/var/tmp/avalon-buildroot.$$");
     }
     dprint "$pkg_buildroot\n";
     return $pkg_buildroot;

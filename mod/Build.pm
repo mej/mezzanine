@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.16 2001/08/20 17:34:45 mej Exp $
+# $Id: Build.pm,v 1.17 2001/08/21 22:47:40 mej Exp $
 #
 
 package Avalon::Build;
@@ -54,9 +54,6 @@ use vars ('@EXPORT_OK');
 
 ### Private global variables
 @my_dirs = ();
-$topdir = "";
-$buildroot = "";
-$pkg_name = "";
 
 ### Initialize exported package variables
 
@@ -292,11 +289,12 @@ create_source_files($)
 sub
 cleanup_build_tree
 {
-    my ($topdir, $buildroot, $type);
+    my ($topdir, $buildroot, $instroot, $type);
     my @dirs;
 
     $topdir = &pkgvar_topdir();
     $buildroot = &pkgvar_buildroot();
+    $instroot = &pkgvar_instroot();
     $type = &pkgvar_cleanup();
 
     dprint "$topdir | $buildroot | $type\n";
