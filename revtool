@@ -1,0 +1,93 @@
+#!/usr/bin/perl -w
+#
+# revtool -- Source Code Revision Control Tool
+#
+# Michael Jennings
+# 05 May 2000
+#
+# $Id: revtool,v 1.1 2000/05/05 18:19:14 mej Exp $
+#
+
+# Include the Perl Modules we need
+use POSIX;
+use Getopt::Mixed;
+
+# Print usage information
+sub
+print_usage_info {
+
+    print "\n";
+    $leader = "$progname $version Usage Information";
+    $underbar = $leader;
+    $underbar =~ s/./-/g;
+    print "$leader\n$underbar\n";
+    print "\n";
+    print "  Syntax:   $ARGV0 [ options ]\n";
+    print "\n";
+    exit(0);
+}
+
+# Generate timestamp for debugging/log file
+sub
+get_time_stamp {
+
+    $ts = POSIX::strftime("[%A, %e %B %Y %H:%M:%S %Z]", localtime);
+    return $ts;
+}
+
+# Debugging printf
+sub
+dprintf {
+
+    my @args = @_;
+    if ($debug) {  # Don't print any of this stuff if we're not debugging
+	$args[0] = "[debug] " . $args[0];  # Prefix "[debug]" to the format string
+	return (printf @args);  # Pass all args to printf()
+    }
+}
+
+# Debugging print
+sub
+dprint {
+
+    my @args = @_;
+    if ($debug) {  # Don't print any of this stuff if we're not debugging
+	$args[0] = "[debug] " . $args[0];  # Prefix "[debug]" to the format string
+	return (print @args);  # Pass all args to print()
+    }
+}
+
+# main() here is basically the same as main() in C
+sub
+main {
+
+}
+
+BEGIN {
+
+    # Set up the basic variables
+    $start_time = time;
+    $progname = "RevTool";
+    $version = "0.1.0";
+    chomp($hostname = `/usr/bin/uname -n`);
+
+    # See the Getopt::Mixed man page for details on the syntax of this line
+    $valid_opts = "h help>h v version>v d debug>d";
+
+    Getopt::Mixed::getOptions($valid_opts);
+    $debug = $opt_d;
+    if ($opt_v) {
+	print "$progname $version by Michael Jennings.\n";
+        print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
+	exit(0);
+    }
+    if ($opt_h) {
+	&print_usage_info();   # Never returns
+    }
+}
+
+&main();
+
+END {
+
+}
