@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.35 2000/06/26 23:17:35 mej Exp $
+# $Id: revtool,v 1.36 2000/06/27 22:00:15 chip Exp $
 #
 
 # Include the Perl Modules we need
@@ -1051,7 +1051,7 @@ tag_local_sources
 sub
 import_vendor_sources
 {
-    my ($module, $vendor_tag, $release_tag, $version, $line, $tries, $err, $msg);
+    my ($module, $vendor_tag, $release_tag, $version, $cmd, $line, $tries, $err, $msg);
     my (@ignores, @links, @conflicts);
     local *CMD;
 
@@ -1086,8 +1086,10 @@ import_vendor_sources
     $version =~ tr/[A-Z]/[a-z]/;
     $msg = "Import of $module $version";
 
-    $cmd = "/bin/sh -c \"cvs $cvsroot import " . ($opt_k ? "-k $opt_k " : "-ko") . ($opt_x ? "-I! " : "")
-            . "-m '$msg' $module $vendor_tag $release_tag\"";
+    $cmd = "/bin/sh -c \"cvs $cvsroot import"
+            . ' -k' . ($opt_k || 'o')
+            . ($opt_x ? ' -I!' : '')
+            . " -m '$msg' $module $vendor_tag $release_tag\"";
 
     for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
         $err = 0;
@@ -1346,7 +1348,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.35 $ created on $Date: 2000/06/26 23:17:35 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.36 $ created on $Date: 2000/06/27 22:00:15 $ by $Author: chip $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
