@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.41 2004/07/28 21:40:21 mej Exp $
+# $Id: Build.pm,v 1.42 2004/08/18 21:03:21 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -598,7 +598,7 @@ build_spm
     $topdir = &pkgvar_topdir();
     $instroot = &pkgvar_instroot();
 
-    @tmp = &grepdir(sub {-f $_ && -s _}, "F");
+    @tmp = &grepdir(sub {-f $_ && -s _ && $_ !~ /^\./ && $_ !~ /\~$/}, "F");
     if (!scalar(@tmp)) {
         return (MEZZANINE_MISSING_FILES, "@{[getcwd()]} does not seem to contain build instructions", undef);
     } elsif (scalar(@tmp) > 1) {
@@ -611,12 +611,20 @@ build_spm
         &pkgvar_instructions($instroot . $specfile);
         &parse_spec_file();
 
-        if ($specdata && $specdata->{"BUILD_DEPS"} && scalar(@{$specdata->{"BUILD_DEPS"}})) {
-            my $ret;
+        if ($specdata) {
+            if ($specdata->{"HEADER"}{"epoch"}) {
+                my $str;
 
-            $ret = &install_deps(join(' ', @{$specdata->{"BUILD_DEPS"}}));
-            if ($ret) {
-                wprint "Build dependency installation failed:  $ret\n";
+                $str = sprintf("Epoch %s not allowed", $specdata->{"HEADER"}{"epoch"});
+                return (MEZZANINE_SPEC_ERRORS, $str, undef);
+            }
+            if ($specdata->{"BUILD_DEPS"} && scalar(@{$specdata->{"BUILD_DEPS"}})) {
+                my $ret;
+
+                $ret = &install_deps(join(' ', @{$specdata->{"BUILD_DEPS"}}));
+                if ($ret) {
+                    wprint "Build dependency installation failed:  $ret\n";
+                }
             }
         }
         &pkgvar_instructions($specfile);
@@ -663,7 +671,7 @@ build_pdr
     $topdir = &pkgvar_topdir();
     $instroot = &pkgvar_instroot();
 
-    @tmp = &grepdir(sub {/\.spec(\.in)?$/ && -f $_ && -s _}, ".");
+    @tmp = &grepdir(sub {/\.spec(\.in)?$/ && -f $_ && -s _ && $_ !~ /^\./}, ".");
     if (!scalar(@tmp)) {
         return (MEZZANINE_MISSING_FILES, "@{[getcwd()]} does not seem to contain build instructions", undef);
     } elsif (scalar(@tmp) > 1) {
@@ -679,12 +687,21 @@ build_pdr
         &parse_spec_file();
     }
 
-    if ($specdata && $specdata->{"BUILD_DEPS"} && scalar(@{$specdata->{"BUILD_DEPS"}})) {
-        my $ret;
+    if ($specdata) {
+        if ($specdata->{"HEADER"}{"epoch"}) {
+            my $str;
 
-        $ret = &install_deps(join(' ', @{$specdata->{"BUILD_DEPS"}}));
-        if ($ret) {
-            wprint "Build dependency installation failed:  $ret\n";
+            $str = sprintf("Epoch %s not allowed", $specdata->{"HEADER"}{"epoch"});
+            return (MEZZANINE_SPEC_ERRORS, $str, undef);
+        }
+
+        if ($specdata->{"BUILD_DEPS"} && scalar(@{$specdata->{"BUILD_DEPS"}})) {
+            my $ret;
+
+            $ret = &install_deps(join(' ', @{$specdata->{"BUILD_DEPS"}}));
+            if ($ret) {
+                wprint "Build dependency installation failed:  $ret\n";
+            }
         }
     }
     &pkgvar_instructions($specfile);
@@ -826,12 +843,20 @@ build_fst
         return (MEZZANINE_SYSTEM_ERROR, "Unable to copy $specfile to $instroot$topdir/SPECS/ -- $!\n", undef);
     } else {
         &parse_spec_file();
-        if ($specdata && $specdata->{"BUILD_DEPS"} && scalar(@{$specdata->{"BUILD_DEPS"}})) {
-            my $ret;
+        if ($specdata) {
+            if ($specdata->{"HEADER"}{"epoch"}) {
+                my $str;
 
-            $ret = &install_deps(join(' ', @{$specdata->{"BUILD_DEPS"}}));
-            if ($ret) {
-                wprint "Build dependency installation failed:  $ret\n";
+                $str = sprintf("Epoch %s not allowed", $specdata->{"HEADER"}{"epoch"});
+                return (MEZZANINE_SPEC_ERRORS, $str, undef);
+            }
+            if ($specdata->{"BUILD_DEPS"} && scalar(@{$specdata->{"BUILD_DEPS"}})) {
+                my $ret;
+
+                $ret = &install_deps(join(' ', @{$specdata->{"BUILD_DEPS"}}));
+                if ($ret) {
+                    wprint "Build dependency installation failed:  $ret\n";
+                }
             }
         }
         &pkgvar_instructions("$topdir/SPECS/" . &basename($specfile));
@@ -908,15 +933,24 @@ build_srpm
 
     &pkgvar_instructions("$instroot$topdir/SPECS/$specs[0]");
     &parse_spec_file();
-    if ($specdata && $specdata->{"BUILD_DEPS"} && scalar(@{$specdata->{"BUILD_DEPS"}})) {
-        my $ret;
+    if ($specdata) {
+        if ($specdata->{"HEADER"}{"epoch"}) {
+            my $str;
 
-        $ret = &install_deps(join(' ', @{$specdata->{"BUILD_DEPS"}}));
-        if ($ret) {
-            wprint "Build dependency installation failed:  $ret\n";
+            $str = sprintf("Epoch %s not allowed", $specdata->{"HEADER"}{"epoch"});
+            return (MEZZANINE_SPEC_ERRORS, $str, undef);
         }
-    } else {
-        dprint "No build deps?\n";
+
+        if ($specdata->{"BUILD_DEPS"} && scalar(@{$specdata->{"BUILD_DEPS"}})) {
+            my $ret;
+
+            $ret = &install_deps(join(' ', @{$specdata->{"BUILD_DEPS"}}));
+            if ($ret) {
+                wprint "Build dependency installation failed:  $ret\n";
+            }
+        } else {
+            dprint "No build deps?\n";
+        }
     }
 
     &pkgvar_instructions("$topdir/SPECS/$specs[0]");
@@ -967,7 +1001,7 @@ build_package
             # There's a custom Makefile.  It's a Custom Full Source Tree (FST).
             @ret = &build_cfst();
         } else {
-            my @specs = &grepdir(sub {/\.spec(\.in)?$/}, ".");
+            my @specs = &grepdir(sub {$_ =~ /\.spec(\.in)?$/ && $_ !~ /^\./}, ".");
 
             if (scalar(@specs) == 1) {
                 # There's a spec file.  Make sure we have all sources.

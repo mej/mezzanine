@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.40 2004/07/28 21:40:21 mej Exp $
+# $Id: Util.pm,v 1.41 2004/08/18 21:03:21 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -29,6 +29,7 @@ use Exporter;
 use POSIX;
 use English;
 use Getopt::Long;
+use File::Find;
 use File::Copy;
 use File::stat;
 use vars '$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS',
@@ -53,11 +54,11 @@ BEGIN {
                '&create_temp_space', '&clean_temp_space', '&basename',
                '&dirname', '&grepdir', '&limit_files', '&xpush',
                '&cat_file', '&parse_rpm_name', '&should_ignore',
-               '&touch_file', '&run_cmd', '&run_mz_cmd',
-               '&MEZZANINE_SUCCESS', '&MEZZANINE_FATAL_ERROR',
-               '&MEZZANINE_SYNTAX_ERROR', '&MEZZANINE_SYSTEM_ERROR',
-               '&MEZZANINE_COMMAND_FAILED', '&MEZZANINE_DUPLICATE',
-               '&MEZZANINE_FILE_NOT_FOUND',
+               '&touch_file', '&newest_file', '&run_cmd',
+               '&run_mz_cmd', '&MEZZANINE_SUCCESS',
+               '&MEZZANINE_FATAL_ERROR', '&MEZZANINE_SYNTAX_ERROR',
+               '&MEZZANINE_SYSTEM_ERROR', '&MEZZANINE_COMMAND_FAILED',
+               '&MEZZANINE_DUPLICATE', '&MEZZANINE_FILE_NOT_FOUND',
                '&MEZZANINE_FILE_OP_FAILED', '&MEZZANINE_UNSUPPORTED',
                '&MEZZANINE_ACCESS_DENIED', '&MEZZANINE_BAD_ADDITION',
                '&MEZZANINE_BAD_LOG_ENTRY', '&MEZZANINE_BAD_LOGIN',
@@ -134,6 +135,7 @@ sub cat_file($);
 sub parse_rpm_name($);
 sub should_ignore($);
 sub touch_file($);
+sub newest_file($);
 sub handle_alarm_for_subcommand(@);
 
 ### Module cleanup
@@ -868,6 +870,8 @@ should_ignore($)
     return 1 if ($fname =~ /^[Cc]hanges?\.?[Ll]og$/);
     # Ignore dotfiles
     return 1 if ($fname =~ /^\./);
+    # Ignore backup files
+    return 1 if ($fname =~ /\~$/);
     # Ignore spec files
     return 1 if ($fname =~ /\.spec(\.in)?$/);
     # Ignore the debian/ directory
@@ -884,6 +888,29 @@ touch_file($)
 
     open(TMP, ">$file") && close(TMP);
     chown($mz_uid, $mz_gid, $file);
+}
+
+sub
+newest_file(@)
+{
+    my @dirs = @_;
+    my ($newest_name, $newest_time) = ("", 0);
+    my @stat_info;
+
+    foreach my $dir (@dirs) {
+        find({ "wanted" => sub {
+                               dprint "Checking $_\n";
+                               @stat_info = stat($_);
+                               if ($stat_info[9] > $newest_time) {
+                                   $newest_name = $_;
+                                   $newest_time = $stat_info[9];
+                               }
+                           }, "no_chdir" => 1
+             }, $topdir);
+    }
+    dprintf("$newest_name is newest with mtime of %s.\n",
+            POSIX::strftime("%Y-%m-%d %H:%M:%S", localtime($newest_time)));
+    return $newest_name;
 }
 
 # Generic wrapper to grab command output

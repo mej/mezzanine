@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.31 2004/07/22 21:04:28 mej Exp $
+# $Id: RPM.pm,v 1.32 2004/08/18 21:03:21 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -231,6 +231,14 @@ parse_spec_file
 
             $var = lc($var);
             dprint "Header:  $var -> $value\n";
+
+            # Aliases
+            if ($var eq "copyright") {
+                $var = "license";
+            } elsif ($var eq "serial") {
+                $var = "epoch";
+            }
+
             if ($var eq "name") {
                 $pkg = $value;
                 @{$specdata->{"PKGS"}} = ($pkg);

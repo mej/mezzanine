@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.195 2004/07/29 17:58:49 mej Exp $
+# $Id: buildtool,v 1.196 2004/08/18 21:03:21 mej Exp $
 #
 
 use strict;
@@ -199,12 +199,13 @@ is_build_needed
     if (! -e $pkgfile) {
         dprint "Doh!  $pkgfile doesn't exist.  It must be built.\n";
     }
-    @stat1 = stat($pkgfile);
+    @stat1 = stat(&newest_file($pkgfile));
 
     # If there is no SRPMS directory, then there are surely no SRPMS to be checked.
     $srpm_dir = &pkgvar_topdir() . "/SRPMS";
     if (! -d $srpm_dir) {
         dprint "SRPM directory $srpm_dir does not exist.\n";
+        dprint "Listing:  `/bin/ls -Fla $srpm_dir/../`\n\n----\n";
         return 1;
     }
 
@@ -254,9 +255,11 @@ scan_rpm_dirs
     # each binary came from, because some (lame) packages change the base name.
     if (-d $topdir) {
         if ($buildtree_layout eq "orc") {
-            find({ "wanted" => sub { ! -d $_ && $_ =~ /\.rpm$/ && push @contents, $_ }, "no_chdir" => 1 }, $topdir);
+            find({ "wanted" => sub { ! -d $_ && $_ =~ /\.rpm$/ && push @contents, $_ }, "no_chdir" => 1 },
+                 $topdir);
         } else {
-            find({ "wanted" => sub { ! -d $_ && $_ =~ /\.rpm$/ && push @contents, $_ }, "no_chdir" => 1 }, "$topdir/RPMS", "$topdir/SRPMS");
+            find({ "wanted" => sub { ! -d $_ && $_ =~ /\.rpm$/ && push @contents, $_ }, "no_chdir" => 1 },
+                 "$topdir/RPMS", "$topdir/SRPMS");
         }
     }
     foreach my $rpm (sort(@contents)) {
@@ -1019,7 +1022,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.195 $ created on $Date: 2004/07/29 17:58:49 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.196 $ created on $Date: 2004/08/18 21:03:21 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();

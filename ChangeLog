@@ -595,3 +595,17 @@ Wed Aug 18 16:49:39 2004                        Michael Jennings (mej)
 
 Clean unpackaged files from perl modules.
 ----------------------------------------------------------------------
+Wed Aug 18 16:59:02 2004                        Michael Jennings (mej)
+
+With these changes, I hope to accomplish the following:
+  - Instead of using the directory timestamp for modules, find the
+    newest file/directory inside the module.  This should solve the
+    problem where packages weren't being noted for rebuild.
+  - If the SRPM directory isn't there, get a directory listing.  I'm
+    trying to figure out why it keeps disappearing and reappearing.
+  - Include .#* and *~ in files nuked by "mzclean" (stupid CVS).
+  - Also nuke directories which no longer exist on the server with
+    "mzclean."
+  - Ignore .* and *~ files when looking for spec files.
+  - Error out if a spec file contains an epoch.
+----------------------------------------------------------------------

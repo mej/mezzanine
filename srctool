@@ -23,11 +23,12 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.50 2004/07/28 21:40:21 mej Exp $
+# $Id: srctool,v 1.51 2004/08/18 21:03:21 mej Exp $
 #
 
 use strict;
 use POSIX;
+use File::Find;
 use File::Copy ('&cp', '&mv');
 
 # Mezzanine modules
@@ -590,6 +591,7 @@ clean_package
 {
     my ($pkg, $pwd, $err);
     my @output;
+    my @nukem;
 
     $pkg = &pkgvar_filename();
     if ($pkg) {
@@ -618,11 +620,18 @@ clean_package
     push @output, @{$scm->propget("saved_output")};
     $scm->propset("handle_output", 1);
     $scm->propset("saved_output", "");
-    @output = grep(/^\?/, @output);
-    if (scalar(@output)) {
-        foreach my $item (@output) {
+    @nukem = grep(/^\?/, @output);
+    push @nukem, grep(/skipping directory/, @output);
+    find({ "wanted" => sub { (($_ =~ /^\.\#/) || ($_ =~ /\~$/)) && push @nukem, $_ }, "no_chdir" => 1 }, ".");
+
+    if (scalar(@nukem)) {
+        foreach my $item (@nukem) {
             chomp($item);
-            $item =~ s/^\?\s+//;
+            if ($item =~ /^\?\s+/) {
+                $item =~ s/^\?\s+//;
+            } elsif ($item =~ /skipping directory/) {
+                $item =~ s/^.*skipping directory\s*//;
+            }
             print "Removing $item...\n";
             &nuke_tree($item);
         }
@@ -815,7 +824,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.50 $ created on $Date: 2004/07/28 21:40:21 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.51 $ created on $Date: 2004/08/18 21:03:21 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();
