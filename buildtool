@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.186 2004/06/10 21:04:48 mej Exp $
+# $Id: buildtool,v 1.187 2004/06/18 18:13:38 mej Exp $
 #
 
 use strict;
@@ -983,7 +983,7 @@ main
                "savecfg|save-config");
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.186 $ created on $Date: 2004/06/10 21:04:48 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.187 $ created on $Date: 2004/06/18 18:13:38 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
@@ -1004,16 +1004,6 @@ main
         $verbosity = 1;
     }
     $config->set("VERBOSITY", $verbosity);
-    $global_user = $OPTION{"repuser"};
-    $global_tree = $OPTION{"dir"};
-    $global_tag = $OPTION{"tag"};
-    $buildtree_layout = $config->set("BUILDTREE_LAYOUT", $OPTION{"buildtree"} || $config->get("BUILDTREE_LAYOUT") || "mej");
-    $config->set("CLEAN", &pkgvar_cleanup($OPTION{"clean"} || $config->get("CLEAN") || $config->get("BUILDTREE_LAYOUT")));
-    $config->set("TARGET", &pkgvar_target($OPTION{"target"} || $config->get("TARGET") || ""));
-    $config->set("REBUILD", $OPTION{"rebuild"} || $config->get("REBUILD") || 0);
-    if (! $config->get("REBUILD")) {
-        ### &fatal_error("Rebuild is " . $config->get("REBUILD"));
-    }
 
     # Open log file, if any.
     $config->set("LOGFILE", $OPTION{"log"} || $config->get("LOGFILE") || "");
@@ -1034,6 +1024,15 @@ main
     }
     select STDOUT; $| = 1;
     nprintf("$PROGNAME $VERSION:  %s [%s]\n", join(' ', @orig_argv), &get_timestamp());
+
+    # Basic config stuff.
+    $global_user = $OPTION{"repuser"};
+    $global_tree = $OPTION{"dir"};
+    $global_tag = $OPTION{"tag"};
+    $buildtree_layout = $config->set("BUILDTREE_LAYOUT", $OPTION{"buildtree"} || $config->get("BUILDTREE_LAYOUT") || "mej");
+    $config->set("CLEAN", &pkgvar_cleanup($OPTION{"clean"} || $config->get("CLEAN") || $config->get("BUILDTREE_LAYOUT")));
+    $config->set("TARGET", &pkgvar_target($OPTION{"target"} || $config->get("TARGET") || ""));
+    $config->set("REBUILD", $OPTION{"rebuild"} || $config->get("REBUILD") || 0);
 
     # Handle hint file/directory specification
     $config->set("HINTS", $OPTION{"hints"} || $config->get("HINTS") || $ENV{"MEZZANINE_HINTS"} || "");

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.23 2004/06/04 20:30:24 mej Exp $
+# $Id: RevCtl.pm,v 1.24 2004/06/18 18:13:38 mej Exp $
 #
 
 package Mezzanine::RevCtl;
@@ -468,12 +468,13 @@ find_module_changelog($)
 
 # Compose a new entry for the ChangeLog
 sub
-do_changelog_entry()
+do_changelog_entry($$)
 {
-    my $log = $_[0];
-    my ($pwd, $username, $fullname, $line, $module, $rel_dir);
+    my ($log, $message) = @_;
+    my ($pwd, $username, $fullname, $line, $module, $rel_dir, $datestamp, $author);
     my @pw_info;
     my @stat_info;
+    my @contents;
     my $logfile = "/var/tmp/.cvs.commit.$$";
     local *LOGFILE;
 
@@ -492,21 +493,30 @@ do_changelog_entry()
     } else {
         $fullname = $pw_info[6];
     }
-    printf LOGFILE "%-25s%45s\n\n", scalar localtime, ($fullname ? "$fullname ($username)" : "$username");
+    $datestamp = scalar(localtime());
+    $author = (($fullname) ? ("$fullname ($username)") : ("$username"));
+    printf LOGFILE "%-25s%45s\n\n", $datestamp, $author;
+    if ($message) {
+        print LOGFILE "$message\n";
+    }
     close(LOGFILE);
 
-    dprint "Current directory is \"$pwd\", module name is \"$module\"\n";
-    print "Please edit your commit message now...\n";
-    system("/bin/sh -c \"" . ($ENV{"EDITOR"} ? $ENV{"EDITOR"} : "vi") . " $logfile\"");
+    if (! $message) {
+        dprint "Current directory is \"$pwd\", module name is \"$module\"\n";
+        print "Please edit your commit message now...\n";
+        system("/bin/sh -c \"" . ($ENV{"EDITOR"} ? $ENV{"EDITOR"} : "vi") . " $logfile\"");
 
-    # Abort if the logfile was not modified or is too small.
-    @stat_info = stat($logfile);
-    if ($stat_info[7] <= 72) {
-        print "Commit message was unmodified or is too short.  Aborting commit.\n";
-        return "";
+        # Abort if the logfile was not modified or is too small.
+        @stat_info = stat($logfile);
+        if ($stat_info[7] <= 72) {
+            print "Commit message was unmodified or is too short.  Aborting commit.\n";
+            return "";
+        }
     }
 
-    return $logfile if (! $log);
+    if (! $log) {
+        return $logfile;
+    }
 
     if (! -f "ChangeLog") {
         $rel_dir = &find_module_changelog();
@@ -530,7 +540,9 @@ do_changelog_entry()
             print "WARNING:  Unable to create ChangeLog:  $!\n";
             return "";
         }
-        &add_new_files("ChangeLog");
+        if (-d "CVS") {
+            &add_new_files("ChangeLog");
+        }
     } else {
         chmod(0644, "ChangeLog") if (! -w "ChangeLog");
         if (!open(CL, ">>ChangeLog")) {
@@ -538,13 +550,28 @@ do_changelog_entry()
             return "";
         }
     }
-    open(LOGFILE, "<$logfile");
-    while (<LOGFILE>) {
-        print CL $_;
+
+    if (!open(LOGFILE, "<$logfile")) {
+        wprint "Unable to read message from $logfile -- $!\n";
+        return "";
+    }
+    @contents = <LOGFILE>;
+    close(LOGFILE);
+
+    if (substr($contents[0], 0, length($datestamp)) eq $datestamp) {
+        shift @contents;
+        if ($contents[0] =~ /^\s*$/) {
+            shift @contents;
+        }
+    }
+
+    printf CL "%-25s%45s\n\n", $datestamp, $author;
+    print CL join("", @contents);
+    if (substr($contents[$#contents], -1, 1) ne "\n") {
+        print CL "\n";
     }
     print CL "----------------------------------------------------------------------\n";
     close(CL);
-    close(LOGFILE);
     return $logfile;
 }
 

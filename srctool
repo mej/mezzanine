@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.42 2004/06/10 21:04:48 mej Exp $
+# $Id: srctool,v 1.43 2004/06/18 18:13:38 mej Exp $
 #
 
 use strict;
@@ -139,17 +139,34 @@ import_package
                 chomp($tmp);
                 $module = "$tmp/$pkg";
             }
-            if ((-r "CVS/Root") && (&revctl_repository() eq $ENV{"CVSROOT"})) {
-                my $tmp = &cat_file("CVS/Root");
+            dprintf("Currently set to import into $module at %s\n", &revctl_repository());
+            if ((-r "$pwd/CVS/Root")
+                && ((! $ENV{"CVSROOT"} && ! &revctl_repository())
+                    || (&revctl_repository() eq $ENV{"CVSROOT"}))) {
+                my $tmp = &cat_file("$pwd/CVS/Root");
 
                 chomp($tmp);
                 &revctl_repository($tmp);
+            }
+
+            dprintf("Now set to import into $module at %s\n", &revctl_repository());
+            if (! -f "ChangeLog") {
+                my ($tmpfile, $msg);
+
+                $msg = sprintf("Mezzanine auto-imported %s from %s.",
+                               $pkg, &basename($pkgfile));
+                $tmpfile = &do_changelog_entry(1, $msg);
+                if ($tmpfile) {
+                    unlink($tmpfile);
+                }
             }
             $err = &import_vendor_sources($module);
             if ($err != MEZZANINE_SUCCESS) {
                 eprint "Import of $pkgfile failed.\n";
                 return $err;
             }
+            &revctl_tag("");
+            &revctl_rtag("");
             chdir($pwd);
         }
         if ($tmpdir) {
@@ -202,6 +219,8 @@ import_package
             } else {
                 $err = &import_vendor_sources();
             }
+            &revctl_tag("");
+            &revctl_rtag("");
             if ($err != MEZZANINE_SUCCESS) {
                 eprintf("Import of %s failed.\n", (($pkgfile) ? ($pkgfile) : (".")));
                 return $err;
@@ -700,7 +719,7 @@ main
                "path|P=s");
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.42 $ created on $Date: 2004/06/10 21:04:48 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.43 $ created on $Date: 2004/06/18 18:13:38 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();
