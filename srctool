@@ -23,18 +23,14 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.8 2001/03/27 05:44:39 mej Exp $
+# $Id: srctool,v 1.9 2001/03/29 09:13:08 mej Exp $
 #
 
 # Include the Perl Modules we need
 require POSIX;
 require Getopt::Long;
 use Avalon::Util;
-
-# Constants
-#
-$WORK_DIR = "work";
-$TMP_DIR = "/var/tmp/srctool.$$";
+use Avalon::Srctool;
 
 # Print usage information
 sub
@@ -198,7 +194,7 @@ import_package
         $rpmcmd = "rpm --define \"_sourcedir $tmpdir/S\" --define \"_specdir $tmpdir/F\"";
         # Install the SRPM into the temporary directory
         @tmp = &run_av_cmd("pkgtool", "-P '$rpmcmd' -ip $pkgfile", 0);
-        if (($err = shift @tmp) != 0) {
+        if (($err = shift @tmp) != AVALON_SUCCESS) {
             eprint "Unable to install $pkgfile\n";
             return AVALON_COMMAND_FAILED;
         }
@@ -294,39 +290,20 @@ prepare_tree
         eprint "Unable to create working directory -- $!\n";
         return AVALON_SYSTEM_ERROR;
     }
-    # Find all the sources and patches and the spec file.
-    @srcs = &find_files("S");
-    @patches = &find_files("P");
-    @tmp = &find_files("F");
-    if (scalar(@tmp) != 1) {
-	my $n = scalar(@tmp);
-	&fatal_error("$n spec files?!\n");
-    }
-    $spec = $tmp[0];
     # Create the RPM build tree
     $tmpdir = &create_temp_space($pkg, "build");
     if (! $tmpdir) {
 	return AVALON_SYSTEM_ERROR;
     }
     # Copy all the files into their proper places for RPM's use
-    foreach my $f (@srcs, @patches) {
-        my $fname;
-
-        ($fname = $f) =~ s/^.\///;
-	if (!link($f, "$tmpdir/SOURCES/$fname")) {
-	    eprint "Unable to copy $f into $tmpdir/SOURCES -- $!\n";
-	    return AVALON_SYSTEM_ERROR;
-	}
-    }
-    ($tmp = $spec) =~ s/^.\///;
-    if (!link($spec, "$tmpdir/SPECS/$tmp")) {
-	eprint "Unable to copy $spec into $tmpdir/SPECS -- $!\n";
+    $spec = &install_spm_files($tmpdir);
+    if (! $spec) {
 	return AVALON_SYSTEM_ERROR;
     }
     print "Creating working directory $pkgdir/$WORK_DIR....\n";
     $rpmcmd = "--define \"_topdir $tmpdir\" --define \"_builddir $pkgdir/$WORK_DIR\" -bp $spec";
     @tmp = &run_cmd("rpm", $rpmcmd, 0);
-    if (($err = shift @tmp) != 0) {
+    if (($err = shift @tmp) != AVALON_SUCCESS) {
         eprint "Creation of working directory failed -- $tmp[$#tmp]\n";
     }
     return $err;
@@ -351,7 +328,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.8 $ created on $Date: 2001/03/27 05:44:39 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.9 $ created on $Date: 2001/03/29 09:13:08 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

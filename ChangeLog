@@ -1103,3 +1103,9 @@ Wed Mar 28 21:00:48 2001                        Michael Jennings (mej)
 You can now run "buildtool" inside a module and get packages built
 from that working copy.  No interaction with server needed. :)
 ----------------------------------------------------------------------
+Thu Mar 29 01:11:05 2001                        Michael Jennings (mej)
+
+buildtool should now be able to build SPM's.  It should also support
+in-module product files named ".prod" which can be used for in-place
+building of modules with non-default semantics.
+----------------------------------------------------------------------

@@ -23,13 +23,14 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.126 2001/03/28 05:01:55 mej Exp $
+# $Id: buildtool,v 1.127 2001/03/29 09:13:08 mej Exp $
 #
 
 # Include the Perl Modules we need
 require POSIX;
 require Getopt::Long;
 use Avalon::Util;
+use Avalon::Srctool;
 
 # Print usage information
 sub
@@ -452,6 +453,12 @@ find_product_file
             return "$proddir/$prodfile";
         }
     }
+
+    # One last chance.  Product directory with a .prod file.
+    if (-s "$builddir/$prodname/.prod") {
+	return "$builddir/$prodname/.prod";
+    }
+
     # Give up.  It doesn't exist.
     return 0;
 }
@@ -1140,41 +1147,51 @@ do_component_stage
                 next;
             }
 
-            ### The next step is to find the spec file.  If it's an oddball
-            ### case, they better have told us what it's actually called....
-            opendir(DIR, ".");
-            @contents = readdir(DIR);
-            closedir(DIR);
-            if ($pkgs->{$pkg}{SPECFILE} && -f $pkgs->{$pkg}{SPECFILE}) {
-                # If they gave us the spec file and it exists, use that.
-                $specfile = $pkgs->{$pkg}{SPECFILE};
-                dprint "User specified a spec file:  $specfile\n";
-            } else {
-                # First choice:  Exactly one file named <pkg>-<distro>.spec
-                ($pn = $prodname) =~ s/^va-//;
-                @tmp = grep($_ =~ /^($pkg-)?(va-)?$pn\.spec/, @contents);
-                if ($#tmp != 0) {
-                    # Second choice:  Exactly one file named <pkg>.spec
-                    @tmp = grep($_ =~ /^$pkg\.spec/, @contents);
-                    if ($#tmp != 0) {
-                        # Third choice:  The first match to *.spec*
-                        @tmp = grep($_ =~ /\.spec/, @contents);
-                    }
-                }
-                $pkgs->{$pkg}{SPECFILE} = $specfile = $tmp[0];
-                if (!defined $specfile || $specfile =~ /^$/) {
-                    # Our attempt to guess failed.  They need to specify the spec file in the .prod file.
-                    &fail_package($pkg, "component", "No spec file could be located in $pkgs->{$pkg}{MODULE}");
-                    next;
-                }
-            }
+	    if (-d "F") {
+		### It's an SPM.  Just copy all the files into the right places.
+		$specfile = &install_spm_files($builddir);
+		if (! $specfile) {
+		    &fail_package($pkg, "component", "Could not copy component files into $builddir");
+		    next;
+		}
+		$pkgs->{$pkg}{SPECFILE} = $specfile;
+	    } else {
+		### The next step is to find the spec file.  If it's an oddball
+		### case, they better have told us what it's actually called....
+		opendir(DIR, ".");
+		@contents = readdir(DIR);
+		closedir(DIR);
+		if ($pkgs->{$pkg}{SPECFILE} && -f $pkgs->{$pkg}{SPECFILE}) {
+		    # If they gave us the spec file and it exists, use that.
+		    $specfile = $pkgs->{$pkg}{SPECFILE};
+		    dprint "User specified a spec file:  $specfile\n";
+		} else {
+		    # First choice:  Exactly one file named <pkg>-<distro>.spec
+		    ($pn = $prodname) =~ s/^va-//;
+		    @tmp = grep($_ =~ /^($pkg-)?(va-)?$pn\.spec/, @contents);
+		    if ($#tmp != 0) {
+			# Second choice:  Exactly one file named <pkg>.spec
+			@tmp = grep($_ =~ /^$pkg\.spec/, @contents);
+			if ($#tmp != 0) {
+			    # Third choice:  The first match to *.spec*
+			    @tmp = grep($_ =~ /\.spec/, @contents);
+			}
+		    }
+		    $pkgs->{$pkg}{SPECFILE} = $specfile = $tmp[0];
+		    if (!defined $specfile || $specfile =~ /^$/) {
+			# Our attempt to guess failed.  They need to specify the spec file in the .prod file.
+			&fail_package($pkg, "component", "No spec file could be located in $pkgs->{$pkg}{MODULE}");
+			next;
+		    }
+		}
 
-            ### Next, generate the source files
-            ($err, $msg) = &gen_sources($pkg, $specfile);
-            if ($err) {
-                &fail_package($pkg, "component", "Creation of vendor sources failed -- $msg");
-                next;
-            }
+		### Next, generate the source files
+		($err, $msg) = &gen_sources($pkg, $specfile);
+		if ($err) {
+		    &fail_package($pkg, "component", "Creation of vendor sources failed -- $msg");
+		    next;
+		}
+	    }
         } elsif ($pkgs->{$pkg}{TYPE} eq "srpm") {
             my $rpmrc = "$buildroot/$pkg-rpmrc";
 
@@ -1730,7 +1747,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.126 $ created on $Date: 2001/03/28 05:01:55 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.127 $ created on $Date: 2001/03/29 09:13:08 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1824,7 +1841,13 @@ main
         } else {
             chomp($basedir = `pwd`);
         }
-        $builddir = ($ENV{BUILD_DIR} ? $ENV{BUILD_DIR} : "$basedir/build");
+	if (-d "$basedir/$prod") {
+	    $builddir = $basedir;
+	} elsif ($ENV{BUILD_DIR}) {
+	    $builddir = $ENV{BUILD_DIR};
+	} else {
+	    $builddir = "$basedir/build";
+	}
     } else {
         my $cwd = &getcwd();
 
@@ -1836,10 +1859,10 @@ main
 
     # Try to find the products directory
     foreach $dir (($ENV{PROD_DIR} ? $ENV{PROD_DIR} : 0), "$basedir/products", "$basedir/../products") {
-        if ($dir && -d $dir) {
-            $proddir = $dir;
-            last;
-        }
+	if ($dir && -d $dir) {
+	    $proddir = $dir;
+	    last;
+	}
     }
 
     # If we don't have a products directory, try to download one.
@@ -1848,7 +1871,7 @@ main
 
         ($err, $msg) = &fetch_package("$revtool -g products");
         if ($err) {
-            &fatal_error("Unable to find/download products directory -- $msg\n");
+            eprint "Unable to find/download products directory -- $msg.  This could be bad.\n";
         }
     }
 
