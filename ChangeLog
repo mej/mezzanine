@@ -1378,3 +1378,7 @@ Mon Aug 20 10:36:18 2001                        Michael Jennings (mej)
 Completely reworked the package variable mechanism.  No more need to
 pass every silly parameter under the sun.
 ----------------------------------------------------------------------
+Mon Aug 20 19:47:54 2001                        Michael Jennings (mej)
+
+Fixed patch generation and added the new module I forgot last time.
+----------------------------------------------------------------------

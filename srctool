@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.26 2001/08/20 17:34:45 mej Exp $
+# $Id: srctool,v 1.27 2001/08/20 18:50:11 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -492,7 +492,7 @@ main
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "i|import", "p|prepare", "m|mod|modify",
-                   "M|merge", "r|resync", "a|apply|patch:s", "n|name=s", "c|clean", "D|dir|repository=s",
+                   "M|merge", "r|resync", "a|apply|patch", "n|name=s", "c|clean", "D|dir|repository=s",
                    "T|test");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
@@ -501,7 +501,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.26 $ created on $Date: 2001/08/20 17:34:45 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.27 $ created on $Date: 2001/08/20 18:50:11 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -589,19 +589,6 @@ main
     } elsif ($0 =~ /avpatch$/ || $opt_a) {
         my ($pkg, $patch);
 
-        if (scalar(@flist) == 2) {
-            if (-d $flist[0]) {
-                ($pkg, $patch) = @flist;
-            } elsif (-d $flist[1]) {
-                ($patch, $pkg) = @flist;
-            }
-        } elsif (scalar(@flist) == 1) {
-            if (-d $flist[0]) {
-                $pkg = $flist[0];
-            } else {
-                $patch = $flist[0];
-            }
-        }
         if (! $pkg) {
             if (-d 'F') {
                 $pkg = "";
@@ -610,11 +597,19 @@ main
                 return AVALON_SYNTAX_ERROR;
             }
         }
-        if (! $patch) {
-            if ($opt_a && $opt_a =~ /patch$/) {
-                $patch = $opt_a;
-            } elsif ($pkgname) {
-                $patch = $pkgname;
+        if (!($patch = &pkgvar_name())) {
+            if (scalar(@flist) == 2) {
+                if (-d $flist[0]) {
+                    ($pkg, $patch) = @flist;
+                } elsif (-d $flist[1]) {
+                    ($patch, $pkg) = @flist;
+                }
+            } elsif (scalar(@flist) == 1) {
+                if (-d $flist[0]) {
+                    $pkg = $flist[0];
+                } else {
+                    $patch = $flist[0];
+                }
             } else {
                 eprint "No patch name was specified.\n";
                 return AVALON_SYNTAX_ERROR;
