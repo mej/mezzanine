@@ -23,12 +23,12 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.28 2000/06/14 05:28:27 mej Exp $
+# $Id: revtool,v 1.29 2000/06/20 04:11:25 mej Exp $
 #
 
 # Include the Perl Modules we need
 use POSIX;
-use Getopt::Mixed;
+use Getopt::Long;
 
 # Constants
 #
@@ -644,7 +644,7 @@ BEGIN {
 
     # Set up the basic variables
     $progname = "revtool";
-    $version = "0.1.0";
+    $version = "1.0";
     $argc = $#ARGV + 2;
     $retval = 0;
 
@@ -652,12 +652,13 @@ BEGIN {
     select STDERR; $| = 1;
     select STDOUT; $| = 1;
 
-    # See the Getopt::Mixed man page for details on the syntax of this line
-    $valid_opts = "h help>h v version>v d debug>d g get>g p put>p a add>a r remove>r"
-                  . " q=s query>q R recurse>R t=s tag>t i=s import>i k=s D=s dir>D"
-                  . " x exclusive>x addlist=s remlist=s T=s rtag>T";
+    # See the Getopt::Long man page for details on the syntax of this line
+    @valid_opts = ("h|help", "v|version", "d|debug", "g|get", "p|put", "a|add", "r|remove",
+                   "q|query=s", "R|recurse", "t|tag=s", "i|import=s", "k=s", "D|dir=s",
+                   "x|exclusive", "addlist=s", "remlist=s", "T|rtag=s");
 
-    Getopt::Mixed::getOptions($valid_opts);
+    Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
+    Getopt::Long::GetOptions(@valid_opts);
     $debug = $opt_d;
     $binary = $opt_b;
     if ($opt_i) {
@@ -681,7 +682,7 @@ BEGIN {
     $cvsroot = "-d $opt_D" if ($opt_D);
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.28 $ created on $Date: 2000/06/14 05:28:27 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.29 $ created on $Date: 2000/06/20 04:11:25 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

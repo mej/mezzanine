@@ -23,12 +23,12 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.3 2000/06/06 04:49:49 mej Exp $
+# $Id: pkgtool,v 1.4 2000/06/20 04:11:25 mej Exp $
 #
 
 # Include the Perl Modules we need
 use POSIX;
-use Getopt::Mixed;
+use Getopt::Long;
 
 # Constants
 #
@@ -741,18 +741,19 @@ main
 {
     # Set up the basic variables
     $progname = "pkgtool";
-    $version = "0.1.0";
+    $version = "0.1";
 
-    # See the Getopt::Mixed man page for details on the syntax of this line
-    $valid_opts = "h help>h v version>v d debug>d b build>b x explode>x c contents>c"
-                   . " o:s sources>o p=s package>p s=s specfile>s scripts>s m=s module>m"
-                   . " r=s release-tag>r t=s head-tag>t D=s dir>D l=s log>l";
-    Getopt::Mixed::getOptions($valid_opts);
+    # See the Getopt::Long man page for details on the syntax of this line
+    @valid_opts = ("h|help", "v|version", "d|debug", "b|build", "x|explode", "c|contents",
+                   "o|sources:s", "p|package=s", "s|specfile|scripts=s", "m|module=s",
+                   "r|release-tag=s", "t|head-tag=s", "D|dir=s", "l|log=s");
+    Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
+    Getopt::Long::GetOptions(@valid_opts);
 
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.3 $ created on $Date: 2000/06/06 04:49:49 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.4 $ created on $Date: 2000/06/20 04:11:25 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

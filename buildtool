@@ -23,12 +23,12 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.70 2000/06/18 00:50:26 mej Exp $
+# $Id: buildtool,v 1.71 2000/06/20 04:11:24 mej Exp $
 #
 
 # Include the Perl Modules we need
 use POSIX;
-use Getopt::Mixed;
+use Getopt::Long;
 
 # Constants
 #
@@ -1797,21 +1797,22 @@ main
 {
     # Set up the basic variables
     $progname = "buildtool";
-    $version = "0.1.0";
+    $version = "1.0";
 
     # No input.
     open(STDIN, "</dev/null");
 
-    # See the Getopt::Mixed man page for details on the syntax of this line
-    $valid_opts = "h help>h v version>v d debug>d b=s build>b p=s product>p package>p"
-                   . " q quiet>q Q really-quiet>Q silent>Q D=s dir>D f force>f l=s log>l"
-                   . " P parallel>P t=s target>t B=s startbuild>B";
-    Getopt::Mixed::getOptions($valid_opts);
+    # See the Getopt::Long man page for details on the syntax of this line
+    @valid_opts = ("h|help", "v|version", "d|debug", "b|build=s", "product|package|p=s",
+                   "q|quiet", "Q|really-quiet|silent", "D|dir=s", "f|force", "l|log=s",
+                   "P|parallel", "t|target=s", "B|startbuild=s");
+    Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
+    Getopt::Long::GetOptions(@valid_opts);
 
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.70 $ created on $Date: 2000/06/18 00:50:26 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.71 $ created on $Date: 2000/06/20 04:11:24 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1829,6 +1830,7 @@ main
         $opt_h = $opt_P = $opt_Q = $opt_p = $opt_q = $opt_v = 0;
     }
     $debug = $opt_d;
+    $revtool = sprintf("revtool%s", ($opt_d ? " --debug" : ""));
     $GLOBAL_LOG = 0;
     if ($opt_l) {
         if (!open(LOGFILE, ">$opt_l")) {
@@ -1879,9 +1881,21 @@ main
         chomp($basedir = `pwd`);
     }
     $builddir = ($ENV{BUILD_DIR} ? $ENV{BUILD_DIR} : "$basedir/build");
-    $proddir = ($ENV{PROD_DIR} ? $ENV{PROD_DIR} : "$basedir/products");
     $buildroot = ($ENV{BUILDROOT} ? $ENV{BUILDROOT} : "/var/tmp/buildtool.$$");
-    $revtool = sprintf("revtool%s", ($opt_d ? " --debug" : ""));
+    foreach $dir (($ENV{PROD_DIR} ? $ENV{PROD_DIR} : 0), "$basedir/products", "$basedir/../products") {
+        if ($dir && -d $dir) {
+            $proddir = $dir;
+            last;
+        }
+    }
+    if (!defined $proddir) {
+        my ($err, $msg);
+
+        ($err, $msg) = &fetch_package("$revtool -g products");
+        if ($err) {
+            &fatal_error("Unable to find/download products directory -- $msg\n");
+        }
+    }
 
     # Signal handling
     $SIG{HUP} = 'IGNORE';
