@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.4 2001/07/25 02:57:32 mej Exp $
+# $Id: Build.pm,v 1.5 2001/07/26 03:13:50 mej Exp $
 #
 
 package Avalon::Build;
@@ -29,6 +29,7 @@ package Avalon::Build;
 BEGIN {
     use Exporter   ();
     use Avalon::Util;
+    use Avalon::Pkg;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
@@ -36,7 +37,7 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('&count_cpus', '&prepare_build_tree', '&get_source_list', '&create_source_file', '&create_source_files', '&special_build', '&cleanup_build_tree');
+    @EXPORT      = ('&count_cpus', '&prepare_build_tree', '&get_source_list', '&create_source_file', '&create_source_files', '&cleanup_build_tree', '&build_spm', '&build_cfst', '&build_fst', '&build_srpm', '&build_tarball', '&build_package');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -52,12 +53,17 @@ use vars ('@EXPORT_OK');
 
 ### Function prototypes
 sub count_cpus();
-sub prepare_build_tree($$$);
+sub prepare_build_tree(\$\$\$);
 sub get_source_list($$$$);
 sub create_source_file($$$$$);
 sub create_source_files($$$\@);
-sub special_build($$$);
 sub cleanup_build_tree($$$);
+sub build_spm($$$$);
+sub build_cfst($$$$);
+sub build_fst($$$$);
+sub build_srpm($$$$$);
+sub build_tarball($$$$$);
+sub build_package($$$$);
 
 # Private functions
 
@@ -86,23 +92,41 @@ count_cpus
 
 # Create the RPM build directories, the buildroot, and the RPM config files
 sub
-prepare_build_tree
+prepare_build_tree(\$\$\$)
 {
-    my ($module, $buildroot, $cflags) = @_;
+    my ($n, $t, $b) = @_;
+    my ($name, $topdir, $buildroot);
     my ($rpmmacros, $rpmrc);
     local *RPMMACROS;
     local *RPMRC;
 
-    if (! -d "$module") {
-        if (!mkdir("$module", 0755)) {
-            &fatal_error("Cannot create $module -- $!\n");
+    # In order to alter the values of $name, $topdir, and $buildroot in the caller,
+    # we are passed references to the variables, not the values.  The brief quantity
+    # of goop below uses $n, $t, and $b as the references, then copies the values to
+    # $name, $topdir, and $buildroot so that the rest of the code is readable. :-)
+    if (! $$n) {
+        $$n = &basename(&getcwd());
+    }
+    if (! $$t) {
+        $$t = &getcwd() . "/build.avalon";
+    }
+    if (! $$b) {
+        $$b = "/var/tmp/avalon-buildroot.$$/$name";
+    }
+    ($name, $topdir, $buildroot) = ($$n, $$t, $$b);
+    ### End of reference-handling goop
+
+    # If the topdir doesn't exist, create it.
+    if (! -d "$topdir") {
+        if (!mkdir("$topdir", 0755)) {
+            &fatal_error("Cannot create $topdir -- $!\n");
         }
     }
 
     # Create the RPM directories also.  Same deal as above.
     foreach my $dir ("BUILD", "SRPMS", "RPMS", "SPECS", "SOURCES") {
-        if (! -d "$module/$dir") {
-            mkdir("$module/$dir", 0755) || &fatal_error("Cannot create $module/$dir -- $!\n");
+        if (! -d "$topdir/$dir") {
+            mkdir("$topdir/$dir", 0755) || &fatal_error("Cannot create $topdir/$dir -- $!\n");
         }
     }
 
@@ -113,35 +137,31 @@ prepare_build_tree
     }
     mkdir($buildroot, 0775);
 
-    if (defined($cflags)) {
-        $cflags =~ s/\&/ /g;
-    } else {
-        $cflags = $ENV{CFLAGS};
-    }
-
     # Create basic rpmmacros
     $rpmmacros = "$buildroot/$pkg-rpmmacros";
     open(RPMMACROS, ">$rpmmacros") || &fatal_error("Cannot create $rpmmacros -- $!\n");
-    print RPMMACROS "\%_topdir           $builddir\n";
+    print RPMMACROS "\%_topdir           $topdir\n";
     close(RPMMACROS);
 
     # Create basic rpmrc
     $rpmrc = "$buildroot/$pkg-rpmrc";
     open(RPMRC, ">$rpmrc") || &fatal_error("Cannot create $rpmrc -- $!\n");
-    print RPMRC "optflags:   i386 $cflags\n";
-    print RPMRC "optflags:   i486 $cflags\n";
-    print RPMRC "optflags:   i586 $cflags\n";
-    print RPMRC "optflags:   i686 $cflags\n";
+    print RPMRC "optflags:   i386 $$ENV{CFLAGS}\n";
+    print RPMRC "optflags:   i486 $$ENV{CFLAGS}\n";
+    print RPMRC "optflags:   i586 $$ENV{CFLAGS}\n";
+    print RPMRC "optflags:   i686 $$ENV{CFLAGS}\n";
     print RPMRC "macrofiles: /usr/lib/rpm/macros:/usr/lib/rpm/\%{_target}/macros:/etc/rpm/macros.specspo:",
                 "/etc/rpm/macros:/etc/rpm/\%{_target}/macros:~/.rpmmacros:$rpmmacros\n";
     close(RPMRC);
+
+    return ($name, $topdir, $buildroot);
 
     # Pre-scan all the binary RPM's for future use in possibly parallel processes.  We need
     # to know what SRPM each binary came from, because some (lame) packages change the base name.
     #if (! $opt_nocache) {
     #    nprint "Updating state information....\n";
-    #    dprint "Scanning binary RPM's in $module/RPMS for their corresponding SRPM's.\n";
-    #    @contents = glob("$module/RPMS/*/*.rpm");
+    #    dprint "Scanning binary RPM's in $topdir/RPMS for their corresponding SRPM's.\n";
+    #    @contents = glob("$topdir/RPMS/*/*.rpm");
     #    foreach my $rpm (@contents) {
     #        dprint "Checking $rpm\n";
     #        $srpm_of_rpm{$rpm} = `rpm -qp $rpm --queryformat \"%{SOURCERPM}\"`;
@@ -152,7 +172,7 @@ prepare_build_tree
 sub
 get_source_list
 {
-    my ($specfile, $module, $srcs, $destdir) = @_;
+    my ($specfile, $module, $srcs) = @_;
     my @srcs;
 
     if ($module && (!chdir($module))) {
@@ -174,11 +194,12 @@ get_source_list
         wprint "you will need to create an avalon.srcs file for this package.\n";
 
         foreach my $fname (&grepdir(sub {! &should_ignore($_);}, ".")) {
-            next if (&should_ignore($fname));
             if (-d $fname) {
                 my @tmp;
 
-                @tmp = grep($_ =~ /^\Q$fname\E\.(tgz|tar\.gz|tar\.Z|tar\.bz2|tbz)$/, values %{$specdata->{SOURCE}});
+                if (defined(%{$specdata->{SOURCE}})) {
+                    @tmp = grep($_ =~ /^\Q$fname\E\.(tgz|tar\.gz|tar\.Z|tar\.bz2|tbz)$/, values %{$specdata->{SOURCE}});
+                }
                 if (scalar(@tmp)) {
                     push @srcs, "$fname:$tmp[0]";
                 } else {
@@ -191,7 +212,6 @@ get_source_list
     }
 
     dprint "Preparing to generate sources \"", join(" ", @srcs), "\".\n";
-    dprint "Sources:  ", join(", ", @{$specdata->{SOURCES}}), "\n";
     return @srcs;
 }
 
@@ -205,6 +225,7 @@ create_source_file
     dprint "Source files:  \"$src_files\"\n";
     if ($tarball) {
         print "Generating $tarball...\n";
+        $destdir .= '/' if (substr($destdir, -1, 1) ne '/');
         if ($tar) {
             $cmd = $tar;
             $cmd =~ s/\%f/$src_files/;
@@ -272,30 +293,61 @@ create_source_files($ $ $ \@)
     return AVALON_SUCCESS;
 }
 
-# Build a package that has its own buildtool makefile
+# Clean up the RPM build directories and the build root
 sub
-special_build
+cleanup_build_tree
 {
-    my ($module, $buildroot, $make) = @_;
-    my ($err, $msg, $srpm, $cmd, $make, $rpmdir, $pwd, $outfiles);
+    my ($topdir, $buildroot, $type) = @_;
+    my @dirs;
+
+    if ($type =~ /no(ne)?/i) {
+        return;
+    } elsif ($type =~ /temp/i) {
+        @dirs = ("$topdir/BUILD", "$topdir/SOURCES", "$topdir/SPECS", $buildroot);
+    } elsif ($type =~ /rpm/i) {
+        @dirs = ("$topdir/BUILD", "$topdir/SOURCES", "$topdir/SRPMS", "$topdir/RPMS", "$topdir/SPECS");
+    } elsif ($type =~ /(build)?root/) {
+        @dirs = ($buildroot);
+    } else {
+        @dirs = ("$topdir/BUILD", "$topdir/SOURCES", "$topdir/SRPMS", "$topdir/RPMS", "$topdir/SPECS", $buildroot);
+    }
+    foreach my $f (@dirs) {
+        nprint "$progname:  Cleaning up $f\n";
+        &nuke_tree($f) || qprint "Warning:  Removal of $f failed -- $!\n";
+    }
+}
+
+# This function knows how to build packages from Source Package Modules (SPM's).  It
+# is usually called by build_package() but can be called directly as long as the
+# chdir() has been done already and we're 100% certain that it's an SPM.
+sub
+build_spm
+{
+    my ($pkg, $topdir, $buildroot, $target_format) = @_;
+
+}
+
+# This function handles the "special case" FST's which have their very own
+# Makefile.avalon.  As with build_spm(), the chdir() must have already been done.
+sub
+build_cfst
+{
+    my ($pkg, $topdir, $buildroot, $target_format) = @_;
+    my ($err, $msg, $cmd, $make, $pkgdir, $outfiles);
     local *MAKE;
 
-    if ($module) {
-        $pwd = &getcwd();
-        if (! chdir($module)) {
-            return (AVALON_PACKAGE_FAILED, "Could not chdir into $module -- $!", 0);
-        }
+    if (!(-f "Makefile.avalon" && -s _)) {
+        &show_backtrace();
+        &fatal_error("Call to build_cfst() in non-CFST module.\n");
     }
+    &prepare_build_tree($pkg, $topdir, $buildroot);
 
-    $rpmdir = "$module/RPMS";
-    if (! $make) {
-        $make = "make -f Makefile.avalon";
-    }
-    $cmd = "$make BUILD_DIR=$module BUILD_ROOT=$buildroot RPMRC=$buildroot/$pkg-rpmrc RPM_DIR=$rpmdir";
+    $make = "make -f Makefile.avalon";
+    $cmd = "$make $target_format BUILD_DIR=$topdir BUILD_ROOT=$buildroot RPMRC=$buildroot/$pkg-rpmrc PKG_DIR=$pkgdir";
 
     dprint "About to run \"$cmd\"\n";
     if (!open(MAKE, "$cmd </dev/null 2>&1 |")) {
-        return (1, "Execution of \"$cmd\" failed -- $!", undef);
+        return (AVALON_COMMAND_FAILED, "Execution of \"$cmd\" failed -- $!", undef);
     }
     $err = 0;
     while (<MAKE>) {
@@ -313,39 +365,144 @@ special_build
 	return ($err, $msg, undef);
     }
 
-    # Find the RPMs
-    $outfiles = join(" ", &grepdir(sub {/\.rpm$/}, $rpmdir));
+    # Find the output packages
+    if ($target_format eq "rpms") {
+        $outfiles = join(" ", &grepdir(sub {/\.rpm$/}, $pkgdir));
+    } elsif ($target_format eq "debs") {
+        $outfiles = join(" ", &grepdir(sub {/\.deb$/}, $pkgdir));
+    } else {
+        $outfiles = join(" ", &grepdir(sub {/\.rpm$/ || /\.deb$/}, $pkgdir));
+    }
+
     if (! $outfiles) {
-	dprint "No RPMS at $rpmdir\n";
+	dprint "No packages found in $pkgdir\n";
         $err = AVALON_PACKAGE_FAILED;
-        $msg = "Make returned good return code, but no RPMs at $rpmdir";
+        $msg = "make finished successfully, but no packages were found in $pkgdir";
     }
     chdir($pwd) if (defined($pwd));
     return ($err, $msg, $outfiles);
 }
 
-# Clean up the RPM build directories and the build root
+# All other FST's (those without their own Makefiles) are built here.  Once again, this
+# function can be called directly as long as the current directory is the FST to build.
 sub
-cleanup_build_tree
+build_fst
 {
-    my ($module, $buildroot, $type) = @_;
-    my @dirs;
+    my ($pkg, $topdir, $buildroot, $target_format) = @_;
+    my ($specfile, $cmd, $ret);
+    my (@srcs, @tmp);
 
-    if ($type =~ /no(ne)?/i) {
-        return;
-    } elsif ($type =~ /temp/i) {
-        @dirs = ("$module/BUILD", "$module/SOURCES", "$module/SPECS", $buildroot);
-    } elsif ($type =~ /rpm/i) {
-        @dirs = ("$module/BUILD", "$module/SOURCES", "$module/SRPMS", "$module/RPMS", "$module/SPECS");
-    } elsif ($type =~ /(build)?root/) {
-        @dirs = ($buildroot);
+    # Look for the build instructions (spec file, debian/ directory, etc.)
+    if ($target_format eq "rpms") {
+        @tmp = &grep_dir(sub {/spec(\.in)?$/}, ".");
+    } elsif ($target_format eq "debs") {
+        @tmp = &grep_dir(sub {$_ =~ m/debian/ && -d $_}, ".");
     } else {
-        @dirs = ("$module/BUILD", "$module/SOURCES", "$module/SRPMS", "$module/RPMS", "$module/SPECS", $buildroot);
+        @tmp = &grep_dir(sub {/spec(\.in)?$/ || ($_ =~ m/debian/ && -d $_)}, ".");
     }
-    foreach my $f (@dirs) {
-        nprint "$progname:  Cleaning up $f\n";
-        &nuke_tree($f) || qprint "Warning:  Removal of $f failed -- $!\n";
+    if (!scalar(@tmp)) {
+        return (AVALON_BAD_PACKAGE, "I'm sorry, but \"$pkg\" doesn't seem to have instructions for building $target_format", undef);
     }
+    $specfile = $tmp[0];
+    if (! &cp($specfile, "$topdir/SPECS/")) {
+        return (AVALON_SYSTEM_ERROR, "Unable to copy $specfile to $topdir/SPECS/ -- $!\n", undef);
+    }
+    # Get ready to build, figure out what sources we need, and create them all.
+    &prepare_build_tree($pkg, $topdir, $buildroot);
+    @srcs = &get_source_list($specfile, ".", undef);
+    $ret = &create_source_files("$topdir/SOURCES", undef, undef, @srcs);
+    if ($ret != AVALON_SUCCESS) {
+        return ($ret, "Creation of source files failed", undef);
+    }
+
+    return &build_topdir($topdir, $buildroot, $target_format);
+}
+
+# Source RPM's can be rebuilt with this function.  build_package() usually handles the
+# extraction of the module name, but this function can be called directly as long as
+# that isn't an issue or has already been taken care of by the calling function.
+sub
+build_srpm
+{
+    my ($pkg, $module, $topdir, $buildroot, $target_format) = @_;
+
+    &prepare_build_tree($pkg, $topdir, $buildroot);
+    # Explode SRPM here
+    return &build_topdir($topdir, $buildroot, $target_format);
+}
+
+# Plain old tarballs can be rebuilt into packages using this function, as long as they
+# contain the necessary file(s) inside them (spec file and/or debian/ directory).
+sub
+build_tarball
+{
+    my ($pkg, $module, $topdir, $buildroot, $target_format) = @_;
+
+}
+
+# This is the main routine for building stuff.  Its job is to figure out what type of
+# stuff it is that you're trying to build, and then call the right function to build it.
+sub
+build_package
+{
+    my ($pkg, $topdir, $buildroot, $target_format) = @_;
+    my $pwd;
+
+    $pwd = &getcwd();
+
+    if ($target_format =~ /rpm/i) {
+        $target_format = "rpms";
+        $pkgdir = "$topdir/RPMS";
+    } elsif ($target_format =~ /deb/i) {
+        $target_format = "debs";
+    } else {
+        $target_format = "all";
+    }
+
+    if (-d $pkg) {
+        # It's a directory.  That means it's some type of module.
+        if (!chdir($pkg)) {
+            eprint "Unable to chdir into \"$pkg\" -- $!\n";
+            return AVALON_SYSTEM_ERROR;
+        }
+        if (-d "F") {
+            # Okay, there's an F/ directory.  I bet it's an SPM.
+            return &build_spm(".", $topdir, $buildroot, $target_format);
+        } elsif (-f "Makefile.avalon" && -s _) {
+            # There's a custom Makefile.  It's a Custom Full Source Tree (FST).
+            return &build_cfst(".", $topdir, $buildroot, $target_format);
+        } else {
+            # If it's not either of the above, it better be a standard Full Source Tree (FST),
+            # and it better conform to the proper assumptions or provide other instructions.
+            return &build_fst(".", $topdir, $buildroot, $target_format);
+        }
+    } elsif (-f _ && -s _) {
+        # It's a file.  Must be a package file of some type.
+        my $module;
+
+        # Split the actual package name from any path information.
+        if ($pkg =~ m|^(.*)/([^/]+)$|) {
+            ($module, $pkg) = ($1, $2);
+        } else {
+            $module = $pwd;
+        }
+        if ($pkg =~ /src\.rpm$/) {
+            return &build_srpm($pkg, $module, $topdir, $buildroot, $target_format);
+        } elsif ($pkg =~ /\.(tar\.|t)(gz|Z|bz2)$/) {
+            return &build_tarball($pkg, $module, $topdir, $buildroot, $target_format);
+        } elsif ($pkg =~ /\.rpm$/) {
+            eprint "Alright...  Who's the wiseguy that told me to recompile \"$pkg,\" a binary RPM? :-P\n";
+            return AVALON_BAD_PACKAGE;
+        } else {
+            eprint "I'm sorry, but I don't know how to build \"$pkg.\"\n";
+            return AVALON_BAD_PACKAGE;
+        }
+    } else {
+        # Okay, it's neither a file nor a directory.  What the hell is it?
+        eprint "I'm sorry, but I can't figure out what to do with \"$pkg.\"\n";
+        return AVALON_BAD_PACKAGE;
+    }
+    return AVALON_SUCCESS;
 }
 
 ### Private functions

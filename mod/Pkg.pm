@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.9 2001/07/25 02:57:32 mej Exp $
+# $Id: Pkg.pm,v 1.10 2001/07/26 03:13:50 mej Exp $
 #
 
 package Avalon::Pkg;
@@ -181,7 +181,7 @@ parse_srcs_file($)
     local *SRCSFILE;
 
     # Read the entire file into a string, converting newlines to commas.
-    open(SRCSFILE, $filename) || return 0;
+    open(SRCSFILE, $filename) || return undef;
     $srcs = join(',', <SRCSFILE>);
     close(SRCSFILE);
 

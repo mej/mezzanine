@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.8 2001/07/25 02:57:32 mej Exp $
+# $Id: Util.pm,v 1.9 2001/07/26 03:13:50 mej Exp $
 #
 
 package Avalon::Util;
@@ -259,6 +259,20 @@ handle_warning(@)
 BEGIN {
     # Take care of this ASAP at load time....
     $SIG{__WARN__} = \&handle_warning;
+}
+
+# Print a stack trace
+sub
+show_backtrace
+{
+    my ($pkg, $file, $line, $subroutine, $i);
+
+    print "STACK TRACE:\n";
+    print "------------\n";
+    for ($i = 1; ($pkg, $file, $line, $subroutine) = caller($i); $i++) {
+        $file =~ s/^.*\/([^\/]+)$/$1/;
+        print ' ' x $i, "$subroutine() at $file:$line\n";
+    }
 }
 
 # Make a directory hierarchy
