@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.153 2001/08/15 00:52:02 mej Exp $
+# $Id: buildtool,v 1.154 2001/08/20 22:21:29 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -31,6 +31,8 @@ require POSIX;
 require Getopt::Long;
 use Cwd;
 use Avalon::Util;
+use Avalon::RevCtl;
+use Avalon::PkgVars;
 use Avalon::Src;
 use Avalon::Pkg;
 use Avalon::Build;
@@ -121,20 +123,21 @@ sub
 build_single_package
 {
     my $pkg = shift;
-    my ($module, $err, $msg, $outfiles);
+    my ($pkgfile, $err, $msg, $outfiles);
 
     # Binaries or not, we need to know the full path and name of the source package.
-    if (! ($module = &get_package_path($pkgs->{$pkg}{MODULE}, $pkgs->{$pkg}{FILENAME}))) {
+    if (! ($pkgfile = &pkgvar_filename($pkgs->{$pkg}{MODULE}, $pkgs->{$pkg}{FILENAME}))) {
         &fail_package($pkg, "I don't know what file/module to build from!");
         return AVALON_NO_SOURCES;
     }
 
     # If there are binaries, no point in trying to build source.
     if ($pkgs->{$pkg}{BINS}) {
-        $outfiles = join(' ', $module, @{$pkgs->{$pkg}{BINS}});
+        &pkgvar_filename(join(' ', &pkgvar_filename(), @{$pkgs->{$pkg}{BINS}}));
     } else {
         # Build the source
-        ($err, $msg, $outfiles) = &build_package($module, &getcwd(), undef, $target);
+        &pkgvar_target($target);
+        ($err, $msg, $outfiles) = &build_package();
         if ($err != AVALON_SUCCESS) {
             &fail_package($pkg, $msg);
             return $err;
@@ -196,36 +199,41 @@ download_packages
 
     nprint "Downloading packages, please wait..." if (! &debug_get());
     foreach $pkg (@packages) {
-        my ($files, $tag, $repository);
+        my ($files, $tag);
 
         $err = 0;
-        $files = &get_package_path($pkgs->{$pkg}{MODULE}, $pkgs->{$pkg}{FILENAME});
+        $files = &pkgvar_filename($pkgs->{$pkg}{MODULE}, $pkgs->{$pkg}{FILENAME});
         if (defined($pkgs->{$pkg}{BINS})) {
             $files = join(' ', $files, @{$pkgs->{$pkg}{BINS}});
         }
+        &pkgvar_filename($files);
+
 	# Set the proper REPOSITORY and tag for the checkout.
+        
         if ($global_tree) {
-            $repository = $global_tree;
+            &revctl_repository($global_tree);
         } elsif ($pkgs->{$pkg}{REPOSITORY}) {
-            $repository = $pkgs->{$pkg}{REPOSITORY};
+            &revctl_repository($pkgs->{$pkg}{REPOSITORY});
         } else {
-            $repository = "";
+            &revctl_repository("");
         }
         if ($global_user) {
+            my $repository;
+
+            $repository = &revctl_repository();
             $repository =~ s/\w+\@/$global_user\@/;
+            &revctl_repository($repository);
         }
         if ($global_tag) {
-            $tag = $global_tag;
+            &revctl_tag(($global_tag eq "head") ? "" : $global_tag);
         } elsif ($pkgs->{$pkg}{TAG}) {
-            ($tag = $pkgs->{$pkg}{TAG}) =~ s/^([^:]+):([^:]+)$/$2/;
+            &revctl_tag(($pkgs->{$pkg}{TAG} eq "head") ? "" : $pkgs->{$pkg}{TAG});
         } else {
-            $tag = "";
+            &revctl_tag("");
         }
 
         nprint "$pkg..." if (! &debug_get());
-        &revctl_set_repository($repository);
-        &revctl_set_tag(($tag eq head ? "" : $tag));
-        ($err, $msg) = &fetch_package("", $files, $tag, $repository);
+        ($err, $msg) = &fetch_package();
         if ($err != AVALON_SUCCESS && $err != AVALON_DUPLICATE) {
             &fail_package($pkg, $msg);
             next;
@@ -316,11 +324,10 @@ parallel_build
     my %child_pkg;
 
     # Create the directories for building this product
-    $pwd = &getcwd();
-    $builddir = &make_build_dir($pwd);
+    &pkgvar_topdir(&make_build_dir(&getcwd()));
     $logdir = &make_log_dir($builddir);
     # Need to do this here for parallel builds because it's not parallel-safe.  Race condition. :(
-    &prepare_build_tree($dummy, $builddir, $buildroot);
+    &prepare_build_tree();
 
     # Download all the packages.
     &download_packages(@packages);
@@ -406,7 +413,7 @@ build_product
     my @packages = @_;
     my $builddir;
 
-    $builddir = &make_build_dir(&getcwd());
+    &pkgvar_topdir(&make_build_dir(&getcwd()));
     if (!chdir($builddir)) {
         &fatal_error("Unable to chdir to build directory -- $!\n");
     }
@@ -488,7 +495,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.153 $ created on $Date: 2001/08/15 00:52:02 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.154 $ created on $Date: 2001/08/20 22:21:29 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -523,16 +530,7 @@ main
     $global_tag = $opt_T;
 
     # Target package format
-    if ($opt_t) {
-        if ($opt_t =~ /rpm/i) {
-            $target = "rpms";
-        } elsif ($opt_t =~ /deb/i) {
-            $target = "debs";
-        }
-    }
-    if (! $target) {
-        $target = "rpms";
-    }
+    &pkgvar_target($opt_t);
 
     # Figure out parallelization stuff
     if (defined($opt_P)) {
@@ -542,7 +540,6 @@ main
 
             $opt_P =~ m/^(?:[Xx]([\d.]+))?([-+][\d.]+)?$/;
             ($mult, $add) = ($1, $2);
-            dprint "Modifying \$num_cpus:  $opt_P   $mult   $add\n";
             $num_cpus = $num_cpus * ($mult ? $mult : 1) + ($add ? $add : 0);
         }
     } else {
@@ -556,7 +553,7 @@ main
     } else {
         $prod = $prodname = &basename(&getcwd());
     }
-    $buildroot = ($ENV{BUILDROOT} ? $ENV{BUILDROOT} : "/var/tmp/buildtool.$$");
+    &pkgvar_buildroot($ENV{AVALON_BUILDROOT} ? $ENV{AVALON_BUILDROOT} : "/var/tmp/buildtool.$$");
 
     if (! $opt_clean) {
         $opt_clean = "build";

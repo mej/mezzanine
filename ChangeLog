@@ -1382,3 +1382,8 @@ Mon Aug 20 19:47:54 2001                        Michael Jennings (mej)
 
 Fixed patch generation and added the new module I forgot last time.
 ----------------------------------------------------------------------
+Mon Aug 20 15:24:33 2001                        Michael Jennings (mej)
+
+Fixes to buildtool to sync up with the new pkgvar stuff.  It's now
+building....
+----------------------------------------------------------------------

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.9 2001/08/15 00:52:02 mej Exp $
+# $Id: Prod.pm,v 1.10 2001/08/20 22:21:29 mej Exp $
 #
 
 package Avalon::Prod;
@@ -500,8 +500,14 @@ parse_prod_file($$$)
         dprint "Parsing $prodfile:  \"$line\"\n";
         $line =~ s/^\s*(.*\S)\s*$/$1/;  # Strip leading and trailing whitespace
         next if ($line =~ /^\#/ || $line !~ /\S/);
-        if ($line =~ /^name\s*:/i || $line =~ /^ver(sion)?\s*:/i) {
+        if ($line =~ /^name\s*:/i) {
             if ($pkg) {
+                next;
+            } else {
+                last;
+            }
+        } elsif ($line =~ /^ver(sion)?\s*:\s*(\S+)/i) {
+            if ((! $prodver) || ($2 eq $prodver)) {
                 next;
             } else {
                 last;
@@ -534,7 +540,7 @@ skip_to_name
         my $line;
 
         chomp($line = $_);
-        dprint "Parsing $prodfile:  \"$line\"\n";
+        dprint "Skipping to name:  \"$line\"\n";
         $line =~ s/^\s*(.*\S)\s*$/$1/;  # Strip leading and trailing whitespace
         next if ($line =~ /^\#/ || $line !~ /\S/);
         if ($line =~ /^name\s*:/i) {
@@ -554,7 +560,7 @@ skip_to_version
         my $line;
 
         chomp($line = $_);
-        dprint "Parsing $prodfile:  \"$line\"\n";
+        dprint "Skipping to version:  \"$line\"\n";
         $line =~ s/^\s*(.*\S)\s*$/$1/;  # Strip leading and trailing whitespace
         next if ($line =~ /^\#/ || $line !~ /\S/);
         if ($line =~ /^ver(sion)?\s*:/i) {

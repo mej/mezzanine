@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.16 2001/08/20 17:34:46 mej Exp $
+# $Id: Pkg.pm,v 1.17 2001/08/20 22:21:29 mej Exp $
 #
 
 package Avalon::Pkg;
@@ -73,10 +73,14 @@ END {
 sub
 fetch_package
 {
+    my $pkg_file = &pkgvar_filename();
     my ($err, $msg, $line) = undef;
     my $missing = 0;
     local *REVTOOL;
 
+    if (! $pkg_file) {
+        return (AVALON_MISSING_SOURCES, "Nothing to fetch?");
+    }
     foreach my $f (split(' ', $pkg_file)) {
         if (!(-d $f) && !(-f $f && -s _)) {
             $missing = 1;
