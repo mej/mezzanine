@@ -5,7 +5,7 @@
 # Michael Jennings <mej@eterm.org>
 # 21 July 2000
 #
-# $Id: bootable-cdtool,v 1.8 2002/05/04 11:52:31 mej Exp $
+# $Id: bootable-cdtool,v 1.9 2002/06/24 15:51:55 mej Exp $
 #
 
 umask 022
@@ -27,8 +27,10 @@ else
     BUILDDIR=$PWD/build.mezz
 fi
 
-V_VER=`cut -d' ' -f2 /etc/vermillion`
-RH_VER=`cut -d' ' -f5 /etc/redhat-release`
+#V_VER=`cut -d' ' -f2 /etc/vermillion`
+#RH_VER=`cut -d' ' -f5 /etc/redhat-release`
+V_VER=7.3.1
+RH_VER=7.3
 
 PKGLIST=$HOME/distro_stuff/base-${RH_VER}.list
 POST_FILES=$HOME/cvs/jc-cd/post
@@ -104,9 +106,9 @@ done
 mv -f usr/lib/security/*.so lib/security/
 mv -f usr/lib/libnss_* lib/
 chroot $IMAGE /sbin/ldconfig
-ln -s libnss_winbind.so lib/libnss_winbind.so.2
+test -e lib/libnss_winbind.so.2 || ln -s libnss_winbind.so lib/libnss_winbind.so.2
 
-mkdirhier var/cache/ICA/zlcache
+mkdir -p var/cache/ICA/zlcache
 chmod 1777 var/cache/ICA var/cache/ICA/zlcache
 rm -rf usr/lib/ICAClient/cache
 ln -s /var/cache/ICA usr/lib/ICAClient/cache

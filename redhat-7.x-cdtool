@@ -5,7 +5,7 @@
 # Michael Jennings <mej@eterm.org>
 # 21 July 2000
 #
-# $Id: redhat-7.x-cdtool,v 1.21 2001/11/29 11:56:05 mej Exp $
+# $Id: redhat-7.x-cdtool,v 1.22 2002/06/24 15:51:55 mej Exp $
 #
 
 umask 022
@@ -94,12 +94,16 @@ $RH_SPLIT_GOOP $NET i386 > $NET/vermillion-${V_VER}-packages.list
 NUM=1
 rm -f ${CD}*/RedHat/RPMS/*.rpm
 for i in `cat $NET/vermillion-${V_VER}-packages.list` ; do
-    ln -f $NET/RedHat/RPMS/$i $CD$NUM/RedHat/RPMS/$i
+    for j in $NET/RedHat/RPMS/$i* ; do
+        ln -f $j $CD$NUM/RedHat/RPMS/
+    done
     SIZE=`du -ks $CD$NUM | cut -f1`
     if [ $SIZE -gt 665000 ]; then
-        rm -f $CD$NUM/RedHat/RPMS/$i
+        rm -f $CD$NUM/RedHat/RPMS/$i*
         NUM=$(($NUM + 1))
-        ln -f $NET/RedHat/RPMS/$i $CD$NUM/RedHat/RPMS/$i
+        for j in $NET/RedHat/RPMS/$i* ; do
+            ln -f $j $CD$NUM/RedHat/RPMS/
+        done
     fi
 done
 
