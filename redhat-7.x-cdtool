@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 21 July 2000
 #
-# $Id: redhat-7.x-cdtool,v 1.14 2001/07/27 21:27:18 mej Exp $
+# $Id: redhat-7.x-cdtool,v 1.15 2001/07/27 22:24:05 mej Exp $
 #
 
 umask 022
@@ -97,7 +97,7 @@ $RH_SPLIT_GOOP $NET i386 > $BUFFY/RH-VALE-${VA_VER}-packages.list
 
 NUM=1
 rm -f ${CD}*/RedHat/RPMS/*.rpm
-for i in `cat tmp.list` ; do
+for i in `cat $BUFFY/RH-VALE-${VA_VER}-packages.list` ; do
     ln -f $NET/RedHat/RPMS/$i $CD$NUM/RedHat/RPMS/$i
     SIZE=`du -ks $CD$NUM | cut -f1`
     if [ $SIZE -gt 665000 ]; then
@@ -108,8 +108,7 @@ for i in `cat tmp.list` ; do
 done
 
 # Regenerate the package list ($CD1/RedHat/base/hdlist) from $CD1/RedHat/base/comps
-cd $BUILD_DIR
-$RH_PKGLIST_GOOP --fileorder tmp.list --withnumbers $BUILD_DIR/$CD*
+$RH_PKGLIST_GOOP --fileorder $BUFFY/RH-VALE-${VA_VER}-packages.list --withnumbers $BUILD_DIR/$CD*
 
 # Create ISO files
 cd $BASE_DIR
