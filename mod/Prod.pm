@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.24 2004/03/24 19:52:16 mej Exp $
+# $Id: Prod.pm,v 1.25 2004/03/30 22:55:50 mej Exp $
 #
 
 package Mezzanine::Prod;
@@ -476,6 +476,7 @@ parse_prod_file($$$)
     my ($prodfile, $pkg, $found, $line);
     my $prod = $prodname;
     my $PROD;
+    local *PRODFILE;
 
     # First, find the product file and open it.
     dprint &print_args(@_);
@@ -484,7 +485,8 @@ parse_prod_file($$$)
         return 0;
     }
     dprint "Found product file \"$prodfile\"\n";
-    open($PROD, "$prodfile") || return 0;
+    open(PRODFILE, "$prodfile") || return 0;
+    $PROD = \*PRODFILE;
 
     if ($prodname) {
         $prodname = &skip_to_name($PROD, $prodname);
@@ -510,7 +512,7 @@ parse_prod_file($$$)
         }
     }
 
-    while (<$PROD>) {
+    while (<PRODFILE>) {
         chomp($line = $_);
         dprint "Parsing $prodfile:  \"$line\"\n";
         $line =~ s/^\s*(.*\S)\s*$/$1/;  # Strip leading and trailing whitespace
@@ -554,7 +556,7 @@ parse_prod_file($$$)
         }
     }
     dprint "Closing file $prodfile\n";
-    close($PROD);
+    close(PRODFILE);
     return (1);
 }
 

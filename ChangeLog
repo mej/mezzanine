@@ -377,3 +377,7 @@ specgen now has automatic detection of:
  - documentation files
  - package license
 ----------------------------------------------------------------------
+Tue Mar 30 18:56:35 2004                        Michael Jennings (mej)
+
+Fixes for older systems.
+----------------------------------------------------------------------

@@ -1,7 +1,7 @@
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
 Version: 1.7
-Release: 0.3
+Release: 0.4
 Copyright: BSD
 Group: Development/Tools
 Source: %{name}.tar.gz
@@ -37,6 +37,9 @@ done
 
 %install
 %define perl_vendorlib %(eval "`perl -V:installvendorlib`"; echo $installvendorlib)
+%if "%{perl_vendorlib}" == "UNKNOWN"
+%define perl_vendorlib %(eval "`perl -V:installsitelib`"; echo $installsitelib)
+%endif
 
 rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT%{_bindir}
@@ -85,7 +88,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-, root, root)
-%doc doc/*.html doc/*.sgml
+%doc doc/*ml
 %{_bindir}/*
 %{perl_vendorlib}/*
 %{_mandir}/*
