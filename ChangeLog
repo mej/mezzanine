@@ -417,3 +417,7 @@ Wed Jun 14 20:16:05 2000                        Michael Jennings (mej)
 Finally remembered to turn off log file syncing.  Also put in support
 for double-quoted strings in product files.  I hope it works. :-)
 ----------------------------------------------------------------------
+Wed Jun 14 20:56:19 2000                        Michael Jennings (mej)
+
+Stupid bug.  I broke the finding of the spec file within the module.
+----------------------------------------------------------------------
