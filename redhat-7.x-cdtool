@@ -5,10 +5,11 @@
 # Michael Jennings <mej@valinux.com>
 # 21 July 2000
 #
-# $Id: redhat-7.x-cdtool,v 1.7 2001/04/21 06:17:59 mej Exp $
+# $Id: redhat-7.x-cdtool,v 1.8 2001/04/23 06:39:16 mej Exp $
 #
 
 PATH=/bin:/usr/bin:/sbin:/usr/sbin
+PYTHONPATH=$PYTHONPATH:/usr/lib/anaconda
 
 if [ "x$1" = "x" ]; then
     VA_VER=7.1.1
@@ -25,11 +26,13 @@ fi
 BUILD_DIR=$BASE_DIR/build
 CD1=va-redhat-${RH_VER}-cd1
 CD2=va-redhat-${RH_VER}-cd2
+CD=va-redhat-${RH_VER}-cd
 EXTRAS=va-redhat-${RH_VER}-extras
 NET=va-redhat-${RH_VER}-net
 RH_GOOP_DIR=/usr/lib/anaconda-runtime
 RH_KERNEL_GOOP=$RH_GOOP_DIR/buildinstall
 RH_PKGLIST_GOOP=$RH_GOOP_DIR/genhdlist
+RH_SPLIT_GOOP=$RH_GOOP_DIR/pkgorder
 
 # Make sure we have the anaconda goop
 if [ ! -d $RH_GOOP_DIR ]; then
@@ -37,14 +40,11 @@ if [ ! -d $RH_GOOP_DIR ]; then
   exit -1
 fi
 
-# The "net" image is a combination of all 3 other images
 cd $BUILD_DIR
-[ -d $NET.new ] && rm -rf $NET.new
-mkdir $NET.new
-for i in $CD2 $CD1 ; do
-  (cd $i ; tar --exclude CVS -cf - .) | (cd $NET.new ; tar -xf -)
-done
-rm $NET.new/.disc*
+if [ -d $NET.new ]; then
+    rm -rf $NET.new
+fi
+cp -a $NET $NET.new
 
 # Generate the hdlist for network-based installs
 cd $NET.new
@@ -73,19 +73,24 @@ rm -f $NET.sh
 grep '^Binary' $NET.patch | awk '{print "cp -af "$5" "$3}' > $NET.sh
 sh $NET.sh
 
-# Re-create CD images from the altered net image
-for i in RedHat/base dosutils images ; do
-  test -d $NET/$i && (cd $NET ; tar --exclude CVS -cf - $i) | (cd $CD1 ; tar -xf -)
-done
-for i in RedHat/instimage ; do
-  test -d $NET/$i && (cd $NET ; tar --exclude CVS -cf - $i) | (cd $CD2 ; tar -xf -)
+cd $BUILD_DIR
+$RH_SPLIT_GOOP $NET i386
+
+for i in 1 2 3 4 5 6 7 ; do
+  test -d $NET-disc$i && (cd $NET-disc$i ; tar --exclude CVS -cf - .) | (cd $CD$i ; tar -xf -)
 done
 
 # Regenerate the package list ($CD1/RedHat/base/hdlist) from $CD1/RedHat/base/comps
 cd $BUILD_DIR
-$RH_PKGLIST_GOOP --withnumbers $BUILD_DIR/$CD1 $BUILD_DIR/$CD2
+$RH_PKGLIST_GOOP --withnumbers $BUILD_DIR/$CD*
 
 # Create ISO files
 cd $BASE_DIR
-mediatool -i $BUILD_DIR/va-redhat-os-${VA_VER}-cd1.iso -D $BUILD_DIR/va-redhat-${RH_VER}-cd1 --boot images/boot.img
-mediatool -i $BUILD_DIR/va-redhat-os-${VA_VER}-cd2.iso -D $BUILD_DIR/va-redhat-${RH_VER}-cd2
+for i in 1 2 3 4 5 6 7 ; do
+    test -d $BUILD_DIR/$CD$i || break
+    if [ -f $BUILD_DIR/$CD$i/images/boot.img ]; then
+        mediatool -i $BUILD_DIR/va-redhat-os-${VA_VER}-cd$i.iso -D $BUILD_DIR/va-redhat-${RH_VER}-cd$i --boot images/boot.img
+    else
+        mediatool -i $BUILD_DIR/va-redhat-os-${VA_VER}-cd$i.iso -D $BUILD_DIR/va-redhat-${RH_VER}-cd$i
+    fi
+done
