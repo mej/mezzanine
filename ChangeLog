@@ -751,3 +751,9 @@ Fri Jul 28 11:54:34 2000                        Michael Jennings (mej)
 
 Abort commit if ChangeLog message is too short.
 ----------------------------------------------------------------------
+Mon Aug  7 14:37:50 2000                        Michael Jennings (mej)
+
+Finally got time to do that massive overhaul of the server interaction
+stuff.  It's now contained entirely in a single function.  This will
+need some regression testing, of course.
+----------------------------------------------------------------------

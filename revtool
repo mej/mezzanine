@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.47 2000/07/28 18:51:59 mej Exp $
+# $Id: revtool,v 1.48 2000/08/07 21:35:52 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -90,6 +90,7 @@ print_usage_info
     print "       --addlist \"files\"     Specify which files to add so that adds and removes can coincide\n";
     print "       --remlist \"files\"     Specify which files to remove so that adds and removes can coincide\n";
     print "       --reset               Reset sticky tags, dates, etc. in the current module\n";
+    print "    -P --protocol <proto>    Specify which protocol to use (cvs or bk)\n";
     print "\n";
     exit(0);
 }
@@ -174,6 +175,173 @@ check_tag
     return 1;
 }
 
+# This routine dispatches server requests to the appropriate
+# routine based on the selected protocol (cvs or bk).
+sub
+talk_to_server
+{
+    if ($protocol eq "cvs") {
+        return &talk_to_cvs_server(@_);
+    } elsif ($protocol eq "bk") {
+        return &talk_to_bk_server(@_);
+    }
+}
+
+# This routine handles interaction with the master CVS server
+sub
+talk_to_cvs_server
+{
+    my ($type, $cmd) = @_;
+    my ($err, $tries, $line);
+    my (@tags, @links, @ignores, @not_found, @removed, @conflicts);
+
+    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
+        $err = 0;
+        dprint "About to run $cmd\n";
+        if (!open(CMD, "$cmd 2>&1 |")) {
+            eprint "Execution of \"$cmd\" failed -- $!";
+            return REVTOOL_COMMAND_FAILED;
+        }
+        while (<CMD>) {
+            chomp($line = $_);
+            if ($line =~ /^cvs \w+: Diffing/) {
+                dprint "$line\n";
+            } else {
+                print "$line\n";
+            }
+
+            # The following routines do output checking for fatal errors,
+            # non-fatal (retryable) errors, and expected command output
+
+            # First, fatal errors
+            if ($line =~ /^cvs \w+: cannot find password/) {
+                eprint "You must login to the repository first.\n";
+                $err = REVTOOL_BAD_LOGIN;
+                last;
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: authorization failed: server \S+ rejected access/) {
+                eprint "Your userid or password was not valid";
+                $err = REVTOOL_BAD_LOGIN;
+                last;
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: \S+ requires write access to the repository/) {
+                eprint "You do not have write access to the master repository.\n";
+                $err = REVTOOL_ACCESS_DENIED;
+                last;
+            } elsif ($line =~ /^cvs server: cannot find module .(\S+). /) {
+                push @not_found, $1;
+                $err = REVTOOL_FILE_NOT_FOUND;
+            } elsif ($line =~ /^cvs server: warning: (.+) is not \(any longer\) pertinent/
+                     || $line =~ /^cvs server: warning: newborn (\S+) has disappeared/) {
+                push @removed, $1;
+                $err = REVTOOL_FILE_REMOVED;
+            } elsif ($line =~ /^C (.+)$/) {
+                push @conflicts, $1;
+                $err = REVTOOL_CONFLICT_FOUND;
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: no such tag/
+                     || $line =~ /^cvs \S+: warning: new-born \S+ has disappeared$/) {
+                eprint "$opt_t is not a valid tag for $file_list\n";
+                $err = REVTOOL_INVALID_TAG;
+            } elsif ($line =~ /^cvs server: nothing known about/) {
+                $line =~ s/^cvs server: nothing known about//;
+                if ($type eq "add") {
+                    eprint "You tried to add a file which does not exist locally ($line).\n";
+                    $err = REVTOOL_BAD_ADDITION;
+                } else {
+                    eprint "You tried to remove a file which does not exist in the repository ($line).\n";
+                    $err = REVTOOL_BAD_REMOVAL;
+                }
+
+            # Retryable errors
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
+                if ($tries < 10) {
+                    $err = -1;
+                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
+                    sleep 3;
+                } else {
+                    eprint "The CVS server was unreachable.\n";
+                    $err = REVTOOL_NO_SERVER;
+                    last;
+                }
+            } elsif ($line =~ /^Unknown host (\S+)\.$/) {
+                if ($tries < 10) {
+                    $err = -1;
+                    print "I can't seem to resolve $1.  I'll wait a bit and try again.\n";
+                    sleep 3;
+                } else {
+                    eprint "The CVS server name ($1) does not resolve.\n";
+                    $err = REVTOOL_NO_SERVER;
+                    last;
+                }
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
+                if ($tries < 10) {
+                    $err = -1;
+                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
+                    sleep 3;
+                } else {
+                    eprint "The CVS server kept crashing.\n";
+                    $err = REVTOOL_SERVER_CRASH;
+                    last;
+                }
+
+            # Expected output
+            } elsif ($line =~ /^\s*Existing Tags:\s*$/) {
+                if ($type eq "query_tags") {
+                    my $tmp;
+
+                    while (($tmp = <CMD>) !~ /^\s*$/) {
+                        last if ($tmp =~ /^\s*No Tags Exist\s*$/);
+                        $tmp =~ s/^\s*(\S+)\s+\((\w+):\s*([\d.]+)\)$/$1 at $2 $3/;
+                        push @tags, $tmp;
+                    }
+                    last;
+                }
+            } elsif ($line =~ /^I (.+)$/) {
+                push @ignores, $1;
+            } elsif ($line =~ /^L (.+)$/) {
+                push @links, $1;
+            }
+        }
+        close(CMD);
+        dprint "Command returned $?\n";
+    }
+    if ($err == 0 && $? != 0) {
+        eprint "An unknown error must have occured, because the command returned $?\n";
+        $err = REVTOOL_UNSPECIFIED_ERROR;
+    }
+    if ($err) {
+        if ($#conflicts != -1) {
+            eprint "The following files had conflicts:  ", join(" ", @conflicts), "\n";
+        }
+        if ($#not_found != -1) {
+            eprint "The following files/modules were not found in the repository:  ", join(" ", @not_found), "\n";
+        }
+        if ($#removed != -1) {
+            eprint "The following files/modules were removed from the repository:  ", join(" ", @removed), "\n";
+        }
+    } else {
+        if ($#tags >= 0) {
+            print @tags;
+        } else {
+            print "No tags found.\n";
+        }
+    }
+    if ($#links >= 0) {
+        print "The following symbolic links were ignored (not imported):  ", join(" ", @links), "\n";
+    }
+    if ($#ignores >= 0) {
+        print "The following files were ignored (not imported):  ", join(" ", @ignores), "\n";
+    }
+    return ($err);
+}
+
+# This routine handles interaction with the master BK server
+sub
+talk_to_bk_server
+{
+    my ($type, $cmd) = @_;
+
+    return REVTOOL_UNSPECIFIED_ERROR;
+}
+
 # Login to the repository
 sub
 login_to_master
@@ -184,29 +352,8 @@ login_to_master
 
     if (-t STDIN) {
         $cmd = "/bin/sh -c \"cvs -d $login login\"";
-        dprint "About to run $cmd\n";
-        if (!open(CMD, "$cmd 2>&1 |")) {
-            eprint "Execution of \"$cmd\" failed -- $!";
-            return REVTOOL_COMMAND_FAILED;
-        }
-        while (<CMD>) {
-            chomp($line = $_);
-            print "$line\n";
-            # Check the output for errors
-            if ($line =~ /^cvs \[\w+ aborted\]: authorization failed: server \S+ rejected access/) {
-                $err = REVTOOL_BAD_LOGIN;
-                $msg = "Your userid or password was not valid";
-                last;
-            }
-        }
-        close(CMD);
-        dprint "\"$cmd\" returned $?\n";
-        if ($? && ! $err) {
-            $err = REVTOOL_UNSPECIFIED_ERROR;
-            $msg = "Unhandled login error";
-        }
+        $err = &talk_to_server("login", $cmd);
         if ($err) {
-            eprint "Login failed -- $msg.\n";
             return 0;
         }
     } else {
@@ -291,67 +438,9 @@ commit_to_master
         close(CL);
         close(LOGFILE);
     }
+
     $cmd = sprintf("/bin/sh -c \"cvs $cvsroot commit %s -F $logfile $file_list\"", ($opt_t ? "-r $opt_t" : ""));
-
-    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
-        $err = 0;
-        dprint "About to run $cmd\n";
-        if (!open(CMD, "$cmd 2>&1 |")) {
-            eprint "Execution of \"$cmd\" failed -- $!";
-            return REVTOOL_COMMAND_FAILED;
-        }
-        while (<CMD>) {
-            chomp($line = $_);
-            print "$line\n";
-            # Check the output for errors
-            if ($line =~ /^cvs \w+: cannot find password/) {
-                eprint "You must login to the repository first.\n";
-                $err = REVTOOL_BAD_LOGIN;
-                last;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: \S+ requires write access to the repository/) {
-                eprint "You do not have sufficient access to commit files.\n";
-                $err = REVTOOL_ACCESS_DENIED;
-                last;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server was unreachable.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^Unknown host (\S+)\.$/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "I can't seem to resolve $1.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server name ($1) does not resolve.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server kept crashing.\n";
-                    $err = REVTOOL_SERVER_CRASH;
-                    last;
-                }
-            }
-        }
-        close(CMD);
-        dprint "\"$cmd\" returned $?\n";
-    }
-    if ($err == 0 && $? != 0) {
-        eprint "An unknown error must have occured, because the command returned $?\n";
-        $err = REVTOOL_UNSPECIFIED_ERROR;
-    }
-
+    $err = &talk_to_server("put", $cmd);
     unlink $logfile;
     return ($err);
 }
@@ -371,7 +460,7 @@ update_from_master
     }
     dprint "File list is \"$file_list\", tag is \"$tag\"\n";
 
-    # Figure out which files exist and update those.  Checkout the rest.
+    # Figure out which files/modules exist and update those.  Checkout the rest.
     foreach $file (split(/\s+/, $file_list)) {
         if (-e $file) {
             dprint "Updating $file\n";
@@ -398,86 +487,9 @@ update_from_master
             $subcmd = "update $tag -Pd";
         }
         $cmd = "/bin/sh -c \"cvs $cvsroot $subcmd $flist\"";
-
-        for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
-            $err = 0;
-            dprint "About to run $cmd\n";
-            if (!open(CMD, "$cmd 2>&1 |")) {
-                eprint "Execution of \"$cmd\" failed -- $!";
-                return REVTOOL_COMMAND_FAILED;
-            }
-            while (<CMD>) {
-                chomp($line = $_);
-                print "$line\n";
-                # Check the output for errors
-                if ($line =~ /^cvs \w+: cannot find password/) {
-                    eprint "You must login to the repository first.\n";
-                    $err = REVTOOL_BAD_LOGIN;
-                    last;
-                } elsif ($line =~ /^cvs server: cannot find module .(\S+). /) {
-                    push @not_found, $1;
-                    $err = REVTOOL_FILE_NOT_FOUND;
-                } elsif ($line =~ /^cvs server: warning: (\w+) is not \(any longer\) pertinent/
-                         || $line =~ /^cvs server: warning: newborn (\S+) has disappeared/) {
-                    push @removed, $1;
-                    $err = REVTOOL_FILE_REMOVED;
-                } elsif ($line =~ /^C /) {
-                    $line =~ s/^C //;
-                    push @conflicts, $line;
-                    $err = REVTOOL_CONFLICT_FOUND;
-                } elsif ($line =~ /^cvs \[\w+ aborted\]: no such tag/
-                         || $line =~ /^cvs \S+: warning: new-born \S+ has disappeared$/) {
-                    eprint "$opt_t is not a valid tag for $file_list\n";
-                    $err = REVTOOL_INVALID_TAG;
-                } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
-                    if ($tries < 10) {
-                        $err = -1;
-                        print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
-                        sleep 3;
-                    } else {
-                        eprint "The CVS server was unreachable.\n";
-                        $err = REVTOOL_NO_SERVER;
-                        last;
-                    }
-                } elsif ($line =~ /^Unknown host (\S+)\.$/) {
-                    if ($tries < 10) {
-                        $err = -1;
-                        print "I can't seem to resolve $1.  I'll wait a bit and try again.\n";
-                        sleep 3;
-                    } else {
-                        eprint "The CVS server name ($1) does not resolve.\n";
-                        $err = REVTOOL_NO_SERVER;
-                        last;
-                    }
-                } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
-                    if ($tries < 10) {
-                        $err = -1;
-                        print "The CVS server crashed.  I'll wait a bit and try again.\n";
-                        sleep 3;
-                    } else {
-                        eprint "The CVS server kept crashing.\n";
-                        $err = REVTOOL_SERVER_CRASH;
-                        last;
-                    }
-                }
-            }
-            close(CMD);
-            dprint "\"$cmd\" returned $?\n";
-        }
-    }
-    if ($err == 0 && $? != 0) {
-        eprint "An unknown error must have occured, because the command returned $?\n";
-        $err = REVTOOL_UNSPECIFIED_ERROR;
-    } elsif ($err) {
-        if ($#conflicts != -1) {
-            eprint "The following files had conflicts:  ", join(" ", @conflicts), "\n";
-        }
-        if ($#not_found != -1) {
-            eprint "The following files/modules were not found in the repository:  ", join(" ", @not_found), "\n";
-        }
-        if ($#removed != -1) {
-            eprint "The following files/modules were removed from the repository:  ", join(" ", @removed), "\n";
-        }
+        # The weird OR on the next line makes sure we don't lose
+        # a previous $err if the second try succeeds.
+        $err = (&talk_to_server("get", $cmd) || $err);
     }
     return $err;
 }
@@ -501,69 +513,7 @@ add_new_files
     }
     $file_list = join(" ", @files);
     $cmd = sprintf("/bin/sh -c \"cvs $cvsroot add %s $file_list\"", ($opt_k ? "-k$opt_k" : ""));
-
-    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
-        $err = 0;
-        dprint "About to run $cmd\n";
-        if (!open(CMD, "$cmd 2>&1 |")) {
-            eprint "Execution of \"$cmd\" failed -- $!";
-            return REVTOOL_COMMAND_FAILED;
-        }
-        while (<CMD>) {
-            chomp($line = $_);
-            print "$line\n";
-            # Check the output for errors
-            if ($line =~ /^cvs \w+: cannot find password/) {
-                eprint "You must login to the repository first.\n";
-                $err = REVTOOL_BAD_LOGIN;
-                last;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: \S+ requires write access to the repository/) {
-                eprint "You do not have sufficient access to add files.\n";
-                $err = REVTOOL_ACCESS_DENIED;
-                last;
-            } elsif ($line =~ /^cvs server: nothing known about/) {
-                $line =~ s/^cvs server: nothing known about//;
-                eprint "You tried to add the file $line, but it does not exist.\n";
-                $err = REVTOOL_BAD_ADDITION;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server was unreachable.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^Unknown host (\S+)\.$/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "I can't seem to resolve $1.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server name ($1) does not resolve.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server kept crashing.\n";
-                    $err = REVTOOL_SERVER_CRASH;
-                    last;
-                }
-            }
-        }
-        close(CMD);
-        dprint "\"$cmd\" returned $?\n";
-    }
-    if ($err == 0 && $? != 0) {
-        eprint "An unknown error must have occured, because the command returned $?\n";
-        $err = REVTOOL_UNSPECIFIED_ERROR;
-    }
+    $err = &talk_to_server("add", $cmd);
     return ($err);
 }
 
@@ -586,69 +536,7 @@ delete_old_files
     }
     $file_list = join(" ", @files);
     $cmd = sprintf("/bin/sh -c \"cvs $cvsroot remove -f %s $file_list\"", ($opt_R ? "-R" : ""));
-
-    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
-        $err = 0;
-        dprint "About to run $cmd\n";
-        if (!open(CMD, "$cmd 2>&1 |")) {
-            eprint "Execution of \"$cmd\" failed -- $!";
-            return REVTOOL_COMMAND_FAILED;
-        }
-        while (<CMD>) {
-            chomp($line = $_);
-            print "$line\n";
-            # Check the output for errors
-            if ($line =~ /^cvs \w+: cannot find password/) {
-                eprint "You must login to the repository first.\n";
-                $err = REVTOOL_BAD_LOGIN;
-                last;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: \S+ requires write access to the repository/) {
-                eprint "You do not have sufficient access to remove files.\n";
-                $err = REVTOOL_ACCESS_DENIED;
-                last;
-            } elsif ($line =~ /^cvs server: nothing known about/) {
-                $line =~ s/^cvs server: nothing known about//;
-                eprint "You tried to remove the file $line, but it does not exist in the repository.\n";
-                $err = REVTOOL_BAD_REMOVAL;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server was unreachable.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^Unknown host (\S+)\.$/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "I can't seem to resolve $1.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server name ($1) does not resolve.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server kept crashing.\n";
-                    $err = REVTOOL_SERVER_CRASH;
-                    last;
-                }
-            }
-        }
-        close(CMD);
-        dprint "\"$cmd\" returned $?\n";
-    }
-    if ($err == 0 && $? != 0) {
-        eprint "An unknown error must have occured, because the command returned $?\n";
-        $err = REVTOOL_UNSPECIFIED_ERROR;
-    }
+    $err = &talk_to_server("remove", $cmd);
     return ($err);
 }
 
@@ -662,75 +550,7 @@ query_tags
 
     $file_list = join(" ", @files);
     $cmd = "/bin/sh -c \"cvs $cvsroot status -v $file_list\"";
-
-    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
-        $err = 0;
-        dprint "About to run $cmd\n";
-        if (!open(CMD, "$cmd 2>&1 |")) {
-            eprint "Execution of \"$cmd\" failed -- $!";
-            return REVTOOL_COMMAND_FAILED;
-        }
-        while (<CMD>) {
-            chomp($line = $_);
-            dprint "$line\n";
-            # Check the output for tags or errors
-            if ($line =~ /^\s*Existing Tags:\s*$/) {
-                my $tmp;
-
-                while (($tmp = <CMD>) !~ /^\s*$/) {
-                    last if ($tmp =~ /^\s*No Tags Exist\s*$/);
-                    $tmp =~ s/^\s*(\S+)\s+\((\w+):\s*([\d.]+)\)$/$1 at $2 $3/;
-                    push @tags, $tmp;
-                }
-                last;
-            } elsif ($line =~ /^cvs \w+: cannot find password/) {
-                eprint "You must login to the repository first.\n";
-                $err = REVTOOL_BAD_LOGIN;
-                last;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server was unreachable.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^Unknown host (\S+)\.$/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "I can't seem to resolve $1.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server name ($1) does not resolve.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server kept crashing.\n";
-                    $err = REVTOOL_SERVER_CRASH;
-                    last;
-                }
-            }
-        }
-        close(CMD);
-        dprint "\"$cmd\" returned $?\n";
-    }
-    if ($err == 0 && $? != 0) {
-        eprint "An unknown error must have occured, because the command returned $?\n";
-        $err = REVTOOL_UNSPECIFIED_ERROR;
-    }
-    if ($#tags >= 0) {
-        print @tags;
-    } else {
-        print "No tags found.\n";
-    }
+    $err = &talk_to_server("query_tags", $cmd);
     return $err;
 }
 
@@ -743,61 +563,7 @@ query_status
 
     $file_list = join(" ", @files);
     $cmd = "/bin/sh -c \"cvs $cvsroot status -v $file_list\"";
-
-    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
-        $err = 0;
-        dprint "About to run $cmd\n";
-        if (!open(CMD, "$cmd 2>&1 |")) {
-            eprint "Execution of \"$cmd\" failed -- $!";
-            return REVTOOL_COMMAND_FAILED;
-        }
-        while (<CMD>) {
-            chomp($line = $_);
-            print "$line\n";
-            # Check the output for errors
-            if ($line =~ /^cvs \w+: cannot find password/) {
-                eprint "You must login to the repository first.\n";
-                $err = REVTOOL_BAD_LOGIN;
-                last;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server was unreachable.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^Unknown host (\S+)\.$/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "I can't seem to resolve $1.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server name ($1) does not resolve.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server kept crashing.\n";
-                    $err = REVTOOL_SERVER_CRASH;
-                    last;
-                }
-            }
-        }
-        close(CMD);
-        dprint "\"$cmd\" returned $?\n";
-    }
-    if ($err == 0 && $? != 0) {
-        eprint "An unknown error must have occured, because the command returned $?\n";
-        $err = REVTOOL_UNSPECIFIED_ERROR;
-    }
+    $err = &talk_to_server("query_status", $cmd);
     return $err;
 }
 
@@ -809,61 +575,7 @@ query_log
 
     $file_list = join(" ", @files);
     $cmd = "/bin/sh -c \"cvs $cvsroot log $file_list\"";
-
-    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
-        $err = 0;
-        dprint "About to run $cmd\n";
-        if (!open(CMD, "$cmd 2>&1 |")) {
-            eprint "Execution of \"$cmd\" failed -- $!";
-            return REVTOOL_COMMAND_FAILED;
-        }
-        while (<CMD>) {
-            chomp($line = $_);
-            print "$line\n";
-            # Check the output for errors
-            if ($line =~ /^cvs \w+: cannot find password/) {
-                eprint "You must login to the repository first.\n";
-                $err = REVTOOL_BAD_LOGIN;
-                last;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server was unreachable.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^Unknown host (\S+)\.$/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "I can't seem to resolve $1.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server name ($1) does not resolve.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server kept crashing.\n";
-                    $err = REVTOOL_SERVER_CRASH;
-                    last;
-                }
-            }
-        }
-        close(CMD);
-        dprint "\"$cmd\" returned $?\n";
-    }
-    if ($err == 0 && $? != 0) {
-        eprint "An unknown error must have occured, because the command returned $?\n";
-        $err = REVTOOL_UNSPECIFIED_ERROR;
-    }
+    $err = &talk_to_server("query_log", $cmd);
     return $err;
 }
 
@@ -876,61 +588,7 @@ query_annotation
     $file_list = join(" ", @files);
     $rev = "-r $tag -f" if ($tag);
     $cmd = "/bin/sh -c \"cvs $cvsroot annotate $rev $file_list\"";
-
-    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
-        $err = 0;
-        dprint "About to run $cmd\n";
-        if (!open(CMD, "$cmd 2>&1 |")) {
-            eprint "Execution of \"$cmd\" failed -- $!";
-            return REVTOOL_COMMAND_FAILED;
-        }
-        while (<CMD>) {
-            chomp($line = $_);
-            print "$line\n";
-            # Check the output for errors
-            if ($line =~ /^cvs \w+: cannot find password/) {
-                eprint "You must login to the repository first.\n";
-                $err = REVTOOL_BAD_LOGIN;
-                last;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server was unreachable.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^Unknown host (\S+)\.$/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "I can't seem to resolve $1.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server name ($1) does not resolve.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server kept crashing.\n";
-                    $err = REVTOOL_SERVER_CRASH;
-                    last;
-                }
-            }
-        }
-        close(CMD);
-        dprint "\"$cmd\" returned $?\n";
-    }
-    if ($err == 0 && $? != 0) {
-        eprint "An unknown error must have occured, because the command returned $?\n";
-        $err = REVTOOL_UNSPECIFIED_ERROR;
-    }
+    $err = &talk_to_server("query_annotation", $cmd);
     return $err;
 }
 
@@ -955,65 +613,7 @@ query_diff
     $rev1 = "-r $rev1" if ($rev1);
     $rev2 = "-r $rev2" if ($rev2);
     $cmd = "/bin/sh -c \"cvs $cvsroot diff -N -R -u $rev1 $rev2 $file_list\"";
-
-    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
-        $err = 0;
-        dprint "About to run $cmd\n";
-        if (!open(CMD, "$cmd 2>&1 |")) {
-            eprint "Execution of \"$cmd\" failed -- $!";
-            return REVTOOL_COMMAND_FAILED;
-        }
-        while (<CMD>) {
-            chomp($line = $_);
-            if ($line =~ /^cvs \w+: Diffing/) {
-                dprint "$line\n";
-            } else {
-                print "$line\n";
-            }
-            # Check the output for errors
-            if ($line =~ /^cvs \w+: cannot find password/) {
-                eprint "You must login to the repository first.\n";
-                $err = REVTOOL_BAD_LOGIN;
-                last;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server was unreachable.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^Unknown host (\S+)\.$/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "I can't seem to resolve $1.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server name ($1) does not resolve.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server kept crashing.\n";
-                    $err = REVTOOL_SERVER_CRASH;
-                    last;
-                }
-            }
-        }
-        close(CMD);
-        dprint "\"$cmd\" returned $?\n";
-    }
-    if ($err == 0 && $? != 0 && $? != 256) {
-        eprint "An unknown error must have occured, because the command returned $?\n";
-        $err = REVTOOL_UNSPECIFIED_ERROR;
-    }
+    $err = &talk_to_server("query_diff", $cmd);
     return $err;
 }
 
@@ -1036,65 +636,7 @@ query_release_diff
         return REVTOOL_INVALID_TAG;
     }
     $cmd = "/bin/sh -c \"cvs $cvsroot rdiff -R -u -r $rev1 -r $rev2 $file_list\"";
-
-    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
-        $err = 0;
-        dprint "About to run $cmd\n";
-        if (!open(CMD, "$cmd 2>&1 |")) {
-            eprint "Execution of \"$cmd\" failed -- $!";
-            return REVTOOL_COMMAND_FAILED;
-        }
-        while (<CMD>) {
-            chomp($line = $_);
-            if ($line =~ /^cvs \w+: Diffing/) {
-                dprint "$line\n";
-            } else {
-                print "$line\n";
-            }
-            # Check the output for errors
-            if ($line =~ /^cvs \w+: cannot find password/) {
-                eprint "You must login to the repository first.\n";
-                $err = REVTOOL_BAD_LOGIN;
-                last;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server was unreachable.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^Unknown host (\S+)\.$/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "I can't seem to resolve $1.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server name ($1) does not resolve.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server kept crashing.\n";
-                    $err = REVTOOL_SERVER_CRASH;
-                    last;
-                }
-            }
-        }
-        close(CMD);
-        dprint "\"$cmd\" returned $?\n";
-    }
-    if ($err == 0 && $? != 0 && $? != 256) {
-        eprint "An unknown error must have occured, because the command returned $?\n";
-        $err = REVTOOL_UNSPECIFIED_ERROR;
-    }
+    $err = &talk_to_server("query_rdiff", $cmd);
     return $err;
 }
 
@@ -1122,61 +664,35 @@ tag_local_sources
     }
 
     $cmd = "/bin/sh -c \"cvs $cvsroot tag -F " . ($opt_b ? "-b " : "") . "$tag $file_list\"";
+    $err = &talk_to_server("tag", $cmd);
+    return $err;
+}
 
-    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
-        $err = 0;
-        dprint "About to run $cmd\n";
-        if (!open(CMD, "$cmd 2>&1 |")) {
-            eprint "Execution of \"$cmd\" failed -- $!";
-            return REVTOOL_COMMAND_FAILED;
-        }
-        while (<CMD>) {
-            chomp($line = $_);
-            print "$line\n";
-            # Check the output for errors
-            if ($line =~ /^cvs \w+: cannot find password/) {
-                eprint "You must login to the repository first.\n";
-                $err = REVTOOL_BAD_LOGIN;
-                last;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server was unreachable.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^Unknown host (\S+)\.$/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "I can't seem to resolve $1.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server name ($1) does not resolve.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server kept crashing.\n";
-                    $err = REVTOOL_SERVER_CRASH;
-                    last;
-                }
-            }
-        }
-        close(CMD);
-        dprint "\"$cmd\" returned $?\n";
+# Tag the repository
+sub
+tag_repository_sources
+{
+    my $file_list = join(" ", @_);
+    my ($module, $mod_tag, $line, $tries, $err, $msg);
+    local *CMD;
+
+    if (-d "CVS") {
+        chomp($module = &cat_file("CVS/Repository"));
+    } elsif ($_[0]) {
+        $module = $_[0];
+    } else {
+        eprint "I don't see any CVS sources to tag here....\n";
+        return REVTOOL_NO_SOURCES;
     }
-    if ($err == 0 && $? != 0) {
-        eprint "An unknown error must have occured, because the command returned $?\n";
-        $err = REVTOOL_UNSPECIFIED_ERROR;
+    ($mod_tag = $module) =~ tr/[a-z]/[A-Z]/;
+
+    if (! &check_tag($mod_tag, $rtag)) {
+        eprint "Tag \"$rtag\" is not valid for module $module\n";
+        return REVTOOL_INVALID_TAG;
     }
+
+    $cmd = "/bin/sh -c \"cvs $cvsroot rtag -F " . ($opt_b ? "-b " : "") . "$rtag $file_list\"";
+    $err = &talk_to_server("rtag", $cmd);
     return $err;
 }
 
@@ -1223,158 +739,7 @@ import_vendor_sources
             . ' -k' . ($opt_k || 'o')
             . ($opt_x ? ' -I!' : '')
             . " -m '$msg' $module $vendor_tag $release_tag\"";
-
-    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
-        $err = 0;
-        dprint "About to run $cmd\n";
-        if (!open(CMD, "$cmd 2>&1 |")) {
-            eprint "Execution of \"$cmd\" failed -- $!";
-            return REVTOOL_COMMAND_FAILED;
-        }
-        while (<CMD>) {
-            chomp($line = $_);
-            print "$line\n";
-            # Read the output
-            if ($line =~ /^cvs \w+: cannot find password/) {
-                eprint "You must login to the repository first.\n";
-                $err = REVTOOL_BAD_LOGIN;
-                last;
-            } elsif ($line =~ /^I (.+)$/) {
-                push @ignores, $1;
-            } elsif ($line =~ /^L (.+)$/) {
-                push @links, $1;
-            } elsif ($line =~ /^C (.+)$/) {
-                push @conflicts, $1;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server was unreachable.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^Unknown host (\S+)\.$/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "I can't seem to resolve $1.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server name ($1) does not resolve.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server kept crashing.\n";
-                    $err = REVTOOL_SERVER_CRASH;
-                    last;
-                }
-            }
-        }
-        close(CMD);
-        dprint "\"$cmd\" returned $?\n";
-    }
-    if ($err == 0 && $? != 0) {
-        eprint "An unknown error must have occured, because the command returned $?\n";
-        $err = REVTOOL_UNSPECIFIED_ERROR;
-    }
-    if ($#links >= 0) {
-        print "The following symbolic links were ignored (not imported):  ", join(" ", @links), "\n";
-    }
-    if ($#ignores >= 0) {
-        print "The following files were ignored (not imported):  ", join(" ", @ignores), "\n";
-    }
-    if ($#conflicts >= 0) {
-        print "The following files conflict with existing files:  ", join(" ", @conflicts), "\n";
-    }
-    return $err;
-}
-
-# Tag the repository
-sub
-tag_repository_sources
-{
-    my $file_list = join(" ", @_);
-    my ($module, $mod_tag, $line, $tries, $err, $msg);
-    local *CMD;
-
-    if (-d "CVS") {
-        chomp($module = &cat_file("CVS/Repository"));
-    } elsif ($_[0]) {
-        $module = $_[0];
-    } else {
-        eprint "I don't see any CVS sources to tag here....\n";
-        return REVTOOL_NO_SOURCES;
-    }
-    ($mod_tag = $module) =~ tr/[a-z]/[A-Z]/;
-
-    if (! &check_tag($mod_tag, $rtag)) {
-        eprint "Tag \"$rtag\" is not valid for module $module\n";
-        return REVTOOL_INVALID_TAG;
-    }
-
-    $cmd = "/bin/sh -c \"cvs $cvsroot rtag -F " . ($opt_b ? "-b " : "") . "$rtag $file_list\"";
-
-    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
-        $err = 0;
-        dprint "About to run $cmd\n";
-        if (!open(CMD, "$cmd 2>&1 |")) {
-            eprint "Execution of \"$cmd\" failed -- $!";
-            return REVTOOL_COMMAND_FAILED;
-        }
-        while (<CMD>) {
-            chomp($line = $_);
-            print "$line\n";
-            # Check the output for errors
-            if ($line =~ /^cvs \w+: cannot find password/) {
-                eprint "You must login to the repository first.\n";
-                $err = REVTOOL_BAD_LOGIN;
-                last;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server was unreachable.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^Unknown host (\S+)\.$/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "I can't seem to resolve $1.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server name ($1) does not resolve.\n";
-                    $err = REVTOOL_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server kept crashing.\n";
-                    $err = REVTOOL_SERVER_CRASH;
-                    last;
-                }
-            }
-        }
-        close(CMD);
-        dprint "\"$cmd\" returned $?\n";
-    }
-    if ($err == 0 && $? != 0) {
-        eprint "An unknown error must have occured, because the command returned $?\n";
-        $err = REVTOOL_UNSPECIFIED_ERROR;
-    }
+    $err = &talk_to_server("import", $cmd);
     return $err;
 }
 
@@ -1450,6 +815,7 @@ BEGIN {
     $version = "1.2";
     $argc = $#ARGV + 2;
     $retval = 0;
+    $defproto = "cvs";
 
     # Synchronize output so it doesn't get all jumbled
     select STDERR; $| = 1;
@@ -1459,11 +825,16 @@ BEGIN {
     @valid_opts = ("h|help", "v|version", "d|debug", "g|get", "p|put", "a|add", "r|remove",
                    "q|query=s", "R|recurse", "t|tag=s", "i|import", "k=s", "D|dir=s",
                    "x|exclusive", "addlist=s", "remlist=s", "T|rtag=s", "l|login", "b|branch",
-                   "ptag", "reset");
+                   "ptag", "reset", "P|protocol");
 
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
     $debug = $opt_d;
+    $protocol = ($opt_P ? $opt_P : $defproto);
+    if (!grep($protocol eq $_, ("cvs", "bk"))) {
+        eprint "Invalid protocol \"$protocol\".  Using default protocol $defproto.\n";
+        $protocol = $defproto;
+    }
     if ($opt_i) {
         $mode = "import";
     } elsif ($opt_q) {
@@ -1503,7 +874,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.47 $ created on $Date: 2000/07/28 18:51:59 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.48 $ created on $Date: 2000/08/07 21:35:52 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
