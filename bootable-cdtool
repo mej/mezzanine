@@ -5,7 +5,7 @@
 # Michael Jennings <mej@eterm.org>
 # 21 July 2000
 #
-# $Id: bootable-cdtool,v 1.7 2002/02/18 18:48:53 mej Exp $
+# $Id: bootable-cdtool,v 1.8 2002/05/04 11:52:31 mej Exp $
 #
 
 umask 022
@@ -76,10 +76,10 @@ rm -f etc/sysconfig/network-scripts/ifdown && ln -sf /sbin/ifdown etc/sysconfig/
 rm -f etc/sysconfig/network-scripts/ifup && ln -sf /sbin/ifup etc/sysconfig/network-scripts/ifup
 
 # Turn services on/off as needed.
-for i in smb ; do
-    chroot $IMAGE /sbin/chkconfig --level 345 $i on
-done
-for i in atd crond nfs nfslock xinetd ; do
+#for i in smb ; do
+#    chroot $IMAGE /sbin/chkconfig --level 345 $i on
+#done
+for i in atd crond nfs nfslock smb xinetd ; do
     chroot $IMAGE /sbin/chkconfig --del $i
 done
 
@@ -89,7 +89,7 @@ chroot $IMAGE /usr/sbin/netconfig --bootproto=dhcp -d eth0 --hostname=localhost 
 # Install and symlink the plugins
 test -x usr/lib/ICAClient/npica.so && install -m 755 usr/lib/ICAClient/npica.so usr/lib/netscape/plugins/
 for i in usr/lib/netscape/plugins/* ; do
-    rm -f usr/lib/mozilla/plugins/`basename $i` && cp -a /$i usr/lib/mozilla/plugins/`basename $i`
+    rm -f usr/lib/mozilla/plugins/`basename $i` && cp -a $i usr/lib/mozilla/plugins/`basename $i`
 done
 
 # Create font directory files
@@ -106,6 +106,11 @@ mv -f usr/lib/libnss_* lib/
 chroot $IMAGE /sbin/ldconfig
 ln -s libnss_winbind.so lib/libnss_winbind.so.2
 
+mkdirhier var/cache/ICA/zlcache
+chmod 1777 var/cache/ICA var/cache/ICA/zlcache
+rm -rf usr/lib/ICAClient/cache
+ln -s /var/cache/ICA usr/lib/ICAClient/cache
+
 # All login-based authentication should be the same
 (cd etc/pam.d
 for i in kde xdm gdm ; do
@@ -120,7 +125,8 @@ fi
 
 # Fix ownerships
 chroot $IMAGE /usr/bin/find . \( -nouser -o -nogroup \) -exec /bin/chown root:root {} \;
-chroot $IMAGE /bin/chown -R lp:lp '/var/spool/lpd/[a-z]*'
+chroot $IMAGE /bin/chown -R lp:lp var/spool/lpd
+chown root:root var/spool/lpd
 
 # Make tarballs for writeable filesystems
 for i in var etc home ; do
