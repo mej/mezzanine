@@ -1293,3 +1293,7 @@ and *.rej when generating patch files.  Other minor issues were fixed,
 but nothing that should show up on radar.  Finally, I added the
 beginnings of an Avalon FAQ in SGML format.
 ----------------------------------------------------------------------
+Fri Jul 20 08:15:14 2001                        Michael Jennings (mej)
+
+This is a WIP.  Don't use it.
+----------------------------------------------------------------------

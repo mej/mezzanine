@@ -1,4 +1,4 @@
-# Avalon Pkgtool Perl Module
+# Avalon Pkg Perl Module
 # 
 # Copyright (C) 2001, Michael Jennings
 #
@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.6 2001/07/18 22:47:49 mej Exp $
+# $Id: Pkg.pm,v 1.7 2001/07/20 15:13:55 mej Exp $
 #
 
 package Avalon::Pkg;
