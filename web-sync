@@ -1,16 +1,22 @@
-#!/bin/sh
+#!/bin/sh -x
 #
 # web-sync - Resync engr web site with latest sources
 #
 # Michael Jennings <mej@valinux.com>
 # 28 Sept 2000
 #
-# $Id: web-sync,v 1.1 2000/09/29 03:58:31 mej Exp $
+# $Id: web-sync,v 1.2 2000/09/30 05:06:04 mej Exp $
 #
+
+if [ ! -z "$SUDO_USER" ]; then
+  USER=$SUDO_USER
+elif [ "x$USER" = "x" ]; then
+  USER=`whoami`
+fi
 
 SCP_CMD="scp -C"
 RSYNC_CMD="rsync -av --exclude=CVS --exclude=.cvsignore --exclude=.buildtool.symlinks --delete --delete-excluded"
-CHOWN_CMD="chown -R `whoami`:engr"
+CHOWN_CMD="chown -R $USER:engr"
 CHMOD_CMD="chmod -R g+s,ug+w,a+r"
 
 if [ "x$1" = "x" ]; then
@@ -51,11 +57,11 @@ for i in $* ; do
       echo "*** Synchronizing network install image ***"
       $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-7.0-net/ $LOCAL_DIR/$i/os/image/
       echo "*** Copying ISO images ***"
-      $SCP_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-os-7.0'*'.iso $LOCAL_DIR/$i/$j/iso/
+      $SCP_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-os-'*'-$i.iso $LOCAL_DIR/$i/os/iso/
       echo "*** Synchronizing extras ***"
       $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-7.0-extras/ $LOCAL_DIR/$i/extras/image/
       echo "*** Copying ISO images ***"
-      $SCP_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-7.0'*'extras.iso $LOCAL_DIR/$i/$j/iso/
+      $SCP_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-7.0'*'extras.iso $LOCAL_DIR/$i/extras/iso/
       for j in RPMS SRPMS ; do
         echo "*** Synchronizing $j ***"
         $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-7.0-www/$j/ $LOCAL_DIR/$i/$j/

@@ -859,3 +859,7 @@ Thu Sep 28 21:16:55 2000                        Michael Jennings (mej)
 
 New script to sync engr web/FTP site with grendel builds.
 ----------------------------------------------------------------------
+Fri Sep 29 22:24:22 2000                        Michael Jennings (mej)
+
+--nocache option to force buildtool to ignore the cache.
+----------------------------------------------------------------------
