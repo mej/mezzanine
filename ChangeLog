@@ -265,3 +265,8 @@ Mon Jun  5 17:24:43 2000                        Michael Jennings (mej)
 
 Tweaking a bit....
 ----------------------------------------------------------------------
+Mon Jun  5 17:29:19 2000                        Michael Jennings (mej)
+
+Added CVS revision/date/author info to -v output for my own benefit.
+Trying to keep everything straight between the various build systems.
+----------------------------------------------------------------------

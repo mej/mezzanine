@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.1 2000/06/06 00:02:23 mej Exp $
+# $Id: pkgtool,v 1.2 2000/06/06 00:18:47 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -632,8 +632,16 @@ main
 
     # Post-parse the options stuff
     if ($opt_v) {
+        my $rcs_info = 'CVS Revision $Revision: 1.2 $ created on $Date: 2000/06/06 00:18:47 $ by $Author: mej $ ';
+
+        $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
+        $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
+        $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
+        print "\n";
 	print "$progname $version by Michael Jennings\n";
         print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
+        print "  ($rcs_info)\n";
+        print "\n";
 	return PKGTOOL_SUCCESS;
     }
     if ($opt_h) {
