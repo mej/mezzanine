@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.13 2002/02/26 20:02:31 mej Exp $
+# $Id: RevCtl.pm,v 1.14 2002/02/26 20:14:21 mej Exp $
 #
 
 package Mezzanine::RevCtl;
@@ -343,7 +343,7 @@ login_to_master
 sub
 find_module_changelog
 {
-    my ($pwd, $repo, $rel_dir);
+    my ($pwd, $rel_dir, $repo);
 
     $pwd = &getcwd();
     $rel_dir = &basename($pwd);
@@ -353,7 +353,7 @@ find_module_changelog
         $rel_dir = &basename(&getcwd()) . "/$rel_dir";
         $repo = &cat_file("CVS/Repository");
     }
-    if (-e "$ChangeLog") {
+    if (-e "ChangeLog") {
         $rel_dir =~ s!^[^/]*/!!;
         $rel_dir = "." if (! $rel_dir);
         return $rel_dir;
@@ -404,11 +404,14 @@ do_changelog_entry
     return $logfile if (! $log);
 
     $rel_dir = &find_module_changelog();
-    if ($rel_dir && ($rel_dir ne ".")) {
+    dprint "Got relative directory \"$rel_dir\"\n";
+    if ($rel_dir && ($rel_dir ne ".") && scalar(@ARGV)) {
         my @tmp = @ARGV;
 
+        dprint "Checking relative paths for arguments...\n";
         @ARGV = ();
         foreach my $tmp (@tmp) {
+            dprint "Updating argument path:  $tmp -> $rel_dir/$tmp\n";
             push @ARGV, "$rel_dir/$tmp";
         }
     }
