@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.29 2004/03/05 22:26:32 mej Exp $
+# $Id: Util.pm,v 1.30 2004/03/14 15:42:08 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -267,7 +267,7 @@ file_owner($$$)
         }
         close(GROUP);
     }
-    dprint "UID:  $mz_uid     GID:  $mz_gid\n";
+    #dprint "UID:  $mz_uid     GID:  $mz_gid\n";
     return ($mz_uid, $mz_gid);
 }
 
@@ -445,7 +445,7 @@ mkdirhier($$)
         dprint "Something went wrong in mkdirhier()!\n";
         return 0;
     } else {
-        dprint "Created $_[0] for $mz_uid:$mz_gid.\n";
+        #dprint "Created $_[0] for $mz_uid:$mz_gid.\n";
         return 1;
     }
 }

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.175 2004/03/05 22:26:32 mej Exp $
+# $Id: buildtool,v 1.176 2004/03/14 15:42:07 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -239,7 +239,7 @@ build_single_package
     my ($pkgfile, $err, $msg, $outfiles);
 
     # Binaries or not, we need to know the full path and name of the source package.
-    dprintf("Building $pkg in %s.  MOO\n", &pkgvar_topdir());
+    dprintf("Building $pkg in %s.\n", &pkgvar_topdir());
     &pkgvar_name($pkg);
     if (! ($pkgfile = &pkgvar_filename($pkgs->{$pkg}{MODULE}, $pkgs->{$pkg}{FILENAME}))) {
         &fail_package($pkg, "I don't know what file/module to build from!");
@@ -357,8 +357,12 @@ build_package_forked
                 &pkgvar_instroot("");
             }
             $err = &build_single_package($pkg);
+            &cleanup_build_tree();
             if (&pkgvar_instroot() && -d &pkgvar_instroot()) {
                 &nuke_tree(&pkgvar_instroot());
+            }
+            if (&pkgvar_buildroot() && -d &pkgvar_buildroot()) {
+                &nuke_tree(&pkgvar_buildroot());
             }
             close(LOGFILE) if ($GLOBAL_LOG);
             exit ($err);
@@ -635,17 +639,22 @@ parallel_build
             @tmp = <ERRLOG>;
             close(ERRLOG);
             # If the last line doesn't match, take the last line out of all the lines that do.
-            if ($tmp[$#tmp] !~ /error: /i) {
-                @tmp = grep($_ =~ /error: /i, @tmp);
-            }
-            chomp($line = $tmp[$#tmp]);
-            # Record that the package failed.
-            if ($line =~ /^$progname:  Error:  Package \S+ failed:  (.*)$/) {
-                &fail_package($pkg, $1);
+            if (scalar(@tmp)) {
+                if ($tmp[$#tmp] !~ /error: /i) {
+                    @tmp = grep($_ =~ /error: /i, @tmp);
+                }
+                chomp($line = $tmp[$#tmp]);
+
+                # Record that the package failed.
+                if ($line =~ /^$progname:  Error:  Package \S+ failed:  (.*)$/) {
+                    &fail_package($pkg, $1);
+                } else {
+                    $line = "Couldn't find error in log" if (! $line);
+                    $line =~ s/^\w+:\s*Error:\s*//;
+                    &fail_package($pkg, "Child process exited with code $err -- $line");
+                }
             } else {
-                $line = "Couldn't find error in log" if (! $line);
-                $line =~ s/^\w+:\s*Error:\s*//;
-                &fail_package($pkg, "Child process exited with code $err -- $line");
+                &fail_package($pkg, "Child process returned $err but log file $logfile is empty");
             }
         }
         # End of loop.  Time to spawn the next child.
@@ -766,7 +775,7 @@ main
     #
     if ($opt_v) {
         &print_version($progname, $version, $author,
-                       'CVS Revision $Revision: 1.175 $ created on $Date: 2004/03/05 22:26:32 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.176 $ created on $Date: 2004/03/14 15:42:07 $ by $Author: mej $ ');
         # Never returns
     }
     if ($opt_h) {
@@ -784,7 +793,7 @@ main
     $global_tree = $opt_D;
     $global_tag = $opt_T;
     $buildtree_layout = (($opt_b) ? ($opt_b) : ("mej"));
-    &pkgvar_cleanup((($opt_clean) ? ($opt_clean) : ("build")));
+    &pkgvar_cleanup((($opt_clean) ? ($opt_clean) : ("temp")));
     &pkgvar_target($opt_t);
 
     # Open log file, if any.

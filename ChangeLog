@@ -328,3 +328,9 @@ Fri Mar  5 17:26:11 2004                        Michael Jennings (mej)
 
 The orc-style build tree layout seems to be working.
 ----------------------------------------------------------------------
+Sun Mar 14 10:40:58 2004                        Michael Jennings (mej)
+
+Remove build-temporary files after build is done.
+
+Fixed obscure regexp-quoting bug.
+----------------------------------------------------------------------

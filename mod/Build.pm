@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.33 2004/03/05 22:26:32 mej Exp $
+# $Id: Build.pm,v 1.34 2004/03/14 15:42:07 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -220,6 +220,7 @@ prepare_build_tree
                 # It's a bogus file.  Nuke it.
                 &nuke_tree("$topdir/$dir");
             }
+            dprint "I'm creating $topdir/$dir.\n";
             &mkdirhier("$topdir/$dir", 0755) || &fatal_error("Cannot create $topdir/$dir -- $!\n");
             xpush @my_dirs, "$topdir/$dir";
         }
@@ -228,6 +229,7 @@ prepare_build_tree
                 # It's a bogus file.  Nuke it.
                 &nuke_tree("$instroot$topdir/$dir");
             }
+            dprint "I'm also creating $instroot$topdir/$dir.\n";
             &mkdirhier("$instroot$topdir/$dir", 0755) || &fatal_error("Cannot create $instroot$topdir/$dir -- $!\n");
             xpush @my_dirs, "$instroot$topdir/$dir";
         }
@@ -235,7 +237,7 @@ prepare_build_tree
 
     # If the build root exists and we're not already using it,
     # get rid of it and create a new (empty) one.
-    if (-d $buildroot && !grep(/$buildroot/, @my_dirs)) {
+    if (-d $buildroot && !grep(/\Q$buildroot\E/, @my_dirs)) {
         &nuke_tree($buildroot);
     }
     &mkdirhier($buildroot, 0775);
