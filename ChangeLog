@@ -118,3 +118,7 @@ Mon Jun 24 13:30:47 2002                        Michael Jennings (mej)
 
 Fixes for the new rpm.
 ----------------------------------------------------------------------
+Wed Jul 10 00:04:41 2002                        Michael Jennings (mej)
+
+Fix handling of binary-only packages.
+----------------------------------------------------------------------
