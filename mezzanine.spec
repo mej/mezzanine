@@ -44,20 +44,20 @@ done
 (
   cd $RPM_BUILD_ROOT%{_bindir}
   for i in get co put ci info add new rm purge rtag tag reset login diff stat status log ; do
-    ln -s revtool av$i
-    echo ".so revtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/av$i.1
+    ln -s revtool mz$i
+    echo ".so revtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/mz$i.1
   done
   for i in import prep mod merge patch clean ; do
-    ln -s srctool av$i
-    echo ".so srctool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/av$i.1
+    ln -s srctool mz$i
+    echo ".so srctool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/mz$i.1
   done
   for i in rpm pkg build inst ; do
-    ln -s pkgtool av$i
-    echo ".so pkgtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/av$i.1
+    ln -s pkgtool mz$i
+    echo ".so pkgtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/mz$i.1
   done
   for i in prod pbuild prodbuild ; do
-    ln -s buildtool av$i
-    echo ".so buildtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/av$i.1
+    ln -s buildtool mz$i
+    echo ".so buildtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/mz$i.1
   done
 )
 
