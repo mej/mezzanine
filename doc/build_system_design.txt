@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: build_system_design.txt,v 1.4 2001/01/05 04:18:59 mej Exp $
+#  $Id: build_system_design.txt,v 1.5 2001/01/24 04:02:45 mej Exp $
 #
 ########################################################################
 
@@ -284,3 +284,47 @@ tagging has revealed CVS to be less than sufficient.
 4.  HIGH-LEVEL PROCESS OVERVIEW
 -------------------------------
 
+This section gives a detailed procedure for many of the high-level
+tasks performed by engineers using the build system.  Each sub-section
+or sub-sub-section will outline a specific procedures and processes
+step-by-step, including as much detail as is appropriate.
+
+4.1.  Importing New Packages
+----------------------------
+
+As new packages need to be maintained, temporarily or permanently, by
+internal personnel, they must be added to the build system so that all
+changes can be tracked and managed in an organized manner.  The
+addition of packages to the build system is called an "import."  There
+are three types of imports which may be done, each of which will be
+outlined in one of the following sections.
+
+4.1.1.  Importing SRPM Packages
+-------------------------------
+
+At times, an external vendor will publish a particular package which
+contains errors in function or judgment on the part of that vendor.
+In order to preserve the integrity of the VA-supplied distribution,
+sometimes we must assume responsibility for a particular package until
+the vendor corrects its error.  If this occurs, the simplest solution
+is to import the vendor SRPM into the build system and modify it to
+correct the error.  The following procedure outlines the steps to
+follow in this situation.
+
+    Pre-conditions:  A vendor SRPM has been downloaded and has proven
+                     faulty.
+
+    1.  
+
+4.1.2.  Importing Source Trees
+4.1.3.  Importing Exploded Packages
+4.2.  Retrieving Products and Packages
+4.3.  Making Alterations
+4.3.1.  Applying Existing Patch Files
+4.3.2.  Making Your Own Changes
+4.4.  Building
+4.4.1.  Individual Packages
+4.4.2.  Entire Products
+4.5.  Publishing and Media Management
+4.5.1.  Creating Package CD's
+4.5.2.  Generating/Syncing Web Sites

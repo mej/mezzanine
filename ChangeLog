@@ -976,3 +976,8 @@ Thu Jan 18 17:28:27 2001                        Michael Jennings (mej)
 Actually, let's do it this way.  The executable name overrides the
 command line options since they can have mixed purposes.
 ----------------------------------------------------------------------
+Tue Jan 23 20:02:26 2001                        Michael Jennings (mej)
+
+With cthulhu being as uncertain as it is, I thought I should commit
+this now.
+----------------------------------------------------------------------
