@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.15 2003/12/30 23:02:55 mej Exp $
+# $Id: Prod.pm,v 1.16 2003/12/31 11:53:50 mej Exp $
 #
 
 package Mezzanine::Prod;
@@ -31,6 +31,7 @@ BEGIN {
     use Exporter   ();
     use Cwd;
     use Mezzanine::Util;
+    use Mezzanine::PkgVars;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking

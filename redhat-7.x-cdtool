@@ -5,7 +5,7 @@
 # Michael Jennings <mej@eterm.org>
 # 21 July 2000
 #
-# $Id: redhat-7.x-cdtool,v 1.27 2003/06/02 16:30:12 mej Exp $
+# $Id: redhat-7.x-cdtool,v 1.28 2003/12/31 11:53:50 mej Exp $
 #
 
 umask 022
@@ -132,6 +132,13 @@ else
     rm -f RPMS.all && ln -s RPMS RPMS.all
     rm -f SRPMS.all && ln -s ../../vermillion-7.3.1-www/SRPMS SRPMS.all
     rm -f base/hdlist.all && ln -s hdlist base/hdlist.all
-    genbasedir -s --default-key=vermillion --progress --bz2only --bloat --flat /os/build.mezzanine/vermillion-7.3.1-net/RedHat all
+    genbasedir -s --default-key=vermillion --progress --bz2only --bloat --flat $BUILDDIR/$NET/RedHat all
     #gpg -s -u vermillion base/hashfile
+    cd $BUILDDIR
+fi
+
+if [ ! -x /usr/bin/yum-arch ]; then
+    echo "yum not found.  Not generating headers."
+else
+    yum-arch -cz $BUILDDIR/vermillion-7.3.1-www/RPMS
 fi

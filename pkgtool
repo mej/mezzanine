@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.53 2003/12/30 23:02:55 mej Exp $
+# $Id: pkgtool,v 1.54 2003/12/31 11:53:50 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -100,7 +100,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.53 $ created on $Date: 2003/12/30 23:02:55 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.54 $ created on $Date: 2003/12/31 11:53:50 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -184,6 +184,8 @@ main
         &pkgvar_hint_installer($opt_hi);
     }
 
+    $ENV{"LANG"} = "C" if (! $ENV{"LANG"});
+
     # Signal handling
     $SIG{HUP} = 'IGNORE';
     $SIG{INT} = \&handle_signal;
@@ -215,6 +217,13 @@ main
         }
         print "Package build succeeded.  Output files are:\n\n";
         foreach my $f (split(' ', $outfiles)) {
+            if (! -e $f) {
+                my $instroot = &pkgvar_instroot();
+
+                if ($instroot && -e "$instroot$f") {
+                    $f = $instroot . $f;
+                }
+            }
             if (&copy_files($f, ".")) {
                 print &basename($f);
             } else {
