@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.23 2000/05/23 02:15:45 mej Exp $
+# $Id: buildtool,v 1.24 2000/05/23 18:40:58 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -851,22 +851,34 @@ do_compose_stage
             &fail_package($pkg, "compose", "Could not chdir into $cwd/$pkgs->{$pkg}{MODULE} -- $!");
             next;
         }
-        ($pn = $prodname) =~ s/^va-//;
         opendir(DIR, ".");
-        @contents = readdir(DIR);
+        @contents = grep($_ =~ /src\.rpm$/, readdir(DIR));
         closedir(DIR);
-        if (grep($_ =~ /src\.rpm$/, @contents)) {
+        if ($#contents > 0) {
+            $srpm = $contents[0];
+            if ($#contents > 0) {
+                nprint "$progname:  Warning:  Multiple target SRPM's found in $pkgs->{$pkg}{MODULE}.\n";
+                nprint "$progname:  Assuming that $srpm is the correct one.\n";
+            }
+        } else {
+            $srpm = 0;
+        }
+        if ($srpm) {
             # The target SRPM already exists.  Skip this stage.
             nprint "$progname:  The target SRPM for \"$pkg\" already exists in $cwd/$pkgs->{$pkg}{MODULE}.\n";
             nprint "$progname:  I'll assume it's the right one.  Compose stage for \"$pkg\" is complete.\n";
+            ($srpm = $contents[0]) =~ m/^(\S+)-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/;
+            ($pkgs->{$pkg}{VERSION}, $pkgs->{$pkg}{RELEASE}) = ($2, $3);
+            $pkgs->{$pkg}{FILENAME} = "$cwd/$pkgs->{$pkg}{MODULE}/$srpm";
             next;
         }
-            
+
         if ($pkgs->{$pkg}{SPECFILE} && -f $pkgs->{$pkg}{SPECFILE}) {
             # If they gave us the spec file and it exists, use that.
             $specfile = $pkgs->{$pkg}{SPECFILE};
         } else {
             # First choice:  Exactly one file named <pkg>-<distro>.spec
+            ($pn = $prodname) =~ s/^va-//;
             @tmp = grep($_ =~ /^($pkg-)?(va-)?$pn\.spec/, @contents);
             if ($#tmp != 0) {
                 # Second choice:  Exactly one file named <pkg>.spec
@@ -1177,7 +1189,7 @@ do_package_stage
         @contents = readdir(DIR);
         foreach $rpm (@contents) {
             dprint "Checking $builddir/SRPMS/$rpm\n";
-            if ($rpm =~ /^\Q$pkg-\E\S*\Q$version-$release\E\.(?:no)?src\.rpm/) {
+            if ($rpm =~ /^\Q$pkg-\E\S*\Q$version-$release\E\.(?:no)?src\.rpm$/) {
                 dprint "Got output file $rpm\n";
                 push @outfiles, "$builddir/SRPMS/$rpm";
             }
@@ -1188,7 +1200,7 @@ do_package_stage
         @contents = glob("$builddir/RPMS/*/$pkg*.rpm");
         foreach $rpm (@contents) {
             dprint "Checking $rpm\n";
-            if ($rpm =~ /^\Q$pkg-\E\S*\Q$version-$release\E\.\S+\.rpm/) {
+            if ($rpm =~ /$version-$release/) {
                 dprint "Got output file $rpm\n";
                 push @outfiles, $rpm;
             }

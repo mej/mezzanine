@@ -204,3 +204,8 @@ Mon May 22 19:22:31 2000                        Michael Jennings (mej)
 
 Fixity-fix some more bugity-bugs.  Time for another build run.
 ----------------------------------------------------------------------
+Tue May 23 11:46:59 2000                        Michael Jennings (mej)
+
+Hopefully this will fix the spec file problem for the CVS modules and
+the finding of target binary RPM's for the other stuff.
+----------------------------------------------------------------------
