@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.24 2000/05/23 18:40:58 mej Exp $
+# $Id: buildtool,v 1.25 2000/05/23 23:34:16 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -502,7 +502,7 @@ parse_product_entry
     # variable for the current package, see if it has a value for the parent product
     # of that package.  If not, try the parent product of that product, and continue
     # going back through the product hierarchy until we find a value or run out.
-    foreach $pkgvar ("REVISION", "LOCATIONS", "RPMCMD", "TAR", "ZIP", "STAGES", "CVSROOT") {
+    foreach $pkgvar ("REVISION", "LOCATIONS", "RPMCMD", "TAR", "ZIP", "STAGES", "CVSROOT", "ARCH") {
         if (! $pkgs->{$name}{$pkgvar}) {
             my ($pkg, $val) = undef;
 
@@ -668,13 +668,14 @@ sub
 build_rpms
 {
     my ($pkg, $specfile) = @_;
-    my ($cmd, $rpm, $line);
+    my ($cmd, $rpm, $line, $target);
     my ($err, $msg, $srpm) = (0, 0, 0);
     my (@failed_deps, @not_found, @spec_errors);
     local *RPM;
 
     $rpm = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
-    $cmd = "$rpm --rcfile $rpmrc -ba $specfile";
+    $target = ($pkgs->{$pkg}{ARCH} ? "--target=$pkgs->{$pkg}{ARCH}" : "");
+    $cmd = "$rpm --rcfile \"/usr/lib/rpm/rpmrc:$rpmrc\" $target -ba $specfile";
     dprint "About to run \"$cmd\"\n";
     if (!open(RPM, "$cmd </dev/null 2>&1 |")) {
         return (1, "Execution of \"$cmd\" failed -- $!", undef);
@@ -852,11 +853,12 @@ do_compose_stage
             next;
         }
         opendir(DIR, ".");
-        @contents = grep($_ =~ /src\.rpm$/, readdir(DIR));
+        @contents = readdir(DIR);
         closedir(DIR);
-        if ($#contents > 0) {
-            $srpm = $contents[0];
-            if ($#contents > 0) {
+        @tmp = grep($_ =~ /src\.rpm$/, @contents);
+        if ($#tmp > 0) {
+            $srpm = $tmp[0];
+            if ($#tmp > 0) {
                 nprint "$progname:  Warning:  Multiple target SRPM's found in $pkgs->{$pkg}{MODULE}.\n";
                 nprint "$progname:  Assuming that $srpm is the correct one.\n";
             }
@@ -867,7 +869,7 @@ do_compose_stage
             # The target SRPM already exists.  Skip this stage.
             nprint "$progname:  The target SRPM for \"$pkg\" already exists in $cwd/$pkgs->{$pkg}{MODULE}.\n";
             nprint "$progname:  I'll assume it's the right one.  Compose stage for \"$pkg\" is complete.\n";
-            ($srpm = $contents[0]) =~ m/^(\S+)-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/;
+            $srpm =~ m/^(\S+)-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/;
             ($pkgs->{$pkg}{VERSION}, $pkgs->{$pkg}{RELEASE}) = ($2, $3);
             $pkgs->{$pkg}{FILENAME} = "$cwd/$pkgs->{$pkg}{MODULE}/$srpm";
             next;
@@ -1289,7 +1291,7 @@ build_process
 {
     $ENV{MAKE} = "make";  # Make sure we don't parallel build, because it doesn't work.
     $ENV{CFLAGS} = "-O2 -march=pentium";  # A bit of optimization, but not much.
-    undef $ENV{LD_LIBRARY_PATH};  # Make glibc happy
+    $ENV{LD_LIBRARY_PATH} = "";  # Make glibc happy
 
     # Perform the build in stages, checking after each one to see if we should stop
     &do_bootstrap_stage();
@@ -1323,7 +1325,8 @@ main
 
     # See the Getopt::Mixed man page for details on the syntax of this line
     $valid_opts = "h help>h v version>v d debug>d b=s build>b p=s product>p package>p"
-                   . " q quiet>q Q really-quiet>Q silent>Q D dir>D f force>f l=s log>l";
+                   . " q quiet>q Q really-quiet>Q silent>Q D=s dir>D f force>f l=s log>l"
+                   . " P parallel>P t=s target>t";
     Getopt::Mixed::getOptions($valid_opts);
 
     # Post-parse the options stuff
@@ -1337,6 +1340,7 @@ main
     }
     $debug = $opt_d;
     $verbosity = ($opt_Q ? 0 : ($opt_q ? 1 : 2));
+    $target = ($opt_t ? $opt_t : 0);
     $opt_b = "p" if (! $opt_b);
     $GLOBAL_LOG = 0;
     if ($opt_l) {

@@ -209,3 +209,9 @@ Tue May 23 11:46:59 2000                        Michael Jennings (mej)
 Hopefully this will fix the spec file problem for the CVS modules and
 the finding of target binary RPM's for the other stuff.
 ----------------------------------------------------------------------
+Tue May 23 16:40:28 2000                        Michael Jennings (mej)
+
+Looks like I've fixed that "can't find specfile" bug.  I've also added
+a variable for specifying the build architecture which will hopefully
+keep stuff from choking on i386 vs. i686.
+----------------------------------------------------------------------
