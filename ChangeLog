@@ -538,3 +538,7 @@ Wed Jun 21 16:02:47 2000                        Michael Jennings (mej)
 Fixed the tagging/importing code.  Just a few small bugs.  Everything
 looks to be in working order now.
 ----------------------------------------------------------------------
+Wed Jun 21 20:45:39 2000                        Michael Jennings (mej)
+
+Added several new query options.
+----------------------------------------------------------------------
