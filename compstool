@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: compstool,v 1.2 2000/11/11 01:14:33 mej Exp $
+# $Id: compstool,v 1.3 2000/11/11 05:14:08 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -160,8 +160,8 @@ parse_comps_file
 {
     my ($comps, $pkgdir, $arch) = @_;
     local (*COMPS, *DIR);
-    my ($line, $pkg);
-    my (@pkgs, @rpms, @missing);
+    my ($line, $pkg, $rpm);
+    my (@pkgs, @rpms, @missing, @ignored);
 
     dprint "Parsing comps file at $comps using package directory $pkgdir\n";
     opendir(DIR, $pkgdir) || &fatal_error("Unable to open package directory ($pkgdir) -- $!\n");
@@ -196,8 +196,20 @@ parse_comps_file
         }
     }
 
+    foreach $rpm (@rpms) {
+        dprint "Looking at $rpm\n";
+        ($pkg = $rpm) =~ s/-[^-]+-[^-]+\.[^\.]+\.rpm//;
+        if (!grep($_ eq $pkg, @pkgs)) {
+            dprint "$rpm is ignored\n";
+            push @ignored, $pkg;
+        }
+    }
+
+    if (scalar(@ignored)) {
+        print "The following packages are not referenced:  \n   ", join("\n   ", sort(@ignored)), "\n";
+    }
     if (scalar(@missing)) {
-        eprint "The following packages are missing:  ", join(" ", @missing), "\n";
+        eprint "The following packages are missing:  \n   ", join("\n   ", sort(@missing)), "\n";
         return COMPSTOOL_MISSING_PKGS;
     } else {
         print "All packages verified.\n";
@@ -224,7 +236,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.2 $ created on $Date: 2000/11/11 01:14:33 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.3 $ created on $Date: 2000/11/11 05:14:08 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 21 July 2000
 #
-# $Id: redhat-6.x-cdtool,v 1.1 2000/09/12 03:14:19 mej Exp $
+# $Id: redhat-6.x-cdtool,v 1.2 2000/11/11 05:14:08 mej Exp $
 #
 
 trap 'exit -1' 1 2 15
@@ -47,7 +47,7 @@ cd ../anaconda ; make clean
 
 # Generate the diff
 cd $BUILD_DIR
-diff -x CVS -x .cvsignore -ur $IMAGE $TMP_IMAGE >& img.patch
+diff -x CVS -x .cvsignore -ur $IMAGE $TMP_IMAGE > img.patch 2>&1
 ${EDITOR:-vi} img.patch
 
 # Make sure there's nothing new popping up unexpectedly.
