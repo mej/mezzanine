@@ -1,0 +1,39 @@
+##########################################################################
+# This is the sample Makefile.mezz.
+# 
+# Mezzanine passes several Make enviroment variables.  They are listed in
+# the debug target below.
+#
+# $Id: Makefile.mezz.sample,v 1.3 2003/11/30 20:17:45 mej Exp $
+##########################################################################
+
+# At build time, Mezzanine runs "make -f Makefile.mezz" and supplies
+# the following variables to the make program:
+#
+#  $BUILD_DIR      The top-level build directory (%_topdir for RPM's).
+#  $BUILD_ROOT     The temporary build/install root ($RPM_BUILD_ROOT).
+#  $PKG_DIR        The destination directory for packages.
+#  $RCFILE         The resource file to use, if any (e.g., ~/.rpmrc).
+#  $TARGET         The package type to build ("rpms" or "debs" or "").
+#
+# The default (first) target is used, and after the make process is
+# finished, the final packages are expected to be placed in $PKG_DIR
+# by the make process.  If they are not there, the package build will
+# fail, even if the make process returned success.
+#
+
+default: #debug
+	make rpm # Call the original Makefile to produce packages.
+	# Then copy the packages to ${PKG_DIR}
+	if [ ! -d ${PKG_DIR} ]; then \ 
+	   mkdir ${PKG_DIR} ;\
+	fi
+	cp path/to/*pkgs* ${PKG_DIR}/
+
+
+debug:	   # This is a debug target
+	@echo "BUILD_DIR  = ${BUILD_DIR}"
+	@echo "BUILD_ROOT = ${BUILD_ROOT}"
+	@echo "PKG_DIR    = ${PKG_DIR}"
+	@echo "RCFILE     = ${RCFILE}"
+	@echo "TARGET     = ${TARGET}"

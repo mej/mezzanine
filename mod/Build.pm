@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.22 2002/02/18 18:48:53 mej Exp $
+# $Id: Build.pm,v 1.23 2003/12/02 20:47:43 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -500,7 +500,7 @@ build_cfst
     } else {
         $cmd = "make -f Makefile.mezz";
     }
-    $cmd .= " BUILD_DIR=$topdir BUILD_ROOT=$buildroot PKG_DIR=$pkgdir";
+    $cmd .= " BUILD_DIR=$topdir BUILD_ROOT=$buildroot PKG_DIR=$pkgdir TARGET=$target_format";
     if (&pkgvar_rcfile()) {
         $cmd .= " RCFILE=" . &pkgvar_rcfile();
     }

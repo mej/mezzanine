@@ -1,6 +1,6 @@
 <!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook V3.1//EN" [
 <!ENTITY MZ "<application>Mezzanine</application>">
-<!ENTITY MZVER "1.1">
+<!ENTITY MZVER "1.5">
 <!ENTITY DOCID "$Id: FAQ.sgml,v 1.1 2001/07/18 22:47:49 mej Exp $">
 ]>
 <article class="FAQ">
@@ -12,7 +12,7 @@
 
 <para>
   This document answers some frequently-asked questions (FAQ's) about
-  Mezzanine.  Use the table of contents below to find the question
+  &MZ;.  Use the table of contents below to find the question
   that pertains to your situation, or browse through all the questions
   in order.
 </para>
@@ -174,6 +174,11 @@
         <para>Which commands use SCM?</para>
       </question>
       <answer>
+        <para>
+          The following &MZ; commands directly manipulate the SCM
+          repository.  Although other &MZ; commands also interact with
+          the repository, they use these basic operations to do so.
+        </para>
         <table frame="sides">
           <title>&MZ; SCM Command Summary</title>
           <tgroup cols="2" align="left" colsep="1" rowsep="0">
@@ -328,10 +333,11 @@
           or directory names are specified on the
           <filename>mzput</filename> command line, only those
           files/directories will be uploaded.  However, if the
-          <userinput>-a</userinput> option is specified, a general
-          upload will be done, and the files/directories listed on the
-          command line will be added to the repository.  This is a
-          shorter way of accomplishing the same task as:
+          <userinput>-a</userinput> option is specified (e.g.,
+          <userinput>mzput -a file1 file2 file3</userinput>), a
+          general upload will be done, and the files/directories
+          listed on the command line will be added to the repository.
+          This is a shorter way of accomplishing the same task as:
         </para>
         <screen>
           mzadd file1 file2 file3
@@ -340,7 +346,8 @@
         <para>
           The <userinput>-r</userinput> option may be used in an
           identical fashion to remove files and upload changes to the
-          repository, a shortcut for
+          repository (e.g., <userinput>mzrm file1 file2
+          file3</userinput>, a shortcut for
         </para>
         <screen>
           mzrm file1 file2 file3
@@ -350,11 +357,53 @@
           You may additionally specify the <userinput>-x</userinput>
           option to indicate that only those files which have been
           added/removed should be synced to the repository.
-          Furthermore, <userinput>-x</userinput> as an option to
-          <filename>mzput</filename> by itself indicates that
-          the ChangeLog file should be neither appended to, nor
-          created, nor uploaded.
+          Furthermore, <userinput>-x</userinput> by itself as an
+          option to <filename>mzput</filename> indicates that the
+          ChangeLog file should be neither appended to, nor created,
+          nor uploaded.
         </para>
+
+        <table frame="sides">
+          <title>&MZ; SCM "Put" Command Summary</title>
+          <tgroup cols="2" align="left" colsep="1" rowsep="0">
+            <colspec colnum="1" colname="c1">
+            <colspec colnum="2" colname="c2">
+            <tbody>
+              <row>
+                <entry><filename>mzput</filename></entry>
+                <entry>Upload all changes to the repository, and append ChangeLog entry.</entry>
+              </row>
+              <row>
+                <entry><filename>mzput file1 file2 ...</filename></entry>
+                <entry>Upload only specified file(s) if changed (including ChangeLog entry).</entry>
+              </row>
+              <row>
+                <entry><filename>mzput -a file1 file2 ...</filename></entry>
+                <entry>Add specified file(s) and upload all changes (w/ ChangeLog).</entry>
+              </row>
+              <row>
+                <entry><filename>mzput -r file1 file2 ...</filename></entry>
+                <entry>Remove specified file(s) and upload all changes (w/ ChangeLog).</entry>
+              </row>
+              <row>
+                <entry><filename>mzput -x</filename></entry>
+                <entry>Upload all changes without appending ChangeLog entry.</entry>
+              </row>
+              <row>
+                <entry><filename>mzput -x file1 file2 ...</filename></entry>
+                <entry>Upload only specified file(s) (no ChangeLog entry).</entry>
+              </row>
+              <row>
+                <entry><filename>mzput -x -a file1 file2 ...</filename></entry>
+                <entry>Add and upload specified file(s) only (w/o ChangeLog).</entry>
+              </row>
+              <row>
+                <entry><filename>mzput -x -r file1 file2 ...</filename></entry>
+                <entry>Remove and upload specified file(s) only (w/o ChangeLog).</entry>
+              </row>
+            </tbody>
+          </tgroup>
+        </table>
       </answer>
     </qandaentry>
     <qandaentry id="g2q5">
@@ -369,8 +418,9 @@
           the repository.  That will determine whether you use
           <filename>mztag</filename> (for the former case) or
           <filename>mzrtag</filename> (for the latter case).  For
-          purposes of this example, I'll use the former case.  Tagging
-          the repository directly isn't appreciably different.
+          purposes of this example, I'll use the former case, but
+          tagging the repository directly (other than the extra
+          <userinput>r</userinput>) isn't any different.
         </para>
         <para>
           Next, you need to choose the tag you want.  Tags should
@@ -390,6 +440,18 @@
         <screen>
           mztag -b FOO-1_0
         </screen>
+        <para>
+          This command will create a new branch with the specified
+          tag.  If you want to work on the created branch, make sure
+          you immediately follow the above command with:
+        </para>
+        <screen>
+          mzget -t FOO-1_0
+        </screen>
+        <para>
+          Though some SCM systems may do this for you, some may not.
+          Better to get in the habit of it to be on the safe side.
+        </para>
       </answer>
     </qandaentry>
   </qandadiv>
@@ -398,27 +460,197 @@
     <title>Managing Individual Packages with &MZ;</title>
     <qandaentry id="g3q1">
       <question>
-        <para>How do I get a package into the system?</para>
+        <para>What's an SPM? FST? CFST?</para>
       </question>
       <answer>
         <para>
+          Like any system, some rather complex concepts are more
+          easily described by agreed-upon terminology.  As &MZ; has a
+          fairly unique view of software products and their
+          components, I had to come up with some way of describing
+          that view.  And thus were born some new <ulink
+          url="http://dictionary.reference.com/search?q=tla">TLA</ulink>'s
+          (including one <ulink
+          url="http://dictionary.reference.com/search?q=xtla">XTLA</ulink>).
         </para>
         <para>
+          When you drill down on a product, through all the layers of
+          products and sub-products, you wind up with a big (or small,
+          as the case may be) list of packages that make up that
+          product.  From the perspective of the overall product build
+          (i.e., buildtool), a package is a package.  However, the
+          underlying build routines distinguish between several
+          different types of packages, some of which actually require
+          building, and others which only need to be moved into
+          place.
         </para>
         <para>
+          From the packager's perspective, there are generally two
+          types of packages: source packages and binary packages.
+          From a buildmaster/build system perspective, there are also
+          two types of packages: those that are built from source into
+          binaries and those that aren't.  For purposes of building,
+          &MZ; recognizes the following 4 types of buildable packages:
+        </para>
+
+        <table frame="sides">
+          <title>&MZ; Buildable Package Types</title>
+          <tgroup cols="2" align="left" colsep="1" rowsep="0">
+            <colspec colnum="1" colname="c1">
+            <colspec colnum="2" colname="c2">
+            <tbody>
+              <row>
+                <entry>Source Package</entry>
+                <entry>
+                  This term refers to a single file which contains all
+                  source and instructions necessary to build the
+                  package.  Specifically, this refers to an SRPM or a
+                  tarball containing a spec file.
+                </entry>
+              </row>
+              <row>
+                <entry>Source Package Module (SPM)</entry>
+                <entry>
+                  In order to maintain a source package under SCM, it
+                  is "exploded" into a directory structure which &MZ;
+                  understands.  This directory structure is called an
+                  SPM (not to be confused with SRPM).  The SPM
+                  contains three directories:  <filename>S</filename>,
+                  which contains the source file(s);
+                  <filename>P</filename>, which holds the patches to
+                  be applied to the original vendor source; and
+                  <filename>F</filename>, which contains the spec file
+                  or other build instructions.  Running
+                  <filename>mzimport</filename> on an SRPM will give
+                  you an SPM.  You can then use other &MZ; commands to
+                  manipulate the SPM to create patches, run a build of
+                  the package, etc.
+                </entry>
+              </row>
+              <row>
+                <entry>Full Source Tree (FST)</entry>
+                <entry>
+                  Back in the early days of &MZ; (then called
+                  "Avalon"), the unarchived (untarred) vendor source
+                  was imported into SCM just like a normal source
+                  tree.  Then each subsequent patch to the source was
+                  made, tagged, and checked in.  The build process
+                  involved building the original source tarball (based
+                  on a tag and instructions held in the SRCS package
+                  variable in the prod file), creating each patch
+                  one-by-one (using mzdiff and the patch tags), then
+                  moving everything into place so that <filename>rpm
+                  -ba</filename> could generate the needed binary and
+                  source packages.  Although this approach was an
+                  interesting one, it proved cumbersome and was
+                  largely abandoned.  &MZ; still supports it, largely
+                  because &MZ; itself is still maintained as an FST.
+                </entry>
+              </row>
+              <row>
+                <entry>Custom-built Full Source Tree (CFST)</entry>
+                <entry>
+                  The "Custom-built" part means that the package is
+                  responsible for building itself (rather than &MZ;
+                  building it).  The CFST contains a file called
+                  <filename>Makefile.mezz</filename> which contains
+                  all commands required to generate the source
+                  tarball, spec file, and/or patches, and build source
+                  and binary package files from them.  &MZ; invokes
+                  the <filename>make</filename> command and provides
+                  some basic variables telling what it wants and where
+                  it expects things to end up; the rest is entirely up
+                  to the package.  This technique is most valuable for
+                  projects that are already maintained under SCM and
+                  would like &MZ; to be able to build the packages
+                  from the original project source tree.  (The
+                  filename was chosen such that its purpose would be
+                  clear without interfering with the normal build
+                  process of existing applications.)
+                </entry>
+              </row>
+            </tbody>
+          </tgroup>
+        </table>
+        <para>
+          As you can see, the terms are important shorthand for
+          describing fairly involved concepts concisely.
         </para>
       </answer>
     </qandaentry>
     <qandaentry id="g3q2">
       <question>
-        <para>What's an SPM? FST? CFST?</para>
+        <para>How do I get a package into the system?</para>
       </question>
       <answer>
         <para>
+          Short answer:  Import it!
         </para>
         <para>
+          The <filename>mzimport</filename> tool is designed to help
+          you get a package into SCM and ready for modification.  The
+          simplest way to import a package is to get an SRPM (e.g.,
+          from <ulink url="http://freshrpms.net/">FreshRPM's</ulink>
+          or <ulink url="http://rpmfind.net/">RPMFind</ulink>) and
+          import that.  &MZ; will automatically turn the SRPM into an
+          SPM for you, after which the directory tree is imported into
+          the repository.
         </para>
         <para>
+          Let's say, for example, you've gone out on the Interweb and
+          found yourself an SRPM for the "pile sarnet" package (which,
+          as everyone knows, is required for a system to be
+          functional).  You've downloaded
+          <filename>pile-sarnet-1.0.7-3.src.rpm</filename> and you
+          want to get it into your tree.  Here's how you do it:
+        </para>
+        <screen>
+          mzimport pile-sarnet-1.0.7-3.src.rpm
+        </screen>
+        <para>
+          Yep, that's it.  &MZ; does everything automatically.  NOTE:
+          if you don't have a repository or aren't connected to the
+          network, you can still use &MZ; to modify the package.
+          Simply specify the <userinput>-L</userinput> (local mode)
+          option to prevent &MZ; from trying to talk to a repository.
+          The following command will create an SPM called
+          <filename>pile-sarnet</filename> in your current directory:
+        </para>
+        <screen>
+          mzimport -L pile-sarnet-1.0.7-3.src.rpm
+        </screen>
+        <para>
+          The local mode flag can also be used with the other commands
+          in this section, excluding (obviously) those like
+          <filename>mzget</filename> and <filename>mzput</filename>
+          which are intended solely to interact with the repository.
+        </para>
+        <para>
+          As another example, let's assume you used local mode to
+          create an SPM on your workstation, but now you want to
+          import it into the SCM repository.  It's still pretty easy;
+          you just need to supply one more piece of information.
+        </para>
+        <para>
+          You see, if you have an SRPM, &MZ; can determine the 
+        </para>
+        <para>
+          
+        </para>
+        <para>
+          
+        </para>
+        <para>
+          
+        </para>
+        <para>
+          
+        </para>
+        <para>
+          
+        </para>
+        <para>
+          
         </para>
       </answer>
     </qandaentry>
@@ -428,10 +660,22 @@
       </question>
       <answer>
         <para>
+          
         </para>
         <para>
+          
         </para>
         <para>
+          
+        </para>
+        <para>
+          
+        </para>
+        <para>
+          
+        </para>
+        <para>
+          
         </para>
       </answer>
     </qandaentry>
@@ -441,10 +685,22 @@
       </question>
       <answer>
         <para>
+          
         </para>
         <para>
+          
         </para>
         <para>
+          
+        </para>
+        <para>
+          
+        </para>
+        <para>
+          
+        </para>
+        <para>
+          
         </para>
       </answer>
     </qandaentry>
@@ -459,6 +715,7 @@
       </question>
       <answer>
         <para>
+          
         </para>
       </answer>
     </qandaentry>

@@ -3,13 +3,13 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: build_process_overview.txt,v 1.5 2003/11/30 20:17:45 mej Exp $
+#  $Id: build_process_overview.txt,v 1.6 2003/12/02 20:47:43 mej Exp $
 #
 ########################################################################
 
 This document contains information on basic usage of the build system.
 This is intended simply as a brief introduction and should not be
-considered a substitute for the complete Avalon documentation.
+considered a substitute for the complete Mezzanine documentation.
 
 1.  REVTOOL
 -----------
@@ -17,24 +17,26 @@ considered a substitute for the complete Avalon documentation.
 Since the build system must not depend on any one particular revision
 management mechanism, revtool provides an encapsulation layer that
 performs the basic functions needed to manipulate a revision control
-system.  Its is designed in such a way that changing control systems
+system.  It is designed in such a way that changing control systems
 would require only changing the commands revtool executes and should
 be a fairly straight-forward process.
 
-Here's a basic overview of revtool's syntax:
+Here's a basic overview of revtool's syntax.  Keep in mind that each
+command has an alias (given in parentheses) that can be used for
+shorthand.
 
-  revtool -g [files]        Retrieves one or more files or modules
+  revtool -g   (mzget)      Retrieves one or more files or modules
                             from the master repository.  Does a CVS
                             checkout or update.  Like a "pull" in bk.
 
-  revtool -p                Uploads changes to the master repository.
+  revtool -p   (mzput)      Uploads changes to the master repository.
                             A commit in CVS, or a commit and push in
                             bk.  'p' is for "put," like 'g' for "get."
 
-  revtool -a                Mark new files for addition to the
+  revtool -a   (mzadd)      Mark new files for addition to the
                             repository.  "add" in cvs, "new" in bk.
 
-  revtool -r                Mark files for removal from the
+  revtool -r   (mzrm)       Mark files for removal from the
                             repository.  "rm -f" in cvs, either "rm"
                             or "gone" in bk.
 
@@ -42,20 +44,27 @@ There's more, but that's the basic idea.  The cool stuff:  a put will
 actually generate a ChangeLog header for you and open your editor
 automatically.  It'll even create the ChangeLog if it isn't there, and
 add it too.  Also, you can do an add or a remove and immediately
-commit it using -ap or -rp.  (Short options can be combined like that
-if they don't take a value.)
+commit it using -a -p or -r -p.  (Note that "revtool -a -p" is
+equivalent to "mzput -a", as is "revtool -r -p" to "mzput -r".)
+
+In practice, programmers being as lazy as they are, aliases like
+"mzget" and "mzput" are almost always used instead of calling revtool
+directly.
+
 
 2.  BUILDTOOL
 -------------
 
-buildtool is the primary interface to the build system for the average
-user.  It is designed to use product manifest files (prod files) to
+buildtool (a.k.a., mzprodbuild) is the overseer of the entire build
+process.  It is designed to use product manifest files (prod files) to
 define what pieces make up a particular product.
 
 A product is composed of packages and (possibly) other products.  A
-package is either an SRPM or a CVS module.  buildtool parses the prod
-file for the product name you give it, as well as the prod files of
-any products which may be components of that primary product.
+package is either a source package that will be rebuilt, a source
+package with corresponding binary packages, a single binary package,
+or a CVS module.  buildtool parses the prod file for the product name
+you give it; if necessary, it will also look for and parse prod files
+of any sub-products defined by the top-level product.
 
 For example:
 
@@ -82,53 +91,26 @@ file per version is wise.
 
 After the name and version are established, the components of that
 product (in this case, "foo-1.0") are defined.  You've got a CVS
-module called "vacm" which should be retrieved using the
-"VACM-2-0-0-BETA" tag.  You have another module called "Eterm" whose
-head branch should be used.  You have an SRPM of imlib on the head
-branch of the contrib-rh module, and an epplets SRPM on the "VA-6-2-1"
-branch.  (tag= and rev= are synonyms.)  Finally, you have a child
-product called "bar" at version 1.0; its prod file will be parsed and
-included in the build process.
+module called "vacm" which should be retrieved using the "VACM-2-0-0"
+tag.  You have another module called "Eterm" whose head branch should
+be used.  You have an SRPM of imlib on the head branch of the
+contrib-rh module, and an epplets SRPM on the "VA-6-2-1" branch.
+(tag= and rev= are synonyms.)  Finally, you have a child product
+called "bar" at version 1.0; its prod file will be parsed, and all its
+component packages and sub-products will be included in the build
+process.
 
-Once all product files are parsed, the build process begins.  This
-process has 7 stages, and buildtool will let you stop at any stage.
-It also tries to avoid doing unnecessary work, so if it detects that a
-particular stage has already been completed (it doesn't care *who*
-completed it, as long as it seems to be done), it will not perform any
-actions for that stage.
-
-First is the bootstrap stage.  Several things can happen here if they
-haven't already been done.  First off, $BUILD_DIR ($BASE_DIR/build by
-default) is created if it doesn't already exist, as are the BUILD,
-SOURCES, SRPMS, RPMS, and SPECS subdirectories for building SRPM's.
-The bootstrap stage also takes care of checking out the necessary
-modules if they are not already present.
-
-The next stage is the compose stage.  Nothing is done here for SRPM's,
-because this is where SRPM's are built from the modules.  There should
-be exactly one directory (other than "CVS" or "SCCS" or "BitKeeper")
-inside the module, and that directory should contain an untarred copy
-of the pristine vendor source.  buildtool will tar it up (ignoring the
-aforementioned revision control directories) and use that tarball in
-combination with a spec file named <package>-<distro>.spec to build an
-SRPM.  The SRPM then ends up in $BUILD_DIR/SRPMS/.
-
-The explode stage takes existing SRPM packages and does "rpm -U" on
-them to "explode" them into their component tarballs, patches, and
-spec files in the appropriate places that rpm expects them to be under
-$BUILD_DIR.  The build stage is where all the packages are rebuilt from their
-exploded components into source and binary RPM's using "rpm -ba".
-Neither of these stages are performed on modules since source and
-binary RPM's have already been built from them.
-
-The package accumulation stage is where all the new source and binary
-RPM's are copied (well, technically hard-linked) into one or more
-"image" trees (directory trees of web sites, storage media, etc.).  At
-this point you have a completed product.
-
-There are two more stages:  the ISO image stage, where ISO images are
-created; and the cleanup stage, where all the intermediate crap
-(namely the build directory and all the checkouts) is removed.  These
-stages usually will not be reached, because most developers will want
-to use -bp (stop after package accumulation stage) instead of -bi
-(after ISO stage) or -ba (don't stop) for diagnostic purposes.
+Once all product files are parsed, the product is described by a set
+of packages.  Now the build process begins.  This process is most
+often run parallelized (using the -P option), but it may be run
+serially as well.  Regardless of which type of build (serial or
+parallel) is used, each package is built using the
+build_single_package() function in buildtool.  This routine is
+deceptively simple, as most of the actual build mojo happens inside
+encapsulated package routines in the various Perl modules.
+Nevertheless, it's important to understand that buildtool views all
+packages, regardless of type, in a uniform manner.  Think of buildtool
+as the conductor of the package symphony; its job is to make sure each
+individual musician does its part so that the whole end result is
+good.  If any portions of the "symphony" fail, buildtool points the
+blame and tries to denote what went wrong.
