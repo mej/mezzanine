@@ -841,3 +841,7 @@ buildtool now supports a TAGFILE variable to specify an alternative
 tagfile.  I also tweaked some old code I'd forgotten I had which will
 hopefully work to handle RPM macros.
 ----------------------------------------------------------------------
+Wed Sep 27 15:10:10 2000                        Michael Jennings (mej)
+
+More contributions from Chip Salzenberg <chip@valinux.com>
+----------------------------------------------------------------------
