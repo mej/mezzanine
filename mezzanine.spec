@@ -1,6 +1,6 @@
 %define name     avalon
 %define ver      2.0
-%define rel      4
+%define rel      5
 %define prefix   /usr
 
 Summary: Avalon -- The VA Software Engineering Build System
@@ -69,7 +69,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-, root, root)
-%doc README ChangeLog doc/*.txt
+%doc README ChangeLog doc/*.txt doc/Makefile.avalon.sample
 %{_bindir}/*
 %{_libdir}/*
 %{_mandir}/*

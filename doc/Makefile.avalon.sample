@@ -1,0 +1,25 @@
+##########################################################################
+# This is the sample Makefile.avalon.  
+# 
+# Avalon passes several Make enviroment variables.  They are listed in
+# the debug target below.
+#
+# $Id: Makefile.avalon.sample,v 1.1 2001/06/08 21:06:46 drummond Exp $
+##########################################################################
+
+default: #debug
+	make rpm	# Call the original Makefile to produce RPMS & SRPMS
+	# Then copy the RPMS & SRPMS to ${RPM_DIR}
+	if [ ! -d ${RPM_DIR} ]; then \ 
+	   mkdir ${RPM_DIR} ;\
+	fi
+	cp path/to/src.rpm ${RPM_DIR}
+	cp path/to/binary.*.rpm ${RPM_DIR}
+
+
+debug:	   # This is a debug target
+	@echo "BASE_DIR = ${BASE_DIR}"
+	@echo "BUILD_DIR = ${BUILD_DIR}"
+	@echo "BUILD_ROOT = ${BUILD_ROOT}"
+	@echo "RPMRC = ${RPMRC}"
+	@echo "RPM_DIR = ${RPM_DIR}"

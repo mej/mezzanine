@@ -1241,3 +1241,8 @@ Tue May 29 12:23:32 2001                        Michael Jennings (mej)
 
 Minor fixes.
 ----------------------------------------------------------------------
+Fri Jun  8 14:05:57 2001                      Walt Drummond (drummond)
+Added sample Makefile.avalon and update buildtool manpage to reference
+it.
+
+----------------------------------------------------------------------
