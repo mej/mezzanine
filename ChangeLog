@@ -95,3 +95,9 @@ Wed May 10 21:09:43 2000                        Michael Jennings (mej)
 Fixed a tiny bug in revtool that kept the new product file from being
 added properly.  Doh!
 ----------------------------------------------------------------------
+Thu May 11 14:57:56 2000                              Craig Ross (ccr)
+
+Commented out packages in va-6.2.1.prod that were removed from
+contrib-rh
+ 
+----------------------------------------------------------------------
