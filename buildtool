@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.65 2000/06/16 19:00:35 mej Exp $
+# $Id: buildtool,v 1.66 2000/06/16 20:07:34 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1499,7 +1499,7 @@ do_package_stage
                 closedir(DIR);
 
                 dprint "Opening directory $builddir/RPMS to scan for output files.\n";
-                @contents = glob("$builddir/RPMS/*/*-$version-$release.*.rpm");
+                @contents = glob("$builddir/RPMS/*/*.rpm");
                 foreach $rpm (@contents) {
                     my $srpm;
 
@@ -1772,8 +1772,6 @@ build_process
     &do_iso_stage() if ("scexbpi" =~ /$start_stage/);
     return if ($end_stage eq "i");
 
-    return;  # This is only temporary.  I'm trying to fix a bug.
-
     &do_cleanup_stage();
 }
 
@@ -1797,7 +1795,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.65 $ created on $Date: 2000/06/16 19:00:35 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.66 $ created on $Date: 2000/06/16 20:07:34 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
