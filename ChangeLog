@@ -195,3 +195,7 @@ Fixed handling of top-level warning/debug messages.
 Updated uptool to do automated version checking using a Perl version
 of my LibAST version comparison function.
 ----------------------------------------------------------------------
+Sat Aug  2 13:10:33 2003                        Michael Jennings (mej)
+
+Fix for newer (RH9) rpm.
+----------------------------------------------------------------------

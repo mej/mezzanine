@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.32 2002/09/22 18:33:52 mej Exp $
+# $Id: srctool,v 1.33 2003/08/02 15:29:35 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -202,7 +202,7 @@ prepare_tree($$)
     }
     print "Creating working directory $pkgdir/$WORK_DIR....\n";
     $rpmcmd = "--define \"_topdir $tmpdir\" --define \"_builddir $pkgdir/$WORK_DIR\" --nodeps -bp $spec";
-    @tmp = &run_cmd("rpm", $rpmcmd, 0);
+    @tmp = &run_cmd("rpmbuild", $rpmcmd, 0);
     if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
         eprint "Creation of working directory failed -- $tmp[$#tmp]\n";
     } elsif ($external) {
@@ -582,7 +582,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.32 $ created on $Date: 2002/09/22 18:33:52 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.33 $ created on $Date: 2003/08/02 15:29:35 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
