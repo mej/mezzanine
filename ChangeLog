@@ -782,3 +782,7 @@ pkgtool now has the ability to query package dependencies.  This is
 required for pkgsort, a new utility I'm working on for the 7.0.1
 project.  It's almost done.
 ----------------------------------------------------------------------
+Wed Sep  6 18:39:00 2000                        Chip Salzenberg (chip)
+
+Debian build directory.
+----------------------------------------------------------------------
