@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.138 2001/05/09 18:06:49 mej Exp $
+# $Id: buildtool,v 1.139 2001/05/09 21:32:05 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1628,7 +1628,7 @@ special_build
         return (AVALON_PACKAGE_FAILED, "Could not chdir into $builddir/$pkgs->{$pkg}{MODULE} -- $!", 0);
     }
 
-    $make = ($pkgs->{$pkg}{MAKE} ? $pkgs->{$pkg}{MAKE} : "make");
+    $make = ($pkgs->{$pkg}{MAKE} ? $pkgs->{$pkg}{MAKE} : "make -f .avalon.makefile");
     $cmd = "$make BASE_DIR=$basedir BUILD_DIR=$builddir BUILD_ROOT=$buildroot RPMRC=$buildroot/$pkg-rpmrc";
 
     dprint "About to run \"$cmd\"\n";
@@ -1790,7 +1790,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.138 $ created on $Date: 2001/05/09 18:06:49 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.139 $ created on $Date: 2001/05/09 21:32:05 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -1219,3 +1219,7 @@ Wed May  9 13:48:03 2001                      Walt Drummond (drummond)
   Partially closed bug #1144
 - Changed the av* hardlinks to symlinks to aid readability
 ----------------------------------------------------------------------
+Wed May  9 14:31:54 2001                        Michael Jennings (mej)
+
+Oops.  Use the right makefile....
+----------------------------------------------------------------------
