@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.46 2000/07/21 19:18:45 mej Exp $
+# $Id: revtool,v 1.47 2000/07/28 18:51:59 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -52,6 +52,7 @@ sub REVTOOL_BAD_REMOVAL()         {42;}
 
 # 61-80 are commit errors
 sub REVTOOL_NEED_UPDATE()         {61;}
+sub REVTOOL_BAD_LOG_ENTRY()       {62;}
 
 # 127 is a catch-all
 sub REVTOOL_UNSPECIFIED_ERROR()   {127;}
@@ -238,6 +239,7 @@ commit_to_master
 {
     my $logfile = "/var/tmp/.cvs.commit.$$";
     my ($cmd, $username, $fullname, $err, $tries, $line, $module);
+    my @stat_info;
     my $cwd = `pwd`;
     my $file_list = join(" ", @_);
 
@@ -273,6 +275,13 @@ commit_to_master
     }        
     print "Please edit your commit message now...\n";
     system($ENV{"EDITOR"} ? $ENV{"EDITOR"} : "vi", $logfile);
+
+    # Abort if the logfile was not modified or is too small.
+    @stat_info = stat($logfile);
+    if ($stat_info[7] <= 72) {
+        print "Commit message was unmodified or is too short.  Aborting commit.\n";
+        return REVTOOL_BAD_LOG_ENTRY;
+    }
     if (! $opt_x) {
         open(LOGFILE, "<$logfile");
         while (<LOGFILE>) {
@@ -1494,7 +1503,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.46 $ created on $Date: 2000/07/21 19:18:45 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.47 $ created on $Date: 2000/07/28 18:51:59 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

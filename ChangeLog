@@ -747,3 +747,7 @@ Fri Jul 28 11:50:43 2000                        Michael Jennings (mej)
 
 Quoting fix for pkgtool.
 ----------------------------------------------------------------------
+Fri Jul 28 11:54:34 2000                        Michael Jennings (mej)
+
+Abort commit if ChangeLog message is too short.
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.20 2000/07/28 18:51:17 mej Exp $
+# $Id: pkgtool,v 1.21 2000/07/28 18:51:59 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -55,6 +55,7 @@ sub REVTOOL_BAD_REMOVAL()         {42;}
 
 # 61-80 are commit errors
 sub REVTOOL_NEED_UPDATE()         {61;}
+sub REVTOOL_BAD_LOG_ENTRY()       {62;}
 
 # 127 is a catch-all
 sub REVTOOL_UNSPECIFIED_ERROR()   {127;}
@@ -1085,7 +1086,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.20 $ created on $Date: 2000/07/28 18:51:17 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.21 $ created on $Date: 2000/07/28 18:51:59 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
