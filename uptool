@@ -1,0 +1,285 @@
+#!/usr/bin/perl -w
+#
+# uptool -- Tool for automating updates from an FTP site
+# 
+# Copyright (C) 2001, Michael Jennings
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies of the Software, its documentation and marketing & publicity
+# materials, and acknowledgment shall be given in the documentation, materials
+# and software packages that this Software was used.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+# $Id: uptool,v 1.1 2001/04/04 09:36:56 mej Exp $
+#
+
+# Include the Perl Modules we need
+use diagnostics;
+require POSIX;
+require Getopt::Long;
+use Net::FTP;
+use Avalon::Util;
+
+# Print usage information
+sub
+print_usage_info
+{
+    print "\n";
+    $leader = "$progname $version Usage Information";
+    $underbar = $leader;
+    $underbar =~ s/./-/g;
+    print "$leader\n$underbar\n";
+    print "\n";
+    print "  Syntax:   uptool [ options ]\n";
+    print "\n";
+    print "    -h --help                        Show this usage information\n";
+    print "    -d --debug                       Turn on debugging\n";
+    print "    -v --version                     Show version and copyright\n";
+    print "\n";
+    exit(AVALON_SUCCESS);
+}
+
+sub
+get_remote_listing($$)
+{
+    my ($session, $path) = @_;
+    my (@flist, @tmp);
+
+    print "Getting directory listing for $path...\n";
+    if (! $session->cwd($path)) {
+        eprint "Path $path does not exist on $host\n";
+        return @flist;
+    }
+    @tmp = $session->dir();
+    foreach my $line (@tmp) {
+        my @fields;
+
+        next if ($line !~ /^[-dl]/);
+        @fields = split(/\s+/, $line);
+        if ($fields[8] =~ $match) {
+            my $fname = $fields[8];
+            my $pkg;
+            my @parts;
+
+            push @flist, $fname;
+            @parts = &parse_rpm_name($fname);
+            $pkg = $parts[0];
+            push @{$rpkgs->{$pkg}{VER}}, $parts[1];
+            push @{$rpkgs->{$pkg}{REL}}, $parts[2];
+            push @{$rpkgs->{$pkg}{ARCH}}, $parts[3];
+            push @{$rpkgs->{$pkg}{FILES}}, $fname;
+        }
+    }
+    return @flist;
+}
+
+sub
+get_local_listing($)
+{
+    my $path = $_[0];
+    my @flist;
+
+    if ($path !~ /^\//) {
+        $path = &getcwd() . $path;
+    }
+    @flist = &grepdir(sub { /$match/ }, $path);
+    foreach my $fname (@flist) {
+        my $pkg;
+        my @parts;
+
+        @parts = &parse_rpm_name($fname);
+        $pkg = $parts[0];
+        push @{$lpkgs->{$pkg}{VER}}, $parts[1];
+        push @{$lpkgs->{$pkg}{REL}}, $parts[2];
+        push @{$lpkgs->{$pkg}{ARCH}}, $parts[3];
+        push @{$lpkgs->{$pkg}{FILES}}, $fname;
+    }
+    return @flist;
+}
+
+sub
+compare_lists()
+{
+    foreach my $pkg (keys $rpkgs) {
+        # Check if we even have that package at all.
+        if (defined($lpkgs->{$pkg})) {
+            # How many files for that package exist remotely?
+            if (scalar(@{$rpkgs->{$pkg}{FILES}}) == 1) {
+                my $rpm = $rpkgs->{$pkg}{FILES}[0];
+
+                # Just one.  Do we have it?
+                if (!grep(/^\Q$rpm\E$/, @{$lpkgs->{$pkg}{FILES}})) {
+                    # Nope, download it
+                    if (! $session->get($rpm)) {
+                        eprint "Unable to download $rpm\n";
+                    } else {
+                        $cmd->{$pkg} = "revtool -a $rpm ; revtool -r " . join(" ", @{$lpkgs->{$pkg}{FILES}});
+                    }
+                } else {
+                    dprint "Found $rpm locally.\n";
+                }
+            } else {
+            }
+        } else {
+            # Nope, download it
+            if (! $session->get($rpm)) {
+                eprint "Unable to download $rpm\n";
+            } else {
+                $cmd->{$pkg} = "revtool -a $rpm";
+            }
+        }
+    }
+}
+
+# Driver function
+sub
+fetch_updates($)
+{
+    my $url = $_[0];
+    my $session;
+    my ($proto, $host, $port, $userid, $passwd, $path);
+
+    # Set defaults for stuff.
+    ($port, $userid, $passwd) = ("21", "anonymous", "info\@valinux.com");
+    undef ($rpkgs, $lpkgs);
+
+    ### Parse the URL into its components.
+
+    # Get rid of the ftp:// part first
+    if ($url =~ m!://!) {
+        $url =~ s!^([^:]+)://!!;
+        $proto = $1;
+    }
+    # Now get everything up to that first /
+    $url =~ s!^([^/]+)/!/!;
+    $host = $1;
+    # What's left over is the path
+    $path = $url;
+    # Now split the userid, passwd, and port off of $host if needed.
+    if ($host =~ /^([^@]+)@([^@]+)$/) {
+        ($userid, $host) = ($1, $2);
+    }
+    if ($userid =~ /^([^:]+):(.*)$/) {
+        ($userid, $passwd) = ($1, $2);
+    }
+    if ($host =~ /^(.+):(\d+)$/) {
+        ($host, $port) = ($1, $2);
+    }
+    return 0 if (! $host || ! $path);
+    $path =~ s/\/$//;
+
+    # Start the FTP session
+    print "Opening FTP session to $host:$port...\n";
+    $session = Net::FTP->new($host, Debug => 0, Port => $port) || return 0;
+    for (; 1; ) {
+        print "Trying to login as $userid...\n";
+        if ($session->login($userid, $passwd)) {
+            last;
+        }
+    }
+    $session->binary();
+
+    foreach my $p (keys %dir) {
+        @rpkgs = &get_remote_listing($session, "$path/$p");
+        @lpkgs = &get_local_listing("$path/$dir{$p}");
+        &compare_lists();
+    }
+
+    print "Closing session...\n";
+    $session->quit();
+    return 1;
+}
+
+# main() here is basically the same as main() in C
+sub
+main
+{
+    my $ret = AVALON_SUCCESS;
+
+    # Set up the basic variables
+    $progname = "uptool";
+    $version = "2.0";
+    &print_usage_info() if (!scalar(@ARGV));
+
+    # See the Getopt::Long man page for details on the syntax of this line
+    @valid_opts = ("h|help", "v|version", "d|debug", "D|dir=s@", "m|match|regex=s");
+    Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
+    Getopt::Long::GetOptions(@valid_opts);
+
+    # Post-parse the options stuff
+    select STDOUT; $| = 1;
+    if ($opt_v) {
+        # Do not edit this variable.  It is updated automatically by CVS when you commit
+        my $rcs_info = 'CVS Revision $Revision: 1.1 $ created on $Date: 2001/04/04 09:36:56 $ by $Author: mej $ ';
+
+        $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
+        $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
+        $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
+        print "\n";
+	print "$progname $version by Michael Jennings <mej\@eterm.org>\n";
+        print "Copyright (c) 2001, Michael Jennings and VA Linux Systems, Inc.\n";
+        print "  ($rcs_info)\n";
+        print "\n";
+	return AVALON_SUCCESS;
+    } elsif ($opt_h) {
+	&print_usage_info();   # Never returns
+    }
+
+    &debug_set($opt_d);
+    if (scalar(@opt_D)) {
+        foreach my $tmp (@opt_D) {
+            my ($arch, $dir) = split(":", $tmp, 2);
+
+            if ($dir !~ /^\//) {
+                $dir = &getcwd() . $dir;
+            }
+            dprint "Architecture $arch mapped to $dir\n";
+            $dir{$arch} = $dir;
+        }
+    } else {
+        dprint "No architecture mapping requested.\n";
+        $dir{"."} = ".";
+    }
+    if ($opt_m) {
+        $match = $opt_m;
+    } else {
+        $match = "\\.rpm\$";
+    }
+    dprint "Files must match $match\n";
+
+    # Signal handling
+    $SIG{HUP} = 'IGNORE';
+    $SIG{INT} = \&handle_signal;
+    $SIG{TERM} = \&handle_signal;
+    $SIG{QUIT} = \&handle_fatal_signal;
+    $SIG{ILL} = \&handle_fatal_signal;
+    $SIG{ABRT} = \&handle_fatal_signal;
+    $SIG{FPE} = \&handle_fatal_signal;
+    $SIG{SEGV} = \&handle_fatal_signal;
+    $SIG{BUS} = \&handle_fatal_signal;
+    $SIG{TSTP} = \&handle_fatal_signal;
+    $SIG{TTIN} = \&handle_fatal_signal;
+    $SIG{TTOU} = \&handle_fatal_signal;
+
+    foreach my $url (@ARGV) {
+        if (!&fetch_updates($url)) {
+            $ret++;
+        }
+    }
+    return $ret;
+}
+
+exit &main();

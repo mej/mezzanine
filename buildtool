@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.129 2001/04/04 02:15:40 mej Exp $
+# $Id: buildtool,v 1.130 2001/04/04 09:36:56 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -538,9 +538,6 @@ parse_product_entry
             }
         }
     }
-    if ($type_guess) {
-        nprint "$progname:  Note:  Since you didn't specify, I have guessed that \"$name\" is a $type.\n";
-    }
     if ($name =~ /\/.+$/) {
 	# If the name contains a / and at least *something* after it, split out the module name
 	# (the part before the /) and the actual package name (the part after the /).  Otherwise,
@@ -640,6 +637,7 @@ parse_product_entry
     # Check for duplicate packages.
     if (grep($_ eq $name, @packages)) {
         if ($type eq "rpm" && ($pkgs->{$name}{TYPE} eq "srpm" || $pkgs->{$name}{TYPE} eq "tar")) {
+            dprint "Adding $module/$filename as a binary package for $name\n";
             push(@{$pkgs->{$name}{BINS}}, "$module/$filename");
             $pkgs->{$name}{STAGES} =~ s/c//;
         } else {
@@ -1736,7 +1734,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.129 $ created on $Date: 2001/04/04 02:15:40 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.130 $ created on $Date: 2001/04/04 09:36:56 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

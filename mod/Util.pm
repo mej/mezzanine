@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.3 2001/04/02 07:53:39 mej Exp $
+# $Id: Util.pm,v 1.4 2001/04/04 09:36:56 mej Exp $
 #
 
 package Avalon::Util;
@@ -40,9 +40,10 @@ BEGIN {
                     '&debug_get', '&debug_set',
 		    '&get_timestamp', '&fatal_error', '&dprintf', '&dprint', '&eprintf', '&eprint',
 		    '&handle_signal', '&handle_fatal_signal', '&handle_warning',
-		    '&mkdirhier', '&nuke_tree', '&move_file', '&getcwd', '&basename', '&dirname', '&grepdir',
+		    '&mkdirhier', '&nuke_tree', '&move_files', '&getcwd', '&basename', '&dirname', '&grepdir',
 		    '&xpush',
 		    '&cat_file',
+                    '&parse_rpm_name',
 
 		    '&AVALON_SUCCESS', '&AVALON_FATAL_ERROR', '&AVALON_SYNTAX_ERROR', '&AVALON_SYSTEM_ERROR',
 		    '&AVALON_COMMAND_FAILED', '&AVALON_FILE_NOT_FOUND', '&AVALON_FILE_OP_FAILED',
@@ -89,6 +90,7 @@ sub dirname($);
 sub grepdir(& $);
 sub xpush(\@; @);
 sub cat_file($);
+sub parse_rpm_name($);
 
 ### Module cleanup
 END {
@@ -399,6 +401,16 @@ cat_file($)
         $contents .= $_;
     }
     return $contents;
+}
+
+# Parse an RPM name into its components
+sub
+parse_rpm_name($)
+{
+    my $rpm = $_[0];
+
+    $rpm =~ m/^(\S+)-([^-]+)-([^-]+)\.([^\.]+)\.rpm$/;
+    return ($1, $2, $3, $4);
 }
 
 1;
