@@ -851,3 +851,7 @@ New dependency sort algorithm for pkgsort.  I won't be able to test it
 tonight due to the kernel builds and such, so who knows if it works or
 not.  :-)
 ----------------------------------------------------------------------
+Thu Sep 28 16:02:12 2000                        Michael Jennings (mej)
+
+Fixes to cdtool.  This one works.
+----------------------------------------------------------------------

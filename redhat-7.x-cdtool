@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 21 July 2000
 #
-# $Id: redhat-7.x-cdtool,v 1.2 2000/09/25 18:22:43 mej Exp $
+# $Id: redhat-7.x-cdtool,v 1.3 2000/09/28 22:43:44 mej Exp $
 #
 
 trap 'exit -1' 1 2 15
@@ -40,7 +40,6 @@ rm $NET.new/.disc*
 # Generate the hdlist for network-based installs
 cd $NET.new
 $RH_PKGLIST_GOOP `pwd`
-cp -a RedHat/base/hdlist RedHat/base/hdlist.net
 
 # Update the install image, boot images, etc. with the new kernel
 $RH_KERNEL_GOOP `pwd`
@@ -75,6 +74,6 @@ done
 
 # Regenerate the package list ($CD1/RedHat/base/hdlist) from $CD1/RedHat/base/comps
 cd $BUILD_DIR
-$RH_PKGLIST_GOOP $BUILD_DIR/$CD1 $BUILD_DIR/$CD2
+$RH_PKGLIST_GOOP --withnumbers $BUILD_DIR/$CD1 $BUILD_DIR/$CD2
 
 echo "Don't forget to commit using revtool -xp"
