@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: uptool,v 1.2 2001/04/05 01:35:27 mej Exp $
+# $Id: uptool,v 1.3 2001/04/05 04:07:58 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -62,7 +62,7 @@ get_remote_listing($$)
 
     print "Getting directory listing for $path...\n";
     if (! $session->cwd($path)) {
-        eprint "Path $path does not exist on $host\n";
+        eprint "Path $path does not exist on remote host.\n";
         return @flist;
     }
     @tmp = $session->dir();
@@ -97,6 +97,7 @@ get_local_listing($)
     if ($path !~ /^\//) {
         $path = &getcwd() . $path;
     }
+    dprint "Looking for files matching $match in $path\n";
     @flist = &grepdir(sub { /$match/ }, $path);
     foreach my $fname (@flist) {
         my $pkg;
@@ -124,29 +125,32 @@ compare_packages()
 }
 
 sub
-compare_lists()
+compare_lists($)
 {
-    foreach my $pkg (keys $rpkgs) {
-        # Check if we even have that package at all.
-        if (defined($lpkgs->{$pkg})) {
-            my @remote_list = @{$rpkgs->{$pkg}{FILES}};
-            my ($i, $rpm);
+    my ($session, $dest) = @_;
 
-            # Find the most recent version of that package on the remote site.
-            $rpm = $remote_list[0];
-            for ($i = 1; $i < scalar(@remote_list); $i++) {
-                if (&compare_packages($rpm, $remote_list[$i])) {
-                    $rpm = $remote_list[$i];
-                }
-            }
+    foreach my $pkg (keys %{$rpkgs}) {
+        my @remote_list = @{$rpkgs->{$pkg}{FILES}};
+        my ($rpm, $i);
 
-            # If we have it, continue.
-            if (grep(/^\Q$rpm\E$/, @{$lpkgs->{$pkg}{FILES}})) {
-                next;
+        print "Checking $pkg...\n";
+
+        # Find the most recent version of that package on the remote site.
+        $rpm = $remote_list[0];
+        for ($i = 1; $i < scalar(@remote_list); $i++) {
+            if (&compare_packages($rpm, $remote_list[$i])) {
+                $rpm = $remote_list[$i];
             }
         }
+
+        # If we have it, continue.
+        if (defined($lpkgs->{$pkg}) && grep(/^\Q$rpm\E$/, @{$lpkgs->{$pkg}{FILES}})) {
+            next;
+        }
+
         # We don't have it, so get it.
-        if (! $session->get($rpm)) {
+        print "Downloading $rpm...\n";
+        if (! $session->get($rpm, "$dest/$rpm")) {
             eprint "Unable to download $rpm\n";
         } else {
             $cmd{$pkg} = "revtool -a $rpm";
@@ -213,12 +217,29 @@ fetch_updates($)
         }
     }
     $session->binary();
+    if ($hash) {
+        my $bytes;
+
+        if ($hash =~ /^(\d+)m$/i) {
+            $bytes = $1 * 1024 * 1024;
+        } elsif ($hash =~ /^(\d+)k$/i) {
+            $bytes = $1 * 1024;
+        } else {
+            $bytes = $hash;
+        }
+        dprint "Printing hash marks every $bytes bytes.\n";
+        $session->hash(\*STDOUT, $bytes);
+    }
 
     foreach my $p (keys %dir) {
         @rpkgs = &get_remote_listing($session, "$path/$p");
-        @lpkgs = &get_local_listing("$path/$dir{$p}");
-        &compare_lists();
-        &show_cmds();
+        if (scalar(@rpkgs)) {
+            @lpkgs = &get_local_listing($dir{$p});
+            &compare_lists($session, $dir{$p});
+        }
+        if (defined(%cmd)) {
+            &show_cmds();
+        }
     }
 
     print "Closing session...\n";
@@ -238,7 +259,7 @@ main
     &print_usage_info() if (!scalar(@ARGV));
 
     # See the Getopt::Long man page for details on the syntax of this line
-    @valid_opts = ("h|help", "v|version", "d|debug", "D|dir=s@", "m|match|regexp=s");
+    @valid_opts = ("h|help", "v|version", "d|debug", "D|dir=s@", "m|match|regexp=s", "H|hash:s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -246,7 +267,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.2 $ created on $Date: 2001/04/05 01:35:27 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.3 $ created on $Date: 2001/04/05 04:07:58 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -262,12 +283,13 @@ main
     }
 
     &debug_set($opt_d);
+    $hash = $opt_H;
     if (scalar(@opt_D)) {
         foreach my $tmp (@opt_D) {
             my ($arch, $dir) = split(":", $tmp, 2);
 
             if ($dir !~ /^\//) {
-                $dir = &getcwd() . $dir;
+                $dir = &getcwd() . "/" . $dir;
             }
             dprint "Architecture $arch mapped to $dir\n";
             $dir{$arch} = $dir;
