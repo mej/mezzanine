@@ -1365,3 +1365,7 @@ Mon Aug 13 17:25:35 2001                        Michael Jennings (mej)
 
 Finalized the 0.8 version by making sure pkgtool groks "avbuild."
 ----------------------------------------------------------------------
+Tue Aug 14 12:35:10 2001                        Michael Jennings (mej)
+
+Getting pkgtool into full working order.  Next is srctool....
+----------------------------------------------------------------------

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.4 2001/08/03 03:08:07 mej Exp $
+# $Id: RPM.pm,v 1.5 2001/08/14 19:32:33 mej Exp $
 #
 
 package Avalon::RPM;
@@ -123,9 +123,11 @@ rpm_show_contents
     my @results;
     local *RPM;
 
+    dprint &print_args(@_);
+
     $rpm = ($pkg_prog ? $pkg_prog : "rpm");
     $rc = ($rcfile ? "--rcfile '/usr/lib/rpm/rpmrc:$rcfile'" : "");
-    $cmd = "$rpm $rc -ql " . ($pkg_file ? "-p $pkg_file" : "");
+    $cmd = "$rpm $rc -qlv " . ($pkg_file ? "-p $pkg_file" : "");
     if (!open(RPM, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.13 2001/08/14 00:00:24 mej Exp $
+# $Id: Pkg.pm,v 1.14 2001/08/14 19:32:33 mej Exp $
 #
 
 package Avalon::Pkg;
@@ -37,7 +37,7 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('$specdata', '&get_package_path', '&parse_spec_file', '&parse_srcs_file', '&fetch_package');
+    @EXPORT      = ('$specdata', '&get_package_path', '&parse_spec_file', '&fetch_package', '&identify_package');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -55,8 +55,8 @@ $specdata = 0;
 ### Function prototypes
 sub get_package_path($$);
 sub parse_spec_file($$);
-sub parse_srcs_file($);
 sub fetch_package($$$$$);
+sub identify_package($);
 
 # Private functions
 sub add_define($$);
@@ -193,38 +193,6 @@ parse_spec_file($$)
     return $specdata;
 }
 
-# Parse the avalon.srcs file inside a module.
-sub
-parse_srcs_file($)
-{
-    my $filename = $_[0];
-    my $srcs;
-    local *SRCSFILE;
-
-    # Read the entire file into a string, converting newlines to commas.
-    open(SRCSFILE, $filename) || return undef;
-    $srcs = join(',', <SRCSFILE>);
-    close(SRCSFILE);
-
-    dprint "Pre-parse SRCS variable:  $srcs\n";
-
-    # Eliminate whitespace around colons and commas, and condense duplicates
-    $srcs =~ s/\s*:+\s*/:/g;
-    $srcs =~ s/\s*,+\s*/,/g;
-
-    # Eliminate leading and trailing whitespace
-    $srcs =~ s/^\s*//;
-    $srcs =~ s/\s*$//;
-
-    # All remaining whitespace should separate source files/directories, so
-    # replace it all with ampersands
-    $srcs =~ s/\s+/&/g;
-
-    dprint "Post-parse SRCS variable:  $srcs\n";
-
-    return split(',', $srcs);
-}
-
 # Use revtool to download a package from the master repository
 sub
 fetch_package
@@ -260,6 +228,24 @@ fetch_package
         return ($err, "");
     }
     return (AVALON_BAD_LOGIN, "Login failure");
+}
+
+# Figure out the type of a particular package file
+sub
+identify_package
+{
+    my $pkg_file = shift;
+    my $type = "";
+
+    if (substr($pkg_file, -4, 4) eq ".rpm") {
+        $type = "rpm";
+    } elsif (substr($pkg_file, -4, 4) eq ".deb") {
+        $type = "deb";
+    } elsif ($pkg_file =~ /\.(tar\.|t)?(gz|bz|bz2|Z)$/) {
+        $type = "tar";
+    }
+    dprint "Identified $pkg_file as $type\n";
+    return $type;
 }
 
 ### Private functions

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.13 2001/08/14 00:00:24 mej Exp $
+# $Id: Build.pm,v 1.14 2001/08/14 19:32:33 mej Exp $
 #
 
 package Avalon::Build;
@@ -43,7 +43,7 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('&count_cpus', '&prepare_build_tree', '&get_source_list', '&create_source_file', '&create_source_files', '&cleanup_build_tree', '&build_rpms_from_tarball', '&build_debs_from_tarball', '&build_rpms_from_topdir', '&build_debs_from_topdir', '&build_topdir', '&build_spm', '&build_cfst', '&build_fst', '&build_srpm', '&build_tarball', '&build_package');
+    @EXPORT      = ('&set_pkg_name', '&set_topdir', '&set_buildroot', '&count_cpus', '&prepare_build_tree', '&get_source_list', '&create_source_file', '&create_source_files', '&cleanup_build_tree', '&build_rpms_from_tarball', '&build_debs_from_tarball', '&build_rpms_from_topdir', '&build_debs_from_topdir', '&build_topdir', '&build_spm', '&build_cfst', '&build_fst', '&build_srpm', '&build_tarball', '&build_package');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -52,14 +52,21 @@ BEGIN {
 use vars ('@EXPORT_OK');
 
 ### Private global variables
+@my_dirs = ();
+$topdir = "";
+$buildroot = "";
+$pkg_name = "";
 
 ### Initialize exported package variables
 
 ### Initialize private global variables
 
 ### Function prototypes
+sub set_pkg_name($);
+sub set_topdir($);
+sub set_buildroot($);
 sub count_cpus();
-sub prepare_build_tree(\$\$\$);
+sub prepare_build_tree($$$);
 sub get_source_list($$$$);
 sub create_source_file($$$$$);
 sub create_source_files($$$\@);
@@ -86,6 +93,39 @@ END {
 
 # Count CPU's for purposes of parallelization
 sub
+set_pkg_name
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        $pkg_name = ($param ?  $param : "");
+    }
+    return $pkg_name;
+}
+
+sub
+set_topdir
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        $topdir = ($param ? $param : "");
+    }
+    return $topdir;
+}
+
+sub
+set_buildroot
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        $buildroot = ($param ? $param : "");
+    }
+    return $buildroot;
+}
+
+sub
 count_cpus
 {
     my $cpus;
@@ -103,7 +143,7 @@ count_cpus
 
 # Create the RPM build directories, the buildroot, and the RPM config files
 sub
-prepare_build_tree(\$\$\$)
+prepare_build_tree
 {
     my ($name, $topdir, $buildroot) = @_;
     my ($rpmmacros, $rpmrc);
@@ -122,12 +162,16 @@ prepare_build_tree(\$\$\$)
         $buildroot = "/var/tmp/avalon-buildroot.$$/$name";
     }
     dprint "$name | $topdir | $buildroot\n";
+    &set_pkg_name($name);
+    &set_topdir($topdir);
+    &set_buildroot($buildroot);
 
     # If the topdir doesn't exist, create it.
     if (! -d "$topdir") {
         if (!mkdir("$topdir", 0755)) {
             &fatal_error("Cannot create $topdir -- $!\n");
         }
+        xpush @my_dirs, $topdir;
     }
 
     # Create the RPM directories also.  Same deal as above.
@@ -138,6 +182,7 @@ prepare_build_tree(\$\$\$)
                 &nuke_tree("$topdir/$dir");
             }
             mkdir("$topdir/$dir", 0755) || &fatal_error("Cannot create $topdir/$dir -- $!\n");
+            xpush @my_dirs, "$topdir/$dir";
         }
     }
 
@@ -146,6 +191,8 @@ prepare_build_tree(\$\$\$)
         &nuke_tree($buildroot);
     }
     mkdir($buildroot, 0775);
+    xpush @my_dirs, $buildroot;
+    dprint "I created:  ", join(" ", @my_dirs), "\n";
 
     return ($name, $topdir, $buildroot);
 
@@ -286,8 +333,11 @@ create_source_files($ $ $ \@)
 sub
 cleanup_build_tree
 {
-    my ($topdir, $buildroot, $type) = @_;
+    my $type = $_[0];
     my @dirs;
+
+    dprint "$topdir | $buildroot | $type\n";
+    dprint "Only allowing cleaning in:  ", join(" ", @my_dirs), "\n";
 
     if ($type =~ /no(ne)?/i) {
         return;
@@ -310,7 +360,17 @@ cleanup_build_tree
     }
     if (scalar(@dirs)) {
         foreach my $f (@dirs) {
-            &nuke_tree($f) if (-e $f);
+            dprint "Cleaning $f?\n";
+            if (! -e $f) {
+                dprint "No; it no longer exists.\n";
+                next;
+            }
+            if (!scalar(grep(($_ eq $f), @my_dirs))) {
+                dprint "No; I did not create it.\n";
+                next;
+            }
+            dprint "Yes.\n";
+            &nuke_tree($f);
         }
     }
 }
@@ -319,7 +379,7 @@ cleanup_build_tree
 sub
 build_rpms_from_tarball
 {
-    my ($tarball, $topdir, $buildroot) = @_;
+    my ($tarball) = @_;
     my $cmd;
 
     $cmd = "/bin/rpm --define '_topdir $topdir' --define 'optflags $ENV{CFLAGS}'";
@@ -334,7 +394,7 @@ build_rpms_from_tarball
 sub
 build_debs_from_tarball
 {
-    my ($script_dir, $topdir, $buildroot) = @_;
+    my ($script_dir) = @_;
     my $cmd;
 
     # Goop goes here.
@@ -345,7 +405,7 @@ build_debs_from_tarball
 sub
 build_rpms_from_topdir
 {
-    my ($specfile, $topdir, $buildroot) = @_;
+    my ($specfile) = @_;
     my $cmd;
 
     $cmd = "/bin/rpm --define '_topdir $topdir' --define 'optflags $ENV{CFLAGS}'";
@@ -360,7 +420,7 @@ build_rpms_from_topdir
 sub
 build_debs_from_topdir
 {
-    my ($script_dir, $topdir, $buildroot) = @_;
+    my ($script_dir) = @_;
     my $cmd;
 
     # Goop goes here.
@@ -372,22 +432,22 @@ build_debs_from_topdir
 sub
 build_topdir
 {
-    my ($specfile, $topdir, $buildroot, $target_format) = @_;
+    my ($specfile, $target_format) = @_;
 
     dprint &print_args(@_);
 
     if ($target_format eq "rpms") {
-        return &build_rpms_from_topdir($specfile, $topdir, $buildroot);
+        return &build_rpms_from_topdir($specfile);
     } elsif ($target_format eq "debs") {
-        return &build_debs_from_topdir($specfile, $topdir, $buildroot);
+        return &build_debs_from_topdir($specfile);
     } else {
         my ($err, $msg, $outfiles);
 
-        ($err, $msg, $outfiles) = &build_rpms_from_topdir($specfile, $topdir, $buildroot);
+        ($err, $msg, $outfiles) = &build_rpms_from_topdir($specfile);
         if ($err) {
             return ($err, $msg, $outfiles);
         }
-        return &build_debs_from_topdir($specfile, $topdir, $buildroot);
+        return &build_debs_from_topdir($specfile);
     }
 }
 
@@ -397,7 +457,7 @@ build_topdir
 sub
 build_spm
 {
-    my ($pkg, $topdir, $buildroot, $target_format) = @_;
+    my ($pkg, $td, $br, $target_format) = @_;
     my $specfile;
     my (@tmp, @tmp2);
 
@@ -407,7 +467,7 @@ build_spm
         &show_backtrace();
         &fatal_error("Call to build_spm() in non-SPM module.\n");
     }
-    &prepare_build_tree($pkg, $topdir, $buildroot);
+    &prepare_build_tree($pkg, $td, $br);
 
     @tmp = &grepdir(sub {-f $_ && -s _}, "F");
     if (!scalar(@tmp)) {
@@ -428,7 +488,7 @@ build_spm
         &copy_files(@tmp, "$topdir/SOURCES");
     }
 
-    return &build_topdir($specfile, $topdir, $buildroot, $target_format);
+    return &build_topdir($specfile, $target_format);
 }
 
 # This function handles the "special case" FST's which have their very own
@@ -436,7 +496,7 @@ build_spm
 sub
 build_cfst
 {
-    my ($pkg, $topdir, $buildroot, $target_format) = @_;
+    my ($pkg, $td, $br, $target_format) = @_;
     my ($err, $msg, $cmd, $make, $pkgdir, $outfiles);
     local *MAKE;
 
@@ -446,7 +506,7 @@ build_cfst
         &show_backtrace();
         &fatal_error("Call to build_cfst() in non-CFST module.\n");
     }
-    &prepare_build_tree($pkg, $topdir, $buildroot);
+    &prepare_build_tree($pkg, $td, $br);
 
     $pkgdir = "$topdir/RPMS";
     $make = "make -f Makefile.avalon";
@@ -495,7 +555,7 @@ build_cfst
 sub
 build_fst
 {
-    my ($pkg, $topdir, $buildroot, $target_format) = @_;
+    my ($pkg, $td, $br, $target_format) = @_;
     my ($specfile, $cmd, $ret);
     my (@srcs, @tmp);
 
@@ -515,7 +575,7 @@ build_fst
         return (AVALON_MISSING_FILES, "I'm sorry, but \"$pkg\" doesn't seem to have instructions for building $target_format", undef);
     }
 
-    &prepare_build_tree($pkg, $topdir, $buildroot);
+    &prepare_build_tree($pkg, $td, $br);
     $specfile = $tmp[0];
     if (! &copy($specfile, "$topdir/SPECS/")) {
         return (AVALON_SYSTEM_ERROR, "Unable to copy $specfile to $topdir/SPECS/ -- $!\n", undef);
@@ -529,7 +589,7 @@ build_fst
         return ($ret, "Creation of source files failed", undef);
     }
 
-    return &build_topdir($specfile, $topdir, $buildroot, $target_format);
+    return &build_topdir($specfile, $target_format);
 }
 
 # Source RPM's can be rebuilt with this function.  build_package() usually handles the
@@ -538,13 +598,13 @@ build_fst
 sub
 build_srpm
 {
-    my ($pkg, $topdir, $buildroot, $target_format) = @_;
+    my ($pkg, $td, $br, $target_format) = @_;
     my $err;
     my (@tmp, @specs);
 
     dprint &print_args(@_);
 
-    &prepare_build_tree($pkg, $topdir, $buildroot);
+    &prepare_build_tree($pkg, $td, $br);
     @tmp = &rpm_show_contents($pkg);
     if (($err = shift @tmp) != AVALON_SUCCESS) {
         return (AVALON_NO_SOURCES, "Unable to examine the contents of $pkg ($err)", undef);
@@ -564,7 +624,7 @@ build_srpm
     if (scalar(@specs) != 1) {
         return (AVALON_NO_SOURCES, "Found ${\(scalar(@specs))} spec files in $pkg?!", undef);
     }
-    return &build_topdir("$topdir/SPECS/$specs[0]", $topdir, $buildroot, $target_format);
+    return &build_topdir("$topdir/SPECS/$specs[0]", $target_format);
 }
 
 # Plain old tarballs can be rebuilt into packages using this function, as long as they
@@ -572,15 +632,16 @@ build_srpm
 sub
 build_tarball
 {
-    my ($pkg, $topdir, $buildroot, $target_format) = @_;
+    my ($pkg, $td, $br, $target_format) = @_;
     my $cmd;
 
     dprint &print_args(@_);
 
+    &prepare_build_tree($pkg, $td, $br);
     if ($target_format eq "rpms") {
-        return &build_rpms_from_tarball($pkg, $topdir, $buildroot);
+        return &build_rpms_from_tarball($pkg);
     } elsif ($target_format eq "debs") {
-        return &build_debs_from_tarball($pkg, $topdir, $buildroot);
+        return &build_debs_from_tarball($pkg);
     }
 }
 
@@ -589,7 +650,7 @@ build_tarball
 sub
 build_package
 {
-    my ($pkg, $topdir, $buildroot, $target_format) = @_;
+    my ($pkg, $td, $br, $target_format) = @_;
     my $pwd;
     my @ret;
 
@@ -613,14 +674,14 @@ build_package
         }
         if (-d "F") {
             # Okay, there's an F/ directory.  I bet it's an SPM.
-            @ret = &build_spm($pkg, $topdir, $buildroot, $target_format);
+            @ret = &build_spm($pkg, $td, $br, $target_format);
         } elsif (-f "Makefile.avalon" && -s _) {
             # There's a custom Makefile.  It's a Custom Full Source Tree (FST).
-            @ret = &build_cfst($pkg, $topdir, $buildroot, $target_format);
+            @ret = &build_cfst($pkg, $td, $br, $target_format);
         } else {
             # If it's not either of the above, it better be a standard Full Source Tree (FST),
             # and it better conform to the proper assumptions or provide other instructions.
-            @ret = &build_fst($pkg, $topdir, $buildroot, $target_format);
+            @ret = &build_fst($pkg, $td, $br, $target_format);
         }
         chdir($pwd);
         return @ret;
@@ -637,9 +698,9 @@ build_package
             }
         }
         if ($pkg =~ /src\.rpm$/) {
-            @ret = &build_srpm($pkg, $topdir, $buildroot, $target_format);
+            @ret = &build_srpm($pkg, $td, $br, $target_format);
         } elsif ($pkg =~ /\.(tar\.|t)(gz|Z|bz2)$/) {
-            @ret = &build_tarball($pkg, $topdir, $buildroot, $target_format);
+            @ret = &build_tarball($pkg, $td, $br, $target_format);
         } elsif ($pkg =~ /\.rpm$/) {
             return (AVALON_NO_SOURCES, "Alright...  Who's the wiseguy that told me to recompile \"$pkg,\" a binary RPM? :-P", undef);
         } else {

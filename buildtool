@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.151 2001/08/02 19:45:17 mej Exp $
+# $Id: buildtool,v 1.152 2001/08/14 19:32:33 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -175,7 +175,7 @@ build_package_forked
                 select LOGFILE; $| = 1;
             }
             $err = &build_single_package($pkg);
-            &cleanup_build_tree(undef, $buildroot, $opt_clean) if ($err == AVALON_SUCCESS);
+            &cleanup_build_tree($opt_clean) if ($err == AVALON_SUCCESS);
             close(LOGFILE) if ($GLOBAL_LOG);
             exit ($err);
         } elsif ($! !~ /No more processes/ && $! !~ /Resource temporarily unavailable/) {
@@ -394,7 +394,7 @@ parallel_build
         }
         # End of loop.  Time to spawn the next child.
     }
-    &cleanup_build_tree($builddir, $buildroot, $opt_clean);
+    &cleanup_build_tree($opt_clean);
     return (scalar(@failed_pkgs) ? AVALON_PACKAGE_FAILED : AVALON_SUCCESS);
 }
 
@@ -419,7 +419,7 @@ build_product
     }
 
     # Now we clean up.
-    &cleanup_build_tree($builddir, undef, $opt_clean);
+    &cleanup_build_tree($opt_clean);
     return (scalar(@failed_pkgs) ? AVALON_PACKAGE_FAILED : AVALON_SUCCESS);
 }
 
@@ -486,7 +486,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.151 $ created on $Date: 2001/08/02 19:45:17 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.152 $ created on $Date: 2001/08/14 19:32:33 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
