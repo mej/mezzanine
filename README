@@ -4,7 +4,7 @@
 #  Written by:  Michael Jennings
 #               Ted T'so
 #
-#  $Id: README,v 1.9 2000/06/26 23:17:35 mej Exp $
+#  $Id: README,v 1.10 2000/06/27 20:13:35 mej Exp $
 #
 ########################################################################
 
@@ -513,6 +513,32 @@ including all files pulled from the repository, all RPM directories
 
 4.  PACKAGE MAINTAINER'S GUIDE
 ------------------------------
+
+The previous sections went over general syntax and operation of the
+build environment and the tools used to interact with it.  This
+section will bring all those concepts together as it takes you through
+the step-by-step maintenance of a sample package.
+
+Let's say you decide to maintain this great new debugging suite called
+Cow.  Version 4.2.8 of Cow has just been released to the public, and
+you feel that it is ready to be included into a product.  So what do
+you do?
+
+4.1.  Adding a New Package
+--------------------------
+
+4.2.  Patches
+-------------
+
+4.3.  Additional Source Files
+-----------------------------
+
+4.4.  Creating a Product File
+-----------------------------
+
+4.5.  Finally, Build That Sucker
+--------------------------------
+
 
 5.  STANDARDS AND CONVENTIONS
 -----------------------------
