@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.69 2000/06/18 00:38:31 mej Exp $
+# $Id: buildtool,v 1.70 2000/06/18 00:50:26 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -423,7 +423,7 @@ setup_macros
         foreach $macro (@macros) {
             my ($name, $expr) = split(/:/, $macro, 2);
 
-            $name =~ s/^\%?\{?(\w+)\}?$/\%\{$1\}/;
+            $name =~ s/^\%?\{?(\w+)\}?$/\%$1/;
             dprint "Macro:  $name -> $expr\n";
             $macros_hash{$name} = $expr;
         }
@@ -1811,7 +1811,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.69 $ created on $Date: 2000/06/18 00:38:31 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.70 $ created on $Date: 2000/06/18 00:50:26 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
