@@ -1,8 +1,9 @@
 Source: mezzanine
 Section: devel
 Priority: optional
+Build-Depends-Indep: debhelper
 Maintainer: Michael Jennings <mej@kainx.org>
-Standards-Version: 3.0.1
+Standards-Version: 3.2.1
 
 Package: mezzanine
 Architecture: all

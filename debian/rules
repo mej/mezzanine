@@ -51,7 +51,7 @@ install: build
 	rm -rf $(DESTDIR)
 	mkdir -p $(DESTDIR)$(prefix)/bin
 	mkdir -p $(DESTDIR)$(prefix)/lib/perl5/Mezzanine
-	mkdir -p $(DESTDIR)$(prefix)/man/man1
+	mkdir -p $(DESTDIR)$(prefix)/share/man/man1
 
 	for i in *tool pkgsort ; do \
 	  install -m 755 $$i $(DESTDIR)$(prefix)/bin/ ; \
@@ -62,24 +62,24 @@ install: build
 	done
 
 	for i in doc/man/*.1 ; do \
-	  install -m 644 $$i $(DESTDIR)$(prefix)/man/man1/ ; \
+	  install -m 644 $$i $(DESTDIR)$(prefix)/share/man/man1/ ; \
 	done
 
 	for i in get co put ci info add new rm purge rtag tag reset login diff stat status log ; do \
 	  ln -s revtool $(DESTDIR)$(prefix)/bin/mz$$i ; \
-	  echo ".so revtool.1" > $(DESTDIR)$(prefix)/man/man1/mz$$i.1 ; \
+	  echo ".so revtool.1" > $(DESTDIR)$(prefix)/share/man/man1/mz$$i.1 ; \
 	done
 	for i in import prep mod merge patch clean sync ; do \
 	  ln -s srctool $(DESTDIR)$(prefix)/bin/mz$$i ; \
-	  echo ".so srctool.1" > $(DESTDIR)$(prefix)/man/man1/mz$$i.1 ; \
+	  echo ".so srctool.1" > $(DESTDIR)$(prefix)/share/man/man1/mz$$i.1 ; \
 	done
 	for i in rpm pkg build inst ; do \
 	  ln -s pkgtool $(DESTDIR)$(prefix)/bin/mz$$i ; \
-	  echo ".so pkgtool.1" > $(DESTDIR)$(prefix)/man/man1/mz$$i.1 ; \
+	  echo ".so pkgtool.1" > $(DESTDIR)$(prefix)/share/man/man1/mz$$i.1 ; \
 	done
 	for i in prod pbuild prodbuild ; do \
 	  ln -s buildtool $(DESTDIR)$(prefix)/bin/mz$$i ; \
-	  echo ".so buildtool.1" > $(DESTDIR)$(prefix)/man/man1/mz$$i.1 ; \
+	  echo ".so buildtool.1" > $(DESTDIR)$(prefix)/share/man/man1/mz$$i.1 ; \
 	done
 
 	dh_movefiles
@@ -89,7 +89,6 @@ install: build
 binary-indep: DH_OPTIONS=-i
 binary-indep: build install
 	# Need this version of debhelper for DH_OPTIONS to work.
-	dh_testversion 1.1.17
 	dh_testdir
 	dh_testroot
 #	dh_installdebconf
@@ -119,7 +118,6 @@ binary-indep: build install
 binary-arch: DH_OPTIONS=-a
 binary-arch: build install
 	# Need this version of debhelper for DH_OPTIONS to work.
-#	dh_testversion 1.1.17
 #	dh_testdir
 #	dh_testroot
 #	dh_installdebconf
