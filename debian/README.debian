@@ -1,9 +1,0 @@
-mezzanine for Debian
------------------
-
-One of these days, we'll have an official Debian package as part of
-the mezzanine source tree.  But that day is not yet.  In the meantime,
-I'm doing this package for my own convenience.
-
-  -- Chip Salzenberg <chip@valinux.com>
-
