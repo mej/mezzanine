@@ -715,3 +715,7 @@ Thu Jul 20 12:27:12 2000                        Michael Jennings (mej)
 I've been getting some weird intermittent failures due to temporary
 name resolution issues.  This should work around those.
 ----------------------------------------------------------------------
+Thu Jul 20 13:19:54 2000                        Michael Jennings (mej)
+
+Allow stripping of files in build trees.
+----------------------------------------------------------------------
