@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.112 2000/11/08 01:40:26 mej Exp $
+# $Id: buildtool,v 1.113 2000/11/16 23:18:47 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -497,25 +497,6 @@ initial_setup
     }
     mkdir($buildroot, 0775);
 
-    $rpmmacros = "$basedir/rpmmacros";
-    if (!(-f $rpmmacros && -s _)) {
-        # Create basic rpmmacros
-        open(RPMMACROS, ">$rpmmacros") || &fatal_error("Cannot create $rpmmacros -- $!\n");
-        print RPMMACROS "\%_topdir           $builddir\n";
-        close(RPMMACROS);
-    }
-    $rpmrc = "$basedir/rpmrc";
-    if (!(-f "$basedir/rpmrc" && -s _)) {
-        # Create basic rpmrc
-        open(RPMRC, ">$rpmrc") || &fatal_error("Cannot create $rpmrc -- $!\n");
-        print RPMRC "optflags:   i386 $ENV{CFLAGS}\n";
-        print RPMRC "optflags:   i486 $ENV{CFLAGS}\n";
-        print RPMRC "optflags:   i586 $ENV{CFLAGS}\n";
-        print RPMRC "optflags:   i686 $ENV{CFLAGS}\n";
-        print RPMRC "macrofiles: /usr/lib/rpm/macros:/usr/lib/rpm/%{_target}/macros:/etc/rpm/macros.specspo:",
-                    "/etc/rpm/macros:/etc/rpm/%{_target}/macros:~/.rpmmacros:$rpmmacros\n";
-        close(RPMRC);
-    }
     chdir("$builddir");
 
     # Pre-scan all the binary RPM's for future use in possibly parallel processes.
@@ -1010,7 +991,7 @@ sub
 build_pkgs
 {
     my ($pkg, $specfile) = @_;
-    my ($cmd, $prog, $line, $target, $out_files);
+    my ($cmd, $prog, $line, $target, $out_files, $rpmrc);
     my ($err, $msg, $srpm) = (0, 0, 0);
     local *PKGTOOL;
 
@@ -1025,6 +1006,8 @@ build_pkgs
             $prog .= " --define \"$name $value\"";
         }
     }
+    $rpmrc = "$buildroot/$pkg-rpmrc";
+    &create_rpm_files($pkg) if (! -s $rpmrc);
     $target = ($main::target ? " --target=$main::target" : ($pkgs->{$pkg}{ARCH} ? " --target=$pkgs->{$pkg}{ARCH}" : ""));
     $prog = "-P '$prog$target'";
     $cmd = "$pkgtool $prog -b -R \"/usr/lib/rpm/rpmrc:$rpmrc\" --root \"$buildroot/$pkg-root\" -s $specfile";
@@ -1067,10 +1050,12 @@ sub
 gen_sources
 {
     my ($pkg, $specfile) = @_;
-    my ($cmd, $prog, $line, $target, $srcs, $htag, $rtag, $tar, $zip);
+    my ($cmd, $prog, $line, $target, $srcs, $htag, $rtag, $tar, $zip, $rpmrc);
     my ($err, $msg) = (0, 0);
     local *PKGTOOL;
 
+    $rpmrc = "$buildroot/$pkg-rpmrc";
+    &create_rpm_files($pkg) if (! -s $rpmrc);
     $prog = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
     $target = ($pkgs->{$pkg}{ARCH} ? " --target=$pkgs->{$pkg}{ARCH}" : ($main::target ? $main::target : ""));
     $prog = "-P '$prog$target'";
@@ -1122,6 +1107,39 @@ gen_sources
     return ($err, $msg);
 }
 
+sub
+create_rpm_files
+{
+    my $pkg = $_[0];
+    my ($rpmmacros, $rpmrc, $cflags);
+    local *RPMMACROS;
+    local *RPMRC;
+
+    if (defined($pkgs->{$pkg}{CFLAGS})) {
+        $cflags = $pkgs->{$pkg}{CFLAGS};
+        $cflags =~ s/\&/ /g;
+    } else {
+        $cflags = $ENV{CFLAGS};
+    }
+
+    # Create basic rpmmacros
+    $rpmmacros = "$buildroot/$pkg-rpmmacros";
+    open(RPMMACROS, ">$rpmmacros") || &fatal_error("Cannot create $rpmmacros -- $!\n");
+    print RPMMACROS "\%_topdir           $builddir\n";
+    close(RPMMACROS);
+
+    # Create basic rpmrc
+    $rpmrc = "$buildroot/$pkg-rpmrc";
+    open(RPMRC, ">$rpmrc") || &fatal_error("Cannot create $rpmrc -- $!\n");
+    print RPMRC "optflags:   i386 $cflags\n";
+    print RPMRC "optflags:   i486 $cflags\n";
+    print RPMRC "optflags:   i586 $cflags\n";
+    print RPMRC "optflags:   i686 $cflags\n";
+    print RPMRC "macrofiles: /usr/lib/rpm/macros:/usr/lib/rpm/\%{_target}/macros:/etc/rpm/macros.specspo:",
+                "/etc/rpm/macros:/etc/rpm/\%{_target}/macros:~/.rpmmacros:$rpmmacros\n";
+    close(RPMRC);
+}
+
 #
 # The build process stages
 #
@@ -1130,8 +1148,6 @@ do_bootstrap_stage
 {
     my ($line, $err, $msg);
     my @p;
-    local *RPMMACROS;
-    local *RPMRC;
 
     if ($#_ >= 0) {
         @p = @_;
@@ -1141,6 +1157,7 @@ do_bootstrap_stage
 
     qprint "$progname:  Entering the bootstrap stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (@p) {
+        &create_rpm_files($pkg);
         if ($pkgs->{$pkg}{STAGES} !~ /s/) {
             nprint "$progname:  Skipping bootstrap stage for the \"$pkg\" package.\n";
             next;
@@ -1335,6 +1352,8 @@ do_explode_stage
     qprint "$progname:  Entering the explode stage.  (${\(&get_timestamp())})\n";
 
     foreach $pkg (@p) {
+        my $rpmrc = "$buildroot/$pkg-rpmrc";
+
         undef @manifest;
         if ($pkgs->{$pkg}{STAGES} !~ /e/ && $pkgs->{$pkg}{STAGES} !~ /x/) {
             nprint "$progname:  Skipping explode stage for the \"$pkg\" package.\n";
@@ -1681,7 +1700,7 @@ do_cleanup_stage
         }
         nprint "$progname:  Cleanup stage for \"$pkg\" is complete.\n";
     }
-    foreach $f ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SPECS", "$basedir/rpmrc", "$basedir/rpmmacros", $buildroot) {
+    foreach $f ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SPECS", $buildroot) {
         &nuke_tree($f) || qprint "Warning:  Removal of $f failed -- $!\n";
     }
 
@@ -1854,7 +1873,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.112 $ created on $Date: 2000/11/08 01:40:26 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.113 $ created on $Date: 2000/11/16 23:18:47 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

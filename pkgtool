@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.29 2000/11/11 00:12:56 mej Exp $
+# $Id: pkgtool,v 1.30 2000/11/16 23:18:47 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -966,7 +966,14 @@ rpm_generate_source_files
         foreach $fname (@contents) {
             next if (&should_ignore($fname));
             if (-d $fname) {
-                push @srcs, "$fname:$fname.tar.gz";
+                my @tmp;
+
+                @tmp = grep($_ =~ /^\Q$fname\E\.(tgz|tar\.gz|tar\.Z|tar\.bz2|tbz)$/, values %source);
+                if (scalar(@tmp)) {
+                    push @srcs, "$fname:$tmp[0]";
+                } else {
+                    push @srcs, "$fname:$fname.tar.gz";
+                }
             } else {
                 push @srcs, $fname;
             }
@@ -1053,7 +1060,7 @@ rpm_generate_source_files
                 dprint "\"$src_files\", (", join('|', @tmp), ")\n";
             }
             for ($i = 0; $i < scalar(@tmp); ) {
-                my @matches = glob($tmp[$i]);
+                my @matches = grep(-e $_, glob($tmp[$i]));
 
                 splice(@tmp, $i, 1, @matches);
                 $i += scalar(@matches);
@@ -1182,7 +1189,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.29 $ created on $Date: 2000/11/11 00:12:56 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.30 $ created on $Date: 2000/11/16 23:18:47 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
