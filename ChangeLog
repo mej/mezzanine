@@ -352,3 +352,8 @@ Added ability to package only and ignore build deps in perlpkg.
 
 Fixed missing '/' characters in buildtool.
 ----------------------------------------------------------------------
+Wed Mar 24 21:58:13 2004                        Michael Jennings (mej)
+
+Added specgen, a very basic specfile generator.  It will get more
+powerful as time progresses.
+----------------------------------------------------------------------
