@@ -57,3 +57,12 @@ More stuff for the README.  I'm at a point where I'm not sure about
 something, so it's time to throw in the towel for the night and get
 comments tomorrow. :-)
 ----------------------------------------------------------------------
+Tue May  9 15:28:32 2000                        Michael Jennings (mej)
+
+buildtool now parses product definition files (.prod files) which
+describe products in terms of packages and other products.  It should
+be able to resolve a single product into all its component products.
+It also has the skeleton of build stages.  The next step is simply to
+flesh out those stages.  Then we're done.  (If only it were that
+simple.) :-)
+----------------------------------------------------------------------

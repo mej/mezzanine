@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.1 2000/05/09 01:14:09 mej Exp $
+# $Id: buildtool,v 1.2 2000/05/09 22:30:15 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -107,11 +107,175 @@ parse_product_def {
 #        print STDERR "$progname:  I'll try to just ignore it and go on, but things could break.\n";
         return 0;
     }
+
+    # For now, just skip the product information.  Eventually we might care, but not now.
+    # The first blank line signifies the end of the product information.
     while (<PROD>) {
-        chomp;
+        chomp($line = $_);
+        last if ($line =~ /^\s*$/);
+    }
+    while (<PROD>) {
+        chomp($line = $_);
+        $line =~ s/^\s+//;
+        $line =~ s/\s+$//;
+        next if ($line !~ /\S/ || $line =~ /^\#/);  # Ignore blank lines and comment lines
+        undef %pkgvars;
+        @inp = split(/\s+/, $line);
+        # Line begins with <type>:<name>, like "module:Eterm"
+        ($type, $name) = split(":", shift @inp);
+        $type =~ tr/[A-Z]/[a-z]/;
+        if ($name =~ /\//) {
+            ($module, $name) = split("/", $name);
+        } else {
+            $module = $name;
+        }
+        if ($type =~ /^prod/) {
+            $type = "product";
+        } elsif ($type =~ /^mod/) {
+            $type = "module";
+        } elsif ($type =~ /^srpm/) {
+            $type = "srpm";
+        } else {
+            eprint "Unrecognized type \"$type\" for package $name.  I'll have to skip that one.\n";
+            next;
+        }
+        if ($type eq "product") {
+            # Recursively convert products into their component packages
+            &parse_product_def($name);
+        } else {
+            # The rest of the line is whitespace-delimited sets of var=value
+            foreach $varval (@inp) {
+                ($var, $val) = split("=", $varval);
+                $var =~ tr/[a-z]/[A-Z]/;
+                # Common variables are REVISION/TAG, VERSION, DATE, CVSROOT
+                if ($var =~ /^RE[VL]/ || $var =~ /^TAG/) {
+                    $var = "REVISION";
+                } elsif ($var =~ /^VER/) {
+                    $var = "VERSION";
+                }
+                $pkgvars{$var} = $val;
+            }
+            # Add defaults for stuff that is required
+            if ($type eq "module") {
+                if ($pkgvars{REVISION} =~ /^head$/i) {
+                    undef $pkgvars{REVISION};
+                }
+            } elsif ($type eq "srpm") {
+                if (! $pkgvars{REVISION}) {
+                    if ($name !~ /^\S+-[^-]+-[^-]+$/) {
+                        eprint "I wasn't given enough information about the $name package in ${prod}.prod.  For SRPM\n";
+                        eprint "packages, the version and revision information must be specified as variables or\n";
+                        eprint "embedded in the package name.  I'm going to have to skip that one.\n";
+                        next;
+                    } else {
+                        ($tmp = $name) =~ s/^\S+-[^-]+-//;
+                        $name =~ s/-[^-]+$//;
+                        $pkgvars{REVISION} = $tmp;
+                    }
+                }
+                if (! $pkgvars{VERSION}) {
+                    if ($name !~ /^\S+-[^-]+$/) {
+                        eprint "I wasn't given enough information about the $name package in ${prod}.prod.  For SRPM\n";
+                        eprint "packages, the version and revision information must be specified as variables or\n";
+                        eprint "embedded in the package name.  I'm going to have to skip that one.\n";
+                        next;
+                    } else {
+                        ($tmp = $name) =~ s/^(\S+)-([^-]+)$/$2/;
+                        $name =~ s/^(\S+)-([^-]+)$/$1/;
+                        $pkgvars{VERSION} = $tmp;
+                    }
+                }
+
+            }
+            # Now that we've got the name/version/revision in their final forms, set up the data structures.
+            $pkgs->{$name}{TYPE} = $type;
+            $pkgs->{$name}{MODULE} = $module;
+            dprint "New package:  $name is a $pkgs->{$name}{TYPE}\n";
+            foreach $pkgvar (keys %pkgvars) {
+                if ($pkgvars{$pkgvar}) {
+                    $pkgs->{$name}{$pkgvar} = $pkgvars{$pkgvar};
+                    dprint "Added variable $pkgvar to package $name with value \"$pkgs->{$name}{$pkgvar}\"\n";
+                }
+            }
+        }
     }
     close(PROD);
     return 1;
+}
+
+#
+# The build process stages
+#
+sub
+do_bootstrap_stage {
+
+    foreach $pkg (@packages) {
+        print "$progname:  Starting bootstrap stage for the \"$pkg\" package....\n";
+
+
+
+        print "$progname:  Bootstrap stage for \"$pkg\" is complete.\n";
+    }
+}
+
+sub
+do_compose_stage {
+
+    foreach $pkg (@packages) {
+        print "$progname:  Starting compose stage for the \"$pkg\" package....\n";
+
+
+
+        print "$progname:  Compose stage for \"$pkg\" is complete.\n";
+    }
+}
+
+sub
+do_explode_stage {
+
+    foreach $pkg (@packages) {
+        print "$progname:  Starting explode stage for the \"$pkg\" package....\n";
+
+
+
+        print "$progname:  Explode stage for \"$pkg\" is complete.\n";
+    }
+}
+
+sub
+do_build_stage {
+
+    foreach $pkg (@packages) {
+        print "$progname:  Starting build stage for the \"$pkg\" package....\n";
+
+
+
+        print "$progname:  Build stage for \"$pkg\" is complete.\n";
+    }
+}
+
+sub
+do_package_stage {
+
+    foreach $pkg (@packages) {
+        print "$progname:  Starting package accumulation stage for the \"$pkg\" package....\n";
+
+
+
+        print "$progname:  Package accumulation stage for \"$pkg\" is complete.\n";
+    }
+}
+
+sub
+do_iso_stage {
+
+    foreach $pkg (@packages) {
+        print "$progname:  Starting ISO image stage for the \"$pkg\" package....\n";
+
+
+
+        print "$progname:  ISO image stage for \"$pkg\" is complete.\n";
+    }
 }
 
 # main() here is basically the same as main() in C
@@ -125,7 +289,32 @@ main {
     }
 
     # Parse the product definition files to figure out what the heck we need to build. :)
-    &parse_product_def($opt_p);
+    if (! &parse_product_def($opt_p)) {
+        # FIXME:  Eventually this should fall back on treating it like a module
+        eprint "$opt_p does not seem to be a product.  Perhaps you made a typo?\n";
+        return;
+    }
+    @packages = sort keys %{$pkgs};
+
+    # Perform the build in stages, checking after each one to see if we should stop
+    &do_bootstrap_stage();
+    return if ($opt_b eq "s");
+
+    &do_compose_stage();
+    return if ($opt_b eq "c");
+
+    &do_explode_stage();
+    return if ($opt_b eq "e" || $opt_b eq "x");
+
+    &do_build_stage();
+    return if ($opt_b eq "b");
+
+    &do_package_stage();
+    return if ($opt_b eq "p");
+
+    &do_iso_stage();
+    return if ($opt_b eq "i");  # Technically not necessary, but what the heck.
+
 }
 
 BEGIN {
@@ -135,7 +324,7 @@ BEGIN {
     $version = "0.1.0";
 
     # See the Getopt::Mixed man page for details on the syntax of this line
-    $valid_opts = "h help>h v version>v d debug>d b build>b p product>p package>p";
+    $valid_opts = "h help>h v version>v d debug>d b=s build>b p=s product>p package>p";
 
     Getopt::Mixed::getOptions($valid_opts);
     $debug = $opt_d;

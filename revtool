@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.11 2000/05/09 01:14:09 mej Exp $
+# $Id: revtool,v 1.12 2000/05/09 22:30:15 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -53,6 +53,7 @@ print_usage_info {
     print "    -t --tag          Specify a symbolic tag\n";
     print "    -i --import       Import a new set of sources, or update the vendor branch for a package\n";
     print "    -k [code]         Specify keyword handling when adding files (use -kb to add binary files)\n";
+    print "    -D --dir          Specify an alternative repository (\$CVSROOT)\n";
     print "\n";
     exit(0);
 }
@@ -97,12 +98,28 @@ eprint {
     return (print @args);
 }
 
+# Return the contents of a file as a string
+sub
+cat_file {
+    my $filename = $_[0];
+    my $contents = "";
+
+    open(FF, "$filename") || return undef;
+    while (<FF>) {
+        $contents .= $_;
+    }
+    return $contents;
+}
+
 # Commit changes to the master repository
 sub
 commit_to_master {
     my $logfile = "/var/tmp/.cvs.commit.$$";
     my ($command, $username, $fullname, $rc);
+    my $cwd = `pwd`;
 
+    $cwd =~ s/[^\/]+\///;  # Remove all but the last part
+    dprint "cwd is $cwd\n";
     open(LOGFILE, ">$logfile") || die("Cannot write to $logfile -- $!\n");
     dprint("Opened log file $logfile for commit log\n");
     $username = $ENV{"LOGNAME"};
@@ -113,7 +130,7 @@ commit_to_master {
     print "Please edit your commit message now...\n";
     system($ENV{"EDITOR"} ? $ENV{"EDITOR"} : "vi", $logfile);
     open(LOGFILE, "<$logfile");
-    if (! -f "ChangeLog") {
+    if ((! -f "ChangeLog") && (&cat_file("CVS/Repository") eq $cwd)) {
         open(CL, ">>ChangeLog");
         print "WARNING:  You have no ChangeLog here.  I have created one for you.\n";
         &add_new_files("ChangeLog");
@@ -126,7 +143,7 @@ commit_to_master {
     print CL "----------------------------------------------------------------------\n";
     close(CL);
     close(LOGFILE);
-    $command = sprintf("/bin/sh -c \"cvs commit %s -F $logfile\"", ($opt_t ? "-r $opt_t" : ""));
+    $command = sprintf("/bin/sh -c \"cvs $cvsroot commit %s -F $logfile\"", ($opt_t ? "-r $opt_t" : ""));
     $rc = system($command) >> 8;
     unlink $logfile;
     return ($rc);
@@ -151,7 +168,7 @@ add_new_files {
         @files = glob($file_list);
     }
     $file_list = join(" ", @files);
-    $command = sprintf("/bin/sh -c \"cvs add %s $file_list\"", ($opt_k ? "-k$opt_k" : ""));
+    $command = sprintf("/bin/sh -c \"cvs $cvsroot add %s $file_list\"", ($opt_k ? "-k$opt_k" : ""));
     $rc = system($command) >> 8;
     return ($rc);
 }
@@ -169,7 +186,7 @@ delete_old_files {
         @files = glob($file_list);
     }
     $file_list = join(" ", @files);
-    $command = sprintf("/bin/sh -c \"cvs remove -f %s $file_list\"", ($opt_R ? "-R" : ""));
+    $command = sprintf("/bin/sh -c \"cvs $cvsroot remove -f %s $file_list\"", ($opt_R ? "-R" : ""));
     $rc = system($command) >> 8;
     return ($rc);
 }
@@ -218,11 +235,12 @@ BEGIN {
 
     # See the Getopt::Mixed man page for details on the syntax of this line
     $valid_opts = "h help>h v version>v d debug>d g get>g p put>p a add>a r remove>r"
-                  . " R recurse>R t=s tag>t i=s import>i k=s";
+                  . " R recurse>R t=s tag>t i=s import>i k=s D=s dir>D";
 
     Getopt::Mixed::getOptions($valid_opts);
     $debug = $opt_d;
     $binary = $opt_b;
+    $cvsroot = "-d $opt_D" if ($opt_D);
     if ($opt_v) {
 	print "$progname $version by Michael Jennings\n";
         print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
