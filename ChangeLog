@@ -648,3 +648,12 @@ Sun Oct  3 21:18:30 2004                        Michael Jennings (mej)
 
 Don't barf if stat fails.
 ----------------------------------------------------------------------
+Tue Oct 19 15:34:28 2004                        Michael Jennings (mej)
+
+Fixed minor cosmetic issue in perlpkg.
+
+specgen will now scan installed files, update the spec, and replace
+paths with auto* macros as appropriate.
+
+Added debugging to try to track down weird permissions issue.
+----------------------------------------------------------------------

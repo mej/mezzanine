@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.45 2004/10/04 01:19:07 mej Exp $
+# $Id: Util.pm,v 1.46 2004/10/19 19:35:35 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -509,13 +509,13 @@ mkdirhier($$)
     if (!defined($mask)) {
         $mask = 0755;
     }
-    #dprint "mkdirhier($dir) called.\n";
+    dprint "mkdirhier($dir) called.\n";
     foreach my $dir (@dirs) {
         $path .= "$dir/";
         if (! -d $path) {
-            #dprint "Creating \"$path\"\n";
+            dprint "Creating \"$path\"\n";
             mkdir($path, $mask) || eprint("Unable to create $path -- $!\n");
-            #dprint "chown $mz_uid:$mz_gid $path\n";
+            dprint "chown $mz_uid:$mz_gid $path\n";
             chown($mz_uid, $mz_gid, $path);
         }
     }
@@ -523,7 +523,7 @@ mkdirhier($$)
         dprint "Something went wrong in mkdirhier()!\n";
         return 0;
     } else {
-        #dprint "Created $_[0] for $mz_uid:$mz_gid.\n";
+        dprint "Created $_[0] for $mz_uid:$mz_gid.\n";
         return 1;
     }
 }

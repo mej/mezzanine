@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: perlpkg,v 1.2 2004/03/24 19:52:16 mej Exp $
+# $Id: perlpkg,v 1.3 2004/10/19 19:35:35 mej Exp $
 #
 
 use strict;
@@ -345,7 +345,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.2 $ created on $Date: 2004/03/24 19:52:16 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.3 $ created on $Date: 2004/10/19 19:35:35 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -464,9 +464,11 @@ main
         chdir($save_pwd);
     }
 
-    print $SAVE_STDOUT "Downloaded the following:\n";
-    foreach my $file (sort { &basename($a) cmp &basename($b) } @tried) {
-        printf $SAVE_STDOUT "     %s\n", &basename($file);
+    if (scalar(@tried)) {
+        print $SAVE_STDOUT "Downloaded the following:\n";
+        foreach my $file (sort { &basename($a) cmp &basename($b) } @tried) {
+            printf $SAVE_STDOUT "     %s\n", &basename($file);
+        }
     }
     &package_perl_dist(@built);
 
