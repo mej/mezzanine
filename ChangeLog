@@ -609,3 +609,9 @@ With these changes, I hope to accomplish the following:
   - Ignore .* and *~ files when looking for spec files.
   - Error out if a spec file contains an epoch.
 ----------------------------------------------------------------------
+Wed Aug 25 17:34:05 2004                        Michael Jennings (mej)
+
+Mostly small fixes and touch-ups.  I also added more mzimport
+debugging so I can determine exactly how gmkurtzer is managing to
+screw the pooch. :-)
+----------------------------------------------------------------------

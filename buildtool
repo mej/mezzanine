@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.196 2004/08/18 21:03:21 mej Exp $
+# $Id: buildtool,v 1.197 2004/08/25 21:34:39 mej Exp $
 #
 
 use strict;
@@ -205,7 +205,7 @@ is_build_needed
     $srpm_dir = &pkgvar_topdir() . "/SRPMS";
     if (! -d $srpm_dir) {
         dprint "SRPM directory $srpm_dir does not exist.\n";
-        dprint "Listing:  `/bin/ls -Fla $srpm_dir/../`\n\n----\n";
+        dprint "Listing:  " . `/bin/ls -Fla $srpm_dir/../` . "\n\n----\n";
         return 1;
     }
 
@@ -847,6 +847,10 @@ parallel_build
             if (scalar(@tmp)) {
                 if ($tmp[$#tmp] !~ /error: /i) {
                     @tmp = grep($_ =~ /error: /i, @tmp);
+                    if (!scalar(@tmp)) {
+                        &fail_package($pkg, "Error $err (no errors found in log)");
+                        next;
+                    }
                 }
                 chomp($line = $tmp[$#tmp]);
 
@@ -1022,7 +1026,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.196 $ created on $Date: 2004/08/18 21:03:21 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.197 $ created on $Date: 2004/08/25 21:34:39 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();

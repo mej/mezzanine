@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.51 2004/08/18 21:03:21 mej Exp $
+# $Id: srctool,v 1.52 2004/08/25 21:34:39 mej Exp $
 #
 
 use strict;
@@ -237,6 +237,9 @@ import_package()
             } elsif (! $OPTION{"path"}) {
                 # No path.  Check for relative path in current repo.
                 $tmp = $scm->relative_path();
+                if (!defined($tmp)) {
+                    $tmp = $scm->relative_path("..");
+                }
             } else {
                 # Supplied path doesn't exist, so take it as gospel.
                 $tmp = $OPTION{"path"};
@@ -824,7 +827,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.51 $ created on $Date: 2004/08/18 21:03:21 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.52 $ created on $Date: 2004/08/25 21:34:39 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();

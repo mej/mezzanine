@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.42 2004/08/18 21:03:21 mej Exp $
+# $Id: Build.pm,v 1.43 2004/08/25 21:34:39 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -612,7 +612,7 @@ build_spm
         &parse_spec_file();
 
         if ($specdata) {
-            if ($specdata->{"HEADER"}{"epoch"}) {
+            if (exists($specdata->{"HEADER"}{"epoch"})) {
                 my $str;
 
                 $str = sprintf("Epoch %s not allowed", $specdata->{"HEADER"}{"epoch"});
@@ -688,7 +688,7 @@ build_pdr
     }
 
     if ($specdata) {
-        if ($specdata->{"HEADER"}{"epoch"}) {
+        if (exists($specdata->{"HEADER"}{"epoch"})) {
             my $str;
 
             $str = sprintf("Epoch %s not allowed", $specdata->{"HEADER"}{"epoch"});
@@ -844,7 +844,7 @@ build_fst
     } else {
         &parse_spec_file();
         if ($specdata) {
-            if ($specdata->{"HEADER"}{"epoch"}) {
+            if (exists($specdata->{"HEADER"}{"epoch"})) {
                 my $str;
 
                 $str = sprintf("Epoch %s not allowed", $specdata->{"HEADER"}{"epoch"});
@@ -934,7 +934,7 @@ build_srpm
     &pkgvar_instructions("$instroot$topdir/SPECS/$specs[0]");
     &parse_spec_file();
     if ($specdata) {
-        if ($specdata->{"HEADER"}{"epoch"}) {
+        if (exists($specdata->{"HEADER"}{"epoch"})) {
             my $str;
 
             $str = sprintf("Epoch %s not allowed", $specdata->{"HEADER"}{"epoch"});

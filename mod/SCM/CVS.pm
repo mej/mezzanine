@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: CVS.pm,v 1.9 2004/07/26 19:34:40 mej Exp $
+# $Id: CVS.pm,v 1.10 2004/08/25 21:34:39 mej Exp $
 #
 
 package Mezzanine::SCM::CVS;
@@ -151,7 +151,7 @@ propget($)
             push @values, $self->{$key};
         }
     }
-    dprintf("Returning %s.\n", join(", ", @values));
+    dprintf("Returning \"%s\".\n", join(", ", @values));
     if (wantarray()) {
         return @values;
     } else {
@@ -327,15 +327,18 @@ relative_path($)
 
     if ($path && -e "$path/CVS/Repository") {
         $rel_dir = &cat_file("$path/CVS/Repository");
+        dprint "Got relative path $rel_dir from $path/CVS/Repository.\n";
     } elsif (-e "CVS/Repository") {
         $rel_dir = &cat_file("CVS/Repository");
+        dprint "Got relative path $rel_dir from CVS/Repository.\n";
     } else {
         $rel_dir = "";
+        dprint "Could not find relative path.\n";
     }
     chomp($rel_dir);
 
     if ($rel_dir) {
-        if ($path) {
+        if ($path && $path ne "..") {
             $rel_dir .= $path;
         }
     } else {

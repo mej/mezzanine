@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.32 2004/08/18 21:03:21 mej Exp $
+# $Id: RPM.pm,v 1.33 2004/08/25 21:34:39 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -471,7 +471,7 @@ sub
 rpm_build()
 {
     my ($cmd, $line, $err, $msg);
-    my (@failed_deps, @not_found, @spec_errors, @out_files);
+    my (@failed_deps, @not_found, @spec_errors, @out_files, @extras);
     local *CMD;
 
     if (&pkgvar_get("buildpkglist_filename")) {
@@ -550,6 +550,15 @@ rpm_build()
                  || $line =~ /^(error: )?File not found(?: by glob)?: (.*)$/) {
             $err = MEZZANINE_MISSING_FILES;
             push @not_found, $2;
+        } elsif ($line =~ /^(error: )?Installed \(but unpackaged\) file/) {
+            $err = MEZZANINE_EXTRA_FILES;
+            while (<CMD>) {
+                chomp($line = $_);
+                last if ($line !~ /^\s+\//);
+                $line =~ s/^\s+(.+)$/$1/;
+                push @extra_files, $line;
+            }
+            $msg = "The following files were not included in the built RPM:  " . join(" ", @extra_files);
         }
     }
     close(CMD);

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.41 2004/08/18 21:03:21 mej Exp $
+# $Id: Util.pm,v 1.42 2004/08/25 21:34:39 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -71,8 +71,8 @@ BEGIN {
                '&MEZZANINE_BUILD_UNNEEDED',
                '&MEZZANINE_ARCH_MISMATCH', '&MEZZANINE_BAD_MODULE',
                '&MEZZANINE_BUILD_FAILURE', '&MEZZANINE_DEPENDENCIES',
-               '&MEZZANINE_MISSING_FILES', '&MEZZANINE_SPEC_ERRORS',
-               '&MEZZANINE_MISSING_PKGS',
+               '&MEZZANINE_MISSING_FILES', '&MEZZANINE_EXTRA_FILES',
+               '&MEZZANINE_SPEC_ERRORS', '&MEZZANINE_MISSING_PKGS',
                '&MEZZANINE_INVALID_PACKAGE', '&MEZZANINE_TERMINATED',
                '&MEZZANINE_CRASHED', '&MEZZANINE_UNSPECIFIED_ERROR');
 
@@ -182,7 +182,8 @@ sub MEZZANINE_BAD_MODULE()         {62;}
 sub MEZZANINE_BUILD_FAILURE()      {63;}
 sub MEZZANINE_DEPENDENCIES()       {64;}
 sub MEZZANINE_MISSING_FILES()      {65;}
-sub MEZZANINE_SPEC_ERRORS()        {66;}
+sub MEZZANINE_EXTRA_FILES()        {66;}
+sub MEZZANINE_SPEC_ERRORS()        {67;}
 
 # compstool-related errors
 sub MEZZANINE_MISSING_PKGS()       {81;}
@@ -897,16 +898,26 @@ newest_file(@)
     my ($newest_name, $newest_time) = ("", 0);
     my @stat_info;
 
+    dprint &print_args(@_);
     foreach my $dir (@dirs) {
-        find({ "wanted" => sub {
-                               dprint "Checking $_\n";
-                               @stat_info = stat($_);
-                               if ($stat_info[9] > $newest_time) {
-                                   $newest_name = $_;
-                                   $newest_time = $stat_info[9];
-                               }
-                           }, "no_chdir" => 1
-             }, $topdir);
+        if (-d $dir) {
+            find({ "wanted" => sub {
+                                   dprint "Checking $_\n";
+                                   @stat_info = stat($_);
+                                   if (scalar(@stat_info) == 13 && ($stat_info[9] > $newest_time)) {
+                                       $newest_name = $_;
+                                       $newest_time = $stat_info[9];
+                                   }
+                               }, "no_chdir" => 1
+                 }, $dir);
+        } else {
+            dprint "Checking $dir\n";
+            @stat_info = stat($dir);
+            if ($stat_info[9] > $newest_time) {
+                $newest_name = $dir;
+                $newest_time = $stat_info[9];
+            }
+        }
     }
     dprintf("$newest_name is newest with mtime of %s.\n",
             POSIX::strftime("%Y-%m-%d %H:%M:%S", localtime($newest_time)));

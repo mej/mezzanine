@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.22 2004/08/18 21:03:21 mej Exp $
+# $Id: Src.pm,v 1.23 2004/08/25 21:34:39 mej Exp $
 #
 
 package Mezzanine::Src;
@@ -119,7 +119,7 @@ install_spm_files($)
     dprint "Installing SPM files to $dir.\n";
     @srcs = &find_files("S");
     @patches = &find_files("P");
-    @tmp = &find_files("F");
+    @tmp = grep { $_ =~ /\.spec(\.in)?$/ } &find_files("F");
     if (scalar(@tmp) != 1) {
 	my $n = scalar(@tmp);
 	&fatal_error("$n spec files?!\n");
@@ -181,7 +181,7 @@ convert_srpm_to_spm($)
     if (!defined($specdata->{SPECFILE})) {
         eprint "Unable to parse spec file.\n";
         return MEZZANINE_SPEC_ERRORS;
-    } elsif ($specdata->{"HEADER"}{"epoch"}) {
+    } elsif (exists($specdata->{"HEADER"}{"epoch"})) {
         eprintf("Epoch %s not allowed", $specdata->{"HEADER"}{"epoch"});
         return MEZZANINE_SPEC_ERRORS;
     }
