@@ -5,7 +5,7 @@
 # Michael Jennings <mej@eterm.org>
 # 21 July 2000
 #
-# $Id: redhat-7.x-cdtool,v 1.26 2002/07/16 15:25:35 mej Exp $
+# $Id: redhat-7.x-cdtool,v 1.27 2003/06/02 16:30:12 mej Exp $
 #
 
 umask 022
@@ -125,13 +125,13 @@ for i in 1 2 3 4 5 6 7 ; do
 done
 test -d vermillion-${V_VER}-extras && mediatool -i vermillion-extras-${V_VER}.iso -D vermillion-${V_VER}-extras
 
-if (apt-get -v >/dev/null 2>&1); then
+if [ ! -x /usr/bin/genbasedir ]; then
     echo "apt not found.  Not generating repository list."
 else
     cd $NET/RedHat
-    ln -s RPMS RPMS.all
-    ln -s hdlist base/hdlist.all
-    ln -s ../vermillion-7.3.1-www/SRPMS ../SRPMS.all
-    genbasedir --topdir=$BUILDDIR/$NET --progress --bz2only --bloat RedHat all
-    gpg -s -u vermillion base/hashfile
+    rm -f RPMS.all && ln -s RPMS RPMS.all
+    rm -f SRPMS.all && ln -s ../../vermillion-7.3.1-www/SRPMS SRPMS.all
+    rm -f base/hdlist.all && ln -s hdlist base/hdlist.all
+    genbasedir -s --default-key=vermillion --progress --bz2only --bloat --flat /os/build.mezzanine/vermillion-7.3.1-net/RedHat all
+    #gpg -s -u vermillion base/hashfile
 fi
