@@ -681,3 +681,13 @@ Tue Jul 18 12:12:23 2000                        Michael Jennings (mej)
 Back to -march=pentium, since -march=pentiumpro doesn't work and play
 well with -m486.
 ----------------------------------------------------------------------
+Tue Jul 18 14:28:16 2000                        Michael Jennings (mej)
+
+The parallelization option now takes an optional string argument in
+the format "xAA+BB".  The number of CPU's on the build machine is
+multiplied by the first number (AA), and the second number (BB) is
+added to that result.  You can use a minus sign ('-') instead of the
+plus sign ('+'), which will cause BB to be subtracted instead of
+added.  You can also omit either or both sections of this string.
+The default is, of course, "x1+0".
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.92 2000/07/18 19:05:19 mej Exp $
+# $Id: buildtool,v 1.93 2000/07/18 21:26:20 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -109,7 +109,7 @@ print_usage_info
     print "    -D --dir <directory>             Specify \"directory\" as the base directory for the build\n";
     print "    -f --force                       Ignore errors, build as much as possible\n";
     print "    -l --log <logfile>               Specify a log file to send informational output to\n";
-    print "    -P --parallel                    Parallelize the build process based on the number of CPU's\n";
+    print "    -P --parallel [expr]             Parallelize the build process based on the number of CPU's\n";
     print "    -t --target <arch>               Tell rpm to build for a particular target architecture\n";
     print "    -C --cflags <flags>              Specify the \$CFLAGS variable to use for building\n";
     print "\n";
@@ -1833,14 +1833,14 @@ main
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "b|build=s", "p|product|package=s",
                    "q|quiet", "Q|really-quiet|silent", "D|dir=s", "f|force", "l|log=s",
-                   "P|parallel", "t|target=s", "C|cflags=s", "B|startbuild=s");
+                   "P|parallel:s", "t|target=s", "C|cflags=s", "B|startbuild=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.92 $ created on $Date: 2000/07/18 19:05:19 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.93 $ created on $Date: 2000/07/18 21:26:20 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1899,6 +1899,14 @@ main
         $master = 1;
         $slave = 0;
         $num_cpus = &count_cpus();
+        if ($opt_P != 1) {
+            my ($mult, $add);
+
+            $opt_P =~ m/^(?:[Xx]([\d.]+))?([-+][\d.]+)?$/;
+            ($mult, $add) = ($1, $2);
+            dprint "Modifying \$num_cpus:  $opt_P   $mult   $add\n";
+            $num_cpus = $num_cpus * ($mult ? $mult : 1) + ($add ? $add : 0);
+        }
     } else {
         $master = 0;
         $slave = 0;
