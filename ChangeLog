@@ -408,3 +408,7 @@ Wed Jun 14 13:54:36 2000                        Michael Jennings (mej)
 
 Added boot image support for ISO stage.
 ----------------------------------------------------------------------
+Wed Jun 14 14:06:59 2000                        Michael Jennings (mej)
+
+Build translation table files and don't build HFS filesystems.
+----------------------------------------------------------------------
