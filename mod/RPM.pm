@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.3 2001/08/02 19:45:17 mej Exp $
+# $Id: RPM.pm,v 1.4 2001/08/03 03:08:07 mej Exp $
 #
 
 package Avalon::RPM;
@@ -70,15 +70,15 @@ END {
 sub
 rpm_install
 {
-    my $pkg_file = $_[0];
+    my ($pkg_file, $topdir) = @_;
     my ($rpm, $cmd, $rc, $err, $msg);
     my (@failed_deps);
     local *RPM;
 
     $rpm = ($pkg_prog ? $pkg_prog : "rpm");
     $rc = ($rcfile ? "--rcfile '/usr/lib/rpm/rpmrc:$rcfile'" : "");
-    $cmd = "$rpm $rc" . ($rootdir ? " --root $rootdir " : " ") . "-U $pkg_file";
-    dprint "About to run \"$cmd\"\n";
+    $topdir = ($topdir ? "--define '_topdir $topdir'" : "");
+    $cmd = "$rpm $rc $topdir" . ($rootdir ? " --root $rootdir " : " ") . "-U $pkg_file";
     if (!open(RPM, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }
@@ -103,7 +103,7 @@ rpm_install
         }
     }
     close(RPM);
-    dprint "\"$cmd\" returned $?\n";
+    dprint "\"$cmd\" returned $?\n" if ($?);
     if ($? != 0 && $err == AVALON_SUCCESS) {
         return AVALON_UNSPECIFIED_ERROR;
     }
@@ -120,32 +120,27 @@ rpm_show_contents
 {
     my $pkg_file = $_[0];
     my ($rpm, $cmd, $rc);
+    my @results;
     local *RPM;
 
     $rpm = ($pkg_prog ? $pkg_prog : "rpm");
     $rc = ($rcfile ? "--rcfile '/usr/lib/rpm/rpmrc:$rcfile'" : "");
     $cmd = "$rpm $rc -ql " . ($pkg_file ? "-p $pkg_file" : "");
-    dprint "About to run \"$cmd\"\n";
     if (!open(RPM, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }
-    while (<RPM>) {
-        print;
-    }
+    @results = <RPM>;
     close(RPM);
-    dprint "\"$cmd\" returned $?\n";
-    if ($? != 0) {
-        return AVALON_UNSPECIFIED_ERROR;
-    }
-    return AVALON_SUCCESS;
+    dprint "\"$cmd\" returned $?\n" if ($?);
+    return ($? >> 8, @results);
 }
 
 sub
 rpm_query
 {
     my ($pkg_file, $query_type) = @_;
-    my ($rpm, $rpm_opt, $cmd, $rc, $line);
-    my (@prov, @deps);
+    my ($rpm, $cmd, $rc);
+    my (@results);
     local *RPM;
 
     if ($query_type eq "d") {
@@ -159,19 +154,13 @@ rpm_query
     $rpm = ($pkg_prog ? $pkg_prog : "rpm");
     $rc = ($rcfile ? "--rcfile '/usr/lib/rpm/rpmrc:$rcfile'" : "");
     $cmd = "$rpm $rc $rpm_opt " . ($pkg_file ? "-p $pkg_file" : "-a");
-    dprint "About to run \"$cmd\"\n";
     if (!open(RPM, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }
-    while (<RPM>) {
-        print;
-    }
+    @results = <RPM>;
     close(RPM);
-    dprint "\"$cmd\" returned $?\n";
-    if ($? != 0) {
-        return AVALON_UNSPECIFIED_ERROR;
-    }
-    return AVALON_SUCCESS;
+    dprint "\"$cmd\" returned $?\n" if ($?);
+    return ($? >> 8, @results);
 }
 
 sub

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.14 2001/08/02 19:45:17 mej Exp $
+# $Id: Util.pm,v 1.15 2001/08/03 03:08:07 mej Exp $
 #
 
 package Avalon::Util;
@@ -40,7 +40,7 @@ BEGIN {
 
                     '&debug_get', '&debug_set',
 		    '&get_timestamp', '&fatal_error', '&dprintf', '&dprint', '&eprintf', '&eprint', '&wprintf', '&wprint',
-		    '&handle_signal', '&handle_fatal_signal', '&handle_warning', '&show_backtrace',
+		    '&handle_signal', '&handle_fatal_signal', '&handle_warning', '&show_backtrace', '&print_args',
 		    '&mkdirhier', '&nuke_tree', '&move_files', '&copy_files', '&basename', '&dirname', '&grepdir',
 		    '&xpush',
 		    '&cat_file',
@@ -83,6 +83,7 @@ sub handle_signal(@);
 sub handle_fatal_signal(@);
 sub handle_warning(@);
 sub show_backtrace();
+sub print_args(@);
 sub mkdirhier($);
 sub nuke_tree($);
 sub move_files(@);
@@ -282,6 +283,22 @@ show_backtrace
         $file =~ s/^.*\/([^\/]+)$/$1/;
         print ' ' x $i, "$subroutine() at $file:$line\n";
     }
+}
+
+# Print function arguments
+sub
+print_args
+{
+    my @args;
+
+    foreach my $arg (@_) {
+        if (defined($arg)) {
+            push @args, $arg;
+        } else {
+            push @args, "<undef>";
+        }
+    }
+    return "\"" . join("\", \"", @args) . "\"";
 }
 
 # Make a directory hierarchy

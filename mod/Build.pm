@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.10 2001/08/02 19:45:17 mej Exp $
+# $Id: Build.pm,v 1.11 2001/08/03 03:08:07 mej Exp $
 #
 
 package Avalon::Build;
@@ -42,7 +42,7 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('&count_cpus', '&prepare_build_tree', '&get_source_list', '&create_source_file', '&create_source_files', '&cleanup_build_tree', '&build_rpms_from_topdir', '&build_debs_from_topdir', '&build_topdir', '&build_spm', '&build_cfst', '&build_fst', '&build_srpm', '&build_tarball', '&build_package');
+    @EXPORT      = ('&count_cpus', '&prepare_build_tree', '&get_source_list', '&create_source_file', '&create_source_files', '&cleanup_build_tree', '&build_rpms_from_tarball', '&build_debs_from_tarball', '&build_rpms_from_topdir', '&build_debs_from_topdir', '&build_topdir', '&build_spm', '&build_cfst', '&build_fst', '&build_srpm', '&build_tarball', '&build_package');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -63,14 +63,16 @@ sub get_source_list($$$$);
 sub create_source_file($$$$$);
 sub create_source_files($$$\@);
 sub cleanup_build_tree($$$);
+sub build_rpms_from_tarball($$$);
+sub build_debs_from_tarball($$$);
 sub build_rpms_from_topdir($$$);
 sub build_debs_from_topdir($$$);
 sub build_topdir($$$$);
 sub build_spm($$$$);
 sub build_cfst($$$$);
 sub build_fst($$$$);
-sub build_srpm($$$$$);
-sub build_tarball($$$$$);
+sub build_srpm($$$$);
+sub build_tarball($$$$);
 sub build_package($$$$);
 
 # Private functions
@@ -313,7 +315,33 @@ cleanup_build_tree
     }
 }
 
-# Builds RPM's
+# Builds RPM's from a tarball
+sub
+build_rpms_from_tarball
+{
+    my ($tarball, $topdir, $buildroot) = @_;
+    my $cmd;
+
+    $cmd = "/bin/rpm --define '_topdir $topdir' --define 'optflags $ENV{CFLAGS}'";
+    if ($buildroot) {
+        $cmd .= " --buildroot=\"$buildroot\"";
+    }
+    $cmd .= " -ta $tarball";
+    return &rpm_build($cmd);
+}
+
+# Builds DEB files from a tarball
+sub
+build_debs_from_tarball
+{
+    my ($script_dir, $topdir, $buildroot) = @_;
+    my $cmd;
+
+    # Goop goes here.
+    return &deb_build($cmd);
+}
+
+# Builds RPM's from a topdir
 sub
 build_rpms_from_topdir
 {
@@ -328,7 +356,7 @@ build_rpms_from_topdir
     return &rpm_build($cmd);
 }
 
-# Builds DEB files
+# Builds DEB files from an RPM-style topdir
 sub
 build_debs_from_topdir
 {
@@ -345,6 +373,8 @@ sub
 build_topdir
 {
     my ($specfile, $topdir, $buildroot, $target_format) = @_;
+
+    dprint &print_args(@_), "\n";
 
     if ($target_format eq "rpms") {
         return &build_rpms_from_topdir($specfile, $topdir, $buildroot);
@@ -370,6 +400,8 @@ build_spm
     my ($pkg, $topdir, $buildroot, $target_format) = @_;
     my $specfile;
     my (@tmp, @tmp2);
+
+    dprint &print_args(@_), "\n";
 
     if (! -d "F") {
         &show_backtrace();
@@ -407,6 +439,8 @@ build_cfst
     my ($pkg, $topdir, $buildroot, $target_format) = @_;
     my ($err, $msg, $cmd, $make, $pkgdir, $outfiles);
     local *MAKE;
+
+    dprint &print_args(@_), "\n";
 
     if (!(-f "Makefile.avalon" && -s _)) {
         &show_backtrace();
@@ -464,6 +498,8 @@ build_fst
     my ($specfile, $cmd, $ret);
     my (@srcs, @tmp);
 
+    dprint &print_args(@_), "\n";
+
     # Look for the build instructions (spec file, debian/ directory, etc.)
     if ($target_format eq "rpms") {
         @tmp = &grepdir(sub {/spec(\.in)?$/});
@@ -496,12 +532,33 @@ build_fst
 sub
 build_srpm
 {
-    my ($pkg, $module, $topdir, $buildroot, $target_format) = @_;
-    my $specfile;
+    my ($pkg, $topdir, $buildroot, $target_format) = @_;
+    my $err;
+    my (@tmp, @specs);
+
+    dprint &print_args(@_), "\n";
 
     &prepare_build_tree($pkg, $topdir, $buildroot);
-    # Explode SRPM here
-    return &build_topdir($specfile, $topdir, $buildroot, $target_format);
+    @tmp = &rpm_show_contents($pkg);
+    if (($err = shift @tmp) != AVALON_SUCCESS) {
+        return (AVALON_NO_SOURCES, "Unable to examine the contents of $pkg ($err)", undef);
+    }
+    foreach my $f (grep(/spec(\.in)?$/, @tmp)) {
+        chomp($f);
+        push @specs, $f;
+    }
+    if (scalar(@specs) != 1) {
+        wprint "Found ${\(scalar(@specs))} spec files in $pkg?!\n";
+    }
+    @tmp = &rpm_install($pkg, $topdir);
+    if (($err = shift @tmp) != AVALON_SUCCESS) {
+        return (AVALON_PACKAGE_FAILED, "Unable to install $pkg ($err)", undef);
+    }
+    @specs = grep(-f "$topdir/SPECS/$_" && -s _, @specs);
+    if (scalar(@specs) != 1) {
+        return (AVALON_NO_SOURCES, "Found ${\(scalar(@specs))} spec files in $pkg?!", undef);
+    }
+    return &build_topdir("$topdir/SPECS/$specs[0]", $topdir, $buildroot, $target_format);
 }
 
 # Plain old tarballs can be rebuilt into packages using this function, as long as they
@@ -509,8 +566,16 @@ build_srpm
 sub
 build_tarball
 {
-    my ($pkg, $module, $topdir, $buildroot, $target_format) = @_;
+    my ($pkg, $topdir, $buildroot, $target_format) = @_;
+    my $cmd;
 
+    dprint &print_args(@_), "\n";
+
+    if ($target_format eq "rpms") {
+        return &build_rpms_from_tarball($pkg, $topdir, $buildroot);
+    } elsif ($target_format eq "debs") {
+        return &build_debs_from_tarball($pkg, $topdir, $buildroot);
+    }
 }
 
 # This is the main routine for building stuff.  Its job is to figure out what type of
@@ -520,6 +585,9 @@ build_package
 {
     my ($pkg, $topdir, $buildroot, $target_format) = @_;
     my $pwd;
+    my @ret;
+
+    dprint &print_args(@_), "\n";
 
     $pwd = &getcwd();
 
@@ -533,7 +601,6 @@ build_package
     }
 
     if (-d $pkg) {
-        my @ret;
 
         # It's a directory.  That means it's some type of module.
         if (!chdir($pkg)) {
@@ -554,23 +621,27 @@ build_package
         return @ret;
     } elsif (-f _ && -s _) {
         # It's a file.  Must be a package file of some type.
-        my $module;
 
         # Split the actual package name from any path information.
         if ($pkg =~ m|^(.*)/([^/]+)$|) {
+            my $module;
+
             ($module, $pkg) = ($1, $2);
-        } else {
-            $module = $pwd;
+            if (!chdir($module)) {
+                return (AVALON_SYSTEM_ERROR, "Unable to chdir into \"$module\" -- $!", undef);
+            }
         }
         if ($pkg =~ /src\.rpm$/) {
-            return &build_srpm($pkg, $module, $topdir, $buildroot, $target_format);
+            @ret = &build_srpm($pkg, $topdir, $buildroot, $target_format);
         } elsif ($pkg =~ /\.(tar\.|t)(gz|Z|bz2)$/) {
-            return &build_tarball($pkg, $module, $topdir, $buildroot, $target_format);
+            @ret = &build_tarball($pkg, $topdir, $buildroot, $target_format);
         } elsif ($pkg =~ /\.rpm$/) {
             return (AVALON_NO_SOURCES, "Alright...  Who's the wiseguy that told me to recompile \"$pkg,\" a binary RPM? :-P", undef);
         } else {
             return (AVALON_NO_SOURCES, "I'm sorry, but I don't know how to build \"$pkg.\"", undef);
         }
+        chdir($pwd);
+        return @ret;
     } else {
         # Okay, it's neither a file nor a directory.  What the hell is it?
         return (AVALON_NO_SOURCES, "I'm sorry, but I can't figure out what to do with \"$pkg.\"", undef);

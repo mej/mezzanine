@@ -1343,3 +1343,8 @@ Thu Aug  2 12:47:16 2001                        Michael Jennings (mej)
 
 Now working a few small kinks out of the parallel build.
 ----------------------------------------------------------------------
+Thu Aug  2 20:09:57 2001                        Michael Jennings (mej)
+
+Not only are parallel builds now working, but it can once again
+rebuild our entire 7.1.1 distro.  Woo-ha!
+----------------------------------------------------------------------
