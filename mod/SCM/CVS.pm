@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: CVS.pm,v 1.4 2004/06/23 00:21:24 mej Exp $
+# $Id: CVS.pm,v 1.5 2004/06/24 23:31:43 mej Exp $
 #
 
 package Mezzanine::SCM::CVS;
@@ -175,41 +175,43 @@ login()
 {
     my $self = shift;
     my ($login, $cmd, $line, $err, $found, $repository);
+    my @params = ("login");
     local *CVSPASS;
 
     dprint &print_args(@_);
 
     $repository = $self->{"repository"};
     if (! $repository || ($repository !~ /^:pserver:/)) {
-        dprint "Login not required.\n";
+        dprint "Login not required -- non-pserver repository.\n";
         return 1;
     }
 
+    $repository =~ s!:\d+/!:/!;
     if (open(CVSPASS, "$ENV{HOME}/.cvspass")) {
         $found = 0;
         while (<CVSPASS>) {
             chomp($line = $_);
-            if ($line =~ /^$repository/) {
+            $line =~ s!:\d+/!:/!;
+            if ($line =~ /$repository/) {
                 $found = 1;
                 last;
             }
         }
         close(CVSPASS);
         if ($found) {
-            dprint "Login not required.\n";
+            dprint "Login not required -- correct login found.\n";
             return 1;
         }
     }
     if (-t STDIN) {
-        $cmd = "/bin/sh -c \"cvs $repository login\"";
-        $err = $self->talk_to_server("login", $cmd);
+        $err = $self->talk_to_server("login", @params);
         if ($err) {
             return 0;
         }
     } else {
         dprint "Performing automated login with an empty password.\n";
         open(CVSPASS, ">> $ENV{HOME}/.cvspass");
-        print CVSPASS "$repository A\n";
+        print CVSPASS "/1 $repository A\n";
         close(CVSPASS);
     }
     return 1;
@@ -226,7 +228,7 @@ parse_repository_path($)
     if (! $repository) {
         $repository = $self->{"repository"};
     }
-    if ($repository =~ /^(:pserver:|:ext:)?(\w+)\@([^:]+)(:\d+)?:(\/.*)$/i) {
+    if ($repository =~ /^(:pserver:|:ext:)?(\w+)\@([^:]+):(\d+)?(\/.*)$/i) {
         ($proto, $user, $pass, $host, $port, $path) = ($1 || "", $2, undef, $3, $4 || "", $5);
         $proto =~ s/^:(.*):$/$1/;
         $port =~ s/^://;
@@ -256,7 +258,7 @@ compose_repository_path($$$$)
                               (($proto) ? (":$proto:") : ("")),
                               (($user) ? ($user) : ("anonymous")),
                               (($host) ? ("\@$host:") : ("\@localhost:")),
-                              (($port) ? ("$port:") : ("")),
+                              (($port) ? ("$port") : ("")),
                               (($path) ? ($path) : ("/cvs")));
     }
     return $self->set("repository", $repository);

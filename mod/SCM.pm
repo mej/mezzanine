@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: SCM.pm,v 1.3 2004/06/22 23:10:07 mej Exp $
+# $Id: SCM.pm,v 1.4 2004/06/24 23:31:43 mej Exp $
 #
 
 package Mezzanine::SCM;
@@ -121,7 +121,9 @@ auto_detect($)
             return Mezzanine::SCM->new($mod);
         } elsif ($ret == MZSCM_WILL_HANDLE) {
             dprint "$mod is willing to handle $path.\n";
-            $will = $mod;
+            if (! $will) {
+                $will = $mod;
+            }
             # Keep looking
         } else {
             dprint $mod . "->can_handle($path) returned $ret?!\n";
