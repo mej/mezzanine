@@ -1,14 +1,14 @@
-Summary: Mezzanine -- The VA Software Engineering Build System
+Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
-Version: 2.1
-Release: 0.13
+Version: 0.1
+Release: 0.1
 Copyright: BSD with Advertising Clause
 Group: Development/Tools
 Source: %{name}.tar.gz
 BuildRoot: /tmp/%{name}-%{version}-root
-Packager: Michael Jennings <mej@valinux.com>
-Vendor: VA Linux Systems (http://www.valinux.com/)
-URL: http://www.valinux.com/
+Packager: Michael Jennings <mej@kainx.org>
+Vendor: KainX.Org (http://www.kainx.org/)
+URL: http://www.kainx.org/mezzanine/
 Requires: perl, perl-libnet
 
 %description
@@ -66,7 +66,6 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-, root, root)
-%doc README ChangeLog doc/*.txt doc/Makefile.mezz.sample
 %{_bindir}/*
 %{_libdir}/*
 %{_mandir}/*
