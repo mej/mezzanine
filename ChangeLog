@@ -1257,3 +1257,11 @@ Moved the SRCS info to the avalon.srcs file for in-place builds.
 
 Fixed revtool's login routine to only login if required.
 ----------------------------------------------------------------------
+Fri Jun  8 17:13:14 2001                        Michael Jennings (mej)
+
+Added support for the -D option in srctool so that avimport (et al.)
+can take alternative CVSROOT's.  (Fixes bug #1047.)
+
+Added a -f/--force option to imgtool.  The default behavior is now to
+exit if a failure occurs.  (Fixes bug #1249.)
+----------------------------------------------------------------------

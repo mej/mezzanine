@@ -1,16 +1,11 @@
-%define name     avalon
-%define ver      2.0
-%define rel      6
-%define prefix   /usr
-
 Summary: Avalon -- The VA Software Engineering Build System
-Name: %name
-Version: %ver
-Release: %rel
+Name: avalon
+Version: 2.0
+Release: 7
 Copyright: BSD with Advertising Clause
 Group: Development/Tools
 Source: %{name}.tar.gz
-BuildRoot: /tmp/%{name}-%{ver}-root
+BuildRoot: /tmp/%{name}-%{version}-root
 Packager: Michael Jennings <mej@valinux.com>
 Vendor: VA Linux Systems (http://www.valinux.com/)
 URL: http://www.valinux.com/

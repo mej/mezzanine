@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: imgtool,v 1.10 2001/04/10 05:29:11 mej Exp $
+# $Id: imgtool,v 1.11 2001/06/09 00:14:14 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -53,6 +53,7 @@ print_usage_info
     print "    -l --list <file>                 Take the package list from \"file\" instead of the command line\n";
     print "    -t --test                        Test dependencies but do not install packages\n";
     print "    -k --keep                        Keep the existing root image and add to it\n";
+    print "    -f --force                       Do as much as possible despite failures\n";
     print "\n";
     exit(AVALON_SUCCESS);
 }
@@ -176,8 +177,12 @@ install_packages
 
     foreach $pkg (@pkgs) {
         if (!defined($rpm_name{$pkg})) {
-            eprint "No package found for $pkg!\n";
-            next;
+            if ($force) {
+                eprint "No package found for $pkg!\n";
+                next;
+            } else {
+                &fatal_error("No package found for $pkg!\n");
+            }
         }
         if ($global_flags || $flags{$pkg}) {
             $prog = "--program='rpm " . ($global_flags ? "$global_flags " : "") . ($flags{$pkg} ? $flags{$pkg} : "") . "'";
@@ -200,7 +205,11 @@ install_packages
         }
         close(CMD);
         if ($? != AVALON_SUCCESS) {
-            &fatal_error("Install of $rpm failed (error $?).\n");
+            if ($force) {
+                eprint "Install of $rpm failed (error $?).\n";
+            } else {
+                &fatal_error("Install of $rpm failed (error $?).\n");
+            }
         }
     }
     return AVALON_SUCCESS;
@@ -220,7 +229,14 @@ archive_image
         $cmd = "tar --numeric-owner --use-compress-program=bzip2 -Pcf $filename .";
     }
 
-    open(CMD, "$cmd 2>&1 |") || &fatal_error("Unable to execute \"$cmd\" -- $!\n");
+    if (!open(CMD, "$cmd 2>&1 |")) {
+        if ($force) {
+            eprint "Unable to execute \"$cmd\" -- $!\n";
+            return;
+        } else {
+            &fatal_error("Unable to execute \"$cmd\" -- $!\n");
+        }
+    }
     print "Creating archive file $filename from $imagedir....\n";
     dprint "$cmd\n";
     while (<CMD>) {
@@ -231,7 +247,11 @@ archive_image
     }
     close(CMD);
     if ($?) {
-        &fatal_error("Creation of archive file failed.\n");
+        if ($force) {
+            eprint "Creation of archive file failed.\n";
+        } else {
+            &fatal_error("Creation of archive file failed.\n");
+        }
     }
 }
 
@@ -246,7 +266,7 @@ main
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "i|image=s", "D|dir=s", "a|archive=s",
-                   "l|list=s", "t|test", "k|keep", "A|arch=s");
+                   "l|list=s", "t|test", "k|keep", "A|arch=s", "f|force");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -254,7 +274,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.10 $ created on $Date: 2001/04/10 05:29:11 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.11 $ created on $Date: 2001/06/09 00:14:14 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -286,6 +306,7 @@ main
         @pkgdirs = glob('$ENV{BUILD_DIR}/RPMS/*');
     }
     $keep = ($opt_k ? 1 : 0);
+    $force = ($opt_f ? 1 : 0);
     $global_flags = ($opt_t ? "--justdb --noscripts --notriggers" : 0);
     $archive = ($opt_a ? $opt_a : 0);
     if ($archive && $archive !~ /^\//) {
