@@ -395,3 +395,9 @@ Converted pkgtool to use new mezz_init() and options stuff.
 
 Moved cache files.
 ----------------------------------------------------------------------
+Thu Apr  1 18:24:19 2004                        Michael Jennings (mej)
+
+Added config engine.
+
+Added initial attempt at preserving successful build logs.
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: uptool,v 1.16 2004/03/31 02:22:23 mej Exp $
+# $Id: uptool,v 1.17 2004/04/01 23:25:24 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -127,6 +127,7 @@ compare_packages()
     my $cache_file = "$ENV{HOME}/.mezz/uptool/cache";
     local *CACHE;
 
+    # FIXME:  Use new Config.pm if this thing ever gets used again.
     if (-s $cache_file) {
         if (open(CACHE, $cache_file)) {
             my @tmp;
@@ -382,7 +383,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.16 $ created on $Date: 2004/03/31 02:22:23 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.17 $ created on $Date: 2004/04/01 23:25:24 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

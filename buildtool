@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.178 2004/03/31 02:22:23 mej Exp $
+# $Id: buildtool,v 1.179 2004/04/01 23:25:24 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -212,7 +212,7 @@ scan_rpm_dirs
 
     $topdir = &pkgvar_topdir();
 
-    # Pre-scan all the binary RPM's for future use We need to know what SRPM
+    # Pre-scan all the binary RPM's for future use.  We need to know what SRPM
     # each binary came from, because some (lame) packages change the base name.
     nprint "Updating state information....\n";
     dprint "Scanning binary RPM's in $topdir for their corresponding SRPM's.\n";
@@ -328,7 +328,16 @@ build_package_forked
             close $GLOBAL_LOG if ($GLOBAL_LOG);
             open(STDOUT, ">/dev/null");
             open(STDIN, "</dev/null");
-            &nuke_tree($logfile) if (-e $logfile);
+            if (-e $logfile) {
+                dprint "Log file $logfile exists.\n";
+                if (! -e "$logfile.save") {
+                    dprint "Renaming to $logfile.save.\n";
+                    &move_files($logfile, "$logfile.save");
+                } else {
+                    dprint "Removing $logfile.\n";
+                    &nuke_tree($logfile);
+                }
+            }
             if (!open(LOGFILE, ">$logfile")) {
                 eprint "Unable to open $logfile -- $!\n";
             } else {
@@ -367,6 +376,21 @@ build_package_forked
                 &nuke_tree(&pkgvar_buildroot());
             }
             close(LOGFILE) if ($GLOBAL_LOG);
+            if ($err == MEZZANINE_SUCCESS) {
+                if (-e "$logfile.broken") {
+                    wprint "Breakage log file $logfile.broken exists -- Package fixed itself!?\n";
+                    &nuke_tree("$logfile.broken");
+                    &nuke_tree("$logfile.save");
+                } elsif (-e "$logfile.save") {
+                    dprint "Previous successful log file $logfile.save exists -- Moving back into place.\n";
+                    &nuke_tree($logfile);
+                    &move_files("$logfile.save", $logfile);
+                }
+            } else {
+                dprint "Renaming $logfile to $logfile.broken.\n";
+                &nuke_tree("$logfile.broken");
+                &move_files($logfile, "$logfile.broken");
+            }
             exit ($err);
         } elsif ($! !~ /No more processes/ && $! !~ /Resource temporarily unavailable/) {
             &fatal_error("fork() failed -- $!\n");
@@ -775,7 +799,7 @@ main
     #
     if ($opt_v) {
         &print_version($progname, $version, $author,
-                       'CVS Revision $Revision: 1.178 $ created on $Date: 2004/03/31 02:22:23 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.179 $ created on $Date: 2004/04/01 23:25:24 $ by $Author: mej $ ');
         # Never returns
     }
     if ($opt_h) {

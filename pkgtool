@@ -23,14 +23,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.60 2004/03/31 02:22:23 mej Exp $
+# $Id: pkgtool,v 1.61 2004/04/01 23:25:24 mej Exp $
 #
 
 use strict;
 
 # Include the Perl Modules we need
 use POSIX;
-use Cwd ('&getcwd', '&abs_path');
 use Mezzanine::Util;
 use Mezzanine::PkgVars;
 use Mezzanine::Pkg;
@@ -95,7 +94,7 @@ main
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.60 $ created on $Date: 2004/03/31 02:22:23 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.61 $ created on $Date: 2004/04/01 23:25:24 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || (!scalar(@ARGV) && &basename($0) !~ /^mz/)) {
         &print_usage_info();
     }
