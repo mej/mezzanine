@@ -5,7 +5,7 @@
 # Michael Jennings <mej@eterm.org>
 # 21 July 2000
 #
-# $Id: bootable-cdtool,v 1.3 2001/11/04 21:54:23 mej Exp $
+# $Id: bootable-cdtool,v 1.4 2001/11/05 13:04:39 mej Exp $
 #
 
 umask 022
@@ -20,3 +20,38 @@ else
     BUILDDIR=$PWD/build.mezz
 fi
 
+V_VER=`cut -d' ' -f2 /etc/vermillion`
+RH_VER=`cut -d' ' -f5 /etc/redhat-release`
+
+PKGLIST=$HOME/hjl_distro_stuff/base-${RH_VER}.list
+POST_FILES=$HOME/cvs/jc-cd/post
+IMAGE=/os/jc-cd
+NET=vermillion-${V_VER}-net
+IMGTOOL=imgtool
+MEDIATOOL=mediatool
+
+$IMGTOOL -i $IMAGE -fl $PKGLIST -D $BUILDDIR/$NET/RedHat/RPMS
+rpm -Uvh --root=$IMAGE $HOME/cvs/vml/bin-rh-7.1/devfsd-*.i386.rpm
+cd $IMAGE
+
+mkdir -m 0755 -p $IMAGE/mnt/home
+
+find bin usr etc lib boot sbin \( -type d -o -type f \) -perm -0002 -xdev -exec chmod o-w {} \;
+
+mv boot isolinux
+ln -s isolinux boot
+cp -a /usr/lib/syslinux/isolinux.bin $IMAGE/boot/
+
+for i in boot/vmlinuz-* ; do rdev $i /dev/hdc ; ramsize $i 10240 ; done
+
+(cd $POST_FILES ; tar --exclude .cvsignore --exclude CVS --exclude ChangeLog -cf - .) | (cd $IMAGE ; tar -xf -)
+
+tar -zcf boot/etc.tgz etc
+
+tar -zcf boot/var.tgz var
+
+rm -rf tmp
+ln -s /mnt/var/tmp tmp
+
+cd $IMAGE/..
+$MEDIATOOL -i jc-cd.iso -D $IMAGE -I isolinux
