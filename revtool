@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.29 2000/06/20 04:11:25 mej Exp $
+# $Id: revtool,v 1.30 2000/06/20 18:55:22 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -78,6 +78,7 @@ print_usage_info
     print "    -i --import              Import a new set of sources, or update the vendor branch for a package\n";
     print "    -T --rtag <tag>          Tag one or more complete modules directly\n";
     print "    -t --tag <tag>           Specify a symbolic tag for an operation, or tag local sources\n";
+    print "    -l --login               Perform a login to the repository\n";
     print "    -R --recurse             Operate recursively (this is the default for some commands)\n";
     print "    -k [code]                Specify keyword handling when adding files (use -kb to add binary files)\n";
     print "    -D --dir                 Specify an alternative repository (\$CVSROOT)\n";
@@ -135,6 +136,61 @@ cat_file
         $contents .= $_;
     }
     return $contents;
+}
+
+# Login to the repository
+sub
+login_to_master
+{
+    my $login = $_[0];
+    my ($cmd, $line, $pass, $err, $msg, $found);
+    local (*CMD, *CVSPASS);
+
+    if (-t) {
+        $cmd = "/bin/sh -c \"cvs -d $login login\"";
+        dprint "About to run $cmd\n";
+        if (!open(CMD, "$cmd 2>&1 |")) {
+            eprint "Execution of \"$cmd\" failed -- $!";
+            return REVTOOL_COMMAND_FAILED;
+        }
+        while (<CMD>) {
+            chomp($line = $_);
+            print "$line\n";
+            # Check the output for errors
+            if ($line =~ /^cvs \[\w+ aborted\]: authorization failed: server \S+ rejected access/) {
+                $err = REVTOOL_BAD_LOGIN;
+                $msg = "Your userid or password was not valid";
+                last;
+            }
+        }
+        close(CMD);
+        dprint "\"$cmd\" returned $?\n";
+        if ($? && ! $err) {
+            $err = REVTOOL_UNSPECIFIED_ERROR;
+            $msg = "Unhandled login error";
+        }
+        if ($err) {
+            eprint "Login failed -- $msg.\n";
+            return 0;
+        }
+    } else {
+        open(CVSPASS, "$ENV{HOME}/.cvspass") || return 0;
+        $found = 0;
+        while (<CVSPASS>) {
+            chomp($line = $_);
+            if ($line =~ /^$login/) {
+                $found = 1;
+                last;
+            }
+        }
+        close(CVSPASS);
+        if (! $found) {
+            open(CVSPASS, ">> $ENV{HOME}/.cvspass");
+            print CVSPASS "$login A\n";
+            close(CVSPASS);
+        }
+    }
+    return 1;
 }
 
 # Commit changes to the master repository
@@ -597,6 +653,9 @@ tag_repository_sources
 sub
 main
 {
+    if ($login) {
+        &login_to_master($login);
+    }
     if ($query) {
         if ($query eq "t") {
             &list_tags(@ARGV);
@@ -655,7 +714,7 @@ BEGIN {
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "g|get", "p|put", "a|add", "r|remove",
                    "q|query=s", "R|recurse", "t|tag=s", "i|import=s", "k=s", "D|dir=s",
-                   "x|exclusive", "addlist=s", "remlist=s", "T|rtag=s");
+                   "x|exclusive", "addlist=s", "remlist=s", "T|rtag=s", "l|login");
 
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
@@ -680,9 +739,18 @@ BEGIN {
         $mode = "rtag";
     }
     $cvsroot = "-d $opt_D" if ($opt_D);
+    if ($opt_l) {
+        if ($opt_D) {
+            $login = $opt_D;
+        } elsif (-f "CVS/Root") {
+            chomp($login = &cat_file("CVS/Root"));
+        } elsif ($ENV{CVSROOT}) {
+            $login = $ENV{CVSROOT};
+        }
+    }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.29 $ created on $Date: 2000/06/20 04:11:25 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.30 $ created on $Date: 2000/06/20 18:55:22 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

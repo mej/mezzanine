@@ -4,7 +4,7 @@
 #  Written by:  Michael Jennings
 #               Ted T'so
 #
-#  $Id: README,v 1.7 2000/06/18 06:48:44 mej Exp $
+#  $Id: README,v 1.8 2000/06/20 18:55:22 mej Exp $
 #
 ########################################################################
 
@@ -17,16 +17,6 @@ design philosophies behind it.  It also details the various standards
 policies which govern its contents, so those planning on adding to
 and/or maintaining part(s) of the tree should read those sections
 carefully.
-
-Before you can build any products, you must set your machine up to be
-able to run the build system tools.  Since you are reading this README
-file, you must have checked out the "base" module.  Within that module
-is a directory called "pm" which contains another directory called
-"getopt."  This getopt directory contains the Getopt::Mixed Perl
-module which is required for the build scripts to function properly.
-You will need to go into pm/getopt and run the following command as
-root:  "perl Makefile.PL ; make ; make install".  Once you have done
-this, return to the base directory and proceed as shown below.
 
 For those wishing to simply build a particular VA product, you will
 find a directory called products under this one.  It contains a series

@@ -519,3 +519,9 @@ Mon Jun 19 22:27:02 2000                        Michael Jennings (mej)
 
 Crap!  Forgot to remove the options debugging stuff.
 ----------------------------------------------------------------------
+Tue Jun 20 12:04:33 2000                        Michael Jennings (mej)
+
+Added support for logging into the repository via revtool.  Also added
+automated password-less logins if stdin is not a tty.  This should
+help support varying CVSROOT's.
+----------------------------------------------------------------------
