@@ -1015,3 +1015,9 @@ Wed Feb  7 14:04:09 2001                        Michael Jennings (mej)
 
 Finishing touches on the product files document.
 ----------------------------------------------------------------------
+Thu Feb 22 18:52:47 2001                        Michael Jennings (mej)
+
+Updated README.  Cleaned up design doc with suggestions from Ted.
+Added support for buffy directory to web-sync.  Added first revision
+of the Avalon 2.0 TODO list with time guesstimates.
+----------------------------------------------------------------------

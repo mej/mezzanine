@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: build_system_design.txt,v 1.10 2001/02/07 22:04:49 mej Exp $
+#  $Id: build_system_design.txt,v 1.11 2001/02/23 02:53:53 mej Exp $
 #
 ########################################################################
 
@@ -79,10 +79,11 @@ for use with CVS.  Therefore, a CVS server will be present on the
 build server.  This CVS server will be responsible for containing all
 build system files in a revision-controlled environment.
 
-For simplicity, this document may refer to the CVS server rather than
-trying to come up with an acronym that isn't the name of one of the
-above systems.  If you choose to use a different backend for your
-repository, make appropriate substitutions where necessary.
+For simplicity, this document may refer to the "CVS server" rather
+than trying to come up with a generic acronym for a revision control
+system that isn't the name of one of the above systems.  If you choose
+to use a different backend for your repository, make appropriate
+substitutions where necessary.
 
 2.2.  Repository Interaction
 ----------------------------
@@ -167,19 +168,19 @@ The culminating force of the build system is the piece that creates
 the end result -- products.  Avalon employs a single program,
 buildtool, which takes product description files ("prod files") and
 creates products from their component packages based on the
-information in those files.  It will utilize the other Avalon
+information in those files.  It will utilize some of the other Avalon
 components to perform this task.
 
 Product files are designed to be a very powerful engine for describing
 products in terms of their components -- packages and other products.
 For example, a RedHat-based distribution could be divided into the OS
-and the Powertools.  The OS could be further subdivided into a minimal
-package set and server/workstation package sets.  Each high-level
-product file simply references the sub-products and packages which
-compose it; buildtool handles the task of recursing through product
-files until a complete list of packages is made.  This facilitates the
-creation of layered products while encouraging cooperative reuse of
-the underlying packages.
+and the Powertools packages.  The OS could be further subdivided into
+a minimal package set and server/workstation package sets.  Each
+high-level product file simply references the sub-products and
+packages which compose it; buildtool handles the task of recursing
+through product files until a complete list of packages is made.  This
+facilitates the creation of layered products while encouraging
+cooperative reuse of the underlying packages.
 
 For instance, an embedded solution product such as VANA (VA NetAttach)
 requires a basic operating system from which to build, but the
@@ -281,26 +282,35 @@ its own tree.  A master project called "build" will contain the Avalon
 tools as well as product files for all products in the system.
 
 Within each product tree will be located individual modules, one per
-component package or package set.  Package sets are groups of packages
-which are not maintained locally and can therefore be used exclusively
-in their package form.  Any locally-maintained or locally-modified
-packages must be in separate modules.  Package set directories should
-be named starting with either "contrib-" (for source packages) or
-"bin-" (for binary packages), followed by an indication of the
-platform for which they are intended (e.g., "rh" for RedHat, "deb" for
-Debian, etc.).  Other directories, those for individual packages,
-should be named according to the package name.
+component package or package set.  Package set modules (the individual
+modules containing the package sets) should be named starting with
+either "contrib-" (for source packages) or "bin-" (for binary
+packages), followed by an indication of the platform for which they
+are intended (e.g., "rh" for RedHat, "deb" for Debian, etc.).  Other
+modules should have the same name as their respective packages.
 
 3.3.  Module Structure
 ----------------------
 
-Each individual module directory will contain the various source files
-(including tarballs) and patch files from the original source
-package.  They should be committed and altered in place and intact.
-Avalon will provide tools to automate the manipulation of these files
-in such a way as to fulfill the project design goals which seem
-overlooked by the implementation.  Past experience with branching and
-tagging has revealed CVS to be less than sufficient.
+The build system will contain three types of modules: package sets,
+source package modules (SPM's), and full source trees (FST's).
+Package sets are groups of packages which are not maintained locally
+and can therefore be used exclusively in their package form.  Any
+locally-maintained or locally-modified packages must be in separate
+modules.
+
+Source package modules are single-level modules containing an exploded
+source package.  Most packages which are modified from the originals
+by VA will be maintained in SPM's.  SPM's contain actual source files,
+patches, tarballs, and spec files.
+
+Full source trees are complete directory hierarchies which are
+actively maintained within the build system.  An FST module should
+contain the spec file (named <pkg>.spec(.in), or
+<pkg>-<distro>.spec(.in), or as a last resort, *.spec(.in)),
+individual source files, and unarchived source trees.  No patches can
+be generated from this tree; if patches are required, use an SPM and
+maintain the package elsewhere.
 
 
 4.  HIGH-LEVEL PROCESS OVERVIEW
@@ -314,15 +324,15 @@ step-by-step, including as much detail as is appropriate.
 4.1.  Importing New Packages
 ----------------------------
 
-As new packages need to be maintained, temporarily or permanently, by
+As new packages need to be maintained temporarily or permanently by
 internal personnel, they must be added to the build system so that all
 changes can be tracked and managed in an organized manner.  The
 addition of packages to the build system is called an "import."  There
 are three types of imports which may be done, each of which will be
 outlined in one of the following sections.
 
-4.1.1.  Importing SRPM Packages
--------------------------------
+4.1.1.  Importing SRPM Packages into SPM's
+------------------------------------------
 
 At times, an external vendor will publish a particular package which
 contains errors in function or judgment on the part of that vendor.
@@ -342,12 +352,12 @@ follow in this situation.
         $ avimport pkg-1.0-1.src.rpm
 
 Avalon will automatically explode the SRPM into its component parts
-and commit them as a new module.  It will also detect if the module
-already exists and attempt to merge the changes, noting which files
-are duplicates.
+and commit them as a new SPM (source package module).  It will also
+detect if the module already exists and attempt to merge the changes,
+noting which files are duplicates.
 
-4.1.2.  Importing Source Trees
-------------------------------
+4.1.2.  Importing Full Source Trees (FST's)
+-------------------------------------------
 
 Some work takes place on code that is actually stored and maintained
 inside the build system.  These packages are generally best stored as
@@ -365,11 +375,10 @@ developers are free to modify, tag, import, etc. at their leisure.
         $ avimport -n pkg-1.0 pkg
 
 Note that you must specify the package name and version for this type
-of import since they cannot be automatically determined.
-(** Actually, I could look in the spec file if it's there, but would
-that be too confusing? **)  The source tree will be imported using a
-branch tag of PKG-1-0 and a vendor tag of PKG and can be used for old
-and new trees alike, just as "cvs import" can be.
+of import since they cannot be automatically determined.  The source
+tree will be imported using a branch tag of PKG-1-0 and a vendor tag
+of PKG and can be used for old and new trees alike, just as "cvs
+import" can be.
 
 4.1.3.  Importing Exploded Packages
 -----------------------------------

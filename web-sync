@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 28 Sept 2000
 #
-# $Id: web-sync,v 1.8 2001/02/07 22:04:49 mej Exp $
+# $Id: web-sync,v 1.9 2001/02/23 02:53:53 mej Exp $
 #
 
 if [ ! -z "$SUDO_USER" ]; then
@@ -54,6 +54,8 @@ for i in $* ; do
         $CHOWN_CMD RPMS SRPMS iso
         $CHMOD_CMD RPMS SRPMS iso
       done
+      echo "*** Syncing buffy files ***"
+      $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/buffy $LOCAL_DIR/$i/
       echo "*** Sync of $i done ***"
       ;;
 

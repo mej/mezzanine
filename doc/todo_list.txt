@@ -1,0 +1,48 @@
+########################################################################
+#        Avalon 2.0 Project Tasks -- Where Do We Go from Here?
+#
+#  Written by:  Michael Jennings
+#
+#  $Id: todo_list.txt,v 1.1 2001/02/23 02:53:54 mej Exp $
+#
+########################################################################
+
+Generic Tasks
+-------------
+
+
+New Tools [32+d]
+----------------
+ - For handling mass package updates from RedHat [1d]
+ - For manipulating source packages (srctool) [21d]
+    - Explode and import SRPM's into SPM's [3d]
+    - Detect existing module and compensate [4d]
+    - Import FST's [2d]
+    - Prepare working tree [5d]
+    - Generate new patches [2d]
+    - Resync patches [3d]
+ - For generating distribution media (CD's, tarballs, etc.) [5d]
+ - For parallelized builds [5d]
+ - For distributed builds [??]
+ - For providing online help (helptool) [??]
+
+
+buildtool Changes [15d]
+-----------------------
+ - Split off ISO stage and cleanup stage [1d]
+ - Break out parallelizer [1d]
+ - Reorganize and clean up code, comment [5d]
+ - Support generic makefile for oddball packages [2d]
+ - Move symlink support to revtool [1d]
+ - Support for tarballs as packages [2d]
+ - Merge compose and explode/build stages [3d]
+
+revtool Changes [1d]
+--------------------
+ - Support for creating symlinks [1d]
+
+
+pkgtool Changes [2d]
+--------------------
+ - Support for individual tarballs containing spec files (rpm -ta) [2d]
+

@@ -1,0 +1,41 @@
+build_system_design.txt
+-----------------------
+
+Section 4.3.1.  Do we make them copy the patch in, add it, edit spec
+file, and commit?  or do we make srctool handle everything, maybe even
+open up the spec file in an editor?
+
+Section 4.5.  What needs to go here?
+
+
+
+buildtool.pdf
+-------------
+
+Page 1
+
+ - The current implementation is not easily distributable.  There are
+   ways to make it distributable, but then other things tend to break,
+   like in-place builds and parallel builds.  Do we really want
+   buildtool to get any more complex?  Perhaps we should have separate
+   build engines, maybe as subprograms which buildtool invokes?
+
+ - The stage concept offers a lot of flexibility in terms of starting
+   and stopping points, and picking up where one left off.  However,
+   maybe there's a better way.  Thoughts?
+
+ - People don't seem to think the existing documentation is
+   sufficient, and perhaps it isn't.  Would some sort of interactive
+   help tool be beneficial?  Something akin to "bk help"?
+
+ - Is it time to learn Perl modules and offload some of the common
+   code?
+
+ - What other sorts of media might we need besides CD's and directory
+   trees.  Tarballs?  Installation trees?  Anything else?
+
+
+Page 2
+
+ - How parallelizable are CVS checkouts of individual files in a
+   single module?  Any better than what we have now (i.e., none)?
