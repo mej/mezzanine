@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.61 2000/06/15 03:46:14 mej Exp $
+# $Id: buildtool,v 1.62 2000/06/16 02:38:22 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1120,7 +1120,7 @@ do_compose_stage
         opendir(DIR, "$builddir/SRPMS");
         @contents = readdir(DIR);
         closedir(DIR);
-        @tmp = grep($_ =~ /^$pkg.*src\.rpm$/, @contents);
+        @tmp = grep($_ =~ /^$pkg-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/, @contents);
         if ($#tmp >= 0) {
             $srpm = $tmp[0];
             if ($#tmp > 0) {
@@ -1779,7 +1779,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.61 $ created on $Date: 2000/06/15 03:46:14 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.62 $ created on $Date: 2000/06/16 02:38:22 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
