@@ -160,7 +160,8 @@ pkgvar_set(%)
             $pkg_vars{$var} = ($param ?  $param : $orig_pkg_vars{$var});
         }
         $ret = $pkg_vars{$var};
-        dprint "Package variable \"$var\" -> \"$ret\"\n";
+        dprintf("Package variable \"%s\" -> \"%s\"\n", $var,
+                (($ret) ? ($ret) : ("")));
     }
     return $ret;
 }

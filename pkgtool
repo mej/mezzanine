@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.62 2004/05/10 14:47:00 mej Exp $
+# $Id: pkgtool,v 1.63 2004/05/18 01:50:17 mej Exp $
 #
 
 use strict;
@@ -103,7 +103,7 @@ main
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.62 $ created on $Date: 2004/05/10 14:47:00 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.63 $ created on $Date: 2004/05/18 01:50:17 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || (!scalar(@ARGV) && &basename($0) !~ /^mz/)) {
         &print_usage_info();
     }
@@ -171,6 +171,8 @@ main
         } else {
             &set_hints_info($config->get("HINTS"));
         }
+    } elsif ($config->get("HINT_INSTALLER")) {
+        &set_hints_info($config->get("HINT_INSTALLER") . '%');
     }
 
     $ENV{"MAKE"} = $config->set("MAKE", $config->get("MAKE") || $ENV{"MEZZANINE_MAKE"} || "make");
