@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: uptool,v 1.10 2001/09/22 13:22:33 mej Exp $
+# $Id: uptool,v 1.11 2001/10/05 16:14:52 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -84,6 +84,7 @@ get_remote_listing($$)
             push @{$rpkgs->{$pkg}{REL}}, $parts[2];
             push @{$rpkgs->{$pkg}{ARCH}}, $parts[3];
             push @{$rpkgs->{$pkg}{FILES}}, $fname;
+            dprint "Adding remote package $pkg:  $fname\n";
         }
     }
     return @flist;
@@ -104,12 +105,14 @@ get_local_listing($)
         my $pkg;
         my @parts;
 
+        $fname = &basename($fname);
         @parts = &parse_rpm_name($fname);
         $pkg = $parts[0];
         push @{$lpkgs->{$pkg}{VER}}, $parts[1];
         push @{$lpkgs->{$pkg}{REL}}, $parts[2];
         push @{$lpkgs->{$pkg}{ARCH}}, $parts[3];
         push @{$lpkgs->{$pkg}{FILES}}, $fname;
+        dprint "Adding local package $pkg:  $fname\n";
     }
     return @flist;
 }
@@ -160,10 +163,12 @@ compare_lists($$)
 {
     my ($session, $dest) = @_;
 
-    foreach my $pkg (keys %{$rpkgs}) {
+    foreach my $pkg (sort keys %{$rpkgs}) {
         my @remote_list = @{$rpkgs->{$pkg}{FILES}};
         my ($rpm, $i);
 
+        # @remote_list contains an array of all RPM files for that particular
+        # package name.  It is *not* a complete list of all remote RPM files.
         print "Checking $pkg...\n";
 
         # Find the most recent version of that package on the remote site.
@@ -173,6 +178,7 @@ compare_lists($$)
                 $rpm = $remote_list[$i];
             }
         }
+        dprint "Going with $rpm\n";
 
         # If we have it, continue.
         if (defined($lpkgs->{$pkg}) && grep(/^\Q$rpm\E$/, @{$lpkgs->{$pkg}{FILES}})) {
@@ -213,6 +219,9 @@ fetch_updates(@)
     my ($session, $url, $pkgcnt, $tries, $last_login);
     my ($proto, $host, $port, $userid, $passwd, $path);
 
+    undef $session;
+    $last_login = "";
+
     foreach $url (@urls) {
         # Set defaults for stuff.
         ($port, $userid, $passwd) = ("21", "anonymous", "info\@kainx.org");
@@ -251,7 +260,7 @@ fetch_updates(@)
 
             print "Opening FTP session to $host:$port...\n";
             for (; 1;) {
-                $session = Net::FTP->new($host, Debug => $debug, Port => $port) || return 0;
+                $session = Net::FTP->new($host, Debug => 0, Port => $port, Passive => 1) || return 0;
                 for ($tries = 0; $tries < 5; $tries++) {
                     print "Trying to login as $userid...";
                     if ($session->login($userid, $passwd)) {
@@ -333,7 +342,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.10 $ created on $Date: 2001/09/22 13:22:33 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.11 $ created on $Date: 2001/10/05 16:14:52 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

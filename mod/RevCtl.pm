@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.7 2001/09/22 13:31:00 mej Exp $
+# $Id: RevCtl.pm,v 1.8 2001/10/05 16:14:52 mej Exp $
 #
 
 package Mezzanine::RevCtl;
@@ -572,11 +572,12 @@ query_release_diff
 sub
 tag_local_sources
 {
-    my $cmd;
+    my ($cmd, $t);
 
     dprint &print_args(@_);
 
-    $cmd = "/bin/sh -c \"cvs $repository tag -F $branch $tag " . join(' ', @_) . "\"";
+    ($t = $tag) =~ s/^-r //;
+    $cmd = "/bin/sh -c \"cvs $repository tag -F $branch $t " . join(' ', @_) . "\"";
     return &talk_to_server("tag", $cmd);
 }
 
@@ -584,11 +585,12 @@ tag_local_sources
 sub
 tag_repository_sources
 {
-    my $cmd;
+    my ($cmd, $t);
 
     dprint &print_args(@_);
 
-    $cmd = "/bin/sh -c \"cvs $repository rtag -F $branch $tag " . join(' ', @_) . "\"";
+    ($t = $tag) =~ s/^-r //;
+    $cmd = "/bin/sh -c \"cvs $repository rtag -F $branch $t " . join(' ', @_) . "\"";
     return &talk_to_server("rtag", $cmd);
 }
 

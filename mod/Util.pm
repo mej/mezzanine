@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.17 2001/09/22 13:22:34 mej Exp $
+# $Id: Util.pm,v 1.18 2001/10/05 16:14:52 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -496,7 +496,7 @@ cat_file($)
 sub
 parse_rpm_name($)
 {
-    my $rpm = $_[0];
+    my $rpm = &basename($_[0]);
 
     $rpm =~ m/^(\S+)-([^-]+)-([^-]+)\.([^\.]+)\.rpm$/;
     return ($1, $2, $3, $4);

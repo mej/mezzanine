@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgsort,v 1.19 2001/09/22 13:22:33 mej Exp $
+# $Id: pkgsort,v 1.20 2001/10/05 16:14:52 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -142,17 +142,14 @@ find_packages
 
         @tmp = &grepdir(sub {/(?<!src)\.rpm$/}, $dir);
         push @contents, @tmp;
-        foreach $tmp (@tmp) {
-            $path{$tmp} = $dir;
-        }
     }
 
     foreach $rpm (@contents) {
         my ($srpm, $spkg, $pkg, $ver, $rel);
 
-        $rpm =~ m/^([^\/]+)-([^-\/]+)-([^-\/]+)\.\w+\.rpm$/;
-        $pkg = $1;
-        if ($have_cache{"$path{$rpm}/$rpm"}) {
+        ($pkg, undef, undef, undef) = &parse_rpm_name($rpm);
+        dprint "Checking $pkg ($rpm)...\n";
+        if ($have_cache{$rpm}) {
             if (grep($_ eq $pkg || ($mode eq "src" && $_ eq $src_rpm{$src_package{$pkg}}) || $_ eq $rpm, @pkgs)) {
                 xpush @new_pkgs, $pkg;
             }
@@ -207,10 +204,24 @@ find_packages
         }
         @new_pkgs = @tmp;
     }
+    foreach my $pkg (@pkgs) {
+        if (!grep($_ eq $pkg, @new_pkgs)) {
+            eprint "No package files found for $pkg\n";
+        }
+    }
+    if (!scalar(@new_pkgs)) {
+        &fatal_error("No packages found.\n");
+    }
     return @new_pkgs;
 }
 
-# Simplify package dependency queries and operations
+# Returns 1 or 0 based on whether or not the package named in the
+# first parameter depends on the package named in the second parameter.
+# If the third parameter is non-zero, *all* requirements of the first
+# package are compared with each of the provisions of the second; if the
+# third parameter is non-existent or 0, only the package name is checked.
+# If the second package is not supplied, return a list of the requirements
+# of the first package.
 sub
 pkg_depends_on
 {
@@ -237,13 +248,21 @@ pkg_depends_on
         return @{$requires{$_[0]}};
     }
 }
+
+# Adds a dependency on the second parameter for the package listed in the
+# first parameter, but only if the two parameters are not the same and
+# the dependency doesn't already exist.
 sub
 pkg_add_dep
 {
     return if ($_[0] eq $_[1]);
-    push @{$requires{$_[0]}}, $_[1] if (! &pkg_depends_on($_[0], $_[1], 1));
+    xpush @{$requires{$_[0]}}, $_[1];
     xpush @{$what_requires{$_[1]}}, $_[0];
 }
+
+# Return 1 or 0 based on whether or not the package listed in the first
+# parameter provides the capability given as the second parameter, or
+# the list of provisions of the first parameter if the second is missing.
 sub
 pkg_provides
 {
@@ -255,13 +274,21 @@ pkg_provides
         return @{$provides{$_[0]}};
     }
 }
+
+# Adds a capability of the second parameter to the package in the first.
 sub
 pkg_add_cap
 {
-    push @{$provides{$_[0]}}, $_[1] if (! &pkg_provides($_[0], $_[1]));
+    xpush @{$provides{$_[0]}}, $_[1];
     xpush @{$what_provides{$_[1]}}, $_[0];
 }
 
+# For each of the third, fourth, fifth, etc. parameters, add an implicit
+# (forced) dependency on the second parameter if they depend on the first.
+# This can be used, for example, to add a dependency on "fileutils" for any
+# package that depends on "/bin/sh" since a dependency on /bin/sh generally
+# signals a shell script, and shell scripts tend to need the programs which
+# are supplied by the "fileutils" package.
 sub
 add_implicit_dependency
 {
@@ -364,7 +391,11 @@ query_packages
             eprint "No package found for $pkg!\n";
             next;
         }
-        dprint "Package $pkg:  ", join(", ", @{$rpm_list{$pkg}}), "\n";
+        if ($debug) {
+            dprint "Package $pkg:  ", join(", ", @{$rpm_list{$pkg}}), "\n";
+        } else {
+            print "$pkg  ";
+        }
         @{$provides{$pkg}} = ($pkg);
         @{$what_provides{$pkg}} = ($pkg);
         # FIXME:  Should this stay enabled for "src" mode?  I'm not sure, but it breaks "bin" mode.
@@ -372,17 +403,13 @@ query_packages
         #    &pkg_add_dep($pkg, $src_package{$pkg});
         #}
         foreach $rpm (@{$rpm_list{$pkg}}) {
-            $cmd = "pkgtool -qd -p $path{$rpm}/$rpm";
+            $cmd = "pkgtool -qd -p $rpm";
 
-            next if ($have_cache{"$path{$rpm}/$rpm"});
+            next if ($have_cache{$rpm});
             open(CMD, "$cmd 2>&1 |") || &fatal_error("Unable to execute pkgtool -- $!\n");
-            if ($debug) {
-                dprint "$cmd\n";
-            } else {
-                print "$pkg  ";
-            }
             while (<CMD>) {
                 chomp($line = $_);
+                next if ($line =~ /^\s*$/);
                 if ($line =~ /^Provides/ || $line =~ /^Contains/) {
                     $line =~ s/^\w+:  \s*(\S.+)\s*$/$1/;
                     $line =~ s/^\s+//;  $line =~ s/\s+$//;
@@ -393,6 +420,7 @@ query_packages
                     $line =~ s/^\w+:  \s*//;
                     $line =~ s/\s+[-=<>lteqng]+\s+\S+$//;
                     $line =~ s/^\s+//;  $line =~ s/\s+$//;
+                    next if ($line =~ /rpmlib\(\w+\)/);
                     &pkg_add_dep($pkg, $line);
                 } else {
                     eprint "$line\n";
@@ -415,11 +443,11 @@ write_cache
 
     open(CACHE, ">$ENV{HOME}/.pkgsort.cache") || return;
     foreach $pkg (@pkgs) {
-        print CACHE "S:$pkg|$src_package{$pkg}|$src_rpm{$src_package{$pkg}}|$src_version{$pkg}|$src_release{$pkg}\n";
+        print CACHE "S:$pkg|$src_package{$pkg}|$src_rpm{$src_package{$pkg}}|$src_version{$pkg}|$src_release{$pkg}\n" if ($mode eq "src");
         foreach $rpm (@{$rpm_list{$pkg}}) {
-            @s = stat("$path{$rpm}/$rpm");
+            @s = stat($rpm);
 
-            print CACHE "F:$pkg:$path{$rpm}/$rpm:$s[9]\n";
+            print CACHE "F:$pkg:$rpm:$s[9]\n";
         }
         print CACHE "P:$pkg|", join("|", @{$provides{$pkg}}), "\n" if (defined($provides{$pkg}));
         print CACHE "R:$pkg|", join("|", @{$requires{$pkg}}), "\n" if (defined($requires{$pkg}));
@@ -435,12 +463,10 @@ read_cache
     local *CACHE;
 
     open(CACHE, "<$ENV{HOME}/.pkgsort.cache") || return;
-    $skip = 0;
     while (<CACHE>) {
         chomp($line = $_);
         next if ($skip && $line !~ /^S/);
         if ($line =~ /^S:([^\|]+)\|/) {
-            $skip = 0;
             $pkg = $1;
             @inp = split("\Q|", $line);
             dprint "Found cache data for $pkg\n";
@@ -456,16 +482,11 @@ read_cache
             $pkg = $inp[1];
             if (!(@fstat = stat($inp[2])) || ($fstat[9] > $inp[3])) {
                 dprint "Cache data for $inp[2] ($pkg) is outdated.\n";
-                delete $src_version{$pkg};
-                delete $src_release{$pkg};
-                $skip = 1;
+                next;
             } else {
                 $have_cache{$inp[2]} = 1;
             }
-            $inp[2] =~ m/^(.*)\/([^\/]+)$/;
-            ($path, $rpm) = ($1, $2);
-            $path{$rpm} = $path;
-            xpush @{$rpm_list{$pkg}}, $rpm;
+            xpush @{$rpm_list{$pkg}}, $inp[2];
         } elsif ($line =~ /^P:([^\|]+)\|/) {
             $pkg = $1;
             @inp = split("\Q|", $line);
@@ -753,17 +774,23 @@ show_packages
     }
 
     if (substr($output_format, 0, 4) eq "prod") {
-        @src_pkgs = &sort_source_packages(@pkgs);
-        if ($output_format eq "prodfile") {
-            foreach $spkg (@src_pkgs) {
-                print OUTFILE "# $spkg\n";
-                print OUTFILE "contrib-rh/$src_rpm{$spkg}";
-                if (scalar(@{$bin_packages{$spkg}})) {
+        my @pkg_list;
+
+        if ($mode eq "src") {
+            @pkg_list = &sort_source_packages(@pkgs);
+        } else {
+            @pkg_list = @pkgs;
+        }
+        foreach my $pkg (@pkg_list) {
+            if ($mode eq "src") {
+                print OUTFILE "# $pkg\n";
+                print OUTFILE "contrib-rh/$src_rpm{$pkg}";
+                if (scalar(@{$bin_packages{$pkg}})) {
                     my @tmp;
 
-                    foreach $pkg (sort @{$bin_packages{$spkg}}) {
-                        foreach $rpm (sort @{$rpm_list{$pkg}}) {
-                            if ($rpm =~ /^(.+)-\Q$src_version{$pkg}\E-\Q$src_release{$pkg}.i386.rpm\E$/) {
+                    foreach $bpkg (sort @{$bin_packages{$pkg}}) {
+                        foreach $rpm (sort @{$rpm_list{$bpkg}}) {
+                            if ($rpm =~ /^(.+)-\Q$src_version{$bpkg}\E-\Q$src_release{$bpkg}.i386.rpm\E$/) {
                                 push @tmp, "bin-rh/$1";
                             } else {
                                 push @tmp, "bin-rh/$rpm";
@@ -773,9 +800,15 @@ show_packages
                     print OUTFILE " bins=", join(',', @tmp);
                 }
                 print OUTFILE "\n\n";
+            } else {
+                my @tmp;
+
+                foreach my $bpkg (@{$rpm_list{$pkg}}) {
+                    push @tmp, &basename($bpkg);
+                }
+                print OUTFILE "bin-rh/", join(",bin-rh/", @tmp), "\n";
             }
         }
-        # FIXME:  What the hell was I going to output if format == "products"?
     } else {
         foreach $pkg (@pkgs) {
             my $flag = "";
@@ -819,7 +852,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.19 $ created on $Date: 2001/09/22 13:22:33 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.20 $ created on $Date: 2001/10/05 16:14:52 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
