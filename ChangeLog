@@ -59,3 +59,8 @@ Mon Feb 18 15:38:36 2002                        Michael Jennings (mej)
 
 Added support for passing SRPM's to mzmerge.
 ----------------------------------------------------------------------
+Mon Feb 25 18:49:59 2002                        Michael Jennings (mej)
+
+Argh.  How long has that extra 's' on the end of query_log() been
+there? :P
+----------------------------------------------------------------------

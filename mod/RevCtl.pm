@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.9 2001/11/04 13:46:30 mej Exp $
+# $Id: RevCtl.pm,v 1.10 2002/02/25 22:01:22 mej Exp $
 #
 
 package Mezzanine::RevCtl;
@@ -37,7 +37,7 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('&revctl_reset', '&revctl_system', '&revctl_command', '&revctl_repository', '&revctl_keyword_expansion', '&revctl_recursion', '&revctl_branching', '&revctl_sticky_clear', '&revctl_exclusive', '&revctl_strict_tagging', '&revctl_tag', '&revctl_rtag', '&check_tag', '&login_to_master', 'do_changelog_entry', '&make_repository_path', '&commit_to_master', '&update_from_master', '&add_new_files', '&delete_old_files', '&query_status', '&query_logs', '&query_annotation', '&query_diff', '&query_release_diff', '&tag_local_sources', '&tag_repository_sources', '&import_vendor_sources');
+    @EXPORT      = ('&revctl_reset', '&revctl_system', '&revctl_command', '&revctl_repository', '&revctl_keyword_expansion', '&revctl_recursion', '&revctl_branching', '&revctl_sticky_clear', '&revctl_exclusive', '&revctl_strict_tagging', '&revctl_tag', '&revctl_rtag', '&check_tag', '&login_to_master', 'do_changelog_entry', '&make_repository_path', '&commit_to_master', '&update_from_master', '&add_new_files', '&delete_old_files', '&query_status', '&query_log', '&query_annotation', '&query_diff', '&query_release_diff', '&tag_local_sources', '&tag_repository_sources', '&import_vendor_sources');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -86,7 +86,7 @@ sub update_from_master(@);
 sub add_new_files(@);
 sub delete_old_files(@);
 sub query_status(@);
-sub query_logs(@);
+sub query_log(@);
 sub query_annotation(@);
 sub query_diff(@);
 sub query_release_diff(@);
