@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: CVS.pm,v 1.3 2004/06/22 23:10:07 mej Exp $
+# $Id: CVS.pm,v 1.4 2004/06/23 00:21:24 mej Exp $
 #
 
 package Mezzanine::SCM::CVS;
@@ -49,6 +49,7 @@ $VERSION     = 0.1;
 
 # Constants
 my %DEFAULT_VALUES = (
+                      "type" => "CVS",
                       "command" => "cvs",
                       "repository" => "",
                       "operation" => "",
@@ -107,6 +108,12 @@ can_handle($)
     if (! $path) {
         dprint "$path is false.\n";
         return MZSCM_CANNOT_HANDLE;
+    } elsif ($path =~ /^(:pserver:|:ext:)?(\w+)\@([^:]+)(:\d+)?:(\/.*)$/i) {
+        dprint "$path is a CVS repository ($1|$2|$3|$4|$5).\n";
+        return MZSCM_CAN_HANDLE;
+    } elsif ($path =~ m!^cvs(pserver|ssh)://!i) {
+        dprint "$path is a CVS repository URL.\n";
+        return MZSCM_CAN_HANDLE;
     } elsif (! -d $path) {
         dprint "$path is not a directory.\n";
         return MZSCM_CANNOT_HANDLE;
@@ -209,6 +216,32 @@ login()
 }
 
 sub
+parse_repository_path($)
+{
+    my ($self, $repository) = @_;
+    my ($proto, $user, $pass, $host, $port, $path);
+
+    dprint &print_args(@_);
+
+    if (! $repository) {
+        $repository = $self->{"repository"};
+    }
+    if ($repository =~ /^(:pserver:|:ext:)?(\w+)\@([^:]+)(:\d+)?:(\/.*)$/i) {
+        ($proto, $user, $pass, $host, $port, $path) = ($1 || "", $2, undef, $3, $4 || "", $5);
+        $proto =~ s/^:(.*):$/$1/;
+        $port =~ s/^://;
+    } elsif ($repository =~ m!^cvs(pserver|ssh)://([^:]+)(:[^:]+)?\@([^:/]+)(:\d+)?(/.*)$!i) {
+        ($proto, $user, $pass, $host, $port, $path) = ($1, $2, $3 || "", $4, $5 || "", $6);
+        $proto =~ s/^ssh$/ext/;
+        $pass =~ s/^://;
+        $port =~ s/^://;
+    } else {
+        return undef;
+    }
+    return ($proto, $user, $pass, $host, $port, $path);
+}
+
+sub
 compose_repository_path($$$$)
 {
     my ($self, $proto, $user, $pass, $host, $port, $path) = @_;
@@ -223,7 +256,7 @@ compose_repository_path($$$$)
                               (($proto) ? (":$proto:") : ("")),
                               (($user) ? ($user) : ("anonymous")),
                               (($host) ? ("\@$host:") : ("\@localhost:")),
-                              (($port) ? ($port) : ("")),
+                              (($port) ? ("$port:") : ("")),
                               (($path) ? ($path) : ("/cvs")));
     }
     return $self->set("repository", $repository);
@@ -320,7 +353,7 @@ get(@)
     if ($self->{"reset"}) {
         push @params, "-A";
     }
-    if ($self->{"source_tag"}) {
+    if ($self->{"source_tag"} && (lc($self->{"source_tag"}) ne "head")) {
         push @params, "-r", $self->{"source_tag"};
     }
     push @params, (($self->{"recursion"}) ? ("-R") : ("-l"));
@@ -408,7 +441,7 @@ put($@)
     }
     push @params, "-m", $entry;
 
-    if ($self->{"source_tag"}) {
+    if ($self->{"source_tag"} && (lc($self->{"source_tag"}) ne "head")) {
         push @params, "-r", $self->{"source_tag"};
     }
     push @params, (($self->{"recursion"}) ? ("-R") : ("-l"));
@@ -472,7 +505,7 @@ annotate(@)
 
     dprint &print_args(@_);
 
-    if ($self->{"source_tag"}) {
+    if ($self->{"source_tag"} && (lc($self->{"source_tag"}) ne "head")) {
         push @params, "-r", $self->{"source_tag"}, "-f";
     }
     push @params, (($self->{"recursion"}) ? ("-R") : ("-l"));

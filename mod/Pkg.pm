@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.22 2004/06/22 23:10:07 mej Exp $
+# $Id: Pkg.pm,v 1.23 2004/06/23 00:21:24 mej Exp $
 #
 
 package Mezzanine::Pkg;
@@ -79,6 +79,9 @@ fetch_package
     my ($err, $msg, $line) = undef;
     my $missing = 0;
     local *REVTOOL;
+
+    # FIXME:  ALL WRONG!
+    return (MEZZANINE_SUCCESS, "");
 
     if (! $pkg_file) {
         return (MEZZANINE_MISSING_PKGS, "Nothing to fetch?");

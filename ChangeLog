@@ -490,3 +490,7 @@ Tue Jun 22 19:07:13 2004                        Michael Jennings (mej)
 Here's all the new SCM stuff.  Needs more thorough testing, but so far
 it Works For Me(tm).  :-)
 ----------------------------------------------------------------------
+Tue Jun 22 20:18:54 2004                        Michael Jennings (mej)
+
+This may or may not fix buildtool.  Pkg.pm is still broken. :(
+----------------------------------------------------------------------
