@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgsort,v 1.13 2001/04/10 05:29:11 mej Exp $
+# $Id: pkgsort,v 1.14 2001/04/18 04:16:57 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -746,15 +746,25 @@ show_packages
         if ($output_format eq "prodfile") {
             foreach $spkg (@src_pkgs) {
                 print OUTFILE "# $spkg\n";
-                print OUTFILE "contrib-rh/$src_rpm{$spkg}\n";
-                foreach $pkg (@{$bin_packages{$spkg}}) {
-                    foreach $rpm (sort @{$rpm_list{$pkg}}) {
-                        print OUTFILE "bin-rh/$rpm\n";
+                print OUTFILE "contrib-rh/$src_rpm{$spkg}";
+                if (scalar(@{$bin_packages{$spkg}})) {
+                    my @tmp;
+
+                    foreach $pkg (sort @{$bin_packages{$spkg}}) {
+                        foreach $rpm (sort @{$rpm_list{$pkg}}) {
+                            if ($rpm =~ /^(.+)-\Q$src_version{$pkg}\E-\Q$src_release{$pkg}.i386.rpm\E$/) {
+                                push @tmp, "bin-rh/$1";
+                            } else {
+                                push @tmp, "bin-rh/$rpm";
+                            }
+                        }
                     }
+                    print OUTFILE " bins=", join(',', @tmp);
                 }
-                print OUTFILE "\n";
+                print OUTFILE "\n\n";
             }
         }
+        # FIXME:  What the hell was I going to output if format == "products"?
     } else {
         foreach $pkg (@pkgs) {
             my $flag = "";
@@ -797,7 +807,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.13 $ created on $Date: 2001/04/10 05:29:11 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.14 $ created on $Date: 2001/04/18 04:16:57 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

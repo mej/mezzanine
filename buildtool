@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.131 2001/04/07 02:22:39 mej Exp $
+# $Id: buildtool,v 1.132 2001/04/18 04:16:57 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -257,7 +257,9 @@ place_file
     my $found = 0;
 
     dprint "place_file(\"$pkg\", \"$file\") called.\n";
-    return 0 if (!defined($pkgs->{$pkg}{LOCATIONS}));
+    if (!defined($pkgs->{$pkg}{LOCATIONS})) {
+        $pkgs->{$pkg}{LOCATIONS} = "/./:$builddir";
+    }
 
     foreach $location (split(",", $pkgs->{$pkg}{LOCATIONS})) {
         my ($regex, $stop, $dest, $image, $subdir);
@@ -266,7 +268,7 @@ place_file
         # tells us whether to check other locations or stop once we match
 	# (':' to continue looking for matches, or '=' to stop if a match is found).
         dprint "Testing location \"$location\"\n";
-        if ($location !~ m/^\/([^\/]+)\/(.)(\S+)$/) {
+        if ($location !~ m/^\/([^\/]+)\/(.)(\S+)?$/) {
             eprint "Location specifier \"$location\" is invalid.\n";
             next;
         }
@@ -280,34 +282,37 @@ place_file
         }
         dprint "Match found.\n";
 
-	# Grab the first part of the destination path, make sure it's an image module
-        ($image = $dest) =~ s/^([^\/]+)\/.*$/$1/;
-        if (!defined($pkgs->{$image}{TYPE}) || ($pkgs->{$image}{TYPE} ne "image")) {
-            qprint "Warning:  Destination \"$dest\" is not a package of type \"image\".\n";
+        if ($dest) {
+            # Grab the first part of the destination path, make sure it's an image module
+            ($image = $dest) =~ s/^([^\/]+)\/.*$/$1/;
+            if (!defined($pkgs->{$image}{TYPE}) || ($pkgs->{$image}{TYPE} ne "image")) {
+                qprint "Warning:  Destination \"$dest\" is not a package of type \"image\".\n";
+            }
+
+            # If the destination does not contain a filename, add the filename portion of
+            # $file to the directory path in $dest.  The destination could be used to rename
+            # a file, however; that's why this check is in place.
+            if (substr($dest, -3, 3) ne substr($file, -3, 3)) {
+                my $tmp;
+
+                ($tmp = $file) =~ s/^.*\/([^\/]+)$/$1/;
+                $dest = "$dest/$tmp";
+            }
+            # If it exists, delete it
+            if (-e $dest) {
+                &nuke_tree($dest);
+            }
+            # Then link it
+            dprint "Linking $dest to $file\n";
+            if (!link($file, $dest)) {
+                &fail_package($pkg, "package accumulation", "Unable to hard-link to $file from $dest -- $!");
+                return $found;
+            }
+            $found++;
         }
 
-	# If the destination does not contain a filename, add the filename portion of
-	# $file to the directory path in $dest.  The destination could be used to rename
-	# a file, however; that's why this check is in place.
-        if (substr($dest, -3, 3) ne substr($file, -3, 3)) {
-            my $tmp;
-
-            ($tmp = $file) =~ s/^.*\/([^\/]+)$/$1/;
-            $dest = "$dest/$tmp";
-        }
-	# If it exists, delete it
-        if (-e $dest) {
-            &nuke_tree($dest);
-        }
-	# Then link it
-        dprint "Linking $dest to $file\n";
-        if (!link($file, $dest)) {
-            &fail_package($pkg, "package accumulation", "Unable to hard-link to $file from $dest -- $!");
-            return $found;
-        }
-        $found++;
-	# If the stop character is '=', stop checking for matches for this package.
-	# If it's ':' (actually, any other character than '='), keep looking for matches.
+        # If the stop character is '=', stop checking for matches for this package.
+        # If it's ':' (actually, any other character than '='), keep looking for matches.
         last if ($stop eq "=");
         dprint "Non-exclusive match.  Continuing on....\n";
     }
@@ -633,6 +638,21 @@ parse_product_entry
             }
         }
         $filename = "$name-$pkgvars{VERSION}-$pkgvars{RELEASE}.$arch.rpm";
+
+        if (defined($pkgvars{BINS})) {
+            my @tmp;
+            my $arch = "i386";
+
+            foreach my $p (split(',', $pkgvars{BINS})) {
+                if ($p =~ /^(.+\/)?.*-[^-]+-[^-]+\.(\w+)\.rpm$/) {
+                    push @tmp, $p;
+                } else {
+                    push @tmp, "$p-$pkgvars{VERSION}-$pkgvars{RELEASE}.$arch.rpm";
+                }
+            }
+            delete $pkgvars{BINS};
+            @{$pkgs->{$name}{BINS}} = @tmp;
+        }
     }
 
     # Check for duplicate packages.
@@ -1552,11 +1572,13 @@ summarize_failures
     }
     qprint ".\n";
 
-    foreach $pkg (@failed_pkgs) {
-        if ($failure->{$pkg}{MESSAGE}) {
-            eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage:  $failure->{$pkg}{MESSAGE}.\n";
-        } else {
-            eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage.\n";
+    if ($nf) {
+        foreach $pkg (@failed_pkgs) {
+            if ($failure->{$pkg}{MESSAGE}) {
+                eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage:  $failure->{$pkg}{MESSAGE}.\n";
+            } else {
+                eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage.\n";
+            }
         }
     }
 }
@@ -1735,7 +1757,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.131 $ created on $Date: 2001/04/07 02:22:39 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.132 $ created on $Date: 2001/04/18 04:16:57 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1910,6 +1932,6 @@ main
 exit &main();
 
 END {
-    &summarize_failures() if (scalar(@failed_pkgs) && ! $slave);
+    &summarize_failures() if (! $slave);
     close($GLOBAL_LOG) if ($GLOBAL_LOG);
 }
