@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.10 2000/05/16 00:43:41 mej Exp $
+# $Id: buildtool,v 1.11 2000/05/16 02:58:27 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -192,6 +192,8 @@ parse_product_def
                     $var = "VERSION";
                 } elsif ($var =~ /^SPEC/) {
                     $var = "SPECFILE";
+                } elsif ($var =~ /^DIR/) {
+                    $var = "DIRECTORY";
                 }
                 $pkgvars{$var} = $val;
             }
@@ -325,6 +327,56 @@ fetch_package
     return ($err, $msg);
 }
 
+# Build RPMS from the spec file
+sub
+build_rpms
+{
+    my ($pkg, $specfile) = @_;
+    my ($cmd, $rpm, $msg, $err, $line, $srpm);
+    my @failed_deps;
+
+    $rpm = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
+    $cmd = "$rpm --rcfile $rpmrc -ba $specfile";
+    dprint "About to run \"$cmd\"\n";
+    if (!open(RPM, "$cmd </dev/null 2>&1 |")) {
+        return (1, "Execution of \"$cmd\" failed -- $!");
+    }
+    $err = 0;
+    while (<RPM>) {
+        chomp($line = $_);
+        nprint "$line\n";
+        if ($line =~ /^Wrote: .*\.src\.rpm$/) {
+            ($srpm = $line) =~ s/^Wrote:\s+//;
+        } elsif ($line =~ /^Bad exit status from/) {
+            $err = 1;
+            $line =~ s/^Bad exit status from \S+ \((%\w+)\)/$1/;
+            $msg = "The RPM $line stage exited abnormally";
+            last;
+        } elsif ($line =~ /^error: failed build dependencies:/) {
+            $err = 1;
+            while (<RPM>) {
+                chomp($line = $_);
+                last if ($line !~ /is needed by/);
+                $line =~ s/^\s+(\S+)\s+is needed by .*$/$1/;
+                push @failed_deps, $line;
+            }
+            $msg = sprintf("Building this SRPM requires the following packages:  %s", join(" ", @failed_deps));
+            last;
+        } elsif ($line =~ /^Architecture is not included:/) {
+            $err = 1;
+            $line =~ s/^Architecture is not included:\s+//;
+            $msg = "This SRPM does not build on the $line architecture";
+        }
+    }
+    close(RPM);
+    dprint "\"$cmd\" returned $?\n";
+    if ($? != 0 && $err == 0) {
+        $err = 1;
+        $msg = "Unhandled RPM build error";
+    }
+    return ($err, $msg, $srpm);
+}
+
 #
 # The build process stages
 #
@@ -408,7 +460,7 @@ do_bootstrap_stage
 sub
 do_compose_stage
 {
-    my ($specfile, $target, $pn);
+    my ($specfile, $target, $pn, $dir, $err, $line);
     my @contents;
     my @tmp;
     my @p = @packages;
@@ -417,10 +469,9 @@ do_compose_stage
     # No compose stage for SRPM's since they're *already* SRPM's....
     foreach $pkg (grep $pkgs->{$_}{TYPE} eq "module", @p) {
         nprint "$progname:  Starting compose stage for the \"$pkg\" package....\n";
-        #
-        # Somewhere in here, be sure to reset the {FILENAME} member
-        # to the path and filename of the SRPM rather than the module.
-        #
+
+        # The first step is to examine the module directory to find
+        # the names of the vendor source directory and the spec file.
         if (! chdir($pkgs->{$pkg}{MODULE})) {
             &fail_package($pkg, "compose", "Could not chdir into $pkgs->{$pkg}{MODULE} -- $!");
             next;
@@ -429,24 +480,87 @@ do_compose_stage
         opendir(DIR, ".");
         @contents = readdir(DIR);
         closedir(DIR);
-        if ($pkgs->{$pkg}{SPECFILE}) {
+        if ($pkgs->{$pkg}{SPECFILE} && -f $pkgs->{$pkg}{SPECFILE}) {
+            # If they gave us the spec file and it exists, use that.
             $specfile = $pkgs->{$pkg}{SPECFILE};
         } else {
-            @tmp = grep($_ =~ /^($pkg-)?(va-)?$prodname\.spec/, @contents);
+            # First choice:  Exactly one file named <pkg>-<distro>.spec
+            @tmp = grep($_ =~ /^($pkg-)?(va-)?$pn\.spec/, @contents);
             if ($#tmp != 0) {
-                @tmp = grep($_ =~ /^($pkg-)?$prodname\.spec/, @contents);
+                # Second choice:  Exactly one file named <pkg>.spec
+                @tmp = grep($_ =~ /^$pkg\.spec/, @contents);
                 if ($#tmp != 0) {
-                    @tmp = grep($_ =~ /^$pkg\.spec/, @contents);
-                    if ($#tmp != 0) {
-                        @tmp = grep($_ =~ /\.spec/, @contents);
-                    }
+                    # Third choice:  The first match to *.spec*
+                    @tmp = grep($_ =~ /\.spec/, @contents);
                 }
             }
             $specfile = $tmp[0];
             if (!defined $specfile || $specfile =~ /^$/) {
+                # Our attempt to guess failed.  They need to specify the spec file in the .prod file.
                 &fail_package($pkg, "compose", "No spec file could be located in $pkgs->{$pkg}{MODULE}");
                 next;
             }
+        }
+        if ($pkgs->{$pkg}{DIRECTORY} && -d $pkgs->{$pkg}{DIRECTORY}) {
+            # If they gave us the directory name, and it exists as a directory, use it
+            $dir = $pkgs->{$pkg}{DIRECTORY};
+        } else {
+            # First choice:  The only directory not named CVS/SCCS/RCS/BitKeeper in the module
+            @tmp = grep($_ !~ /^(CVS|SCCS|RCS|BitKeeper)$/ && -d $_, @contents);
+            if ($#tmp != 0) {
+                # Second choice:  The only directory that starts with the package name
+                @tmp = grep($_ =~ /^$pkg/ && -d $_, @tmp);
+                if ($#tmp != 0) {
+                    # We're screwed.  Give up.
+                    &fail_package($pkg, "compose", "Unable to determine vendor source directory");
+                }
+            }
+            $dir = $tmp[0];
+        }
+
+        # tar that bad boy up.
+        $cmd = "tar --exclude CVS --exclude RCS --exclude BitKeeper --exclude SCCS -zcf "
+                . "$builddir/SOURCES/${pkg}-$pkgs->{$pkg}{VERSION}.tar.gz $dir";
+        if (!open(CMD, "$cmd 2>&1 |")) {
+            &fail_package($pkg, "compose", "Execution of \"$cmd\" failed -- $!");
+            next;
+        }
+        $err = 0;
+        while (<CMD>) {
+            chomp($line = $_);
+            nprint "tar output -> $line\n";
+            if ($line !~ /^$/) {
+                # Any output from this command is an error.
+                $err = 1;
+            }
+        }
+        close(CMD);
+        dprint "\"$cmd\" returned $?\n";
+        if ($err || $?) {
+            &fail_package($pkg, "compose", "Creation of vendor source tarball failed");
+            next;
+        }
+
+        # Now build the new SRPM from the new vendor source tarball and the spec file.
+        ($err, $msg, $srpm) = &build_rpms($pkg, $specfile);
+        if ($err) {
+            &fail_package($pkg, "compose", $msg);
+            next;
+        }
+        dprint "Module apparently just built its SRPM as $srpm\n";
+
+        # Copy it here and assign FILENAME to it.
+        system("cp $srpm .");
+        $pkgs->{$pkg}{FILENAME} = $srpm;
+        $pkgs->{$pkg}{FILENAME} =~ s/^(\S+)\/([^\/]+\.src\.rpm)$/$2/;
+        $pkgs->{$pkg}{FILENAME} = "$pkgs->{$pkg}{MODULE}/$pkgs->{$pkg}{FILENAME}";
+        dprint "Filename is $pkgs->{$pkg}{FILENAME}\n";
+
+        # Go back to where we were.
+        if ($basedir =~ /^\.?\.$/) {
+            chdir("..");
+        } else {
+            chdir("$basedir");
         }
 
         nprint "$progname:  Compose stage for \"$pkg\" is complete.\n";
@@ -595,46 +709,9 @@ do_build_stage
         }
 
         # Rebuild from the spec file
-        $rpm = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
-        $cmd = "$rpm --rcfile $rpmrc -ba $specfile";
-        dprint "About to run \"$cmd\"\n";
-        if (!open(RPM, "$cmd </dev/null 2>&1 |")) {
-            &fail_package($pkg, "build", "Execution of \"$cmd\" failed -- $!");
-            next;
-        }
-        $err = 0;
-        while (<RPM>) {
-            chomp($line = $_);
-            nprint "$line\n";
-            if ($line =~ /^Bad exit status from/) {
-                $err = 1;
-                $line =~ s/^Bad exit status from \S+ \((%\w+)\)/$1/;
-                $msg = "The RPM $line stage exited abnormally";
-                last;
-            } elsif ($line =~ /^error: failed build dependencies:/) {
-                my @failed_deps = undef;
-
-                $err = 1;
-                while (<RPM>) {
-                    chomp($line = $_);
-                    last if ($line !~ /is needed by/);
-                    $line =~ s/^\s+(\S+)\s+is needed by .*$/$1/;
-                    push @failed_deps, $line;
-                }
-                $msg = sprintf("Building this SRPM requires the following packages:  %s", join(" ", @failed_deps));
-                last;
-            } elsif ($line =~ /^Architecture is not included:/) {
-                $err = 1;
-                $line =~ s/^Architecture is not included:\s+//;
-                $msg = "This SRPM does not build on the $line architecture";
-            }
-        }
-        close(RPM);
-        dprint "\"$cmd\" returned $?\n";
+        ($err, $msg) = &build_rpms($pkg, $specfile);
         if ($err) {
             &fail_package($pkg, "build", $msg);
-        } elsif ($?) {
-            &fail_package($pkg, "build", "Unhandled RPM build error");
         }
         nprint "$progname:  Build stage for \"$pkg\" is complete.\n";
     }

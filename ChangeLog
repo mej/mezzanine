@@ -118,3 +118,7 @@ This should fix that build bug where some packages got excluded from
 one stage or another.  The beginnings of the compose stage are here
 too.
 ----------------------------------------------------------------------
+Mon May 15 20:05:59 2000                        Michael Jennings (mej)
+
+The rest of the compose stage....
+----------------------------------------------------------------------
