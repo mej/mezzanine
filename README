@@ -4,7 +4,7 @@
 #  Written by:  Michael Jennings
 #               Ted T'so
 #
-#  $Id: README,v 1.1 2000/05/09 02:55:55 mej Exp $
+#  $Id: README,v 1.2 2000/05/09 03:42:12 mej Exp $
 #
 ########################################################################
 
@@ -39,6 +39,28 @@ keep reading!
 
 1.  Overall Philosophy
 ----------------------
+
+The build system is designed on two basic concepts:  the "product" and
+the "package."  A "product" is a collection of packages which form some
+coherent entity when you put them all together, such as a distribution.
+A "package" is the basic unit which the build system must know how to
+take from its "source" form and generate its "target" form.  Take care
+not to confuse this term with "package file."  Although a package can
+take the form of a package file, like an SRPM, not all packages are
+package files, nor are all package files packages.
+
+In general, the build system works with two basic types of packages.
+Some packages are modified by VA before being included in our
+enhanced distribution(s), while others are taken directly from RedHat
+or some other source.  The build system must be able to seamlessly
+handle both these cases.  For the latter case, the packages are simply
+kept as SRPM's, and buildtool knows how to explode the SRPM and build
+from the exploded sources.
+
+The former case is much more complicated.  Packages which are modified
+internally by VA are stored as directory trees containing the source,
+the necessary spec files, and any other files required by the build
+process.
 
 2.  Revision Control
 --------------------
