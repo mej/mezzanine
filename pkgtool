@@ -23,12 +23,12 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.6 2000/06/28 23:14:40 mej Exp $
+# $Id: pkgtool,v 1.7 2000/06/29 23:38:21 mej Exp $
 #
 
 # Include the Perl Modules we need
-use POSIX;
-use Getopt::Long;
+require POSIX;
+require Getopt::Long;
 
 # Constants
 #
@@ -71,6 +71,7 @@ sub PKGTOOL_SPEC_ERRORS()       {11;}
 sub PKGTOOL_DEPENDENCIES()      {12;}
 sub PKGTOOL_ARCH_MISMATCH()     {13;}
 sub PKGTOOL_BUILD_FAILURE()     {14;}
+sub PKGTOOL_BAD_MODULE()        {15;}
 
 sub PKGTOOL_TERMINATED()        {50;}
 sub PKGTOOL_CRASHED()           {60;}
@@ -104,6 +105,8 @@ print_usage_info
     print "    -R --rcfile <rcfile>             Specify an alternate rpmrc file\n";
     print "    -D --dir <directory>             Specify \"directory\" as the full path to the module\n";
     print "    -l --log <logfile>               Specify a log file to send informational output to\n";
+    print "       --tar <tarcmd>                Use <tarcmd> as the \"tar\" command\n";
+    print "       --zip <zipcmd>                Use <zipcmd> as the compression program\n";
     print "\n";
     exit(PKGTOOL_SUCCESS);
 }
@@ -112,8 +115,7 @@ print_usage_info
 sub
 get_timestamp
 {
-    $ts = POSIX::strftime("%A, %d %B %Y %H:%M:%S %Z", localtime);
-    return $ts;
+    return POSIX::strftime("%A, %d %B %Y %H:%M:%S %Z", localtime);
 }
 
 # Report a fatal error
@@ -162,7 +164,6 @@ handle_signal
 {
     my $sig = $_[0];
 
-    &summarize_failures() if ($#failed_pkgs >= 0);
     eprint "Someone sent me a SIG$sig asking me to exit, so I shall.\n";
     close($GLOBAL_LOG) if ($GLOBAL_LOG);
     exit PKGTOOL_TERMINATED;
@@ -205,17 +206,25 @@ replace_defines
     while ($line =~ /\%(\w+)/g) {
         my $var = $1;
 
+        dprint "Found macro:  $var\n";
         if (defined $define{$var}) {
+            dprint "Replacing with:  $define{$var}\n";
             $line =~ s/\%$var/$define{$var}/g;
             reset;
+        } else {
+            dprint "Definition not found.\n";
         }
     }
     while ($line =~ /\%\{([^\}]+)\}/g) {
         my $var = $1;
 
+        dprint "Found macro:  $var\n";
         if (defined $define{$var}) {
+            dprint "Replacing with:  $define{$var}\n";
             $line =~ s/\%\{$var\}/$define{$var}/g;
             reset;
+        } else {
+            dprint "Definition not found.\n";
         }
     }
     return $line;
@@ -233,7 +242,7 @@ parse_spec_file
         # Look in the specified module
     }
 
-    open(SPECFILE, $specfile) || &fatal_error("Unable to open $specfile -- $!");
+    open(SPECFILE, $specfile) || &fatal_error("Unable to open $specfile -- $!\n");
     $stage = 0;
     while (<SPECFILE>) {
         chomp($line = $_);
@@ -289,20 +298,157 @@ parse_spec_file
     }
     close(SPECFILE);
 
+    @sources = sort {$a <=> $b} keys %source;
+    @patches = sort {$a <=> $b} keys %patch;
+    @headers = sort {uc($a) cmp uc($b)} keys %header;
+
     if ($debug) {
         dprint "Got the following sources:\n";
-        foreach $src (sort {$a <=> $b} keys %source) {
+        foreach $src (@sources) {
             dprint "    Source $src -> $source{$src}\n";
         }
         dprint "Got the following patches:\n";
-        foreach $p (sort {$a <=> $b} keys %patch) {
+        foreach $p (@patches) {
             dprint "    Patch $p -> $patch{$p}\n";
         }
         dprint "Got the following header info:\n";
-        foreach $h (sort {uc($a) cmp uc($b)} keys %header) {
+        foreach $h (@headers) {
             dprint "    $h -> $header{$h}\n";
         }
     }
+}
+
+# Emulate rm -rf
+sub
+nuke_tree
+{
+    my $path = $_[0];
+    my @files;
+    local *DIR;
+
+    if ((-d $path) && !(-l $path)) {
+        opendir(DIR, $path) || return 0;
+        @files = readdir(DIR);
+        closedir(DIR);
+        foreach $f (@files) {
+            if ($f ne "." && $f ne "..") {
+                &nuke_tree("$path/$f");
+            }
+        }
+        dprint "Removing directory $path\n";
+        rmdir $path || return 0;
+    } else {
+        dprint "Unlinking $path\n";
+        unlink($path) || return 0;
+    }
+    return 1;
+}
+
+sub
+get_tag_list
+{
+    my $tagfile = $_[0];
+    my ($cmd, $line);
+    my @tags;
+    local *CMD;
+
+    $cmd = "revtool -qt $tagfile";
+    if (!open(CMD, "$cmd 2>&1 |")) {
+        eprint "Execution of \"$cmd\" failed -- $!\n";
+    }
+    while (<CMD>) {
+        chomp($line = $_);
+        if ($line =~ /^([-A-Z0-9]+) at (revision|branch) [.\d]+$/) {
+            unshift @tags, $1;  # Place new tags at end so older tags come first
+            $tag_type{$1} = $2;
+        } elsif ($line =~ /^No tags found/) {
+            eprint "The sample tag file ($tagfile) contains no tags.\n";
+            last;
+        } else {
+            eprint "Unexpected output from revtool:  $line\n";
+        }
+    }
+    close(CMD);
+    return @tags;
+}
+
+sub
+fetch_package
+{
+    my $cmd = $_[0];
+    my ($err, $msg, $line) = undef;
+    local *REVTOOL;
+
+    dprint "About to run $cmd\n";
+    if (!open(REVTOOL, "$cmd 2>&1 |")) {
+        $err = REVTOOL_COMMAND_FAILED;
+        $msg = "Execution of \"$cmd\" failed -- $!";
+        last;
+    }
+    while (<REVTOOL>) {
+        chomp($line = $_);
+        if ($debug) {
+            dprint "From revtool -> $line\n";
+        }
+        next if ($line =~ /^\[debug:/);
+        # Check the output for errors
+        if ($line =~ /^revtool:\s*Error/) {
+            ($msg = $line) =~ s/^revtool:\s*Error:\s*//;
+        }
+    }
+    close(REVTOOL);
+    $err = $?;
+    dprintf "\"$cmd\" returned $err (%d)\n", $err >> 8;
+    return ($err >> 8, $msg);
+}
+
+sub
+create_source_file
+{
+    my ($src_files, $tarball, $destdir, $tar, $zip) = @_;
+    my $cmd;
+    local *CMD;
+
+    if ($tarball) {
+        if ($tar) {
+            $cmd = $tar;
+        } else {
+            if (! $zip) {
+                if ($src =~ /(gz|Z)$/) {
+                    $zip = "gzip";
+                } elsif ($src =~ /\.bz2$/) {
+                    $zip = "bzip2";
+                }
+            }
+            $cmd = "tar --exclude CVS --exclude RCS --exclude BitKeeper --exclude SCCS"
+                   . " --use-compress-program=$zip -cf ${destdir}$tarball $src_files";
+        }
+        dprint "Creating $tarball:  $cmd\n";
+        unlink($tarball);
+        if (!open(CMD, "$cmd 2>&1 |")) {
+            eprint "Execution of \"$cmd\" failed -- $!\n";
+            return PKGTOOL_COMMAND_FAILED;
+        }
+        while (<CMD>) {
+            chomp($line = $_);
+            print "tar output -> $line\n";
+        }
+        close(CMD);
+        dprint "\"$cmd\" returned $?\n";
+        if ($?) {
+            eprint "Creation of vendor source tarball $tarball failed\n";
+            return PKGTOOL_BUILD_FAILURE;
+        }
+    } else {
+        my $rc;
+
+        $rc = system("cp -f $src_files $destdir") >> 8;
+        if ($rc) {
+            eprint "Unable to copy $src_files to $destdir -- $!\n";
+            return PKGTOOL_BUILD_FAILURE;
+        }
+    }
+    return PKGTOOL_SUCCESS;
 }
 
 sub
@@ -518,168 +664,154 @@ deb_build
 }
 
 sub
-do_compose_stage
+rpm_generate_source_files
 {
-    my ($specfile, $target, $pn, $dir, $line, $src, $tarball, $cwd);
-    my ($err, $msg, $srpm) = (0, 0, 0);
-    my (@contents, @tmp, @dirs, @sfiles, @srcs);
-    my @p;
-    local *DIR;
-    local *CMD;
+    my ($specfile, $module, $srcs, $head_tag, $release_tag) = @_;
+    my ($err, $msg, $src_files, $tarball, $modname);
+    my (@contents, @tags, @srcs, @all_srcs);
+    local (*DIR, *CMD);
 
-    if ($#_ >= 0) {
-        @p = @_;
+    # The first step is to examine the module directory to find
+    # the names of the vendor source files/directories and the spec file.
+    ($modname = $module) =~ s/^.*\/([^\/]+)$/$1/;
+    if (! chdir($module)) {
+        return PKGTOOL_BAD_MODULE;
+    }
+    if ($destdir && $destdir !~ /\/$/) {
+        $destdir .= "/";
+    }
+    opendir(DIR, ".");
+    @contents = readdir(DIR);
+    closedir(DIR);
+
+    &parse_spec_file($specfile) if ($specfile);
+
+    if ($srcs) {
+        @srcs = split(/[\s,]/, $srcs);
     } else {
-        @p = @packages;
-    }
+        my $fname;
 
-    print "$progname:  Entering the compose stage.  (${\(&get_timestamp())})\n";
-    chomp($cwd = `pwd`);
-
-    # No compose stage for package files since they're *already* package files....
-    foreach $pkg (grep $pkgs->{$_}{TYPE} eq "module", @p) {
-        if ($pkgs->{$pkg}{STAGES} !~ /c/) {
-            print "$progname:  Skipping compose stage for the \"$pkg\" package.\n";
-            next;
-        }
-        print "$progname:  Starting compose stage for the \"$pkg\" package....  (${\(&get_timestamp())})\n";
-
-        # The first step is to examine the module directory to find
-        # the names of the vendor source files/directories and the spec file.
-        if (! chdir("$cwd/$pkgs->{$pkg}{MODULE}")) {
-            &fail_package($pkg, "compose", "Could not chdir into $cwd/$pkgs->{$pkg}{MODULE} -- $!");
-            next;
-        }
-        opendir(DIR, ".");
-        @contents = readdir(DIR);
-        closedir(DIR);
-        @tmp = grep($_ =~ /src\.rpm$/, @contents);
-        if ($#tmp >= 0) {
-            $srpm = $tmp[0];
-            if ($#tmp > 0) {
-                print "$progname:  Warning:  Multiple target SRPM's found in $pkgs->{$pkg}{MODULE}.\n";
-                print "$progname:  Assuming that $srpm is the correct one.\n";
-            }
-        } else {
-            $srpm = 0;
-        }
-        if ($srpm) {
-            # The target SRPM already exists.  Skip this stage.
-            print "$progname:  The target SRPM for \"$pkg\" already exists in $cwd/$pkgs->{$pkg}{MODULE}.\n";
-            print "$progname:  I'll assume it's the right one.  Compose stage for \"$pkg\" is complete.\n";
-            $srpm =~ m/^(\S+)-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/;
-            ($pkgs->{$pkg}{VERSION}, $pkgs->{$pkg}{RELEASE}) = ($2, $3);
-            $pkgs->{$pkg}{FILENAME} = "$cwd/$pkgs->{$pkg}{MODULE}/$srpm";
-            next;
-        }
-
-        if ($pkgs->{$pkg}{SPECFILE} && -f $pkgs->{$pkg}{SPECFILE}) {
-            # If they gave us the spec file and it exists, use that.
-            $specfile = $pkgs->{$pkg}{SPECFILE};
-        } else {
-            # First choice:  Exactly one file named <pkg>-<distro>.spec
-            ($pn = $prodname) =~ s/^va-//;
-            @tmp = grep($_ =~ /^($pkg-)?(va-)?$pn\.spec/, @contents);
-            if ($#tmp != 0) {
-                # Second choice:  Exactly one file named <pkg>.spec
-                @tmp = grep($_ =~ /^$pkg\.spec/, @contents);
-                if ($#tmp != 0) {
-                    # Third choice:  The first match to *.spec*
-                    @tmp = grep($_ =~ /\.spec/, @contents);
-                }
-            }
-            $specfile = $tmp[0];
-            if (!defined $specfile || $specfile =~ /^$/) {
-                # Our attempt to guess failed.  They need to specify the spec file in the .prod file.
-                &fail_package($pkg, "compose", "No spec file could be located in $pkgs->{$pkg}{MODULE}");
-                next;
-            }
-        }
-
-        undef @srcs;
-        if ($pkgs->{$pkg}{SRCS}) {
-            @srcs = split(",", $pkgs->{$pkg}{SRCS});
-        } else {
-            my $fname;
-
-            foreach $fname (@contents) {
-                # Ignore revision control goop
-                next if ($fname =~ /^(CVS|SCCS|RCS|BitKeeper)$/);
-                # Ignore the revtool-generated ChangeLog
-                next if ($fname =~ /^[Cc]hanges?\.?[Ll]og$/);
-                # Ignore dotfiles
-                next if ($fname =~ /^\./);
-                # Ignore spec files
-                next if ($fname =~ /\.spec(\.in)?$/);
-                # Ignore the debian/ directory
-                next if ($fname =~ /^debian$/ && -d $fname);
-                if (-d $fname) {
-                    push @srcs, "$fname:$fname.tar.gz";
-                } else {
-                    push @srcs, $fname;
-                }
-            }
-        }
-
-        foreach $src (@srcs) {
-            my ($src_files, $tarball) = split(":", $src);
-
-            $src_files =~ s/\&/ /g;
-            if ($tarball) {
-                my $zip;
-
-                if ($pkgs->{$pkg}{TAR}) {
-                    $cmd = $pkgs->{$pkg}{TAR};
-                    $cmd =~ s/\%f/$src_files/;
-                    $cmd =~ s/\%t/$builddir\/SOURCES\/$tarball/;
-                } else {
-                    if ($pkgs->{$pkg}{ZIP}) {
-                        $zip = "--use-compress-program=\"$pkgs->{$pkg}{ZIP}\"";
-                    } elsif ($src =~ /(gz|Z)$/) {
-                        $zip = "--use-compress-program=gzip";
-                    } elsif ($src =~ /\.bz2$/) {
-                        $zip = "--use-compress-program=bzip2";
-                    }
-                    $cmd = "tar --exclude CVS --exclude RCS --exclude BitKeeper --exclude SCCS"
-                            . " $zip -cf $builddir/SOURCES/$tarball $src_files";
-                }
-                dprint "Creating $tarball:  $cmd\n";
-                unlink($tarball);
-                if (!open(CMD, "$cmd 2>&1 |")) {
-                    &fail_package($pkg, "compose", "Execution of \"$cmd\" failed -- $!");
-                    $err = 1;
-                    last;
-                }
-                $err = 0;
-                while (<CMD>) {
-                    chomp($line = $_);
-                    print "tar output -> $line\n";
-                }
-                close(CMD);
-                dprint "\"$cmd\" returned $?\n";
-                if ($?) {
-                    &fail_package($pkg, "compose", "Creation of vendor source tarball $tarball from failed");
-                    $err = 1;
-                    last;
-                }
+        foreach $fname (@contents) {
+            # Ignore revision control goop
+            next if ($fname =~ /^(CVS|SCCS|RCS|BitKeeper)$/);
+            # Ignore the revtool-generated ChangeLog
+            next if ($fname =~ /^[Cc]hanges?\.?[Ll]og$/);
+            # Ignore dotfiles
+            next if ($fname =~ /^\./);
+            # Ignore spec files
+            next if ($fname =~ /\.spec(\.in)?$/);
+            # Ignore the debian/ directory
+            next if ($fname =~ /^debian$/ && -d $fname);
+            if (-d $fname) {
+                push @srcs, "$fname:$fname.tar.gz";
             } else {
-                my $rc;
-
-                $rc = system("cp -f $src_files $builddir/SOURCES/") >> 8;
-                if ($rc) {
-                    &fail_package($pkg, "compose", "Unable to copy $src_files to $builddir/SOURCES/ -- $!");
-                    $err = 1;
-                    last;
-                }
+                push @srcs, $fname;
             }
         }
-        if ($err) {
-            next;
+    }
+
+    dprint "Preparing to generate sources \"", join(" ", @srcs), "\".\n";
+    dprint "Sources:  ", join(", ", @sources), "\n";
+    dprint "Patches:  ", join(", ", @patches), "\n";
+
+    if ($#patches >= 0) {
+        @tags = grep($tag_type{$_} eq "revision", &get_tag_list($tagfile));
+        if ($release_tag || $head_tag) {
+            my @real_tags;
+            my $keep = ($release_tag ? 0 : 1);
+
+            foreach $tag (@tags) {
+                if ($tag eq $release_tag) {
+                    $keep = 1;
+                } elsif ($tag eq $head_tag) {
+                    $keep = 0;
+                }
+                push @real_tags, $tag if ($keep);
+            }
+            @tags = @real_tags;
+        }
+        dprint "Real Tags:  ", join(" ", @tags), "\n";
+        for ($i = 1; $i <= $#tags; $i++) {
+            if ($tags[$i] =~ /^$release_tag-PATCH-(\d+)$/) {
+                my $num = $1;
+
+                $last_tag{$patch{$num}} = $tags[$i - 1];
+                dprint "Previous tag for patch $num ($patch{$num}) is $last_tag{$patch{$num}}\n";
+            } elsif ($tags[$i] =~ /^$release_tag-SOURCE-(\d+)$/) {
+                my $num = $1;
+
+                $last_tag{$source{$num}} = $tags[$i - 1];
+                dprint "Previous tag for source $num ($source{$num}) is $last_tag{$source{$num}}\n";
+            }
+        }
+        #($err, $msg) = &fetch_package("revtool -gt $release_tag $modname");
+        #if ($err) {
+        #    eprint "Unable to obtain $modname using release tag $release_tag -- $msg\n";
+        #    return PKGTOOL_BAD_MODULE;
+        #}
+        #chdir($modname);
+
+        #opendir(DIR, ".");
+        #@contents = readdir(DIR);
+        #closedir(DIR);
+
+        # Generate all the source files that already exist
+        foreach $src (@srcs) {
+            my @tmp;
+
+            ($src_files, $tarball) = split(":", $src);
+            @tmp = split(/[\&\s]+/, $src_files);
+            @all_srcs = (@all_srcs, @tmp);
+            @tmp = grep(-e $_, @tmp);
+            $src_files = join(" ", @tmp);
+            $err = &create_source_file($src_files, $tarball, $destdir, $tar, $zip);
+            if ($err) {
+                return $err;
+            }
+            foreach $num (@sources) {
+                if (($tarball && $source{$num} =~ /$tarball$/)
+                    || (! $tarball && $src_files =~ /^(.*\s+)?$source{$num}(\s+.*)?$/)) {
+                    dprint "Undefining source $num\n";
+                    undef $source{$num};
+                }
+            }
+            @sources = sort {$a <=> $b} keys %source;
         }
 
+        # Clean the checkout we did.
+        #chdir("..");
+        #&nuke_tree($modname) if (-d $modname);
+
+        # At this point, we've generated all the source files which are initially available
+        # in the original import of the module.  The rest we have to generate using diffs.
+        foreach $num (@sources) {
+            my $source = $source{$num};
+            my ($tag, $prev_tag);
+
+            dprint "Generating diff for source $num ($source)\n";
+            $tag = "$release_tag-SOURCE-$num";
+            $prev_tag = $last_tag{$tag};
+
+
+        }
+        foreach $num (@patches) {
+            my $patch = $patch{$num};
+
+            dprint "Generating diff for patch $num ($patch)\n";
+        }
+
+    } else {
+        # Just sources.  Do it like we always have.
+        foreach $src (@srcs) {
+            ($src_files, $tarball) = split(":", $src);
+            $src_files =~ s/\&/ /g;
+            $err = &create_source_file($src_files, $tarball, $destdir, $tar, $zip);
+            if ($err) {
+                return $err;
+            }
+        }
     }
-    chdir($cwd);
-    print "$progname:  Compose stage is now complete.  (${\(&get_timestamp())})\n";
+    return PKGTOOL_SUCCESS;
 }
 
 # main() here is basically the same as main() in C
@@ -695,14 +827,15 @@ main
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "b|build", "i|install", "c|contents",
                    "g|generate", "o|sources:s", "p|package=s", "s|specfile|scripts=s", "m|module=s",
-                   "r|release-tag=s", "t|head-tag=s", "P|program=s", "R|rcfile=s");
+                   "r|release-tag=s", "t|head-tag=s", "P|program=s", "R|rcfile=s", "tar=s", "zip=s",
+                   "tagfile=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.6 $ created on $Date: 2000/06/28 23:14:40 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.7 $ created on $Date: 2000/06/29 23:38:21 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -713,7 +846,12 @@ main
         print "  ($rcs_info)\n";
         print "\n";
 	return PKGTOOL_SUCCESS;
+    } elsif ($opt_h) {
+	&print_usage_info();   # Never returns
+        # This is a really silly way to shut up the "used only once" warnings.
+        $opt_h = $opt_v = $opt_b = $opt_c = $opt_i = $opt_g = 0;
     }
+
     if ($opt_b) {
         $mode = "build";
     } elsif ($opt_i) {
@@ -728,11 +866,6 @@ main
 
     print "\n\n*** Warning:  $progname is under heavy development.  Unless you are the developer, don't use it.\n\n";
 
-    if ($opt_h || (! $mode)) {
-	&print_usage_info();   # Never returns
-        # This is a really silly way to shut up the "used only once" warnings.
-        $opt_h = $opt_v = $opt_b = $opt_c = $opt_i = $opt_g = 0;
-    }
     $debug = ($opt_d ? $opt_d : 0);
     $srcs = ($opt_o ? $opt_o : 0);
     $pkg_file = ($opt_p ? $opt_p : 0);
@@ -742,6 +875,10 @@ main
     $release_tag = ($opt_r ? $opt_r : 0);
     $head_tag = ($opt_t ? $opt_t : 0);
     $rcfile = ($opt_R ? $opt_R : 0);
+    $tar = ($opt_tar ? $opt_tar : 0);
+    $zip = ($opt_zip ? $opt_zip : 0);
+    $tagfile = ($opt_tagfile ? $opt_tagfile : ($specfile ? $specfile : 0));
+    $destdir = ($opt_D ? $opt_D : "");
 
     # Signal handling
     $SIG{HUP} = 'IGNORE';
@@ -758,15 +895,9 @@ main
     $SIG{TTOU} = \&handle_fatal_signal;
     $SIG{__WARN__} = \&handle_warning;
 
-    # Environment modifications
-    $ENV{MAKE} = "make";  # Make sure we don't parallel build, because it doesn't work.
-    $ENV{CFLAGS} = "-O2 -march=pentium";  # A bit of optimization, but not much.
-    $ENV{LD_LIBRARY_PATH} = "";  # Make glibc happy
-
     if ($specfile) {
-        if (-f $specfile && -s _) {
+        if ((-f $specfile || -f "$module/$specfile") && -s _) {
             $type = "rpm";
-            &parse_spec_file($specfile);
         } elsif (-d $script_dir) {
             $type = "deb";
         } else {
@@ -774,8 +905,21 @@ main
             return PKGTOOL_SYNTAX_ERROR;
         }
     }
-    if (! $pkg_file && $#ARGV >= 0) {
-        $pkg_file = join(" ", @ARGV);
+    if ($#ARGV >= 0) {
+        if (! $specfile) {
+            # If they didn't give us a spec file, find one on the command line
+            ($specfile) = grep(/\.spec(\.in)?$/, @ARGV);
+            if ($specfile) {
+                @ARGV = grep($_ !~ /\.spec(\.in)?$/, @ARGV);
+            }
+        }
+        if (! $pkg_file) {
+            # If it looks like a package, assume it is one
+            $pkg_file = join(" ", grep(/\.(rpm|deb|gz)$/, @ARGV));
+            if ($pkg_file) {
+                @ARGV = grep($_ !~ /\.(rpm|deb|gz)$/, @ARGV);
+            }
+        }
     }
     if ($pkg_file) {
         if ($pkg_file =~ /\.(deb|gz)$/) {
@@ -814,6 +958,14 @@ main
             $ret = &deb_show_contents($pkg_file);
         }
     } elsif ($mode eq "generate") {
+        if (! $specfile || ! $module) {
+            eprint "Please specify a spec file/script directory and a module\n";
+            return PKGTOOL_SYNTAX_ERROR;
+        }
+        if ($type eq "rpm") {
+            $ret = &rpm_generate_source_files($specfile, $module, $srcs, $head_tag, $release_tag);
+        } elsif ($type eq "deb") {
+        }
     }
 
     return $ret;

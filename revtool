@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.37 2000/06/29 23:06:21 chip Exp $
+# $Id: revtool,v 1.38 2000/06/29 23:38:21 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -79,6 +79,7 @@ print_usage_info
     print "    -i --import              Import a new set of sources, or update the vendor branch for a package\n";
     print "    -T --rtag <tag>          Tag one or more complete modules directly\n";
     print "    -t --tag <tag>           Specify a symbolic tag for an operation, or tag local sources\n";
+    print "    -b --branch              When performing a tag, make it a branch tag\n";
     print "    -l --login               Perform a login to the repository\n";
     print "    -R --recurse             Operate recursively (this is the default for some commands)\n";
     print "    -k [code]                Specify keyword handling when adding files (use -kb to add binary files)\n";
@@ -1349,7 +1350,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.37 $ created on $Date: 2000/06/29 23:06:21 $ by $Author: chip $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.38 $ created on $Date: 2000/06/29 23:38:21 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -579,3 +579,9 @@ complex, so I'll wait on it.)
 
 The source generation stuff is next.
 ----------------------------------------------------------------------
+Thu Jun 29 16:46:33 2000                        Michael Jennings (mej)
+
+Still working on pkgtool.  I just want to sync up before Chip and I
+get too far apart. :-)  I fixed a few more use vs. require mishaps
+like the one Chip fixed in revtool.
+----------------------------------------------------------------------
