@@ -4,26 +4,27 @@
 #  Written by:  Michael Jennings
 #               Ted T'so
 #
-#  $Id: README,v 1.3 2000/06/06 00:02:23 mej Exp $
+#  $Id: README,v 1.4 2000/06/14 00:28:17 mej Exp $
 #
 ########################################################################
 
-0.  Introduction and Quick Start
+0.  INTRODUCTION AND QUICK START
 --------------------------------
 
 This document is intended as a brief overview of the new Software
 Engineering build system:  how it works, how to use it, and some of the
 design philosophies behind it.  It also details the various standards
-policies which govern its contents, so those planning on adding and/or
-maintaining its contents should read those sections carefully.
+policies which govern its contents, so those planning on adding to
+and/or maintaining part(s) of the tree should read those sections
+carefully.
 
 Before you can build any products, you must set your machine up to be
 able to run the build system tools.  Since you are reading this README
 file, you must have checked out the "base" module.  Within that module
 is a directory called "pm" which contains another directory called
-"getopt."  This getopt directory contains the Getopt::Mixed Perl module
-which is required for the build scripts to function properly.  You will
-need to go into pm/getopt as root and run the following command as
+"getopt."  This getopt directory contains the Getopt::Mixed Perl
+module which is required for the build scripts to function properly.
+You will need to go into pm/getopt and run the following command as
 root:  "perl Makefile.PL ; make ; make install".  Once you have done
 this, return to the base directory and proceed as shown below.
 
@@ -47,7 +48,8 @@ use the system, so if you are going to be involved in the actual day-
 to-day maintenance of the system or any packages within the system,
 keep reading!
 
-1.  Overall Philosophy
+
+1.  OVERALL PHILOSOPHY
 ----------------------
 
 The build system is designed on two basic concepts:  the "product" and
@@ -59,13 +61,13 @@ not to confuse this term with "package file."  Although a package can
 take the form of a package file, like an SRPM, not all packages are
 package files, nor are all package files packages.
 
-In general, the build system works with two basic types of packages.
-Some packages are modified by VA before being included in our
-enhanced distribution(s), while others are taken directly from RedHat
-or some other source.  The build system must be able to seamlessly
-handle both these cases.  For the latter case, the packages are simply
-kept as SRPM's, and buildtool knows how to explode the SRPM and build
-from the exploded sources.
+In general, the build system works with two general classifications of
+packages.  Some packages are modified by VA before being included in
+our enhanced distribution(s), while others are taken directly from
+RedHat or some other source.  The build system must be able to
+seamlessly handle both these cases.  For the latter case, the packages
+are simply kept as SRPM's, and buildtool knows how to explode the SRPM
+and build from the exploded sources.
 
 The former case is much more complicated.  Packages which are modified
 internally by VA are stored as directory trees containing the source,
@@ -73,30 +75,58 @@ the necessary spec files, and any other files required by the build
 process.  These directory trees will hereafter be referred to by their
 proper term in revision control lingo, "modules."
 
-Two tools are employed as user-level interfaces to this system.  The
-first, called "revtool," handles all interaction with the revision
-control system.  It encapsulates all revision control system-specific
+Several tools are employed as user-level interfaces to this system.
+The first, called "revtool," handles all interaction with the revision
+control system.  It encapsulates all revision-control-system-specific
 commands and gives them an interface which is independent of the
-underlying system.  Thus, if the repository was moved from CVS to, say,
-BitKeeper, revtool's code would change, but its interface would remain
-the same.
+underlying system.  Thus, if the repository was moved from CVS to,
+say, BitKeeper, revtool's code would change, but its interface would
+remain the same.
 
 The second tool is "buildtool," mentioned briefly above.  buildtool is
 what takes a product name/version pair, like "va-redhat-6.2.1" and
 translates that via a series of product definition/configuration files
 ("prod files" for short) into a set of packages to build.  It then
 builds those packages, creating both source and binary package files.
-It can also build ISO images for CD's from these packages and some
-template modules.
+It can also use these packages to build ISO images for product CD's.
 
-2.  Revision Control with revtool
+There are other tools, such as pkgtool and safetool, which are not yet
+ready for widespread use.  We'll discuss those when that situation
+changes.
+
+
+2.  REVISION CONTROL WITH REVTOOL
 ---------------------------------
 
-3.  Building Products
+The syntax of revtool is intended to be generic, in that it should
+apply well to any arbitrary revision control system one might choose.
+Each function revtool performs should translate into zero or more
+commands specific to the revision control system in question.  For
+example, a "put" in revtool-speak is analogous to a "commit" in CVS
+lingo.  A "get" in revtool is either a "checkout" or an "update" in
+CVS, or a "pull" in BitKeeper.  Thus, revtool acts as an encapsulation
+layer for the underlying revision control system.
+
+revtool also assists in routine upkeep actions, like maintaining the
+ChangeLog.  revtool will append your commit log entry to the ChangeLog
+automatically.  It will even create the ChangeLog for you if it
+doesn't exist, and the date and identity information are provided for
+you.
+
+Finally, revtool acts as a means of policy enforcement.  This allows
+us to ensure that commits are properly tagged, for example.
+Consistency and cleanliness of operation are vital for the ongoing
+functionality, stability, and manageability of the build system, and
+revtool allows us to enforce the policies that provide those things
+before anything enters the tree that could disrupt it.
+
+
+
+3.  BUILDING PRODUCTS
 ---------------------
 
-4.  Package Maintainer's Guide
+4.  PACKAGE MAINTAINER'S GUIDE
 ------------------------------
 
-5.  Standards and Conventions
+5.  STANDARDS AND CONVENTIONS
 -----------------------------
