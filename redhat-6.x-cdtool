@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 21 July 2000
 #
-# $Id: redhat-6.x-cdtool,v 1.3 2001/04/07 02:22:39 mej Exp $
+# $Id: redhat-6.x-cdtool,v 1.4 2001/04/11 02:10:34 mej Exp $
 #
 
 trap 'exit -1' 1 2 15
@@ -18,6 +18,9 @@ BUILD_DIR=$BASE_DIR/build
 IMAGE=$BUILD_DIR/va-os-rpms
 TMP_IMAGE=$BUILD_DIR/img.bak
 SYSLINUX_DIR=syslinux-1.45
+
+# Remove kernel-build RPM's
+rm -f $IMAGE/RedHat/RPMS/kernel-build-* $IMAGE/VALinux/RPMS/kernel-build-*
 
 # Make a copy of the ISO image tree
 cd $BUILD_DIR

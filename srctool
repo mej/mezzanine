@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.11 2001/04/07 02:22:39 mej Exp $
+# $Id: srctool,v 1.12 2001/04/11 02:10:34 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -176,7 +176,7 @@ import_package
     my ($err, $msg, $cmd, $pwd, $tmpdir, $rpmcmd, $pkg, $ver, $rel, $spec, $tag);
     my (@contents, @srcs, @patches, @tmp);
 
-    chomp($pwd = `/bin/pwd`);
+    $pwd = &getcwd();
 
     if ($pkgfile && -f $pkgfile) {
         # If it's a file, make sure it's an SRPM
@@ -272,7 +272,7 @@ prepare_tree
     my ($pwd, $pkgdir, $cmd, $err, $msg, $spec, $tmpdir, $rpmcmd, $tmp);
     my (@srcs, @patches, @tmp);
 
-    chomp($pwd = `/bin/pwd`);
+    $pwd = &getcwd();
 
     # cd into the package directory if one was specified.  If not, use the current directory.
     if ($pkg) {
@@ -310,6 +310,13 @@ prepare_tree
     return $err;
 }
 
+sub
+merge_file($$)
+{
+    my ($pkg, $new_file) = @_;
+
+}
+
 # main() here is basically the same as main() in C
 sub
 main
@@ -329,7 +336,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.11 $ created on $Date: 2001/04/07 02:22:39 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.12 $ created on $Date: 2001/04/11 02:10:34 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -404,7 +411,10 @@ main
             }
         }
         foreach my $f (grep($_ ne $pkg, @flist)) {
+            my $err;
 
+            $err = &merge_file($pkg, $f);
+            return $err if ($err);
         }
     } elsif ($0 =~ /avmod$/ || $opt_m) {
     } elsif ($0 =~ /avpatch$/ || $opt_a) {

@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: todo_list.txt,v 1.11 2001/03/22 02:36:17 mej Exp $
+#  $Id: todo_list.txt,v 1.12 2001/04/11 02:10:34 mej Exp $
 #
 ########################################################################
 
@@ -14,15 +14,15 @@ Generic Tasks [1/2]
 
 New Tools [19/46]
 -----------------
- - For handling mass package updates from RedHat [2/4]
+ + For handling mass package updates from RedHat [2/4]
  - For manipulating source packages (srctool) [13/32]
     + Explode and import SRPM's into SPM's [1/4]
     + Import FST's [1/3]
     + Prepare working tree [2/5]
     - Generate new patches [2/4]
-    - Resync patches [2/5]
+    x Resync patches [2/5]
     - Add/remove/modify patches [4/7]
-    - Detect existing module and compensate [1/4]
+    x Detect existing module and compensate [3/5]
  + For generating distribution media (CD's, tarballs, etc.) [2/5]
 
 
