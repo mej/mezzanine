@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.20 2000/05/21 04:15:40 mej Exp $
+# $Id: buildtool,v 1.21 2000/05/21 21:46:14 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -91,6 +91,17 @@ get_timestamp
     return $ts;
 }
 
+# Report a fatal error
+sub
+fatal_error
+{
+    my $msg = $_[0];
+
+    print STDERR $msg;
+    print $GLOBAL_LOG $msg if ($GLOBAL_LOG);
+    exit(-1);
+}
+
 # Debugging output
 sub
 dprintf
@@ -117,8 +128,8 @@ dprint
 sub
 eprintf
 {
-    print STDERR "$progname:  Error:  ";
-    printf STDERR @_;
+    print "$progname:  Error:  ";
+    printf @_;
     if ($GLOBAL_LOG) {
         print $GLOBAL_LOG "$progname:  Error:  ";
         printf $GLOBAL_LOG @_;
@@ -127,7 +138,7 @@ eprintf
 sub
 eprint
 {
-    print STDERR "$progname:  Error:  ", @_;
+    print "$progname:  Error:  ", @_;
     if ($GLOBAL_LOG) {
         print $GLOBAL_LOG "$progname:  Error:  ", @_;
     }
@@ -186,7 +197,7 @@ mkdirhier
         dprint "mkdirhier() checking for \"$path\"\n";
         if (! -d $path) {
             dprint "mkdirhier() creating \"$path\"\n";
-            mkdir($path, 0755) || die("Unable to create $path -- $!\n");
+            mkdir($path, 0755) || eprint("Unable to create $path -- $!\n");
         }
     }
     dprint "Something went wrong in mkdirhier()!\n" if (! -d $_[0]);
@@ -417,7 +428,7 @@ parse_product_entry
                 eprint "I wasn't given enough information about the $name package in $prodfile.  For SRPM\n";
                 eprint "packages, the version and release information must be specified as variables or\n";
                 eprint "embedded in the package name.  I'm going to have to skip that one.\n";
-                next;
+                return 0;
             } else {
                 ($tmp = $name) =~ s/^\S+-[^-]+-//;
                 $name =~ s/-[^-]+$//;
@@ -429,7 +440,7 @@ parse_product_entry
                 eprint "I wasn't given enough information about the $name package in $prodfile.  For SRPM\n";
                 eprint "packages, the version and release information must be specified as variables or\n";
                 eprint "embedded in the package name.  I'm going to have to skip that one.\n";
-                next;
+                return 0;
             } else {
                 ($tmp = $name) =~ s/^(\S+)-([^-]+)$/$2/;
                 $name =~ s/^(\S+)-([^-]+)$/$1/;
@@ -437,6 +448,13 @@ parse_product_entry
             }
         }
         $filename = sprintf("%s$name-$pkgvars{VERSION}-$pkgvars{RELEASE}.src.rpm", ($module ? "$module/" : ""));
+    }
+
+    # Check for duplicates
+    if (grep($_ eq $name, @packages)) {
+        eprint "I already have $name as a $pkgs->{$name}{TYPE} package in $pkgs->{$name}{PRODUCT}.\n";
+        eprint "I will ignore the duplicate entry found in $prodname $prodver\n";
+        return 0;
     }
     # Now that we've got the name/version/release in their final forms, set up the data structures.
     $pkgs->{$name}{TYPE} = $type;
@@ -636,7 +654,9 @@ build_rpms
         nprint "$line\n";
         if ($line =~ /^Wrote: .*\.src\.rpm$/) {
             ($srpm = $line) =~ s/^Wrote:\s+//;
-        } elsif ($line =~ /^line \d+: [^:]+: /) {
+        } elsif ($line =~ /^line \d+: [^:]+: /
+                 || $line =~ /^Failed to find \w+:/
+                 || $line =~ /^Symlink points to BuildRoot: /) {
             $err = 1;
             push @spec_errors, $line;
         } elsif ($line =~ /^Bad exit status from/) {
@@ -658,9 +678,12 @@ build_rpms
             $err = 1;
             $line =~ s/^Architecture is not included:\s+//;
             $msg = "This SRPM does not build on the $line architecture";
-        } elsif ($line =~ /^File not found( by glob)?: /) {
+        } elsif ($line =~ /^File (.*): No such file or directory$/
+                 || $line =~ /^Bad file: (.*): No such file or directory$/
+                 || $line =~ /^File is not a regular file: (.*)$/
+                 || $line =~ /^Unable to open icon (\S+):$/
+                 || $line =~ /^File not found(?: by glob)?: (.*)$/) {
             $err = 1;
-            $line =~ s/^File not found( by glob)?: //;
             push @not_found, $line;
         }
     }
@@ -670,12 +693,12 @@ build_rpms
         $err = 1;
         $msg = "Unhandled RPM build error";
     } elsif ($#not_found != -1) {
-        $msg = sprintf("The following were expected by the spec file, but no matching files were found:  %s",
+        $msg = sprintf("The following were expected by rpm, but no matching files were found:  %s",
                        join(" ", @not_found));
     } elsif ($#spec_errors != -1) {
         $msg = sprintf("The spec file contains the following errors:  \"%s\"", join("\" \"", @spec_errors));
     }
-    dprintf "build_rpms():  Returning $err, $msg, $srpm\n";
+    dprint "build_rpms():  Returning $err, $msg, $srpm\n";
     return ($err, $msg, $srpm);
 }
 
@@ -692,7 +715,7 @@ do_bootstrap_stage
 
     qprint "$progname:  Entering the bootstrap stage.  (${\(&get_timestamp())})\n";
     if (! -d "$builddir") {
-        mkdir("$builddir", 0755) || die "Cannot create $builddir -- $!\n";
+        mkdir("$builddir", 0755) || &fatal_error("Cannot create $builddir -- $!\n");
         foreach $dir ("BUILD", "SRPMS", "RPMS", "SPECS", "SOURCES") {
             mkdir("$builddir/$dir", 0755);
         }
@@ -703,7 +726,7 @@ do_bootstrap_stage
         $rpmmacros = "$basedir/rpmmacros";
         if (!(-f "$basedir/rpmmacros" && -s _)) {
             # Create basic rpmmacros
-            open(RPMMACROS, ">$rpmmacros") || die "Cannot create $rpmmacros -- $!\n";
+            open(RPMMACROS, ">$rpmmacros") || &fatal_error("Cannot create $rpmmacros -- $!\n");
             print RPMMACROS "\%_topdir        $builddir\n";
             close(RPMMACROS);
         }
@@ -714,7 +737,7 @@ do_bootstrap_stage
         $rpmrc = "$basedir/rpmrc";
         if (!(-f "$basedir/rpmrc" && -s _)) {
             # Create basic rpmrc
-            open(RPMRC, ">$rpmrc") || die "Cannot create $rpmrc -- $!\n";
+            open(RPMRC, ">$rpmrc") || &fatal_error("Cannot create $rpmrc -- $!\n");
             print RPMRC "optflags:   i386 $ENV{CFLAGS}\n";
             print RPMRC "macrofiles: /usr/lib/rpm/macros:/usr/lib/rpm/%{_target}/macros:/etc/rpm/macros.specspo:",
                          "/etc/rpm/macros:/etc/rpm/%{_target}/macros:~/.rpmmacros:$rpmmacros\n";
@@ -781,18 +804,25 @@ do_compose_stage
             nprint "$progname:  Skipping compose stage for the \"$pkg\" package.\n";
             next;
         }
-        nprint "$progname:  Starting compose stage for the \"$pkg\" package....\n";
+        nprint "$progname:  Starting compose stage for the \"$pkg\" package....  (${\(&get_timestamp())})\n";
 
         # The first step is to examine the module directory to find
         # the names of the vendor source files/directories and the spec file.
         if (! chdir("$cwd/$pkgs->{$pkg}{MODULE}")) {
-            &fail_package($pkg, "compose", "Could not chdir into $pkgs->{$pkg}{MODULE} -- $!");
+            &fail_package($pkg, "compose", "Could not chdir into $cwd/$pkgs->{$pkg}{MODULE} -- $!");
             next;
         }
         ($pn = $prodname) =~ s/^va-//;
         opendir(DIR, ".");
         @contents = readdir(DIR);
         closedir(DIR);
+        if (grep($_ =~ /\.src\.rpm$/, @contents)) {
+            # The target SRPM already exists.  Skip this stage.
+            nprint "$progname:  The target SRPM for \"$pkg\" already exists in $cwd/$pkgs->{$pkg}{MODULE}.\n";
+            nprint "$progname:  I'll assume it's the right one.  Compose stage for \"$pkg\" is complete.\n";
+            next;
+        }
+            
         if ($pkgs->{$pkg}{SPECFILE} && -f $pkgs->{$pkg}{SPECFILE}) {
             # If they gave us the spec file and it exists, use that.
             $specfile = $pkgs->{$pkg}{SPECFILE};
@@ -902,11 +932,12 @@ do_compose_stage
         system("mv $srpm .");
         $pkgs->{$pkg}{FILENAME} = $srpm;
         $pkgs->{$pkg}{FILENAME} =~ s/^(\S+)\/([^\/]+\.src\.rpm)$/$2/;
-        $pkgs->{$pkg}{FILENAME} = "$pkgs->{$pkg}{MODULE}/$pkgs->{$pkg}{FILENAME}";
+        $pkgs->{$pkg}{FILENAME} = "$basedir/$pkgs->{$pkg}{MODULE}/$pkgs->{$pkg}{FILENAME}";
         dprint "Filename is $pkgs->{$pkg}{FILENAME}\n";
 
-        nprint "$progname:  Compose stage for \"$pkg\" is complete.\n";
+        nprint "$progname:  Compose stage for \"$pkg\" is complete.  (${\(&get_timestamp())})\n";
     }
+    chdir($cwd);
     qprint "$progname:  Compose stage is now complete.  (${\(&get_timestamp())})\n";
 }
 
@@ -1036,7 +1067,7 @@ do_build_stage
             nprint "$progname:  Skipping build stage for the \"$pkg\" package.\n";
             next;
         }
-        nprint "$progname:  Starting build stage for the \"$pkg\" package....\n";
+        nprint "$progname:  Starting build stage for the \"$pkg\" package....  (${\(&get_timestamp())})\n";
 
         # Check for a target SRPM that is newer than the original SRPM and the
         # spec file.  If such an SRPM exists, skip the build stage for this package.
@@ -1063,7 +1094,7 @@ do_build_stage
         if ($err) {
             &fail_package($pkg, "build", $msg);
         }
-        nprint "$progname:  Build stage for \"$pkg\" is complete.\n";
+        nprint "$progname:  Build stage for \"$pkg\" is complete.  (${\(&get_timestamp())})\n";
     }
     qprint "$progname:  Build stage is now complete.  (${\(&get_timestamp())})\n";
 }
@@ -1082,7 +1113,7 @@ do_package_stage
     # Create the directories where we'll put the packages
     # FIXME:  The prod files should probably be able to specify this
     if (! -d "$basedir/$prod") {
-        mkdir("$basedir/$prod", 0755) || die "Cannot create $basedir/$prod -- $!\n";
+        mkdir("$basedir/$prod", 0755) || &fatal_error("Cannot create $basedir/$prod -- $!\n");
         foreach $dir ("SRPMS", "RPMS") {
             mkdir("$basedir/$prod/$dir", 0755);
         }
@@ -1100,7 +1131,7 @@ do_package_stage
 
         # Find all the RPM's installed by this package
         dprint "Opening directory $builddir/SRPMS to scan for output files.\n";
-        opendir(DIR, "$builddir/SRPMS") || die "Cannot open directory $builddir/SRPMS -- $!\n";
+        opendir(DIR, "$builddir/SRPMS") || &fatal_error("Cannot open directory $builddir/SRPMS -- $!\n");
         @contents = readdir(DIR);
         foreach $rpm (@contents) {
             dprint "Checking $builddir/SRPMS/$rpm\n";
@@ -1236,10 +1267,6 @@ main
     $progname = "buildtool";
     $version = "0.1.0";
 
-    # Synchronize output so it doesn't get all jumbled
-    select STDERR; $| = 1;
-    select STDOUT; $| = 1;
-
     # See the Getopt::Mixed man page for details on the syntax of this line
     $valid_opts = "h help>h v version>v d debug>d b=s build>b p=s product>p package>p"
                    . " q quiet>q Q really-quiet>Q silent>Q D dir>D f force>f l=s log>l";
@@ -1262,6 +1289,7 @@ main
             eprint "Unable to open $opt_l -- $!\n";
         } else {
             $GLOBAL_LOG = \*LOGFILE;
+            open(STDERR, ">&LOGFILE");
         }
     }
     if ($opt_D) {
