@@ -346,3 +346,8 @@ seem to be very "thread-safe" as it were.  I also moved the CVS
 modules and such into the build directory instead of the base
 directory.  This should make things cleaner.
 ----------------------------------------------------------------------
+Sun Jun 11 00:53:14 2000                        Michael Jennings (mej)
+
+Somehow the damn thing managed to crash on a SIGTTOU.  I'm going to
+try ignoring the tty signals.  We'll see what happens.
+----------------------------------------------------------------------
