@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgsort,v 1.2 2000/09/09 05:47:32 mej Exp $
+# $Id: pkgsort,v 1.3 2000/09/09 07:46:53 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -277,6 +277,7 @@ query_packages
             next;
         }
         dprint "Package $pkg:  ", join(", ", @{$rpm_list{$pkg}}), "\n";
+        @{$provides{$pkg}} = ($pkg);
         foreach $rpm (@{$rpm_list{$pkg}}) {
             $cmd = "pkgtool -qd -p $path{$rpm}/$rpm";
 
@@ -456,6 +457,7 @@ cmp_packages_by_relation
         } else {
             my $n = $pkg1 cmp $pkg2;
             my $s;
+            my ($lib_cnt1, $lib_cnt2);
 
             # Doh!  We have a circular dependency.  Note it, then sort alphabetically.
             dprint "Circular dependency detected between $pkg1 and $pkg2.\n";
@@ -467,7 +469,17 @@ cmp_packages_by_relation
             if (!grep($_ eq $s, @circular_deps)) {
                 push @circular_deps, $s;
             }
-            return 0;
+
+            # Now here's the hard part.  What to do about circular dependencies.  First,
+            # let's see if one supplies libs and the other doesn't.  If so, libs first.
+            $lib_cnt1 = grep($_ =~ /^lib/, @{$provides{$pkg1}});
+            $lib_cnt2 = grep($_ =~ /^lib/, @{$provides{$pkg2}});
+            if ($lib_cnt1 != $lib_cnt2) {
+                return ($lib_cnt2 <=> $lib_cnt1);
+            }
+
+            # Doh!  They both provide the same number of libs, probably none.  What next?
+            return &cmp_packages_by_dep_count($pkg1, $pkg2);
         }
     }
 
@@ -565,7 +577,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.2 $ created on $Date: 2000/09/09 05:47:32 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.3 $ created on $Date: 2000/09/09 07:46:53 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

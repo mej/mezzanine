@@ -792,3 +792,9 @@ pkgsort consistently returns the same ordering on output now,
 regardless of the ordering on input.  It looks like I still have some
 dependency checks getting missed, though.
 ----------------------------------------------------------------------
+Sat Sep  9 00:44:57 2000                        Michael Jennings (mej)
+
+I fixed the dependency checking problems.  The resulting list still
+doesn't result in a successful base image install because RedHat's
+dependency info is incomplete.  *sigh*
+----------------------------------------------------------------------
