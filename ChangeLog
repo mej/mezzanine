@@ -461,3 +461,8 @@ Thu Jun 15 20:14:28 2000                        Michael Jennings (mej)
 
 And here's another fix....
 ----------------------------------------------------------------------
+Fri Jun 16 11:58:27 2000                        Michael Jennings (mej)
+
+This should fix the problem with finding output RPM's in a partial
+build if the RPM name doesn't contain the package name.
+----------------------------------------------------------------------
