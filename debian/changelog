@@ -1,3 +1,9 @@
+mezzanine (1.4-0.5) unstable; urgency=low
+
+  * Updated to 1.4-0.5
+
+ -- Michael Jennings <mej@nplus1.net>  Wed, 31 Jul 2002 11:25:51 -0400
+
 mezzanine (1.2-1) unstable; urgency=low
 
   * Resync with latest version.
