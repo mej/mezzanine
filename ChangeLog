@@ -404,3 +404,7 @@ Wed Jun 14 13:44:16 2000                        Michael Jennings (mej)
 More documentation.  I've covered the existing features of revtool,
 and I'm starting on the buildtool part.
 ----------------------------------------------------------------------
+Wed Jun 14 13:54:36 2000                        Michael Jennings (mej)
+
+Added boot image support for ISO stage.
+----------------------------------------------------------------------
