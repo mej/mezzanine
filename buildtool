@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.31 2000/05/30 21:59:04 mej Exp $
+# $Id: buildtool,v 1.32 2000/05/31 23:51:34 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -416,7 +416,7 @@ sub
 parse_product_entry
 {
     my ($line, $prodname, $prodver) = @_;
-    my ($type, $name, $module, $filename, $pkgvar, $var, $val);
+    my ($type, $name, $arch, $module, $filename, $pkgvar, $var, $val);
     my $type_guess = 0;
     my (%pkgvars, @inp);
     my $prod;
@@ -447,6 +447,8 @@ parse_product_entry
             $type = "module";
         } elsif ($type =~ /^srpm/) {
             $type = "srpm";
+        } elsif ($type =~ /^rpm/) {
+            $type = "rpm";
         } else {
             eprint "$type is not a valid package type.  I'll try to guess the correct one.\n";
             $type = 0;
@@ -458,8 +460,11 @@ parse_product_entry
         ($name = shift @inp) =~ s/^\w*://;
         dprint "Guessing type of \"$name\"\n";
         if ($name =~ /src\.rpm/) {
-            # Name ends with .src.rpm.  That's an easy one.
+            # Name ends with src.rpm.  That's an easy one.
             $type = "srpm";
+        } elsif ($name =~ /\.rpm/) {
+            # Name ends with .rpm but it's not a source RPM.  That's easy too.
+            $type = "rpm";
         } else {
             my @contents = ();
 
@@ -537,11 +542,15 @@ parse_product_entry
         if (defined($pkgvars{REVISION}) && $pkgvars{REVISION} =~ /^head$/i) {
             undef $pkgvars{REVISION};
         }
-    } elsif ($type eq "srpm") {
-        $name =~ s/(\.|no)src\.rpm$//;
+    } elsif ($type eq "srpm" || $type eq "rpm") {
+        if ($name =~ /^(\S+)\.(\w+)\.rpm$/) {
+            ($name, $arch) = ($1, $2);
+        } else {
+            $arch = ($type eq "srpm" ? "src" : "i386");
+        }
         if (!defined $pkgvars{RELEASE}) {
             if ($name !~ /^\S+-[^-]+-[^-]+$/) {
-                eprint "I wasn't given enough information about the $name package in $prodfile.  For SRPM\n";
+                eprint "I wasn't given enough information about the $name package in $prodfile.  For RPM/SRPM\n";
                 eprint "packages, the version and release information must be specified as variables or\n";
                 eprint "embedded in the package name.  I'm going to have to skip that one.\n";
                 return 0;
@@ -553,7 +562,7 @@ parse_product_entry
         }
         if (!defined $pkgvars{VERSION}) {
             if ($name !~ /^\S+-[^-]+$/) {
-                eprint "I wasn't given enough information about the $name package in $prodfile.  For SRPM\n";
+                eprint "I wasn't given enough information about the $name package in $prodfile.  For RPM/SRPM\n";
                 eprint "packages, the version and release information must be specified as variables or\n";
                 eprint "embedded in the package name.  I'm going to have to skip that one.\n";
                 return 0;
@@ -563,7 +572,7 @@ parse_product_entry
                 $pkgvars{VERSION} = $tmp;
             }
         }
-        $filename = sprintf("%s$name-$pkgvars{VERSION}-$pkgvars{RELEASE}.src.rpm", ($module ? "$module/" : ""));
+        $filename = sprintf("%s$name-$pkgvars{VERSION}-$pkgvars{RELEASE}.$arch.rpm", ($module ? "$module/" : ""));
     }
 
     # Check for duplicates
@@ -607,8 +616,13 @@ parse_product_entry
         }
     }
     if (!defined $pkgs->{$name}{STAGES}) {
-        dprint "parse_product_entry():  Defaulting to all stages for $name\n";
-        $pkgs->{$name}{STAGES} = "scebpia";
+        if ($type eq "rpm") {
+            dprint "parse_product_entry():  Defaulting to minimal stages for binary package $name\n";
+            $pkgs->{$name}{STAGES} = "spia";
+        } else {
+            dprint "parse_product_entry():  Defaulting to all stages for source package $name\n";
+            $pkgs->{$name}{STAGES} = "scebpia";
+        }
     }
     push @packages, $name;
     $pkgs->{$name}{PRODUCT} = $prod;
@@ -937,7 +951,7 @@ do_compose_stage
     qprint "$progname:  Entering the compose stage.  (${\(&get_timestamp())})\n";
     chomp($cwd = `pwd`);
 
-    # No compose stage for SRPM's since they're *already* SRPM's....
+    # No compose stage for package files since they're *already* package files....
     foreach $pkg (grep $pkgs->{$_}{TYPE} eq "module", @p) {
         if ($pkgs->{$pkg}{STAGES} !~ /c/) {
             nprint "$progname:  Skipping compose stage for the \"$pkg\" package.\n";

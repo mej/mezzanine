@@ -242,3 +242,13 @@ Tue May 30 15:10:42 2000                        Michael Jennings (mej)
 
 Attempt to fix the moc problem.
 ----------------------------------------------------------------------
+Tue May 30 21:08:00 2000                        Michael Jennings (mej)
+
+buildtool should handle binary RPM's now.  I added the first few prod
+file changes to attempt to test the multi-directory commit thingie.
+----------------------------------------------------------------------
+Wed May 31 17:02:41 2000                        Michael Jennings (mej)
+
+Updated the product files to include binary packages for those whose
+source packages won't compile.
+----------------------------------------------------------------------
