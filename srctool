@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.4 2001/03/21 07:53:31 mej Exp $
+# $Id: srctool,v 1.5 2001/03/21 23:31:13 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -32,6 +32,9 @@ require Getopt::Long;
 
 # Constants
 #
+$WORK_DIR = ".avalon.work";
+$TMP_DIR = "/var/tmp/srctool.$$";
+
 # Return codes for revtool
 sub REVTOOL_NO_SERVER()           {1;}
 sub REVTOOL_SERVER_CRASH()        {2;}
@@ -101,6 +104,9 @@ print_usage_info
     print "    -h --help                        Show this usage information\n";
     print "    -d --debug                       Turn on debugging\n";
     print "    -v --version                     Show version and copyright\n";
+    print "    -i --import                      Import a new package/source tree\n";
+    print "    -p --prepare                     Prepare a working tree\n";
+    print "    -n --name <pkg>-<version>        Specify the package name and version for an import\n";
     print "\n";
     exit(SRCTOOL_SUCCESS);
 }
@@ -257,7 +263,7 @@ find_files
     my $dir = $_[0];
     my @files;
 
-    @files = &grepdir(sub {-f "$dir/$_"}, $dir);
+    @files = &grepdir(sub {-f "$dir/$_" && $_ !~ /^\./}, $dir);
     foreach my $f (0..$#files) {
 	$files[$f] = "$dir/$files[$f]";
     }
@@ -271,7 +277,7 @@ find_subdirs
     my $dir = $_[0];
     my @subdirs;
 
-    @subdirs = &grepdir(sub {-d "$dir/$_"}, $dir);
+    @subdirs = &grepdir(sub {-d "$dir/$_" && $_ !~ /^\./}, $dir);
     foreach my $f (0..$#subdirs) {
 	$subdirs[$f] = "$dir/$subdirs[$f]";
     }
@@ -286,7 +292,7 @@ create_temp_space
     my ($dir, $d);
     my @dirlist;
 
-    $dir = "/var/tmp/srctool.$$/$pkg";
+    $dir = "$TMP_DIR/$pkg";
     &nuke_tree($dir);
     &mkdirhier($dir) || return "";
     if ($type eq "SPM") {
@@ -307,7 +313,7 @@ create_temp_space
 sub
 clean_temp_space
 {
-    return &nuke_tree("/var/tmp/srctool.$$");
+    return &nuke_tree($TMP_DIR);
 }
 
 # Generic Avalon command wrapper
@@ -334,7 +340,7 @@ run_cmd
         push @output, $line;
         if ($show_output) {
             print "$show_output$line\n";
-            # Check the output for errors
+            # Check the output for errors.  May not work for non-Avalon programs.
             if ($line =~ /^\w+:\s*error:\s*(\S.*)$/i) {
                 $msg = $1;
             }
@@ -480,6 +486,11 @@ prepare_tree
 	($pkg = $pwd) =~ s/^.*\/([^\/]+)$/$1/;
 	$pkgdir = $pwd;
     }
+    # Create the working directory
+    if (!mkdir($WORK_DIR)) {
+        eprint "Unable to create working directory -- $!\n";
+        return SRCTOOL_SYSTEM_ERROR;
+    }
     # Find all the sources and patches and the spec file.
     @srcs = &find_files("S");
     @patches = &find_files("P");
@@ -505,8 +516,8 @@ prepare_tree
 	eprint "Unable to copy $spec into $tmpdir/SPECS -- $!\n";
 	return SRCTOOL_SYSTEM_ERROR;
     }
-    $rpmcmd = "--define \"_topdir $pkgdir\" -bp";
-    @tmp = &run_cmd("");
+    $rpmcmd = "--define \"_topdir $pkgdir\" --define \"_builddir $pkgdir/$WORK_DIR\" -bp $spec";
+    @tmp = &run_cmd("rpm", $rpmcmd, 0);
 }
 
 # main() here is basically the same as main() in C
@@ -527,7 +538,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.4 $ created on $Date: 2001/03/21 07:53:31 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.5 $ created on $Date: 2001/03/21 23:31:13 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
