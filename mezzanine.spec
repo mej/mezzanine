@@ -27,9 +27,14 @@ Requires: perl
 %install
 rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT%{prefix}/bin
+mkdir -p $RPM_BUILD_ROOT%{prefix}/man/man1
 
 for i in *tool ; do
   install -m 755 $i $RPM_BUILD_ROOT%{prefix}/bin/
+done
+
+for i in *.1 ; do
+  install -m 644 $i $RPM_BUILD_ROOT%{prefix}/man/man1/
 done
 
 %clean
@@ -39,3 +44,4 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-, root, root)
 %doc README ChangeLog
 %{prefix}/bin/*
+%{prefix}/man/*

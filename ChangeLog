@@ -547,3 +547,8 @@ Thu Jun 22 11:57:00 2000                              Craig Ross (ccr)
 Added buildtool man page.
 
 ----------------------------------------------------------------------
+Thu Jun 22 16:41:15 2000                        Michael Jennings (mej)
+
+Added the man page to the spec file, and added a "product tag"
+capability to revtool to facilitate tagging product releases.
+----------------------------------------------------------------------

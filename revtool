@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.33 2000/06/22 03:36:00 mej Exp $
+# $Id: revtool,v 1.34 2000/06/22 23:32:13 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -137,6 +137,36 @@ cat_file
         $contents .= $_;
     }
     return $contents;
+}
+
+# Check a tag for validity
+sub
+check_tag
+{
+    my ($module, $tag) = @_;
+
+    # The regexp's below enforce the following tag rules:
+    #   1. Branch tags must begin with a branch key, hypen, the package name, hyphen, e.g. VA-KERNEL-
+    #   2. Non-branch tags are the same, but without the branch key at the beginning, e.g. KERNEL-
+    #   3. Tags must contain only uppercase characters and hyphens.  Note that this rule is more
+    #      restrictive than CVS's own rules but is enforced for standards compliance.
+    #   4. Product tags are only subject to rule #3.
+
+    if ($tag !~ /^[-A-Z0-9]+$/) {
+        return 0;
+    }
+    if ($mode ne "ptag") {
+        if ($opt_b) {
+            if ($tag !~ /^([A-Z]+)-$module-/) {
+                return 0;
+            }
+        } else {
+            if ($tag !~ /^$module-/) {
+                return 0;
+            }
+        }
+    }
+    return 1;
 }
 
 # Login to the repository
@@ -963,13 +993,7 @@ tag_local_sources
     }
     ($mod_tag = $module) =~ tr/[a-z]/[A-Z]/;
 
-    # Okay, the regexp's below enforce the following tag rules:
-    #   1. Branch tags must begin with a branch key, hypen, the package name, hyphen, e.g. VA-KERNEL-
-    #   2. Non-branch tags are the same, but without the branch key at the beginning, e.g. KERNEL-
-    #   3. Tags must contain only uppercase characters and hyphens.  Note that this rule is more
-    #      restrictive than CVS's own rules but is enforced for standards compliance.
-    if (($opt_b && $tag !~ /^([A-Z]+)-$mod_tag-/) || (! $opt_b && $tag !~ /^$mod_tag-/)
-        || $tag !~ /^[-A-Z0-9]+$/) {
+    if (! &check_tag($mod_tag, $tag)) {
         eprint "Tag \"$tag\" is not valid for module $module\n";
         return REVTOOL_INVALID_TAG;
     }
@@ -1052,11 +1076,8 @@ import_vendor_sources
     }
     dprint "Using module name $module, vendor tag $vendor_tag, release tag $release_tag\n";
 
-    # Okay, the regexp's below enforce the following tag rules:
-    #   1. The release tag must start with the package name and a hyphen, e.g. KERNEL-
-    #   2. Tags must contain only uppercase characters and hyphens.  Note that this rule is more
-    #      restrictive than CVS's own rules but is enforced for standards compliance.
-    if ($release_tag !~ /^$vendor_tag-/ || $release_tag !~ /^[-A-Z0-9]+$/) {
+    $opt_b = 0;  # Stupidity protection  :-)
+    if (! &check_tag($vendor_tag, $release_tag)) {
         eprint "Release tag \"$tag\" is not valid for module $module\n";
         return REVTOOL_INVALID_TAG;
     }
@@ -1148,13 +1169,7 @@ tag_repository_sources
     }
     ($mod_tag = $module) =~ tr/[a-z]/[A-Z]/;
 
-    # Okay, the regexp's below enforce the following tag rules:
-    #   1. Branch tags must begin with a branch key, hypen, the package name, hyphen, e.g. VA-KERNEL-
-    #   2. Non-branch tags are the same, but without the branch key at the beginning, e.g. KERNEL-
-    #   3. Tags must contain only uppercase characters and hyphens.  Note that this rule is more
-    #      restrictive than CVS's own rules but is enforced for standards compliance.
-    if (($opt_b && $rtag !~ /^([A-Z]+)-$mod_tag-/) || (! $opt_b && $rtag !~ /^$mod_tag-/)
-        || $rtag !~ /^[-A-Z0-9]+$/) {
+    if (! &check_tag($mod_tag, $rtag)) {
         eprint "Tag \"$rtag\" is not valid for module $module\n";
         return REVTOOL_INVALID_TAG;
     }
@@ -1232,7 +1247,7 @@ main
         } elsif ($query eq "D") {
             &query_release_diff(@ARGV);
         }
-    } elsif ($mode eq "tag") {
+    } elsif ($mode eq "tag" || $mode eq "ptag") {
         &tag_local_sources(@ARGV);
     } elsif ($mode eq "rtag") {
         &tag_repository_sources(@ARGV);
@@ -1288,7 +1303,8 @@ BEGIN {
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "g|get", "p|put", "a|add", "r|remove",
                    "q|query=s", "R|recurse", "t|tag=s", "i|import", "k=s", "D|dir=s",
-                   "x|exclusive", "addlist=s", "remlist=s", "T|rtag=s", "l|login", "b|branch");
+                   "x|exclusive", "addlist=s", "remlist=s", "T|rtag=s", "l|login", "b|branch",
+                   "ptag");
 
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
@@ -1306,6 +1322,8 @@ BEGIN {
         $mode = "add";
     } elsif ($opt_r) {
         $mode = "remove";
+    } elsif ($opt_ptag) {
+        $mode = "ptag";
     } elsif ($opt_t) {
         $mode = "tag";
     } elsif ($opt_T || $opt_b) {
@@ -1328,7 +1346,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.33 $ created on $Date: 2000/06/22 03:36:00 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.34 $ created on $Date: 2000/06/22 23:32:13 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
