@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.106 2000/10/31 20:08:51 mej Exp $
+# $Id: buildtool,v 1.107 2000/10/31 23:07:40 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -695,9 +695,9 @@ parse_product_entry
         ($type, $name) = split(":", $inp[0]);
         $type =~ tr/[A-Z]/[a-z]/;
         if (! $name && $inp[1]) {
-            # If there's no name, but there's a something after the type, they probably
+            # If there's no name, but there's something after the type, they probably
             # just put in some extra whitespace.  Grab it and shift everything left.
-            $name = $inp[0];
+            $name = $inp[1];
             shift @inp;
         }
         dprint "parse_product_entry():  Found type \"$type\" and name \"$name\"\n";
@@ -1874,7 +1874,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.106 $ created on $Date: 2000/10/31 20:08:51 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.107 $ created on $Date: 2000/10/31 23:07:40 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
