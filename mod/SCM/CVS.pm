@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: CVS.pm,v 1.7 2004/07/13 19:59:42 mej Exp $
+# $Id: CVS.pm,v 1.8 2004/07/25 03:48:40 mej Exp $
 #
 
 package Mezzanine::SCM::CVS;
@@ -630,8 +630,8 @@ imprt()
 
     dprint &print_args(@_);
 
-    if (!scalar(@files)) {
-        push @files, '.';
+    if (!scalar(@files) || !defined($files[0])) {
+        @files = ( '.' );
     }
 
     foreach my $module (@files) {

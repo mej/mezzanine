@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.46 2004/07/25 03:01:39 mej Exp $
+# $Id: srctool,v 1.47 2004/07/25 03:48:40 mej Exp $
 #
 
 use strict;
@@ -240,7 +240,7 @@ import_package
             # Supplied path doesn't exist, so take it as gospel.
             $tmp = $OPTION{"path"};
         }
-        if (length($tmp) > 1) {
+        if (defined($tmp) && length($tmp) > 1) {
             $module = "$tmp/$pkg";
         }
 
@@ -249,9 +249,7 @@ import_package
             $scm->detect_repository();
         }
 
-        chdir($tmpdir);
         $err = $scm->imprt($module);
-        chdir($pwd);
 
         # FIXME:  Needed?
         $scm->propset("source_tag", "");
@@ -810,7 +808,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.46 $ created on $Date: 2004/07/25 03:01:39 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.47 $ created on $Date: 2004/07/25 03:48:40 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();

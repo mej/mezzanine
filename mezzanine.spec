@@ -64,7 +64,7 @@ done
 
 (
   cd $RPM_BUILD_ROOT%{_bindir}
-  for i in get co put ci info add new rm purge rtag tag reset login ann annotate blame diff stat status log ; do
+  for i in get co put ci info add new rm purge rtag tag reset login ann annotate blame diff stat status log init ; do
     ln -s revtool mz$i
     echo ".so revtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/mz$i.1
   done
