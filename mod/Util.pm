@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.42 2004/08/25 21:34:39 mej Exp $
+# $Id: Util.pm,v 1.43 2004/09/14 22:06:33 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -896,30 +896,31 @@ newest_file(@)
 {
     my @dirs = @_;
     my ($newest_name, $newest_time) = ("", 0);
-    my @stat_info;
+    my $stat_info;
 
     dprint &print_args(@_);
     foreach my $dir (@dirs) {
         if (-d $dir) {
             find({ "wanted" => sub {
-                                   dprint "Checking $_\n";
-                                   @stat_info = stat($_);
-                                   if (scalar(@stat_info) == 13 && ($stat_info[9] > $newest_time)) {
+                                   #dprint "Checking $_\n";
+                                   $stat_info = stat($_);
+                                   #dprintf("Got mtime is %s\n", ($stat_info->mtime || "<undef>"));
+                                   if (defined($stat_info->mtime) && ($stat_info->mtime > $newest_time)) {
                                        $newest_name = $_;
-                                       $newest_time = $stat_info[9];
+                                       $newest_time = $stat_info->mtime;
                                    }
                                }, "no_chdir" => 1
                  }, $dir);
         } else {
             dprint "Checking $dir\n";
-            @stat_info = stat($dir);
-            if ($stat_info[9] > $newest_time) {
+            $stat_info = stat($dir);
+            if ($stat_info->mtime > $newest_time) {
                 $newest_name = $dir;
-                $newest_time = $stat_info[9];
+                $newest_time = $stat_info->mtime;
             }
         }
     }
-    dprintf("$newest_name is newest with mtime of %s.\n",
+    dprintf("\"$newest_name\" is newest with mtime of %s.\n",
             POSIX::strftime("%Y-%m-%d %H:%M:%S", localtime($newest_time)));
     return $newest_name;
 }

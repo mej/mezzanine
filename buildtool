@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.197 2004/08/25 21:34:39 mej Exp $
+# $Id: buildtool,v 1.198 2004/09/14 22:06:33 mej Exp $
 #
 
 use strict;
@@ -198,8 +198,16 @@ is_build_needed
     # If the file/module does not exist, we definitely need to build it.
     if (! -e $pkgfile) {
         dprint "Doh!  $pkgfile doesn't exist.  It must be built.\n";
+    } else {
+        my $which_one;
+
+        $which_one = &newest_file($pkgfile);
+        if ($which_one && -e $which_one) {
+            @stat1 = stat($which_one);
+        } else {
+            @stat1 = stat($pkgfile);
+        }
     }
-    @stat1 = stat(&newest_file($pkgfile));
 
     # If there is no SRPMS directory, then there are surely no SRPMS to be checked.
     $srpm_dir = &pkgvar_topdir() . "/SRPMS";
@@ -1026,7 +1034,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.197 $ created on $Date: 2004/08/25 21:34:39 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.198 $ created on $Date: 2004/09/14 22:06:33 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();

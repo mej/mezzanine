@@ -624,3 +624,10 @@ Tue Aug 31 20:25:41 2004                        Michael Jennings (mej)
 
 Oops.  Broke building of PDR's.
 ----------------------------------------------------------------------
+Tue Sep 14 18:06:06 2004                        Michael Jennings (mej)
+
+Fixed timestamp checking.
+
+Translate perl(Some::Module) to perl-Some-Module for installing build
+deps.
+----------------------------------------------------------------------

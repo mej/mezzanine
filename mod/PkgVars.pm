@@ -269,6 +269,7 @@ sub
 identify_package_type
 {
     my $filename = $pkg_vars{"file"};
+    my $orig_cwd = &getcwd();
 
     $pkg_vars{"type"}{$filename} = $pkg_vars{"subtype"}{$filename} = "";
 
@@ -288,21 +289,23 @@ identify_package_type
         }
     } elsif ($filename =~ /\.(tar\.|t)?(gz|bz|bz2|Z)$/) {
         $pkg_vars{"type"}{$filename} = $pkg_vars{"subtype"}{$filename} = "tar";
-    } elsif ((-d $filename) || ($filename eq &basename(&getcwd))) {
+    } elsif ((-d $filename) || ($filename eq &basename(&getcwd()))) {
         my @specs;
 
+        dprint "$filename is a directory.\n";
         if (($filename ne &basename(&getcwd)) && (-d $filename)) {
-            # FIXME:  This breaks mzimport on directories.  Needed?
-            #chdir($filename);
+            chdir($filename);
         }
         if (-s "Makefile.mezz") {
             $pkg_vars{"type"}{$filename} = "CFST";
         } else {
-            @specs = &grepdir(sub { $_ =~ /\.spec(\.in)?$/ }, ".");
+            @specs = &grepdir(sub { $_ =~ /\.spec(\.in)?$/ && &basename($_) !~ /^\./ }, ".");
+            dprintf("Found %d specs in \".\"\n", scalar(@specs));
             if (scalar(@specs)) {
                 $pkg_vars{"type"}{$filename} = "PDR";
             } elsif (-d "F") {
-                @specs = &grepdir(sub { $_ =~ /\.spec(\.in)?$/ }, "F");
+                @specs = &grepdir(sub { $_ =~ /\.spec(\.in)?$/ && &basename($_) !~ /^\./ }, "F");
+                dprintf("Found %d specs in \"F/\"\n", scalar(@specs));
                 if (scalar(@specs)) {
                     $pkg_vars{"type"}{$filename} = "SPM";
                 }
@@ -312,7 +315,12 @@ identify_package_type
             $pkg_vars{"type"}{$filename} = "FST";
         }
     }
-    dprint "Identified $filename as $pkg_vars{type}{$filename}\n";
+    chdir($orig_cwd);
+    dprintf("Identified $filename as $pkg_vars{type}{$filename}%s.\n",
+            (($pkg_vars{"subtype"}{$filename})
+             ? (" ($pkg_vars{subtype}{$filename})")
+             : ("")
+            ));
 }
 
 ### Private functions
