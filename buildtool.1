@@ -1,0 +1,61 @@
+.TH BUILDTOOL 1  "22 Jul 2000" "BUILDTOOL(1)"
+.SH NAME
+buildtool - the application which builds binary and source package files. 
+.SH SYNOPSIS
+.B buildtool
+.RI [ options ]
+
+.SH DESCRIPTION
+.PP
+.B buildtool 
+is what takes a product name/version pair, like "va-redhat-6.2.1" and
+translates that, via a series of product definition/configuration files
+("prod files" for short) into a set of packages to build.  It then builds
+those packages, creating both source and binary package files.  It can also
+use these packages to build ISO images for product CD's. 
+.SH OPTIONS
+The
+.B buildtool 
+options are listed below.
+.LP
+.TP
+.BR "\-h" , " \-\-help"
+Print out a message describing available options. 
+.TP
+.BR "\-d" , "\-\-debug" 
+Turn on debugging 
+.TP
+.BR "\-v" , "\-\-version" 
+Show version and copyright
+.TP
+.BI \-b " stage" ", \-\-build " stage
+Stop building after a particular stage(see README)
+.TP
+.BI \-p " name" ", \-\-product " name 
+Specify the product or package to build
+.TP
+.BR "\-q" , " \-\-quiet"
+Print only basic progress info
+.TP
+.BI \-D " directory" ", \-\-dir " directory
+Specify "directory" as the base directory for the build
+.TP
+.BR "\-f" , " \-\-force"
+Ignore errors, build as much as possible
+.TP
+.BI \-l " logfile" ", \-\-log " logfile 
+Specify a log file to send informational output to
+.TP
+.BR "\-P" , " \-\-parallel" 
+Parallelize the build process based on the number of CPU's
+.TP
+.BI \-target " arch" ", \-\-target " arch 
+Tell rpm to build for a particular target architecture
+
+.SH AUTHORS
+Michael Jennings (mej@valinux.com).  
+Man page written by ccr (ccr@valinux.com).
+
+.SH MORE INFORMATION
+A detailed description of buildtool functionality is available
+in the README.
