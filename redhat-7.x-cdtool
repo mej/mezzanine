@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 21 July 2000
 #
-# $Id: redhat-7.x-cdtool,v 1.6 2001/04/20 04:20:53 mej Exp $
+# $Id: redhat-7.x-cdtool,v 1.7 2001/04/21 06:17:59 mej Exp $
 #
 
 PATH=/bin:/usr/bin:/sbin:/usr/sbin
@@ -75,10 +75,10 @@ sh $NET.sh
 
 # Re-create CD images from the altered net image
 for i in RedHat/base dosutils images ; do
-  (cd $NET ; tar --exclude CVS -cf - $i) | (cd $CD1 ; tar -xf -)
+  test -d $NET/$i && (cd $NET ; tar --exclude CVS -cf - $i) | (cd $CD1 ; tar -xf -)
 done
 for i in RedHat/instimage ; do
-  (cd $NET ; tar --exclude CVS -cf - $i) | (cd $CD2 ; tar -xf -)
+  test -d $NET/$i && (cd $NET ; tar --exclude CVS -cf - $i) | (cd $CD2 ; tar -xf -)
 done
 
 # Regenerate the package list ($CD1/RedHat/base/hdlist) from $CD1/RedHat/base/comps

@@ -21,13 +21,14 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.6 2001/04/17 03:20:47 mej Exp $
+# $Id: Util.pm,v 1.7 2001/04/21 06:17:59 mej Exp $
 #
 
 package Avalon::Util;
 
 BEGIN {
     use Exporter   ();
+    use File::Copy;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
@@ -325,20 +326,18 @@ move_files($ $)
         $dest .= '/' if ($dest !~ /\/$/);
         $addname = 1;
     }
+    dprint "\$dest is $dest, \$addname is $addname\n";
     foreach my $f (@flist) {
         my $target;
 
         if ($addname) {
-            ($target = $f) =~ s/^.*\/([^\/]+)$/$1/;
+            ($target = $f) =~ s/^(.*\/)?([^\/]+)$/$dest$2/;
         } else {
             $target = $dest;
         }
-        if (!link($f, $target)) {
-            eprint "Unable to copy $f to $target -- $!\n";
-            return $fcnt;
-        }
-        if (!unlink($f)) {
-            eprint "Unable to remove $f -- $!\n";
+        dprint "Moving $f to $target\n";
+        if (!&File::Copy::move($f, $target)) {
+            eprint "Unable to move $f to $target -- $!\n";
             return $fcnt;
         }
         $fcnt++;

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.17 2001/04/18 04:16:57 mej Exp $
+# $Id: srctool,v 1.18 2001/04/21 06:17:59 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -108,7 +108,11 @@ import_package
         }
         @srcs = values %{$specdata->{SOURCE}};
         @patches = values %{$specdata->{PATCH}};
+        dprint "Specfile $spec, sources ", join(' ', @srcs), ", patches ", join(' ', @patches), "\n";
+
         # Move the patches to $tmpdir/P/
+        chdir("$tmpdir/S");
+        dprint "Moving patches to $tmpdir/P/\n";
         if (&move_files(@patches, "$tmpdir/P/") < scalar(@patches)) {
             eprint "One or more patches could not be moved into place.\n";
             return AVALON_FILE_OP_FAILED;
@@ -200,9 +204,10 @@ prepare_tree($$)
 	return AVALON_SYSTEM_ERROR;
     }
     print "Creating working directory $pkgdir/$WORK_DIR....\n" if ($external);
-    $rpmcmd = "--define \"_topdir $tmpdir\" --define \"_builddir $pkgdir/$WORK_DIR\" -bp $spec";
+    $rpmcmd = "--define \"_topdir $tmpdir\" --define \"_builddir $pkgdir/$WORK_DIR\" --nodeps -bp $spec";
     @tmp = &run_cmd("rpm", $rpmcmd, 0);
     if (($err = shift @tmp) != AVALON_SUCCESS) {
+        dprint join("\n  ", @tmp), "\n";
         eprint "Creation of working directory failed -- $tmp[$#tmp]\n";
     } elsif ($external) {
         print "You may now chdir to ", ($pkg ? "$pkg/$WORK_DIR" : $WORK_DIR), " to make changes.\n";
@@ -426,7 +431,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.17 $ created on $Date: 2001/04/18 04:16:57 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.18 $ created on $Date: 2001/04/21 06:17:59 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -1171,3 +1171,8 @@ Thu Apr 19 21:20:38 2001                        Michael Jennings (mej)
 
 More bug fixes, now 0.10 release.
 ----------------------------------------------------------------------
+Fri Apr 20 23:17:05 2001                        Michael Jennings (mej)
+
+Some import bugs fixed as well as some erroneous behavior brought on
+by new features of 7.1.
+----------------------------------------------------------------------

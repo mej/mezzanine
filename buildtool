@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.132 2001/04/18 04:16:57 mej Exp $
+# $Id: buildtool,v 1.133 2001/04/21 06:17:59 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -285,7 +285,7 @@ place_file
         if ($dest) {
             # Grab the first part of the destination path, make sure it's an image module
             ($image = $dest) =~ s/^([^\/]+)\/.*$/$1/;
-            if (!defined($pkgs->{$image}{TYPE}) || ($pkgs->{$image}{TYPE} ne "image")) {
+            if ($dest != $builddir && (!defined($pkgs->{$image}{TYPE}) || ($pkgs->{$image}{TYPE} ne "image"))) {
                 qprint "Warning:  Destination \"$dest\" is not a package of type \"image\".\n";
             }
 
@@ -1757,7 +1757,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.132 $ created on $Date: 2001/04/18 04:16:57 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.133 $ created on $Date: 2001/04/21 06:17:59 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
