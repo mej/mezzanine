@@ -786,3 +786,9 @@ Wed Sep  6 18:39:00 2000                        Chip Salzenberg (chip)
 
 Debian build directory.
 ----------------------------------------------------------------------
+Fri Sep  8 22:37:08 2000                        Michael Jennings (mej)
+
+pkgsort consistently returns the same ordering on output now,
+regardless of the ordering on input.  It looks like I still have some
+dependency checks getting missed, though.
+----------------------------------------------------------------------

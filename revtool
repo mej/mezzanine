@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.50 2000/08/23 21:55:39 mej Exp $
+# $Id: revtool,v 1.51 2000/09/09 05:47:32 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -159,15 +159,18 @@ check_tag
     #   4. Product tags are only subject to rule #3.
 
     if ($tag !~ /^[-A-Z0-9]+$/) {
+        dprint "Tag $tag failed character constraint check.\n";
         return 0;
     }
-    if ($mode ne "ptag") {
+    if (! $ptag) {
         if ($opt_b) {
             if ($tag !~ /^([A-Z]+)-$module-/) {
+                dprint "Tag $tag failed branch name check.\n";
                 return 0;
             }
         } else {
             if ($tag !~ /^$module-/) {
+                dprint "Tag $tag failed name check.\n";
                 return 0;
             }
         }
@@ -303,7 +306,7 @@ talk_to_cvs_server
         close(CMD);
         dprint "Command returned $?\n";
     }
-    if ($err == 0 && $? != 0) {
+    if ($err == 0 && $? != 0 && $type !~ /^query_r?diff$/) {
         eprint "An unknown error must have occured, because the command returned $?\n";
         $err = REVTOOL_UNSPECIFIED_ERROR;
     }
@@ -314,9 +317,6 @@ talk_to_cvs_server
         if ($#not_found != -1) {
             eprint "The following files/modules were not found in the repository:  ", join(" ", @not_found), "\n";
         }
-        if ($#removed != -1) {
-            eprint "The following files/modules were removed from the repository:  ", join(" ", @removed), "\n";
-        }
     } else {
         if ($type eq "query_tags") {
             if ($#tags >= 0) {
@@ -325,6 +325,9 @@ talk_to_cvs_server
                 print "No tags found.\n";
             }
         }
+    }
+    if ($#removed != -1) {
+        print "The following files/modules were removed from the repository:  ", join(" ", @removed), "\n";
     }
     if ($#links >= 0) {
         print "The following symbolic links were ignored (not imported):  ", join(" ", @links), "\n";
@@ -729,7 +732,7 @@ import_vendor_sources
 
     $opt_b = 0;  # Stupidity protection  :-)
     if (! &check_tag($vendor_tag, $release_tag)) {
-        eprint "Release tag \"$tag\" is not valid for module $module\n";
+        eprint "Release tag \"$release_tag\" is not valid for module $module\n";
         return REVTOOL_INVALID_TAG;
     }
     ($version = $release_tag) =~ s/^[^-]+-//;
@@ -769,7 +772,7 @@ main
         } elsif ($query eq "D") {
             &query_release_diff(@ARGV);
         }
-    } elsif ($mode eq "tag" || $mode eq "ptag") {
+    } elsif ($mode eq "tag") {
         &tag_local_sources(@ARGV);
     } elsif ($mode eq "rtag") {
         &tag_repository_sources(@ARGV);
@@ -850,8 +853,6 @@ BEGIN {
         $mode = "add";
     } elsif ($opt_r) {
         $mode = "remove";
-    } elsif ($opt_ptag) {
-        $mode = "ptag";
     } elsif ($opt_t) {
         $mode = "tag";
     } elsif ($opt_T || $opt_b) {
@@ -864,6 +865,7 @@ BEGIN {
     $cvsroot = "-d $opt_D" if ($opt_D);
     $tag = $opt_t;
     $rtag = $opt_T;
+    $ptag = ($opt_ptag ? ($tag ? $tag : $rtag) : $opt_ptag);
     dprint "Debugging is on, mode is $mode, CVSROOT is $cvsroot, tag is $tag, rtag is $rtag\n";
     if ($opt_l) {
         if ($opt_D) {
@@ -876,7 +878,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.50 $ created on $Date: 2000/08/23 21:55:39 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.51 $ created on $Date: 2000/09/09 05:47:32 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

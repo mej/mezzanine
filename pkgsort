@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgsort,v 1.1 2000/09/06 06:15:05 mej Exp $
+# $Id: pkgsort,v 1.2 2000/09/09 05:47:32 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -78,6 +78,7 @@ print_usage_info
     print "    -h --help                        Show this usage information\n";
     print "    -d --debug                       Turn on debugging\n";
     print "    -v --version                     Show version and copyright\n";
+    print "    -n --names                       Output package names rather than package files\n";
     print "    -D --dir <directory>             Specify one or more directories from which to take packages\n";
     print "    -l --list <file>                 Take the input package list from \"file\" instead of the command line\n";
     print "    -o --outfile <file>              Output the resulting package list to \"file\" instead of stdout\n";
@@ -211,6 +212,7 @@ find_packages
 {
     my @pkgs = @_;
     my (@contents, @rpms);
+    my $i;
     local *DIR;
 
     foreach $dir (@pkgdirs) {
@@ -289,19 +291,19 @@ query_packages
                 if ($line =~ /^Contains/) {
                     $line =~ s/^\w+:  \s*(\S.+)\s*$/$1/;
                     $line =~ s/^\s+//;  $line =~ s/\s+$//;
-                    push @{$contains{$pkg}}, $line;
-                    push @{$what_contains{$line}}, $pkg;
+                    push @{$contains{$pkg}}, $line if (!grep($_ eq $line, @{$contains{$pkg}}));
+                    push @{$what_contains{$line}}, $pkg if (!grep($_ eq $pkg, @{$what_contains{$line}}));
                 } elsif ($line =~ /^Provides/) {
                     $line =~ s/^\w+:  \s*(\S.+)\s*$/$1/;
                     $line =~ s/^\s+//;  $line =~ s/\s+$//;
-                    push @{$provides{$pkg}}, $line;
-                    push @{$what_provides{$line}}, $pkg;
+                    push @{$provides{$pkg}}, $line if (!grep($_ eq $line, @{$provides{$pkg}}));
+                    push @{$what_provides{$line}}, $pkg if (!grep($_ eq $pkg, @{$what_provides{$line}}));
                 } elsif ($line =~ /^Requires/) {
                     $line =~ s/^\w+:  \s*//;
                     $line =~ s/\s+[-=<>lteqng]+\s+\S+$//;
                     $line =~ s/^\s+//;  $line =~ s/\s+$//;
-                    push @{$requires{$pkg}}, $line;
-                    push @{$what_requires{$line}}, $pkg;
+                    push @{$requires{$pkg}}, $line if (!grep($_ eq $line, @{$requires{$pkg}}));
+                    push @{$what_requires{$line}}, $pkg if (!grep($_ eq $pkg, @{$what_requires{$line}}));
                 } else {
                     eprint "$line\n";
                 }
@@ -313,6 +315,33 @@ query_packages
         }
     }
     print "\nQuery complete.\n";
+
+    # Go through the contains info and throw out any files not required by other packages
+    foreach $pkg (keys %contains) {
+        for ($i = 0; $i < scalar(@{$contains{$pkg}}); ) {
+            my $file = $contains{$pkg}[$i];
+            my $found = 0;
+
+            foreach $p (@pkgs) {
+                if (grep($_ eq $file, @{$requires{$p}})) {
+                    dprint "Found package $p which requires $file\n";
+                    $found = 1;
+                    last;
+                }
+            }
+            if ($found) {
+                $i++;  # Keep this one and go on to the next one.
+            } else {
+                # Nothing requires this file.  Junk it.
+                splice(@{$contains{$pkg}}, $i, 1);
+                delete $what_contains{$file};
+            }
+        }
+        if (!scalar(@{$contains{$pkg}})) {
+            # Package contains no files needed by other packages.
+            delete $contains{$pkg};
+        }
+    }
 
     if ($debug) {
         foreach $pkg (sort keys %contains) {
@@ -337,29 +366,110 @@ query_packages
         foreach $file (sort keys %what_contains) {
             dprint "Packages containing $file:  ", join(", ", @{$what_contains{$file}}), "\n";
         }
-        foreach $file (sort keys %what_provides) {
-            dprint "Packages providing $file:  ", join(", ", @{$what_provides{$file}}), "\n";
+        foreach $cap (sort keys %what_provides) {
+            dprint "Packages providing $cap:  ", join(", ", @{$what_provides{$cap}}), "\n";
         }
-        foreach $file (sort keys %what_requires) {
-            dprint "Packages requiring $file:  ", join(", ", @{$what_requires{$file}}), "\n";
+        foreach $pkg (sort keys %what_requires) {
+            dprint "Packages requiring $pkg:  ", join(", ", @{$what_requires{$pkg}}), "\n";
         }
     }
-    return IMGTOOL_SUCCESS;
+    return PKGSORT_SUCCESS;
 }
 
 sub
-cmp_packages
+cmp_packages_by_dep_count
 {
     my ($pkg1, $pkg2) = @_;
-    my ($requires, $provides) = (0, 0);
+    my ($r1, $r2, $p1, $p2, $c1, $c2) = (0, 0, 0, 0, 0, 0);
 
-    # First, see if pkg1 requires anything that pkg2 provides ($requires)
+    if (scalar(@_) != 2) {
+        # If we were called by the sort() function, use $a and $b
+        ($pkg1, $pkg2) = ($a, $b);
+    }
+    dprint "Comparing $pkg1 and $pkg2\n";
+    $r1 = scalar(@{$requires{$pkg1}}) if (defined($requires{$pkg1}));
+    $r2 = scalar(@{$requires{$pkg2}}) if (defined($requires{$pkg2}));
+    $p1 = scalar(@{$provides{$pkg1}}) if (defined($provides{$pkg1}));
+    $p2 = scalar(@{$provides{$pkg2}}) if (defined($provides{$pkg2}));
+    $c1 = scalar(@{$contains{$pkg1}}) if (defined($contains{$pkg1}));
+    $c2 = scalar(@{$contains{$pkg2}}) if (defined($contains{$pkg2}));
 
+    # First compare by the number of dependencies.  If they're equal, compare by
+    # the number of things provided.  If they're still equal, compare by the number
+    # of files provided.
+    if ($r1 != $r2) {
+        # Whoever has less dependencies is less in the sort order
+        return ($r1 <=> $r2);
+    } elsif ($p1 != $p2) {
+        # Whoever provides more is less in the sort order
+        return ($p2 <=> $p1);  # Notice these are reversed
+    } elsif ($c1 != $c2) {
+        return ($c2 <=> $c1);  # These too
+    }
+    return ($pkg1 cmp $pkg2);
+}
 
-    # Next, see if pkg1 provides anything that pkg2 requires ($provides)
+sub
+cmp_packages_by_relation
+{
+    my ($pkg1, $pkg2) = @_;
+    my (@requires, @provides, @tmp);
 
+    # First, see if pkg1 requires anything that pkg2 provides (@requires)
+    if (defined(@{$requires{$pkg1}})) {
+        foreach $prov (@{$provides{$pkg2}}, @{$contains{$pkg2}}) {
+            #dprint "Checking $prov against ", join(", ", @{$requires{$pkg1}}), "\n";
+            push(@requires, grep($_ eq $prov, @{$requires{$pkg1}}));
+        }
+    }
+
+    # Next, see if pkg1 provides anything that pkg2 requires (@provides)
+    foreach $req (@{$requires{$pkg2}}) {
+        if (defined(@{$provides{$pkg1}})) {
+            #dprint "Checking $req against ", join(", ", @{$provides{$pkg1}}), "\n";
+            push(@provides, grep($_ eq $req, @{$provides{$pkg1}}));
+        }
+        if (defined(@{$contains{$pkg1}})) {
+            #dprint "Checking $req against ", join(", ", @{$contains{$pkg1}}), "\n";
+            push(@provides, grep($_ eq $req, @{$contains{$pkg1}}));
+        }
+    }
 
     # Check for circular dependency and return a value
+    dprint "Comparing $pkg1 and $pkg2:  Requires $#requires, provides $#provides\n";
+    if ($#requires < 0) {
+        # Package 1 requires nothing provided by package 2, so pkg1 <= pkg2.
+        if ($#provides >= 0) {
+            # Package 1 provides things required by package 2, but not vice versa.
+            # So package 2 depends on package 1.  pkg1 < pkg2.
+            return -1;
+        } else {
+            # Neither requires anything the other provides.
+            return 0;
+        }
+    } else {
+        # Package 1 requires things provided by package 2, so pkg1 >= pkg2.
+        if ($#provides < 0) {
+            # Package 1 depends on package 2, but not vice versa.
+            # So pkg1 > pkg2.
+            return 1;
+        } else {
+            my $n = $pkg1 cmp $pkg2;
+            my $s;
+
+            # Doh!  We have a circular dependency.  Note it, then sort alphabetically.
+            dprint "Circular dependency detected between $pkg1 and $pkg2.\n";
+            if ($n <= 0) {
+                $s = "$pkg1/$pkg2";
+            } else {
+                $s = "$pkg2/$pkg1";
+            }
+            if (!grep($_ eq $s, @circular_deps)) {
+                push @circular_deps, $s;
+            }
+            return 0;
+        }
+    }
 
     return 0;
 }
@@ -368,13 +478,71 @@ sub
 sort_packages
 {
     my @pkgs = @_;
+    my $cnt = scalar(@pkgs);
+    my ($changes, $func_start, $loop_start, $loop_end, $func_end, $n);
+    local *OUTFILE;
 
-    @pkgs = sort cmp_packages @pkgs;
+    $func_start = (times)[0];
+    $n = 0;
+    return if ($cnt == 1);
+
+    # First sort packages by the number of dependencies they have/fulfill
+    @pkgs = sort cmp_packages_by_dep_count @pkgs;
+
+    # Then brute-force check and fix the list until no changes are made
+    do {
+        $loop_start = (times)[0];
+        ($changes, @pkgs) = &verify_list(@pkgs);
+        $loop_end = (times)[0];
+        $n++;
+        dprint "Verify pass #$n took ", $loop_end - $loop_start, " seconds.\n";
+    } while ($changes);
+
+    $func_end = (times)[0];
+    dprint "Complete sort operation took ", $func_end - $func_start, " seconds and $n passes.\n";
+
+    if (($outfile eq "-") || !open(OUTFILE, ">$outfile")) {
+        open(OUTFILE, ">&STDOUT");
+    }
+
     foreach $pkg (@pkgs) {
-        foreach $rpm (sort @{$rpm_list{$pkg}}) {
-            print "$rpm\n";
+        my $flag = "";
+
+        if (grep($_ =~ /^\Q$pkg\E\// || $_ =~ /\/\Q$pkg\E$/, @circular_deps)) {
+            $flag .= " --nodeps";
+        }
+        if ($output_names) {
+            print OUTFILE "$pkg$flag\n";
+        } else {
+            foreach $rpm (sort @{$rpm_list{$pkg}}) {
+                print OUTFILE "$rpm$flag\n";
+            }
         }
     }
+    close(OUTFILE);
+    return PKGSORT_SUCCESS;
+}
+
+sub
+verify_list
+{
+    my @pkgs = @_;
+    my ($i, $j, $changes);
+
+    for ($i = 0, $changes = 0; $i <= $#pkgs; $i++) {
+        for ($j = $i + 1; $j <= $#pkgs; $j++) {
+            if (&cmp_packages_by_relation($pkgs[$i], $pkgs[$j]) > 0) {
+                my $tmp;
+
+                dprint "Dependency order error:  $pkgs[$i] ($i) depends on $pkgs[$j] ($j)\n";
+                $changes++;
+                $tmp = splice(@pkgs, $j, 1);
+                splice(@pkgs, $i, 0, $tmp);
+                dprint "Moved $tmp to position $i.  New order is $pkgs[$i], $pkgs[$i+1]\n";
+            }
+        }
+    }
+    return ($changes, @pkgs);
 }
 
 # main() here is basically the same as main() in C
@@ -388,7 +556,8 @@ main
     $version = "1.0";
 
     # See the Getopt::Long man page for details on the syntax of this line
-    @valid_opts = ("h|help", "v|version", "d|debug", "D|dir=s", "l|list=s", "o|outfile=s");
+    @valid_opts = ("h|help", "v|version", "d|debug", "n|names", "D|dir=s", "l|list=s",
+                   "o|outfile=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -396,7 +565,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.1 $ created on $Date: 2000/09/06 06:15:05 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.2 $ created on $Date: 2000/09/09 05:47:32 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -410,11 +579,12 @@ main
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
         # This is a really silly way to shut up the "used only once" warnings.
-        $opt_h = $opt_v = 0;
+        $opt_h = $opt_v = $opt_d = $opt_n = 0;
     }
 
-    $debug = ($opt_d ? $opt_d : 0);
+    $debug = $opt_d;
     $outfile = ($opt_o ? $opt_o : "-");
+    $output_names = $opt_n;
     if ($opt_D) {
         @pkgdirs = split(/[:\s]/, $opt_D);
     } else {
@@ -443,7 +613,9 @@ main
 
     &find_packages(@pkgs);
     &query_packages(@pkgs);
-    &sort_packages(@pkgs);
+    $ret = &sort_packages(@pkgs);
+
+    return $ret;
 }
 
 exit &main();
