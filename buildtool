@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.125 2001/03/26 09:48:54 mej Exp $
+# $Id: buildtool,v 1.126 2001/03/28 05:01:55 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -393,7 +393,7 @@ find_product_file
     my @contents;
     local *PRODFILE;
 
-    dprint "find_product_file($prodname, $prodver)\n";
+    dprint "find_product_file($prodname, ", ($prodver ? $prodver : ""), ")\n";
     if ($prodver) {
         # If it already has the .prod extension, and it exists, return that
         if ($prod =~ /\.prod$/) {
@@ -716,7 +716,7 @@ parse_prod_file
     local *PROD;
 
     # First, find the product file and open it.
-    dprint "parse_prod_file($prodname, $prodver, $parent_prod)\n";
+    dprint "parse_prod_file($prodname, ", ($prodver ? $prodver : ""), ", ", ($parent_prod ? $parent_prod : ""), ")\n";
     if (!($prodfile = &find_product_file($prodname, $prodver))) {
         dprint "parse_prod_file():  find_product_file() failed.  Returning 0.\n";
         return 0;
@@ -749,9 +749,9 @@ parse_prod_file
         } elsif ($line =~ /^ver(sion)?\s*:/) {
             if ($skip_to_next_ver) {
                 $line =~ s/^[^:]+:\s*//;
-                next if ($line ne $prodver && $prodver);
+                next if ($prodver && $line ne $prodver);
                 # Found it!
-                if ($line eq $prodver) {
+                if ($prodver) {
                     dprint "parse_prod_file():  Found product version match.  Time to parse the product.\n";
                 } else {
                     dprint "parse_prod_file():  No product version given.  Using first entry:  $line\n";
@@ -1505,7 +1505,19 @@ do_package_stage
 sub
 cleanup
 {
-    foreach $f ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SPECS", $buildroot) {
+    my $type = $_[0];
+    my @dirs;
+
+    if ($type =~ /all/i) {
+        @dirs = ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SRPMS", "$builddir/RPMS", "$builddir/SPECS", $buildroot);
+    } elsif ($type =~ /rpm/i) {
+        @dirs = ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SRPMS", "$builddir/RPMS", "$builddir/SPECS");
+    } elsif ($type =~ /(build)?root/) {
+        @dirs = ($buildroot);
+    } else {
+        @dirs = ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SPECS", $buildroot);
+    }
+    foreach $f (@dirs) {
         nprint "$progname:  Cleaning up $f\n";
         &nuke_tree($f) || qprint "Warning:  Removal of $f failed -- $!\n";
     }
@@ -1703,7 +1715,6 @@ main
     # Set up the basic variables
     $progname = "buildtool";
     $version = "2.0";
-    &print_usage_info() if (!scalar(@ARGV));
 
     # No input.
     open(STDIN, "</dev/null");
@@ -1712,14 +1723,14 @@ main
     @valid_opts = ("h|help", "v|version", "d|debug", "b|build=s", "p|product|package=s",
                    "q|quiet", "Q|really-quiet|silent", "D|dir=s", "f|force", "l|log=s",
                    "P|parallel:s", "t|target=s", "C|cflags=s", "B|startbuild=s", "tree=s",
-                   "tag=s", "nocache", "clean");
+                   "tag=s", "nocache", "clean:s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.125 $ created on $Date: 2001/03/26 09:48:54 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.126 $ created on $Date: 2001/03/28 05:01:55 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1734,7 +1745,7 @@ main
     if ($opt_h) {
 	&print_usage_info();   # Never returns
         # This is a really silly way to shut up the "used only once" warnings.
-        $opt_h = $opt_P = $opt_Q = $opt_p = $opt_q = $opt_v = $opt_nocache = $opt_clean = 0;
+        $opt_h = $opt_P = $opt_Q = $opt_p = $opt_q = $opt_v = $opt_nocache = 0;
     }
     $debug = $opt_d;
     $revtool = "revtool" . ($opt_d ? " --debug" : "");
@@ -1797,15 +1808,33 @@ main
         $num_cpus = 1;
     }
     dprint "Using $num_cpus parallel processes.\n";
-    if ($opt_D && -d $opt_D) {
-        $basedir = $opt_D;
-    } elsif ($ENV{BASE_DIR} && $ENV{BASE_DIR} =~ /^\// && -d $ENV{BASE_DIR}) {
-        $basedir = $ENV{BASE_DIR};
+
+    # Try to parse the product name we were given into a name or a name-version combo
+    if ($opt_p) {
+        $prod = $opt_p;
+        if ($prod =~ /^(\S+)-((?:\d|us|a|alpha|b|beta)[^-]+)$/) {
+            ($prodname, $prodver) = ($1, $2);
+        } else {
+            ($prodname, $prodver) = ($prod, 0);
+        }
+        if ($opt_D && -d $opt_D) {
+            $basedir = $opt_D;
+        } elsif ($ENV{BASE_DIR} && $ENV{BASE_DIR} =~ /^\// && -d $ENV{BASE_DIR}) {
+            $basedir = $ENV{BASE_DIR};
+        } else {
+            chomp($basedir = `pwd`);
+        }
+        $builddir = ($ENV{BUILD_DIR} ? $ENV{BUILD_DIR} : "$basedir/build");
     } else {
-        chomp($basedir = `pwd`);
+        my $cwd = &getcwd();
+
+        $prod = $prodname = &basename($cwd);
+        $basedir = $builddir = &dirname($cwd);
     }
-    $builddir = ($ENV{BUILD_DIR} ? $ENV{BUILD_DIR} : "$basedir/build");
     $buildroot = ($ENV{BUILDROOT} ? $ENV{BUILDROOT} : "/var/tmp/buildtool.$$");
+    qprint "$progname:  Building product:  $prodname", ($prodver ? " $prodver" : ""), "\n";
+
+    # Try to find the products directory
     foreach $dir (($ENV{PROD_DIR} ? $ENV{PROD_DIR} : 0), "$basedir/products", "$basedir/../products") {
         if ($dir && -d $dir) {
             $proddir = $dir;
@@ -1847,23 +1876,6 @@ main
                   . ":/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/X11R6/bin:/usr/kerberos/sbin"
                   . ":/usr/kerberos/bin:.";
 
-    # Try to parse the product name we were given into a name or a name-version combo
-    if ($opt_p) {
-        $prod = $opt_p;
-        if ($prod =~ /^(\S+)-((?:\d|us|a|alpha|b|beta)[^-]+)$/) {
-            ($prodname, $prodver) = ($1, $2);
-        } else {
-            ($prodname, $prodver) = ($prod, 0);
-        }
-    }
-    if ($prod) {
-        qprint "$progname:  Building product:  $prodname", ($prodver ? " $prodver" : ""), "\n";
-    } else {
-        eprint "You didn't tell me what to build, so I'm not quite sure what to do.\n";
-        eprint "If you aren't familiar with how to use $progname, try $progname --help.\n";
-        return AVALON_BAD_PRODUCT;
-    }
-
     # Parse the product definition files to figure out what the heck we need to build. :)
     # If we're a slave process, we know it's going to be a straight product entry.
     if ($slave || ! &parse_prod_file($prodname, $prodver, 0)) {
@@ -1878,8 +1890,11 @@ main
     if ($end_stage ne "Z") {  # -dbZ, a.k.a. How To Debug the Parser :-)
         &initial_setup();
         &build_process();
-        &cleanup() if ($opt_clean);
+        &cleanup($opt_clean) if (defined($opt_clean));
         &summarize_failures();
+    } else {
+        # This way we can just do cleanup. :-)
+        &cleanup($opt_clean) if (defined($opt_clean));
     }
     close(LOGFILE) if ($GLOBAL_LOG);
     return (defined(@failed_pkgs) && $#failed_pkgs != -1) ? AVALON_PACKAGE_FAILED : AVALON_SUCCESS;
