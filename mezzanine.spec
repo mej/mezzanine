@@ -6,7 +6,7 @@ Copyright: BSD
 Group: Development/Tools
 Source: %{name}.tar.gz
 BuildRoot: /tmp/%{name}-%{version}-root
-Packager: Michael Jennings <mej@kainx.org>
+Packager: Michael Jennings <mezzanine@kainx.org>
 Vendor: KainX.Org (http://www.kainx.org/)
 URL: http://www.kainx.org/mezzanine/
 Requires: perl, perl(Net::FTP), perl(Cwd), perl(POSIX), perl(File::Copy), perl(Getopt::Long), perl(File::Find)
