@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.25 2004/03/05 22:26:32 mej Exp $
+# $Id: RPM.pm,v 1.26 2004/03/24 19:52:16 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -702,7 +702,11 @@ parse_deps($)
     $deps =~ s/\s*[<>=]+\s*\S+\s*/ /g;
     @tmp = split(/\s+/, $deps);
     foreach my $pkg (@tmp) {
-        push @pkgs, $pkg;
+        my @not_deps = ("or");
+
+        if (!scalar(grep { $_ eq $pkg } @not_deps)) {
+            push @pkgs, $pkg;
+        }
     }
     dprint "Dep packages:  ", join('|', @pkgs), "\n";
     return @pkgs;

@@ -23,20 +23,25 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: perlpkg,v 1.1 2004/02/14 03:17:09 mej Exp $
+# $Id: perlpkg,v 1.2 2004/03/24 19:52:16 mej Exp $
 #
 
 use strict;
-use vars '$progname', '$version', '$opt_v', '$opt_h', '$opt_d', '$opt_t', '$opt_s';
+use vars '$progname', '$version', '$opt_v', '$opt_h', '$opt_d',
+    '$opt_t', '$opt_s', '$opt_p', '$opt_n', '$opt_u';
 use CPAN;
 use POSIX;
 use Getopt::Long;
 use Mezzanine::Util;
+use Mezzanine::Template;
+use Mezzanine::RPM '&rpm_compare_versions';
 
 my ($SAVE_STDIN, $SAVE_STDOUT, $SAVE_STDERR);
 my %distributions;
 my @tried;
-my ($templates_dir, $template, $save_pwd);
+my @built;
+my ($template, $save_pwd);
+my ($handle_build_deps, $pkgonly, $update);
 
 # Print usage information
 sub
@@ -56,7 +61,10 @@ print_usage_info
     print "    -d --debug                       Turn on debugging\n";
     print "    -v --version                     Show version and copyright\n";
     print "    -s --search                      Search only; don't build anything\n";
-    print "    -t --template                    Use specified template file/directory\n";
+    print "    -t --template <path>             Use specified template file/directory\n";
+    print "    -p --pkgonly                     Package only; do not attempt to build\n";
+    print "    -n --nodeps                      Do not handle build dependencies\n";
+    print "    -u --update                      Check for updates\n";
     print "\n";
     exit(MEZZANINE_SUCCESS);
 }
@@ -81,52 +89,140 @@ create_cpan_list()
         my @tmp = split(/\s+/, $mod->as_glimpse());
         my $name = $tmp[1];
         my $file = $mod->cpan_file();
+        my $installed = $mod->inst_version() || "";
+        my $uptodate = $mod->uptodate();
 
         #print $SAVE_STDERR "Got module:  $name ($file)\n";
         push @{$distributions{$file}{"MODLIST"}}, $name;
+        push @{$distributions{$file}{"MODOBJLIST"}}, $mod;
+        next;
+        if (defined($distributions{$file}{"INSTALLED"})) {
+            if ($distributions{$file}{"INSTALLED"} && !($installed)) {
+                $distributions{$file}{"INSTALLED"} = 0;
+            }
+        } else {
+            $distributions{$file}{"INSTALLED"} = (($installed) ? (1) : (0));
+        }
+        if (defined($distributions{$file}{"UPTODATE"})) {
+            if ($distributions{$file}{"UPTODATE"} && !($uptodate)) {
+                $distributions{$file}{"UPTODATE"} = 0;
+            }
+        } else {
+            $distributions{$file}{"UPTODATE"} = (($uptodate) ? (1) : (0));
+        }
+    }
+}
+
+sub
+get_install_info(@)
+{
+    my @distributions = @_;
+
+    foreach my $file (@distributions) {
+        if (!defined($distributions{$file}{"UPTODATE"})) {
+            my $dist_obj = CPAN::Shell->expand("Distribution", $file);
+            my @modobj_list = @{$distributions{$file}{"MODOBJLIST"}};
+            my $installed = 1;
+
+            next if (!defined($dist_obj));
+            $distributions{$file}{"UPTODATE"} = $dist_obj->uptodate();
+            if (&debug_get()) {
+                print $SAVE_STDOUT "Up-to-date status for $file:  $distributions{$file}{UPTODATE}\n";
+            }
+            foreach my $modobj (@modobj_list) {
+                my $inst_version = $modobj->inst_version();
+
+                if (! $inst_version) {
+                    $installed = 0;
+                    if (&debug_get()) {
+                        printf $SAVE_STDOUT ("Missing module from %s:  %s.\n",
+                                             $modobj->cpan_file(),
+                                             $modobj->as_glimpse());
+                    }
+                    last;
+                }
+            }
+            $distributions{$file}{"INSTALLED"} = $installed;
+            if (&debug_get()) {
+                print $SAVE_STDOUT "Installation status for $file:  $distributions{$file}{INSTALLED}\n";
+            }
+        }
     }
 }
 
 sub
 build(@)
 {
+    my $depth = shift @_;
     my @distributions = @_;
+    my $depth_str = "";
 
+    if ($depth) {
+        $depth_str = "[$depth] ";
+    }
+    &get_install_info(@distributions);
     foreach my $file (@distributions) {
         my $dist_obj = CPAN::Shell->expand("Distribution", $file);
         my $href;
 
         next if (!defined($dist_obj));
         if (scalar(grep($_ eq $file, @tried))) {
-            print $SAVE_STDOUT "Skipping $file; already tried.\n";
+            #print $SAVE_STDOUT "${depth_str}Skipping $file; already tried.\n";
             next;
         } elsif (&basename($file) =~ /^perl-[\d\.]+\.(t|tar\.)(gz|bz2?)$/) {
-            print $SAVE_STDOUT "Something requires newer Perl; aborting!\n";
-            last;
+            print $SAVE_STDOUT "${depth_str}Something requires newer Perl (", &basename($file), "); aborting!\n";
+            next;
+        } elsif (!($update) && $distributions{$file}{"INSTALLED"}) {
+            print $SAVE_STDOUT "${depth_str}Skipping installed package $file\n";
+            next;
+        } elsif ($update && $distributions{$file}{"UPTODATE"}) {
+            print $SAVE_STDOUT "${depth_str}Skipping up-to-date package $file\n";
+            next;
+        } elsif (&debug_get()) {
+            print $SAVE_STDOUT "${depth_str}Need to build $file.\n";
         }
-        print $SAVE_STDOUT "Building $file:  ";
+        print $SAVE_STDOUT "${depth_str}Building $file:  ";
         print $SAVE_STDOUT "downloading...";
         $dist_obj->get();
 
-        print $SAVE_STDOUT "building...";
+        if (! $pkgonly) {
+            print $SAVE_STDOUT "building...";
+        }
         $dist_obj->make();
         $href = $dist_obj->prereq_pm();
         push @tried, $file;
-        if ($href) {
-            my @deps;
+        if ($href && ref($href) eq "HASH" && scalar(keys(%{$href})) > 0) {
+            if ($handle_build_deps) {
+                my @deps;
 
-            print $SAVE_STDOUT "deps found.\n";
-            foreach my $dep (keys(%{$href})) {
-                push @deps, grep { grep { $_ =~ $dep } @{$distributions{$_}{"MODLIST"}} } keys(%distributions);
+                foreach my $dep (keys(%{$href})) {
+                    foreach my $distfile (grep { grep { $_ =~ $dep } @{$distributions{$_}{"MODLIST"}} } keys(%distributions)) {
+                        if (!scalar(grep { $distfile eq $_ } @tried)) {
+                            push @deps, $distfile;
+                        }
+                    }
+                }
+                if (scalar(@deps)) {
+                    if ($depth) {
+                        print $SAVE_STDOUT "deps found.\n";
+                    } else {
+                        print $SAVE_STDOUT "deps found:  ", join(", ", map { &basename($_) } @deps), "\n";
+                    }
+                    &build($depth + 1, @deps);
+                    print $SAVE_STDOUT "${depth_str}Resuming $file...building...";
+                    $dist_obj->make();
+                }
+            } else {
+                print $SAVE_STDOUT "Not handling dependencies:  ", join(", ", map { &basename($_) } keys(%{$href})), "\n";
             }
-            &build(@deps);
-            print $SAVE_STDOUT "Resuming $file...building...";
-            $dist_obj->make();
         }
-        print $SAVE_STDOUT "testing...";
-        $dist_obj->test();
-        print $SAVE_STDOUT "cleaning...";
-        $dist_obj->clean();
+        if (! $pkgonly) {
+            print $SAVE_STDOUT "testing...";
+            $dist_obj->test();
+            print $SAVE_STDOUT "cleaning...";
+            $dist_obj->clean();
+        }
+        push @built, $file;
         print $SAVE_STDOUT "done.\n";
     }
 }
@@ -135,9 +231,11 @@ sub
 package_perl_dist(@)
 {
     my @distributions = @_;
+    my $ret;
 
-    if (! -f "$templates_dir/$template") {
-        print $SAVE_STDERR "Error:  Cannot package; template " . &getcwd() . " $templates_dir/$template not found.\n";
+    if (! $template->verify()) {
+        printf $SAVE_STDERR ("Error:  Cannot package; template %s/%s not found.\n",
+                             $template->directory(), $template->file());
         return;
     }
 
@@ -152,7 +250,7 @@ package_perl_dist(@)
             print $SAVE_STDERR "Error:  $filepath not found.\n";
             next;
         }
-        if (&basename($file) !~ /^(.+)-([^-]+)\.(t|tar\.)(gz|bz2?)$/) {
+        if (&basename($file) !~ /^(.+)-([^-]+)\.((t|tar\.)(gz|bz2?)|zip)$/) {
             print $SAVE_STDERR "Error:  $file unparseable.\n";
             next;
         } else {
@@ -172,29 +270,31 @@ package_perl_dist(@)
         }
 
         # Assign variables.
-        $vars{"DISTNAME"} = $distname;
-        $vars{"MODULE"} = $pkgname;
-        $vars{"VERSION"} = $version;
-        $vars{"VENDORSUFFIX"} = "%{?_vendorsuffix:%{_vendorsuffix}}%{!?_vendorsuffix:%{_vendor}}";
-        $vars{"PACKAGER"} = "%{?_packager:%{_packager}}%{!?_packager:%{_vendor}}";
-        $vars{"VENDOR"} = "%{?_vendorinfo:%{_vendorinfo}}%{!?_vendorinfo:%{_vendor}}";
-        $vars{"DISTRIBUTION"} = "%{?_distribution:%{_distribution}}%{!?_distribution:%{_vendor}}";
-        $vars{"MODULENAME"} = $modname;
-        $vars{"DISTFILE"} = &basename($file);
-        $vars{"BUILDARCH"} = "noarch";
-        $vars{"CHANGELOG"} = sprintf("* %s Mezzanine <mezzanine\@kainx.org>\n- %s\n",
-                                     POSIX::strftime("%a %b %d %Y", localtime()),
-                                     "PDR auto-generated from CPAN by $progname");
+        $template->vars("DISTNAME", $distname);
+        $template->vars("MODULE", $pkgname);
+        $template->vars("VERSION", $version);
+        $template->vars("VENDORSUFFIX", "%{?_vendorsuffix:%{_vendorsuffix}}%{!?_vendorsuffix:%{_vendor}}");
+        $template->vars("PACKAGER", "%{?_packager:%{_packager}}%{!?_packager:%{_vendor}}");
+        $template->vars("VENDOR", "%{?_vendorinfo:%{_vendorinfo}}%{!?_vendorinfo:%{_vendor}}");
+        $template->vars("DISTRIBUTION", "%{?_distribution:%{_distribution}}%{!?_distribution:%{_vendor}}");
+        $template->vars("MODULENAME", $modname);
+        $template->vars("DISTFILE", &basename($file));
+        $template->vars("BUILDARCH", "noarch");
+        $template->vars("CHANGELOG", sprintf("* %s Mezzanine <mezzanine\@kainx.org>\n- %s\n",
+                                             POSIX::strftime("%a %b %d %Y", localtime()),
+                                             "PDR auto-generated from CPAN by $progname"));
+        $template->delimiter('@');
 
-        @tmp = &subst_file("$templates_dir/$template", '@', %vars);
-        $specfile = &basename(shift @tmp);
-        if (!open(SPECFILE, ">$pkgname/$specfile")) {
-            print $SAVE_STDERR "Error:  Unable to write $pkgname/$specfile -- $!\n";
-            next;
+        # Generate the spec file
+        $specfile = $template->subst($template->file());
+        $ret = $template->generate("$pkgname/$specfile");
+        if (!defined($ret)) {
+            print $SAVE_STDERR "Error:  Unable to open template file -- $!\n";
+        } elsif (! $ret) {
+            print $SAVE_STDERR "Error:  Unable to create spec file $pkgname/$specfile -- $!\n";
+        } else {
+            print $SAVE_STDOUT "Package $pkgname created.\n";
         }
-        print SPECFILE join("", @tmp);
-        close(SPECFILE);
-        print $SAVE_STDOUT "Package $pkgname created.\n";
     }
 }
 
@@ -202,6 +302,7 @@ package_perl_dist(@)
 sub
 main
 {
+    my @requests;
     my @valid_opts;
     my @distributions;
     local (*SAVE_STDIN, *SAVE_STDOUT, *SAVE_STDERR);
@@ -215,27 +316,28 @@ main
     $SAVE_STDERR = \*SAVE_STDERR;
 
     # Signal handling
-    $SIG{HUP} = 'IGNORE';
-    $SIG{INT} = \&handle_signal;
-    $SIG{TERM} = \&handle_signal;
-    $SIG{QUIT} = \&handle_fatal_signal;
-    $SIG{ILL} = \&handle_fatal_signal;
-    $SIG{ABRT} = \&handle_fatal_signal;
-    $SIG{FPE} = \&handle_fatal_signal;
-    $SIG{SEGV} = \&handle_fatal_signal;
-    $SIG{BUS} = \&handle_fatal_signal;
-    $SIG{TSTP} = \&handle_fatal_signal;
-    $SIG{TTIN} = \&handle_fatal_signal;
-    $SIG{TTOU} = \&handle_fatal_signal;
+    $SIG{"HUP"} = 'IGNORE';
+    $SIG{"INT"} = \&handle_signal;
+    $SIG{"TERM"} = \&handle_signal;
+    $SIG{"QUIT"} = \&handle_fatal_signal;
+    $SIG{"ILL"} = \&handle_fatal_signal;
+    $SIG{"ABRT"} = \&handle_fatal_signal;
+    $SIG{"FPE"} = \&handle_fatal_signal;
+    $SIG{"SEGV"} = \&handle_fatal_signal;
+    $SIG{"BUS"} = \&handle_fatal_signal;
+    $SIG{"TSTP"} = \&handle_fatal_signal;
+    $SIG{"TTIN"} = \&handle_fatal_signal;
+    $SIG{"TTOU"} = \&handle_fatal_signal;
 
     # Set up the basic variables
     $progname = "perlpkg";
-    $version = "0.1";
+    $version = "0.2";
     #&print_usage_info() if (!scalar(@ARGV));
     umask 022;
 
     # See the Getopt::Long man page for details on the syntax of this line
-    @valid_opts = ("h|help", "v|version", "d|debug", "s|search", "t|template=s");
+    @valid_opts = ("h|help", "v|version", "d|debug", "s|search",
+                   "t|template=s", "p|pkgonly", "n|nodeps", "u|update");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -243,7 +345,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.1 $ created on $Date: 2004/02/14 03:17:09 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.2 $ created on $Date: 2004/03/24 19:52:16 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -263,76 +365,110 @@ main
         open(STDOUT, ">/dev/null");
         open(STDERR, ">/dev/null");
     }
+    $pkgonly = (($opt_p) ? (1) : (0));
+    $handle_build_deps = (($opt_n) ? (0) : (1));
+    $update = (($opt_u) ? (1) : (0));
     $save_pwd = &getcwd();
+
+    # Create template object for new spec file.
+    $template = new Mezzanine::Template;
     if ($opt_t) {
         if (-d $opt_t) {
-            $templates_dir = $opt_t;
+            $template->directory($opt_t);
         } elsif (-f $opt_t) {
-            $template = &basename($opt_t);
-            $templates_dir = &dirname($opt_t);
+            $template->file(&basename($opt_t));
+            $template->directory(&dirname($opt_t));
         }
     }
-    if (! $template) {
-        $template = 'perl-@DISTNAME@.spec';
+    if (! $template->file()) {
+        $template->file('perl-@DISTNAME@.spec');
     }
-    if (! $templates_dir) {
-        foreach my $dir (@INC, $save_pwd) {
-            if (-f "$dir/Mezzanine/templates/$template") {
-                $templates_dir = "$dir/Mezzanine/templates";
-                last;
-            } elsif (-f "$dir/templates/$template") {
-                $templates_dir = "$dir/templates";
-                last;
-            }
-        }
-    }
+    $template->find($template->directory());
 
-
+    # Search CPAN for packages.
     print $SAVE_STDOUT "Searching CPAN, please wait....\n";
-    if (($ARGV[0] =~ /\//) || ($ARGV[0] =~ /-/)) {
-        &create_cpan_list();
-        @distributions = grep { $_ =~ $ARGV[0] } keys(%distributions);
-    } else {
-        &create_cpan_list();
-        @distributions = grep { grep { $_ =~ $ARGV[0] } @{$distributions{$_}{"MODLIST"}} } keys(%distributions);
-    }
+    &create_cpan_list();
 
-    if ($opt_s || scalar(@distributions) != 1) {
-        if (scalar(@distributions) > 1) {
-            print $SAVE_STDOUT "Distributions which contain $ARGV[0]:\n";
-            foreach my $dist (sort(@distributions)) {
-                my @mods = grep { $_ =~ $ARGV[0] } @{$distributions{$dist}{"MODLIST"}};
+    if ($update && !scalar(@ARGV)) {
+        local *RPMQA;
 
-                printf $SAVE_STDOUT "%-40s (%s)\n", &basename($dist),
-                    ((!scalar(@mods))
-                     ? ("none")
-                     : ((scalar(@mods) > 3)
-                        ? ("$mods[0], $mods[1], $mods[2], ...")
-                        : (join(", ", @mods))
-                        )
-                    );
+        $handle_build_deps = 0;
+        if (open(RPMQA, "rpm -qa |")) {
+            my $line;
+
+            while ($line = <RPMQA>) {
+                my @tmp;
+
+                chomp($line);
+                next if ($line !~ /^perl-\D+/);
+                $line =~ s/^perl-(.+)-\d+[^-]+-[^-]+$/$1/;
+                #print $SAVE_STDOUT "xxx$line\n";
+                @tmp = grep { &basename($_) =~ /^\Q$line\E-\d+/ } keys(%distributions);
+                if (scalar(@tmp) > 1) {
+                    my $latest = shift @tmp;
+
+                    foreach my $f (@tmp) {
+                        if (&rpm_compare_versions($latest, $f) < 0) {
+                            $latest = $f;
+                        }
+                    }
+                    push @requests, $latest;
+                } else {
+                    push @requests, @tmp;
+                }
             }
-        } elsif (scalar(@distributions)) {
-            my $dist = $distributions[0];
-
-            print $SAVE_STDOUT "Distribution $dist contains:\n";
-            foreach my $mod (@{$distributions{$dist}{"MODLIST"}}) {
-                print $SAVE_STDOUT "     $mod\n";
+            if (&debug_get()) {
+                printf $SAVE_STDOUT ("Got packages:  %s.\n",
+                                     join(", ", @requests));
             }
-        } else {
-            print $SAVE_STDOUT "Nothing found for $ARGV[0].\n";
         }
-        return MEZZANINE_SUCCESS;
+    } else {
+        @requests = @ARGV;
+    }
+    foreach my $req (@requests) {
+        if (($req =~ /\//) || ($req =~ /-/)) {
+            @distributions = grep { $_ =~ $req } keys(%distributions);
+        } else {
+            @distributions = grep { grep { $_ =~ $req } @{$distributions{$_}{"MODLIST"}} } keys(%distributions);
+        }
+
+        if ($opt_s || scalar(@distributions) != 1) {
+            if (scalar(@distributions) > 1) {
+                print $SAVE_STDOUT "Distributions which contain $req:\n";
+                foreach my $dist (sort(@distributions)) {
+                    my @mods = grep { $_ =~ $req } @{$distributions{$dist}{"MODLIST"}};
+
+                    printf $SAVE_STDOUT "%-40s (%s)\n", &basename($dist),
+                        ((!scalar(@mods))
+                         ? ("none")
+                         : ((scalar(@mods) > 3)
+                            ? ("$mods[0], $mods[1], $mods[2], ...")
+                            : (join(", ", @mods))
+                           )
+                        );
+                }
+            } elsif (scalar(@distributions)) {
+                my $dist = $distributions[0];
+
+                print $SAVE_STDOUT "Distribution $dist contains:\n";
+                foreach my $mod (@{$distributions{$dist}{"MODLIST"}}) {
+                    print $SAVE_STDOUT "     $mod\n";
+                }
+            } else {
+                print $SAVE_STDOUT "Nothing found for $req.\n";
+            }
+            next;
+        }
+
+        &build(0, @distributions);
+        chdir($save_pwd);
     }
 
-    &build(@distributions);
     print $SAVE_STDOUT "Downloaded the following:\n";
-    foreach my $file (sort(@tried)) {
-        print $SAVE_STDOUT "     $file\n";
+    foreach my $file (sort { &basename($a) cmp &basename($b) } @tried) {
+        printf $SAVE_STDOUT "     %s\n", &basename($file);
     }
-
-    chdir($save_pwd);
-    &package_perl_dist(@tried);
+    &package_perl_dist(@built);
 
     return MEZZANINE_SUCCESS;
 }

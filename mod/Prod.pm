@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.23 2004/03/14 15:42:08 mej Exp $
+# $Id: Prod.pm,v 1.24 2004/03/24 19:52:16 mej Exp $
 #
 
 package Mezzanine::Prod;
@@ -268,7 +268,7 @@ parse_product_entry
             my @contents = ();
 	    
             # Check to see if there is a product file for it
-            @contents = &grepdir(sub {/^$name-?.*\.prod$/}, $proddir);
+            @contents = &grepdir(sub {/^\Q$name\E-?.*\.prod$/}, $proddir);
             # Product files win over modules because they contain more detail
             # about the package and are more likely to succeed.
             if ($#contents >= 0) {
@@ -291,15 +291,25 @@ parse_product_entry
     } else {
         $module = $name;
     }
+
     # The rest of the line is whitespace-delimited sets of var=value
     shift @inp;
     dprint "Input is now \"", join("\" \"", @inp), "\"\n";
+    $pkgvars{"NAME"} = $name;
+    $pkgvars{"MODULE"} = $module;
+    $pkgvars{"TYPE"} = $type;
     foreach $varval (@inp) {
         ($var, $val) = split("=", $varval, 2);
         $var = &get_var_name($var);
 	# Store them in %pkgvars for now; we'll move them later.
         $pkgvars{$var} = $val;
     }
+
+    # Keep our package variables in sync with our local ones.
+    $name = $pkgvars{"NAME"};
+    $module = $pkgvars{"MODULE"};
+    $type = $pkgvars{"TYPE"};
+
     # Some package types require special treatment at this point.
     if ($type eq "product") {
         my ($pname, $pver);
@@ -353,37 +363,34 @@ parse_product_entry
     } elsif ($type eq "tar") {
         $filename = "$module/$name";
     } elsif ($type eq "srpm" || $type eq "rpm") {
+        $filename = $name;
         if ($name =~ /^(\S+)\.(\w+)\.rpm$/) {
             ($name, $arch) = ($1, $2);
         } else {
             $arch = ($type eq "srpm" ? "src" : "i386");
         }
         if (!defined $pkgvars{RELEASE}) {
-            if ($name !~ /^\S+-[^-]+-[^-]+$/) {
+            if ($name =~ /^\S+-[^-]+-([^-]+)$/) {
+                $pkgvars{RELEASE} = $1;
+            } else {
                 eprint "I wasn't given enough information about the $name package in $prodfile.  For RPM/SRPM\n";
                 eprint "packages, the version and release information must be specified as variables or\n";
                 eprint "embedded in the package name.  I'm going to have to skip that one.\n";
                 return 0;
-            } else {
-                ($tmp = $name) =~ s/^\S+-[^-]+-//;
-                $name =~ s/-[^-]+$//;
-                $pkgvars{RELEASE} = $tmp;
             }
         }
         if (!defined $pkgvars{VERSION}) {
-            if ($name !~ /^\S+-[^-]+$/) {
+            if ($name =~ /^\S+-([^-]+)-[^-]+$/) {
+                $pkgvars{VERSION} = $1;
+            } else {
                 eprint "I wasn't given enough information about the $name package in $prodfile.  For RPM/SRPM\n";
                 eprint "packages, the version and release information must be specified as variables or\n";
                 eprint "embedded in the package name.  I'm going to have to skip that one.\n";
                 return 0;
-            } else {
-                ($tmp = $name) =~ s/^(\S+)-([^-]+)$/$2/;
-                $name =~ s/^(\S+)-([^-]+)$/$1/;
-                $pkgvars{VERSION} = $tmp;
             }
         }
         $pkgvars{"ARCH"} = $arch;
-        $filename = "$name-$pkgvars{VERSION}-$pkgvars{RELEASE}.$arch.rpm";
+        #$filename = "$name-$pkgvars{VERSION}-$pkgvars{RELEASE}.$arch.rpm";
 
         if (defined($pkgvars{BINS})) {
             my @tmp;
@@ -406,7 +413,6 @@ parse_product_entry
         if ($type eq "rpm" && ($pkgs->{$name}{TYPE} eq "srpm" || $pkgs->{$name}{TYPE} eq "tar")) {
             dprint "Adding $module/$filename as a binary package for $name\n";
             push(@{$pkgs->{$name}{BINS}}, "$module/$filename");
-            $pkgs->{$name}{STAGES} =~ s/c//;
         } else {
             eprint "I already have $name as a $pkgs->{$name}{TYPE} package in $pkgs->{$name}{PRODUCT}.\n";
             eprint "I will ignore the duplicate entry found in $prodname $prodver\n";

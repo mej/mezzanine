@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.176 2004/03/14 15:42:07 mej Exp $
+# $Id: buildtool,v 1.177 2004/03/24 19:52:16 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -176,7 +176,9 @@ is_build_needed
     }
 
     # If the file/module does not exist, we definitely need to build it.
-    return 1 if (! -e $pkgfile);
+    if (! -e $pkgfile) {
+        dprint "Doh!  $pkgfile doesn't exist.  It must be built.\n";
+    }
     @stat1 = stat($pkgfile);
 
     # If there is no SRPMS directory, then there are surely no SRPMS to be checked.
@@ -185,7 +187,7 @@ is_build_needed
 
     # For each SRPM that matches the package name, see if it's newer than the directory.
     # If so, we do not need to rebuild that package.
-    foreach my $srpm (&grepdir(sub {&basename($_) =~ /^\Q$pkg\E-[^-]+-[^-]+\.(no)?src\.rpm$/}, $srpm_dir)) {
+    foreach my $srpm (&grepdir(sub {&basename($_) =~ /^\Q$pkg\E\.(no)?src\.rpm$/}, $srpm_dir)) {
         my @stat2;
 
         dprint "Checking $srpm...\n";
@@ -570,12 +572,11 @@ parallel_build
                 &file_owner($pkgs->{$pkg}{"BUILDUSER"}, "", "");
             }
             if ($buildtree_layout eq "orc") {
-                my $dirname;
+                my $dirname = $pkg;
 
-                $dirname = sprintf("/%s-%s-%s", $pkg, $pkgs->{$pkg}{"VERSION"},
-                                   $pkgs->{$pkg}{"RELEASE"});
+                #$dirname = sprintf("/%s-%s-%s", $pkg, $pkgs->{$pkg}{"VERSION"}, $pkgs->{$pkg}{"RELEASE"});
                 $save_builddir = $builddir;
-                $builddir .= $dirname;
+                $builddir .= ((substr($builddir, -1, 1) eq '/') ? ("") : ('/')) . $dirname;
                 &make_build_dir($builddir);
                 $logdir = $builddir;
                 &pkgvar_topdir($builddir);
@@ -624,11 +625,10 @@ parallel_build
 
             # Doh, it failed.  Look through the log file to try and find the problem.
             if ($buildtree_layout eq "orc") {
-                my $dirname;
+                my $dirname = $pkg;
 
-                $dirname = sprintf("/%s-%s-%s", $pkg, $pkgs->{$pkg}{"VERSION"},
-                                   $pkgs->{$pkg}{"RELEASE"});
-                $logfile = "$builddir$dirname/$pkg.log";
+                #$dirname = sprintf("/%s-%s-%s", $pkg, $pkgs->{$pkg}{"VERSION"}, $pkgs->{$pkg}{"RELEASE"});
+                $logfile = "$builddir/$dirname/$pkg.log";
             } else {
                 $logfile = "$logdir/$pkg.log";
             }
@@ -698,11 +698,11 @@ build_product
         my %preserve_pkg_vars = &pkgvar_get_all();
 
         if ($buildtree_layout eq "orc") {
-            my $dirname;
+            my $dirname = $pkg;
 
-            $dirname = sprintf("/%s-%s-%s", $pkg, $pkgs->{$pkg}{"VERSION"},
-                               $pkgs->{$pkg}{"RELEASE"});
-            $builddir = &pkgvar_topdir() . $dirname;
+            #$dirname = sprintf("/%s-%s-%s", $pkg, $pkgs->{$pkg}{"VERSION"}, $pkgs->{$pkg}{"RELEASE"});
+            $builddir = &pkgvar_topdir();
+            $builddir .= ((substr($builddir, -1, 1) eq '/') ? ("") : ('/')) . $dirname;
             &make_build_dir($builddir);
             $logdir = $builddir;
             &pkgvar_topdir($builddir);
@@ -775,7 +775,7 @@ main
     #
     if ($opt_v) {
         &print_version($progname, $version, $author,
-                       'CVS Revision $Revision: 1.176 $ created on $Date: 2004/03/14 15:42:07 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.177 $ created on $Date: 2004/03/24 19:52:16 $ by $Author: mej $ ');
         # Never returns
     }
     if ($opt_h) {
@@ -920,7 +920,11 @@ main
 
             @pkg_list = &grepdir(sub {((-f $_ || -d $_) && (&basename($_) !~ /^\./))}, $srcdir);
             foreach my $pkg (sort(@pkg_list)) {
-                &parse_product_entry($pkg, $prod);
+                my $prodfile_line;
+
+                #$prodfile_line = sprintf("%s NAME=%s-%04d", $pkg, &basename($pkg), int(rand(10000)));
+                $prodfile_line = $pkg;
+                &parse_product_entry($prodfile_line, $prod);
             }
         }
     }

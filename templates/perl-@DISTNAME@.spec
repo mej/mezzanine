@@ -33,7 +33,7 @@ rm -rf $RPM_BUILD_ROOT
 
 find $RPM_BUILD_ROOT%{_prefix} -type f -print | \
         sed "s@^$RPM_BUILD_ROOT@@g" | \
-        perl -pe 's@(\.\d+pm)$@$1*@g' | \
+        perl -pe 's@(%{_mandir}/man.*\.\d+(pm)?)$@$1*@g' | \
         grep -v perllocal.pod | \
         grep -v "\.packlist" > @MODULE@-filelist
 if [ "$(cat @MODULE@-filelist)X" = "X" ] ; then

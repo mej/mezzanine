@@ -334,3 +334,21 @@ Remove build-temporary files after build is done.
 
 Fixed obscure regexp-quoting bug.
 ----------------------------------------------------------------------
+Wed Mar 24 14:48:55 2004                        Michael Jennings (mej)
+
+Improved perl spec file template.
+
+Added support for keywords that are *not* packages in dependency
+statements.
+
+Use version and release in package key so we can build multiple SRPM's
+of the same package.
+
+Added update capability to perlpkg.
+
+Moved templating code into an OO perl module.
+
+Added ability to package only and ignore build deps in perlpkg.
+
+Fixed missing '/' characters in buildtool.
+----------------------------------------------------------------------
