@@ -5,7 +5,7 @@
 # Michael Jennings
 # 05 May 2000
 #
-# $Id: revtool,v 1.1 2000/05/05 18:19:14 mej Exp $
+# $Id: revtool,v 1.2 2000/05/06 02:50:27 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -22,7 +22,11 @@ print_usage_info {
     $underbar =~ s/./-/g;
     print "$leader\n$underbar\n";
     print "\n";
-    print "  Syntax:   $ARGV0 [ options ]\n";
+    print "  Syntax:   revtool [ options ]\n";
+    print "\n";
+    print "    -h --help         Show this usage information\n";
+    print "    -d --debug        Turn on debugging\n";
+    print "    -v --version      Show version and copyright\n";
     print "\n";
     exit(0);
 }
@@ -69,7 +73,7 @@ BEGIN {
     $start_time = time;
     $progname = "RevTool";
     $version = "0.1.0";
-    chomp($hostname = `/usr/bin/uname -n`);
+    chomp($hostname = `hostname`);
 
     # See the Getopt::Mixed man page for details on the syntax of this line
     $valid_opts = "h help>h v version>v d debug>d";
