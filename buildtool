@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.179 2004/04/01 23:25:24 mej Exp $
+# $Id: buildtool,v 1.180 2004/04/05 02:29:42 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -31,6 +31,7 @@ use POSIX;
 use Getopt::Long;
 use File::Find;
 use Mezzanine::Util;
+use Mezzanine::Config;
 use Mezzanine::RevCtl;
 use Mezzanine::PkgVars;
 use Mezzanine::Src;
@@ -62,6 +63,10 @@ my $global_user;  # Build user
 my $global_tree;  # Repository to use
 my $global_tag;  # Tag to get packages with
 my $buildtree_layout = "mej";  # The layout style to use for the build tree.
+
+# RPM/SRPM cache data.
+my $rpm_cache;
+my ($CFG_RPMCACHE_NAME, $CFG_RPMCACHE_PATH, $CFG_RPMCACHE_MTIME, $CFG_RPMCACHE_SIBLINGS) = (0, 1, 2, 3);
 
 
 # Print usage information
@@ -162,6 +167,7 @@ is_build_needed
 {
     my ($pkg, $pkgfile, $srpm_dir);
     my @stat1;
+    my @srpm_matches;
 
     $pkg = &pkgvar_name();
     if (!$pkg) {
@@ -187,7 +193,13 @@ is_build_needed
 
     # For each SRPM that matches the package name, see if it's newer than the directory.
     # If so, we do not need to rebuild that package.
-    foreach my $srpm (&grepdir(sub {&basename($_) =~ /^\Q$pkg\E\.(no)?src\.rpm$/}, $srpm_dir)) {
+    if ($pkgs->{$pkg}{"TYPE"} =~ /^s?rpm$/) {
+        @srpm_matches = &grepdir(sub {&basename($_) =~ /^\Q$pkg\E\.(no)?src\.rpm$/}, $srpm_dir);
+    } else {
+        @srpm_matches = &grepdir(sub {&basename($_) =~ /^\Q$pkg\E-[^-]+-[^-]+\.(no)?src\.rpm$/}, $srpm_dir);
+    }
+
+    foreach my $srpm (@srpm_matches) {
         my @stat2;
 
         dprint "Checking $srpm...\n";
@@ -209,28 +221,95 @@ scan_rpm_dirs
 {
     my $topdir;
     my @contents;
+    my %siblings;
 
+    nprint "Updating state information....\n";
     $topdir = &pkgvar_topdir();
+
+    $rpm_cache = Mezzanine::Config->new("$progname/rpm_cache.cdf");
 
     # Pre-scan all the binary RPM's for future use.  We need to know what SRPM
     # each binary came from, because some (lame) packages change the base name.
-    nprint "Updating state information....\n";
-    dprint "Scanning binary RPM's in $topdir for their corresponding SRPM's.\n";
-    #@contents = glob("$topdir/RPMS/*/*.rpm");
-    find({ "wanted" => sub { ! -d $_ && $_ =~ /\.rpm$/ && $_ !~ /src\.rpm$/ && push @contents, $_ }, "no_chdir" => 1 }, $topdir);
-    foreach my $rpm (@contents) {
-        my $srpm;
-
-        $srpm = `rpm -qp $rpm --queryformat \"%{SOURCERPM}\"`;
-        dprint "$rpm -> $srpm\n";
-        $srpm_of_rpm{$rpm} = $srpm;
-        if (!defined($rpms_of_srpm{$srpm})) {
-            @{$rpms_of_srpm{$srpm}} = ($rpm);
-        } else {
-            push @{$rpms_of_srpm{$srpm}}, $rpm;
-        }
-        dprint "RPM's for $srpm:  ", join(' ', @{$rpms_of_srpm{$srpm}}), "\n";
+    if ($buildtree_layout eq "orc") {
+        find({ "wanted" => sub { ! -d $_ && $_ =~ /\.rpm$/ && push @contents, $_ }, "no_chdir" => 1 }, $topdir);
+    } else {
+        find({ "wanted" => sub { ! -d $_ && $_ =~ /\.rpm$/ && push @contents, $_ }, "no_chdir" => 1 }, "$topdir/RPMS");
     }
+    foreach my $rpm (sort(@contents)) {
+        my ($aref, $rpmfile, $name, $path, $mtime);
+        my $srpm;
+        my @info;
+
+        $rpmfile = &basename($rpm);
+        $path = &dirname($rpm);
+        $aref = $rpm_cache->get($rpmfile);
+
+        if ($opt_nocache) {
+            dprint "Ignoring any cache info for $rpm.\n";
+        } elsif (ref($aref) eq "ARRAY") {
+            my @statinfo;
+
+            # Valid array ref.  Let's make sure the times match.
+            @statinfo = stat($rpm);
+            $mtime = $aref->[$CFG_RPMCACHE_MTIME];
+            if ($statinfo[9] > $mtime) {
+                # Our cache info is outdated.  We'll have to update it.
+                dprint "Out-of-date cache info for $rpm\n";
+            } elsif ($statinfo[9] < $mtime) {
+                dprint "Cache data newer than $rpm?!?!\n";
+            } else {
+                dprint "Cache data matches, skipping $rpm.\n";
+                @{$siblings{$rpmfile}} = split(' ', $aref->[$CFG_RPMCACHE_SIBLINGS]);
+                next;
+            }
+        } else {
+            dprint "Cache lookup for $rpm failed.\n";
+        }
+
+        # If we get here, we need to update our cache info.
+        # Stat the file
+        @info = stat($rpm);
+        $mtime = $info[9];
+
+        # Get name and architecture
+        @info = &parse_rpm_name($rpmfile);
+        $name = $info[0];
+
+        if ($info[3] eq "src" || $info[3] eq "nosrc") {
+            # It's an SRPM.  Do we need to do anything here?
+
+        } else {
+            # It's a binary RPM.
+            my @tmp;
+
+            $srpm = `rpm -qp $rpm --queryformat \"%{SOURCERPM}\"`;
+            @{$siblings{$rpmfile}} = $srpm;
+            if (!defined($siblings{$srpm})) {
+                @{$siblings{$srpm}} = ($rpmfile);
+            } else {
+                push @{$siblings{$srpm}}, $rpmfile;
+            }
+        }
+        @info = ($name, $path, $mtime, "");
+        $rpm_cache->set($rpmfile, \@info);
+    }
+
+    # Now that we've got all the data, store it back into the config object.
+    foreach my $rpm (sort(keys(%siblings))) {
+        my $aref = $rpm_cache->get($rpm);
+
+        if (! $aref || ref($aref) ne "ARRAY") {
+            eprint "EEEEP!  Caching mechanism fell apart for $rpm!\n";
+            next;
+        } else {
+            dprint "Recording cache information for $rpm.\n";
+        }
+
+        $aref->[$CFG_RPMCACHE_SIBLINGS] = join(' ', @{$siblings{$rpm}});
+        # This next part shouldn't be needed, but for paranoia...
+        $rpm_cache->set($rpm, $aref);
+    }
+    $rpm_cache->save();
 }
 
 # Build a single package from source (if needed) and place the resulting files where they go.
@@ -296,12 +375,31 @@ build_single_package
             return $err;
         }
     } else {
+        my $aref;
         my $srpm;
 
         # No build needed.  Just get the list of output files.
         $srpm = &basename(&pkgvar_filename());
-        $outfiles = join(' ', &pkgvar_filename(), @{$rpms_of_srpm{$srpm}});
-        dprint "Got cached output files:  $outfiles\n";
+        $aref = $rpm_cache->get($srpm);
+
+        if (ref($aref) eq "ARRAY") {
+            my @tmp = split(' ', $aref->[$CFG_RPMCACHE_SIBLINGS]);
+
+            for (my $i = 0; $i < scalar(@tmp); $i++) {
+                my $aref2 = $rpm_cache->get($tmp[$i]);
+
+                if (ref($aref2) ne "ARRAY") {
+                    eprint "Bugger.  No data for $tmp[$i].  Not good.\n";
+                    &fail_package($pkg, "Cache has gone to pot");
+                }
+                $tmp[$i] = $aref2->[$CFG_RPMCACHE_PATH] . '/' . $tmp[$i];
+            }
+            $outfiles = &pkgvar_filename() . ' ' . join(' ', @tmp);
+            dprint "Got cached output files:  $outfiles\n";
+        } else {
+            eprint "Oh dear.  No data for $srpm.  This is bad news.\n";
+            &fail_package($pkg, "Big huge messy caching foul-up occured");
+        }
     }
     $err = &place_package_files($pkg, $outfiles, $pkgs->{$pkg}{LOCATIONS});
     return $err if ($err != MEZZANINE_SUCCESS);
@@ -325,9 +423,6 @@ build_package_forked
             my ($err, $buildroot);
 
             # Child -- reset state as needed and jump to build process
-            close $GLOBAL_LOG if ($GLOBAL_LOG);
-            open(STDOUT, ">/dev/null");
-            open(STDIN, "</dev/null");
             if (-e $logfile) {
                 dprint "Log file $logfile exists.\n";
                 if (! -e "$logfile.save") {
@@ -338,6 +433,9 @@ build_package_forked
                     &nuke_tree($logfile);
                 }
             }
+            close $GLOBAL_LOG if ($GLOBAL_LOG);
+            open(STDOUT, ">/dev/null");
+            open(STDIN, "</dev/null");
             if (!open(LOGFILE, ">$logfile")) {
                 eprint "Unable to open $logfile -- $!\n";
             } else {
@@ -375,7 +473,6 @@ build_package_forked
             if (&pkgvar_buildroot() && -d &pkgvar_buildroot()) {
                 &nuke_tree(&pkgvar_buildroot());
             }
-            close(LOGFILE) if ($GLOBAL_LOG);
             if ($err == MEZZANINE_SUCCESS) {
                 if (-e "$logfile.broken") {
                     wprint "Breakage log file $logfile.broken exists -- Package fixed itself!?\n";
@@ -388,9 +485,11 @@ build_package_forked
                 }
             } else {
                 dprint "Renaming $logfile to $logfile.broken.\n";
+                &nuke_tree("$logfile.save");
                 &nuke_tree("$logfile.broken");
                 &move_files($logfile, "$logfile.broken");
             }
+            close(LOGFILE) if ($GLOBAL_LOG);
             exit ($err);
         } elsif ($! !~ /No more processes/ && $! !~ /Resource temporarily unavailable/) {
             &fatal_error("fork() failed -- $!\n");
@@ -656,8 +755,8 @@ parallel_build
             } else {
                 $logfile = "$logdir/$pkg.log";
             }
-            if (!open(ERRLOG, $logfile)) {
-                &fail_package($pkg, "Child process returned $err but log file $logfile is missing");
+            if (!open(ERRLOG, $logfile) && !open(ERRLOG, "$logfile.broken")) {
+                &fail_package($pkg, "Error $err (log file $logfile is missing)");
                 next;
             }
             @tmp = <ERRLOG>;
@@ -675,10 +774,11 @@ parallel_build
                 } else {
                     $line = "Couldn't find error in log" if (! $line);
                     $line =~ s/^\w+:\s*Error:\s*//;
-                    &fail_package($pkg, "Child process exited with code $err -- $line");
+                    $line =~ s/^Package \"[^\"]+\" failed:\s*//;
+                    &fail_package($pkg, "Error $err -- $line");
                 }
             } else {
-                &fail_package($pkg, "Child process returned $err but log file $logfile is empty");
+                &fail_package($pkg, "Error $err (log file $logfile is empty)");
             }
         }
         # End of loop.  Time to spawn the next child.
@@ -799,7 +899,7 @@ main
     #
     if ($opt_v) {
         &print_version($progname, $version, $author,
-                       'CVS Revision $Revision: 1.179 $ created on $Date: 2004/04/01 23:25:24 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.180 $ created on $Date: 2004/04/05 02:29:42 $ by $Author: mej $ ');
         # Never returns
     }
     if ($opt_h) {

@@ -401,3 +401,12 @@ Added config engine.
 
 Added initial attempt at preserving successful build logs.
 ----------------------------------------------------------------------
+Sun Apr  4 22:28:21 2004                        Michael Jennings (mej)
+
+Refactored config engine.
+
+Made error messages shorter and less redundant.
+
+Merged RPM and SRPM info into new cache.  No more unnecessary rpm
+queries on startup.
+----------------------------------------------------------------------
