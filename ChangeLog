@@ -425,3 +425,7 @@ Thu Jun 15 12:11:34 2000                        Michael Jennings (mej)
 
 Added xforms to prod file.
 ----------------------------------------------------------------------
+Thu Jun 15 14:47:44 2000                        Michael Jennings (mej)
+
+xforms must be binaries because all the SRPM's for it are bad.
+----------------------------------------------------------------------
