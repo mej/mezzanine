@@ -5,7 +5,7 @@
 # Michael Jennings <mej@eterm.org>
 # 21 July 2000
 #
-# $Id: bootable-cdtool,v 1.4 2001/11/05 13:04:39 mej Exp $
+# $Id: bootable-cdtool,v 1.5 2001/11/29 11:56:05 mej Exp $
 #
 
 umask 022
@@ -13,6 +13,13 @@ umask 022
 PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 trap 'exit -1' 1 2 15
+
+if [ "x$1" = "x-i" ]; then
+    UPD=1
+    shift
+else
+    UPD=0
+fi
 
 if [ "x$MEZZANINE_BUILDDIR" != "x" ]; then
     BUILDDIR=$MEZZANINE_BUILDDIR
@@ -30,28 +37,48 @@ NET=vermillion-${V_VER}-net
 IMGTOOL=imgtool
 MEDIATOOL=mediatool
 
-$IMGTOOL -i $IMAGE -fl $PKGLIST -D $BUILDDIR/$NET/RedHat/RPMS
-rpm -Uvh --root=$IMAGE $HOME/cvs/vml/bin-rh-7.1/devfsd-*.i386.rpm
+if [ $UPD -eq 1 ]; then
+    $IMGTOOL -i $IMAGE -fl $PKGLIST -D $BUILDDIR/$NET/RedHat/RPMS:$HOME:$HOME/pkgs
+fi
+
 cd $IMAGE
-
-mkdir -m 0755 -p $IMAGE/mnt/home
-
 find bin usr etc lib boot sbin \( -type d -o -type f \) -perm -0002 -xdev -exec chmod o-w {} \;
 
-mv boot isolinux
-ln -s isolinux boot
+KERNEL_VER=`ls -1 boot/vmlinuz-*netboot | sed 's!boot/vmlinuz-!!'`
+
+test -d boot && mv boot isolinux && ln -s isolinux boot
 cp -a /usr/lib/syslinux/isolinux.bin $IMAGE/boot/
-
-for i in boot/vmlinuz-* ; do rdev $i /dev/hdc ; ramsize $i 10240 ; done
-
+test -d root && mv root home/ && ln -s home/root root
+mkdir -p -m 755 var/sys
+touch var/sys/kernel.h && rm -f boot/kernel.h && ln -s /var/sys/kernel.h boot/kernel.h
+rm -f boot/System.map
+ln -sf System.map-${KERNEL_VER} boot/System.map
+rm -f lib/modules/*/modules.dep
+for i in lib/modules/*netboot ; do
+    chroot $IMAGE /sbin/depmod -a -F /boot/System.map-${KERNEL_VER} ${KERNEL_VER}
+done
+mv -f lib/modules/${KERNEL_VER}/modules.dep var/sys/
+for i in lib/modules/* ; do
+    test -d $i && ln -sf /var/sys/modules.dep $i/modules.dep
+done
+rm -f etc/X11/X && ln -sf /usr/X11R6/bin/XFree86 etc/X11/X
+for i in nfs nfslock ; do
+    chroot $IMAGE /sbin/chkconfig --del $i
+done
+chroot $IMAGE /usr/sbin/netconfig --bootproto=dhcp -d eth0 --hostname=localhost --domain=localdomain
+for i in usr/lib/netscape/plugins/* ; do
+    rm -f usr/lib/mozilla/plugins/`basename $i` && ln -s /$i usr/lib/mozilla/plugins/`basename $i`
+done
 (cd $POST_FILES ; tar --exclude .cvsignore --exclude CVS --exclude ChangeLog -cf - .) | (cd $IMAGE ; tar -xf -)
 
 tar -zcf boot/etc.tgz etc
 
 tar -zcf boot/var.tgz var
 
+tar -zcf boot/home.tgz home
+
 rm -rf tmp
-ln -s /mnt/var/tmp tmp
+ln -s /var/tmp tmp
 
 cd $IMAGE/..
 $MEDIATOOL -i jc-cd.iso -D $IMAGE -I isolinux

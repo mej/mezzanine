@@ -5,7 +5,7 @@
 # Michael Jennings <mej@eterm.org>
 # 21 July 2000
 #
-# $Id: redhat-7.x-cdtool,v 1.20 2001/11/04 13:46:30 mej Exp $
+# $Id: redhat-7.x-cdtool,v 1.21 2001/11/29 11:56:05 mej Exp $
 #
 
 umask 022
@@ -62,7 +62,7 @@ if [ $IMAGE -eq 1 ]; then
     # Generate the diff
     cd $BUILDDIR
     diff -x CVS -x .cvsignore -x '*.rpm' -ur $NET $NET.new >$NET.patch 2>&1
-    ${EDITOR:-vi} $NET.patch
+    #${EDITOR:-vi} $NET.patch
 
     # Make sure there's nothing new popping up unexpectedly.
     ONLY=`grep '^Only' $NET.patch | sed 's/: /\//' | awk '{print $3}'`
@@ -89,11 +89,11 @@ cd $BUILDDIR/$NET
 $RH_PKGLIST_GOOP `pwd`
 
 cd $BUILDDIR
-$RH_SPLIT_GOOP $NET i386 > $NET/RH-VALE-${V_VER}-packages.list
+$RH_SPLIT_GOOP $NET i386 > $NET/vermillion-${V_VER}-packages.list
 
 NUM=1
 rm -f ${CD}*/RedHat/RPMS/*.rpm
-for i in `cat $NET/RH-VALE-${V_VER}-packages.list` ; do
+for i in `cat $NET/vermillion-${V_VER}-packages.list` ; do
     ln -f $NET/RedHat/RPMS/$i $CD$NUM/RedHat/RPMS/$i
     SIZE=`du -ks $CD$NUM | cut -f1`
     if [ $SIZE -gt 665000 ]; then
@@ -104,7 +104,7 @@ for i in `cat $NET/RH-VALE-${V_VER}-packages.list` ; do
 done
 
 # Regenerate the package list ($CD1/RedHat/base/hdlist) from $CD1/RedHat/base/comps
-$RH_PKGLIST_GOOP --fileorder $NET/RH-VALE-${V_VER}-packages.list --withnumbers $BUILDDIR/$CD*
+$RH_PKGLIST_GOOP --fileorder $NET/vermillion-${V_VER}-packages.list --withnumbers $BUILDDIR/$CD*
 
 # Create ISO files
 cd $BUILDDIR
