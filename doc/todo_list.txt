@@ -3,49 +3,53 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: todo_list.txt,v 1.4 2001/02/27 22:10:39 mej Exp $
+#  $Id: todo_list.txt,v 1.5 2001/02/28 05:00:02 mej Exp $
 #
 ########################################################################
 
-Generic Tasks [1d]
+Generic Tasks [1/2]
+-------------------
+ - Create test project [1/2]
+
+
+New Tools [19/46]
+-----------------
+ - For handling mass package updates from RedHat [2/4]
+ - For manipulating source packages (srctool) [13/32]
+    - Explode and import SRPM's into SPM's [1/4]
+    - Import FST's [1/3]
+    - Prepare working tree [2/5]
+    - Generate new patches [2/4]
+    - Resync patches [2/5]
+    - Add/remove/modify patches [4/7]
+    - Detect existing module and compensate [1/4]
+ - For generating distribution media (CD's, tarballs, etc.) [2/5]
+ - For parallelized builds [2/5]
+
+
+buildtool Changes [13/21]
+-------------------------
+ + Move symlink support to revtool [1/1]
+ + Support for tarballs as packages [1/2]
+ - Support for multiple binary RPM's (and an SRPM) for a single package [2/4]
+ - Merge compose and explode/build stages [1/3]
+ - Split off ISO stage and cleanup stage [1/2]
+ - Break out parallelizer [1/2]
+ - Support generic makefile for oddball packages [2/4]
+ - Reorganize and clean up code, comment [4/5]
+
+
+revtool Changes [1/1]
+---------------------
+ + Support for creating symlinks [1/1]
+
+
+pkgtool Changes [1/2]
+---------------------
+ + Support for individual tarballs containing spec files (rpm -ta) [1/2]
+
+
+Long-Term Wishlist
 ------------------
- - Create test project [1d]
-
-
-New Tools [37+d]
-----------------
- - For handling mass package updates from RedHat [1d]
- - For manipulating source packages (srctool) [26d]
-    - Explode and import SRPM's into SPM's [3d]
-    - Import FST's [2d]
-    - Prepare working tree [5d]
-    - Generate new patches [2d]
-    - Resync patches [3d]
-    - Add/remove/modify patches [5d]
-    - Detect existing module and compensate [4d]
- - For generating distribution media (CD's, tarballs, etc.) [5d]
- - For parallelized builds [5d]
- - For distributed builds [??]
- - For providing online help (helptool) [??]
-
-
-buildtool Changes [15d]
------------------------
- + Move symlink support to revtool [1d]
- + Support for tarballs as packages [2d]
- - Merge compose and explode/build stages [3d]
- - Split off ISO stage and cleanup stage [1d]
- - Break out parallelizer [1d]
- - Support generic makefile for oddball packages [2d]
- - Reorganize and clean up code, comment [5d]
-
-
-revtool Changes [1d]
---------------------
- + Support for creating symlinks [1d]
-
-
-pkgtool Changes [2d]
---------------------
- + Support for individual tarballs containing spec files (rpm -ta) [2d]
-
+ - Driver program for distributed builds
+ - Interactive help/guidance (helptool)

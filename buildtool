@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.117 2001/02/27 07:49:53 mej Exp $
+# $Id: buildtool,v 1.118 2001/02/28 05:00:02 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -763,6 +763,8 @@ parse_product_entry
     # Add defaults for stuff that is required
     if ($type eq "module" || $type eq "image") {
         # Anything needed here?
+    } elsif ($type eq "tar") {
+        $filename = "$module/$name";
     } elsif ($type eq "srpm" || $type eq "rpm") {
         if ($name =~ /^(\S+)\.(\w+)\.rpm$/) {
             ($name, $arch) = ($1, $2);
@@ -1875,7 +1877,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.117 $ created on $Date: 2001/02/27 07:49:53 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.118 $ created on $Date: 2001/02/28 05:00:02 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
