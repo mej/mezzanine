@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.46 2004/10/19 19:35:35 mej Exp $
+# $Id: Util.pm,v 1.47 2004/10/20 19:02:39 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -500,16 +500,24 @@ sub
 mkdirhier($$)
 {
     my ($dir, $mask) = @_;
-    my @dirs = split("/", $dir);
+    my @dirs;
     my $path = "";
 
+    if (! $dir) {
+        eprint "mkdirhier() called with empty directory!\n";
+        &show_backtrace();
+        return 0;
+    }
     if (-d $dir) {
+        dprint "$dir exists, no need to create it.\n";
         return 1;
     }
     if (!defined($mask)) {
         $mask = 0755;
     }
+
     dprint "mkdirhier($dir) called.\n";
+    @dirs = split("/", $dir);
     foreach my $dir (@dirs) {
         $path .= "$dir/";
         if (! -d $path) {

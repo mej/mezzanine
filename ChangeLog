@@ -657,3 +657,7 @@ paths with auto* macros as appropriate.
 
 Added debugging to try to track down weird permissions issue.
 ----------------------------------------------------------------------
+Wed Oct 20 15:00:30 2004                        Michael Jennings (mej)
+
+Still trying to fix permissions issue.
+----------------------------------------------------------------------

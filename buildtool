@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.199 2004/09/29 20:57:54 mej Exp $
+# $Id: buildtool,v 1.200 2004/10/20 19:02:39 mej Exp $
 #
 
 use strict;
@@ -1069,7 +1069,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.199 $ created on $Date: 2004/09/29 20:57:54 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.200 $ created on $Date: 2004/10/20 19:02:39 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
@@ -1303,6 +1303,8 @@ main
 
     # Set the buildroot for the overall build.
     &pkgvar_buildroot($config->set("BUILDROOT", $config->get("BUILDROOT") || $ENV{"MEZZANINE_BUILDROOT"}));
+    &mkdirhier(&pkgvar_buildroot(), 01777);
+    chmod(01777, &pkgvar_buildroot());
 
     $ENV{"MAKE"} = $config->set("MAKE", $config->get("MAKE") || $ENV{"MEZZANINE_MAKE"} || "make");
     $ENV{"CFLAGS"} = $config->set("CFLAGS", $OPTION{"cflags"} || $config->get("CFLAGS") || $ENV{"MEZZANINE_CFLAGS"} || "-O2");
@@ -1310,8 +1312,10 @@ main
                                 || "/usr/build/bin:/usr/local/build/bin:/usr/lib/qt-1.45/bin:/usr/lib/qt-2.1.0/bin"
                                 . ":/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/X11R6/bin:/usr/kerberos/sbin"
                                 . ":/usr/kerberos/bin:.");
-    $ENV{"MEZZANINE_BUILDDIR"} = $config->set("BUILDDIR", $OPTION{"builddir"} || $config->get("BUILDDIR") || $ENV{"MEZZANINE_BUILDDIR"} || (&getcwd() . "/build.mezz"));
-    $ENV{"MEZZANINE_LOGDIR"} = $config->set("LOGDIR", $config->get("LOGDIR") || $ENV{"MEZZANINE_LOGDIR"} || $ENV{"MEZZANINE_BUILDDIR"});
+    $ENV{"MEZZANINE_BUILDDIR"} = $config->set("BUILDDIR", $OPTION{"builddir"} || $config->get("BUILDDIR")
+                                              || $ENV{"MEZZANINE_BUILDDIR"} || (&getcwd() . "/build.mezz"));
+    $ENV{"MEZZANINE_LOGDIR"} = $config->set("LOGDIR", $config->get("LOGDIR") || $ENV{"MEZZANINE_LOGDIR"}
+                                            || $ENV{"MEZZANINE_BUILDDIR"});
 
     # Don't hard code any RPATH's into binaries
     delete $ENV{"LD_RUN_PATH"};
