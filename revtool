@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.15 2000/05/11 04:02:29 mej Exp $
+# $Id: revtool,v 1.16 2000/05/12 02:51:50 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -131,10 +131,14 @@ commit_to_master
     print "Please edit your commit message now...\n";
     system($ENV{"EDITOR"} ? $ENV{"EDITOR"} : "vi", $logfile);
     open(LOGFILE, "<$logfile");
-    if ((! -f "ChangeLog") && (&cat_file("CVS/Repository") eq $cwd)) {
-        open(CL, ">>ChangeLog");
-        print "WARNING:  You have no ChangeLog here.  I have created one for you.\n";
-        &add_new_files("ChangeLog");
+    if (! -f "ChangeLog") {
+        if (&cat_file("CVS/Repository") eq $cwd) {
+            open(CL, ">>ChangeLog");
+            print "WARNING:  You have no ChangeLog here.  I have created one for you.\n";
+            &add_new_files("ChangeLog");
+        } else {
+            # We're not in the module directory.  Offer to cd to it.
+        }
     } else {
         open(CL, ">>ChangeLog");
     }

@@ -101,3 +101,10 @@ Commented out packages in va-6.2.1.prod that were removed from
 contrib-rh
  
 ----------------------------------------------------------------------
+Thu May 11 19:11:26 2000                        Michael Jennings (mej)
+
+All the important stages are complete, at least for SRPM's.  I still
+have the ISO stage, the cleanup stage, and the compose stage to go,
+but it should be to the point where the RedHat 6.2 packages can be
+rebuilt and congregated.  Time to test that theory....
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.7 2000/05/11 03:56:57 mej Exp $
+# $Id: buildtool,v 1.8 2000/05/12 02:51:50 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -112,6 +112,25 @@ sub
 qprint
 {
     print @_ if ($verbosity >= 1);
+}
+
+# Make a directory hierarchy
+sub
+mkdirhier
+{
+    my $dir = $_[0];
+    my @dirs = split("/", $dir);
+    my $path = "";
+
+    foreach $dir (@dirs) {
+        $path .= "$dir/";
+        dprint "mkdirhier() checking for \"$path\"\n";
+        if (! -d $path) {
+            dprint "mkdirhier() creating \"$path\"\n";
+            mkdir($path, 0755) || die("Unable to create $path -- $!\n");
+        }
+    }
+    dprint "Something went wrong in mkdirhier()!\n" if (! -d $_[0]);
 }
 
 # Parse product definition files recursively to establish
@@ -422,6 +441,7 @@ do_explode_stage
         }
         while (<RPM>) {
             chomp($line = $_);
+            dprint "RPM contents -> $line\n";
             push @manifest, $line;  # Add the file to the manifest
             if ($line =~ /\.spec(\.in)?$/) {
                 $specfile = $line;
@@ -430,12 +450,15 @@ do_explode_stage
         }
         close(RPM);
         dprint "\"$cmd\" returned $?\n";
+        if ($? != 0) {
+            # FIXME:  What to do here?
+        }
         if (! $specfile) {
             &fail_package($pkg, "explode", "Unable to locate spec file in SRPM");
         }
         # We'll use these later, so they MUST be defined for
         # any package we plan on actually building later.
-        $pkgs->{$pkg}{SPECFILE} = $specfile;
+        $pkgs->{$pkg}{SPECFILE} = "$basedir/build/SPECS/$specfile";
         $pkgs->{$pkg}{MANIFEST} = join(" ", @manifest);
 
         # Check for each of those files.
@@ -461,6 +484,7 @@ do_explode_stage
         $err = 0;
         while (<RPM>) {
             chomp($line = $_);
+            nprint "$line\n";
             if ($line !~ /^$/) {
                 # Any output from this command is an error.
                 $err = 1;
@@ -470,6 +494,9 @@ do_explode_stage
         }
         close(RPM);
         dprint "\"$cmd\" returned $?\n";
+        if ($? != 0) {
+            # FIXME:  What to do here?
+        }
         if ($err) {
             &fail_package($pkg, "explode", $msg);
         }
@@ -481,12 +508,50 @@ do_explode_stage
 sub
 do_build_stage
 {
+    my ($cmd, $err, $msg, $line, $specfile, $rpm, $tmp, $target) = undef;
+    my @outfiles;
+
     qprint "$progname:  Entering the build stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (@packages) {
+        undef @outfiles;
         nprint "$progname:  Starting build stage for the \"$pkg\" package....\n";
-        if ($pkgs->{$pkg}{TYPE} eq "module") {
-        } elsif ($pkgs->{$pkg}{TYPE} eq "srpm") {
+
+        # Check for a target SRPM that is newer than the original SRPM and the
+        # spec file.  If such an SRPM exists, skip the build stage for this package.
+        $target = "$basedir/build/SRPMS/$pkgs->{$pkg}{NAME}" . "-"
+                   . "$pkgs->{$pkg}{VERSION}" . "-" . "$pkgs->{$pkg}{RELEASE}.src.rpm";
+        $specfile = $pkgs->{$pkg}{SPECFILE};
+        if (-f $target) {
+            $target_age = -M _;
+            $orig_age = -M $pkgs->{$pkg}{FILENAME};
+            $spec_age = -M $specfile;
+            dprint "File ages:  $orig_age for $pkgs->{$pkg}{FILENAME}, $target_age for $target,"
+                    . " and $spec_age for $specfile\n";
+            next if ($target_age < $spec_age && $target_age < $orig_age);
         }
+
+        # Rebuild from the spec file
+        $rpm = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
+        $cmd = "$rpm --rcfile $rpmrc -ba $specfile";
+        dprint "About to run \"$cmd\"\n";
+        if (!open(RPM, "$cmd 2>&1 |")) {
+            &fail_package($pkg, "build", "Execution of \"$cmd\" failed -- $!");
+            next;
+        }
+        while (<RPM>) {
+            chomp($line = $_);
+            nprint "$line\n";
+            if ($line =~ /^Wrote: \/\S+\.rpm/) {
+                ($tmp = $line) =~ s/^Wrote: //;
+                push @outfiles, $tmp;
+            }
+        }
+        close(RPM);
+        dprint "\"$cmd\" returned $?\n";
+        if ($err) {
+            &fail_package($pkg, "build", $msg);
+        }
+        $pkgs->{$pkg}{RPMS} = join(" ", @outfiles);
         nprint "$progname:  Build stage for \"$pkg\" is complete.\n";
     }
     qprint "$progname:  Build stage is now complete.  (${\(&get_timestamp())})\n";
@@ -495,11 +560,28 @@ do_build_stage
 sub
 do_package_stage
 {
+    my $path;
+
     qprint "$progname:  Entering the package accumulation stage.  (${\(&get_timestamp())})\n";
+
+    # Create the directories where we'll put the packages
+    # FIXME:  The prod files should probably be able to specify this
+    if (! -d "$basedir/$prod") {
+        mkdir("$basedir/$prod", 0755) || die "Cannot create $basedir/$prod -- $!\n";
+        foreach $dir ("SRPMS", "RPMS") {
+            mkdir("$basedir/$prod/$dir", 0755);
+        }
+    }
+    
     foreach $pkg (@packages) {
         nprint "$progname:  Starting package accumulation stage for the \"$pkg\" package....\n";
-        if ($pkgs->{$pkg}{TYPE} eq "module") {
-        } elsif ($pkgs->{$pkg}{TYPE} eq "srpm") {
+        foreach $rpm (split(" ", $pkgs->{$pkg}{RPMS})) {
+            ($path = $rpm) =~ s/^\S+\/(S?RPMS\/)/$1/;  # Get only the names of the subdirectories
+            $path =~ s/\/([^\/]+)$//;
+            $path = "$prod/$path";
+            dprint "Path is \"$path\"\n";
+            &mkdirhier("$path");
+            system("cp $rpm $path/");
         }
         nprint "$progname:  Package accumulation stage for \"$pkg\" is complete.\n";
     }
@@ -512,9 +594,7 @@ do_iso_stage
     qprint "$progname:  Entering the ISO image stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (@packages) {
         nprint "$progname:  Starting ISO image stage for the \"$pkg\" package....\n";
-        if ($pkgs->{$pkg}{TYPE} eq "module") {
-        } elsif ($pkgs->{$pkg}{TYPE} eq "srpm") {
-        }
+
         nprint "$progname:  ISO image stage for \"$pkg\" is complete.\n";
     }
     qprint "$progname:  ISO image stage is now complete.  (${\(&get_timestamp())})\n";
@@ -526,9 +606,7 @@ do_cleanup_stage
     qprint "$progname:  Entering the cleanup stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (@packages) {
         nprint "$progname:  Starting cleanup stage for the \"$pkg\" package....\n";
-        if ($pkgs->{$pkg}{TYPE} eq "module") {
-        } elsif ($pkgs->{$pkg}{TYPE} eq "srpm") {
-        }
+
         nprint "$progname:  Cleanup stage for \"$pkg\" is complete.\n";
     }
     qprint "$progname:  Cleanup stage is now complete.  (${\(&get_timestamp())})\n";
@@ -619,6 +697,7 @@ BEGIN {
     } else {
         $proddir = ".";
     }
+    $opt_b = "p" if (! $opt_b);
     $basedir = ($ENV{BASE_DIR} ? $ENV{BASE_DIR} : ".");
     $revtool = sprintf("revtool%s", ($opt_d ? " --debug" : ""));
     if ($opt_v) {
