@@ -1233,3 +1233,7 @@ o Have special_build() look for RPMs in a specific location rather
   than parsing output of make.  This is more deterministic.
 o Added debugging prints for $prod, $basedir and $builddir
 ----------------------------------------------------------------------
+Tue May 15 14:17:48 2001                        Michael Jennings (mej)
+
+Minor update to web-sync.
+----------------------------------------------------------------------
