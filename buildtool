@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.36 2000/06/06 00:18:47 mej Exp $
+# $Id: buildtool,v 1.37 2000/06/06 04:49:49 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1588,13 +1588,14 @@ main
 
     # Post-parse the options stuff
     if ($opt_v) {
-        my $rcs_info = 'CVS Revision $Revision: 1.36 $ created on $Date: 2000/06/06 00:18:47 $ by $Author: mej $ ';
+        # Do not edit this variable.  It is updated automatically by CVS when you commit
+        my $rcs_info = 'CVS Revision $Revision: 1.37 $ created on $Date: 2000/06/06 04:49:49 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
         $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
         print "\n";
-	print "$progname $version by Michael Jennings\n";
+	print "$progname $version by Michael Jennings <mej\@eterm.org>\n";
         print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
         print "  ($rcs_info)\n";
         print "\n";
@@ -1602,6 +1603,8 @@ main
     }
     if ($opt_h) {
 	&print_usage_info();   # Never returns
+        # This is a really silly way to shut up the "used only once" warnings.
+        $opt_h = $opt_P = $opt_Q = $opt_p = $opt_q = $opt_v = 0;
     }
     $debug = $opt_d;
     $verbosity = ($opt_Q ? 0 : ($opt_q ? 1 : 2));

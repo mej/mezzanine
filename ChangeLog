@@ -270,3 +270,9 @@ Mon Jun  5 17:29:19 2000                        Michael Jennings (mej)
 Added CVS revision/date/author info to -v output for my own benefit.
 Trying to keep everything straight between the various build systems.
 ----------------------------------------------------------------------
+Mon Jun  5 21:58:41 2000                        Michael Jennings (mej)
+
+pkgtool now parses spec files and gets the sources, patches, and
+header variables correct.  It also handles %define'd macros properly
+AFAICT.  Theoretically, it should even handle recursive ones.
+----------------------------------------------------------------------
