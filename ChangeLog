@@ -661,3 +661,9 @@ Wed Oct 20 15:00:30 2004                        Michael Jennings (mej)
 
 Still trying to fix permissions issue.
 ----------------------------------------------------------------------
+Tue Oct 26 12:26:26 2004                        Michael Jennings (mej)
+
+Undo some verbose debugging.
+
+Ignore non-spec files in SPM's too.
+----------------------------------------------------------------------

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.44 2004/09/01 00:26:19 mej Exp $
+# $Id: Build.pm,v 1.45 2004/10/26 16:26:46 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -239,6 +239,15 @@ prepare_build_tree
     }
     &mkdirhier($buildroot, 0775);
     xpush @my_dirs, $buildroot;
+
+    if ($instroot && ! -d "$instroot$buildroot") {
+        dprint "Creating $instroot$buildroot with mkdirhier().\n";
+        if (! &mkdirhier("$instroot$buildroot", 0755)) {
+            &fatal_error("Cannot create $instroot$buildroot -- $!\n");
+        }
+        xpush @my_dirs, "$instroot$buildroot";
+    }
+
     dprint "I created:  ", join(" ", @my_dirs), "\n";
 
     $ret = &install_hints();
@@ -598,7 +607,7 @@ build_spm
     $topdir = &pkgvar_topdir();
     $instroot = &pkgvar_instroot();
 
-    @tmp = &grepdir(sub {-f $_ && -s _ && $_ !~ /^\./ && $_ !~ /\~$/}, "F");
+    @tmp = &grepdir(sub {/\.spec(\.in)?$/ && -f $_ && -s _ && &basename($_) !~ /^\./}, "F");
     if (!scalar(@tmp)) {
         return (MEZZANINE_MISSING_FILES, "@{[getcwd()]} does not seem to contain build instructions", undef);
     } elsif (scalar(@tmp) > 1) {

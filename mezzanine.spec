@@ -1,9 +1,9 @@
-# $Id: mezzanine.spec,v 1.123 2004/10/19 19:35:35 mej Exp $
+# $Id: mezzanine.spec,v 1.124 2004/10/26 16:26:46 mej Exp $
 
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
 Version: 1.8
-Release: 0.16
+Release: 0.17
 Copyright: BSD
 Group: Development/Tools
 Source: %{name}.tar.gz
