@@ -66,3 +66,7 @@ It also has the skeleton of build stages.  The next step is simply to
 flesh out those stages.  Then we're done.  (If only it were that
 simple.) :-)
 ----------------------------------------------------------------------
+Tue May  9 16:14:02 2000                        Michael Jennings (mej)
+
+Added a .prod file for RedHat 6.2.  Time to make the thing build.
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.2 2000/05/09 22:30:15 mej Exp $
+# $Id: buildtool,v 1.3 2000/05/09 23:14:48 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -148,8 +148,10 @@ parse_product_def {
                 ($var, $val) = split("=", $varval);
                 $var =~ tr/[a-z]/[A-Z]/;
                 # Common variables are REVISION/TAG, VERSION, DATE, CVSROOT
-                if ($var =~ /^RE[VL]/ || $var =~ /^TAG/) {
+                if ($var =~ /^REV/ || $var =~ /^TAG/) {
                     $var = "REVISION";
+                } elsif ($var =~ /^REL/) {
+                    $var = "RELEASE";
                 } elsif ($var =~ /^VER/) {
                     $var = "VERSION";
                 }
@@ -157,26 +159,26 @@ parse_product_def {
             }
             # Add defaults for stuff that is required
             if ($type eq "module") {
-                if ($pkgvars{REVISION} =~ /^head$/i) {
-                    undef $pkgvars{REVISION};
+                if ($pkgvars{RELEASE} =~ /^head$/i) {
+                    undef $pkgvars{RELEASE};
                 }
             } elsif ($type eq "srpm") {
-                if (! $pkgvars{REVISION}) {
+                if (! $pkgvars{RELEASE}) {
                     if ($name !~ /^\S+-[^-]+-[^-]+$/) {
                         eprint "I wasn't given enough information about the $name package in ${prod}.prod.  For SRPM\n";
-                        eprint "packages, the version and revision information must be specified as variables or\n";
+                        eprint "packages, the version and release information must be specified as variables or\n";
                         eprint "embedded in the package name.  I'm going to have to skip that one.\n";
                         next;
                     } else {
                         ($tmp = $name) =~ s/^\S+-[^-]+-//;
                         $name =~ s/-[^-]+$//;
-                        $pkgvars{REVISION} = $tmp;
+                        $pkgvars{RELEASE} = $tmp;
                     }
                 }
                 if (! $pkgvars{VERSION}) {
                     if ($name !~ /^\S+-[^-]+$/) {
                         eprint "I wasn't given enough information about the $name package in ${prod}.prod.  For SRPM\n";
-                        eprint "packages, the version and revision information must be specified as variables or\n";
+                        eprint "packages, the version and release information must be specified as variables or\n";
                         eprint "embedded in the package name.  I'm going to have to skip that one.\n";
                         next;
                     } else {
@@ -187,7 +189,7 @@ parse_product_def {
                 }
 
             }
-            # Now that we've got the name/version/revision in their final forms, set up the data structures.
+            # Now that we've got the name/version/release in their final forms, set up the data structures.
             $pkgs->{$name}{TYPE} = $type;
             $pkgs->{$name}{MODULE} = $module;
             dprint "New package:  $name is a $pkgs->{$name}{TYPE}\n";
