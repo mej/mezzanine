@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: todo_list.txt,v 1.1 2001/02/23 02:53:54 mej Exp $
+#  $Id: todo_list.txt,v 1.2 2001/02/24 00:29:01 mej Exp $
 #
 ########################################################################
 
@@ -36,6 +36,7 @@ buildtool Changes [15d]
  - Move symlink support to revtool [1d]
  - Support for tarballs as packages [2d]
  - Merge compose and explode/build stages [3d]
+
 
 revtool Changes [1d]
 --------------------
