@@ -105,3 +105,8 @@ Tue Feb 26 17:05:14 2002                        Michael Jennings (mej)
 
 Okay, let's see if *this* works too....
 ----------------------------------------------------------------------
+Wed Feb 27 16:06:26 2002                        Michael Jennings (mej)
+
+Fixed a bug with commits from the top level directory when specifying
+filenames.
+----------------------------------------------------------------------
