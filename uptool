@@ -23,13 +23,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: uptool,v 1.3 2001/04/05 04:07:58 mej Exp $
+# $Id: uptool,v 1.4 2001/04/07 02:22:39 mej Exp $
 #
 
 # Include the Perl Modules we need
-use diagnostics;
 require POSIX;
 require Getopt::Long;
+use Cwd;
 use Net::FTP;
 use Avalon::Util;
 
@@ -118,10 +118,40 @@ compare_packages()
 {
     my ($p1, $p2) = @_;
     my $ans;
+    my $cache_file = "$ENV{HOME}/.avalon.update_cache";
+    local *CACHE;
 
+    if (-s $cache_file) {
+        if (open(CACHE, $cache_file)) {
+            my @tmp;
+
+            @tmp = <CACHE>;
+            close(CACHE);
+            if (scalar(@tmp = grep(/$p1/ && /$p2/, @tmp))) {
+                my $line = $tmp[0];
+                my ($n1, $n2, $sign);
+
+                dprint "Found cache line $line";  # $line already has a newline
+                ($n1, $sign, $n2) = split(" ", $line);
+                return (($n1 eq $p1) ? ($sign eq '<') : ($sign eq '>'));
+            } else {
+                dprint "$p1 and $p2 not found in cache.\n";
+            }
+        }
+    }
     print "Is $p2 more recent than $p1 [y/n]? ";
     chomp($ans = <STDIN>);
-    return ($ans =~ /^\s*y(es)?\s*$/i);
+    if ($ans =~ /^\s*y(es)?\s*$/i) {
+        open(CACHE, ">>$cache_file");
+        print CACHE "$p1 < $p2\n";
+        close(CACHE);
+        return 1;
+    } else {
+        open(CACHE, ">>$cache_file");
+        print CACHE "$p1 > $p2\n";
+        close(CACHE);
+        return 0;
+    }
 }
 
 sub
@@ -175,7 +205,7 @@ sub
 fetch_updates($)
 {
     my $url = $_[0];
-    my $session;
+    my ($session, $pkgcnt);
     my ($proto, $host, $port, $userid, $passwd, $path);
 
     # Set defaults for stuff.
@@ -238,12 +268,14 @@ fetch_updates($)
             &compare_lists($session, $dir{$p});
         }
         if (defined(%cmd)) {
+            $pkgcnt = scalar(keys %cmd);
             &show_cmds();
         }
     }
 
     print "Closing session...\n";
     $session->quit();
+    print "Update complete.  Found $pkgcnt out-dated/missing packages.\n";
     return 1;
 }
 
@@ -267,7 +299,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.3 $ created on $Date: 2001/04/05 04:07:58 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.4 $ created on $Date: 2001/04/07 02:22:39 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -23,12 +23,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: imgtool,v 1.7 2001/04/05 01:35:27 mej Exp $
+# $Id: imgtool,v 1.8 2001/04/07 02:22:39 mej Exp $
 #
 
 # Include the Perl Modules we need
 require POSIX;
 require Getopt::Long;
+use Cwd;
 use Avalon::Util;
 
 # Print usage information
@@ -238,7 +239,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.7 $ created on $Date: 2001/04/05 01:35:27 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.8 $ created on $Date: 2001/04/07 02:22:39 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -256,12 +257,12 @@ main
     &debug_set($opt_d);
     $imagedir = ($opt_i ? $opt_i : ($ENV{"IMAGE_DIR"} ? $ENV{"IMAGE_DIR"} : ""));
     if ($imagedir eq "") {
-        chomp($imagedir = `/bin/pwd`);
+        $imagedir = &getcwd() || &fatal_error("Current directory does not exist?!\n");
         $imagedir .= "/img";
-    } elsif ($imagedir =~ /^[^\/]/) {
+    } elsif ($imagedir !~ /^\//) {
         my $pwd;
 
-        chomp($pwd = `/bin/pwd`);
+        $pwd = &getcwd() || &fatal_error("Current directory does not exist?!\n");
         $imagedir = "$pwd/$imagedir";
     }
     if ($opt_D) {
@@ -276,6 +277,11 @@ main
         @pkgs = &get_package_list($opt_l);
     } else {
         @pkgs = @ARGV;
+    }
+
+    # Oops-proofing
+    if (abs_path($imagedir) eq "/" && ! $keep) {
+        &fatal_error("Sorry, I refuse to remove /.\n");
     }
 
     # Signal handling

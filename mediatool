@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: mediatool,v 1.4 2001/04/02 07:53:39 mej Exp $
+# $Id: mediatool,v 1.5 2001/04/07 02:22:39 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -81,7 +81,7 @@ create_tarball
         } elsif ($tarball =~ /\.(tar\.|t)\.bz2?$/) {
             $cmd .= " --use-compress-program=bzip2";
         }
-        $cmd .= "  -Pcf $tarball .";
+        $cmd .= " -Pcf $tarball .";
     }
 
     open(CMD, "$cmd 2>&1 |") || &fatal_error("Unable to execute \"$cmd\" -- $!\n");
@@ -119,7 +119,15 @@ create_iso
     $err = 0;
     while (<MKHYBRID>) {
         chomp($line = $_);
-        dprint "$line\n";
+        if (&debug_get()) {
+            dprint "$line\n";
+        } elsif ($line =~ /^\s*Size of boot image is \d+ sectors -> Emulating a (.*) floppy$/) {
+            print "ISO will contain $1 boot floppy image.\n";
+        } elsif ($line =~ /^(.*) done, estimate finish/) {
+            print "\r$1 complete.";
+        } elsif ($line =~ /^\d+ extents written \((.*)\)$/) {
+            print "\rISO creation complete, total size $1.\n";
+        }
     }
     close(MKHYBRID);
     dprint "\"$cmd\" returned $?\n";
@@ -147,7 +155,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.4 $ created on $Date: 2001/04/02 07:53:39 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.5 $ created on $Date: 2001/04/07 02:22:39 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

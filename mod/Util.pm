@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.4 2001/04/04 09:36:56 mej Exp $
+# $Id: Util.pm,v 1.5 2001/04/07 02:22:39 mej Exp $
 #
 
 package Avalon::Util;
@@ -40,7 +40,7 @@ BEGIN {
                     '&debug_get', '&debug_set',
 		    '&get_timestamp', '&fatal_error', '&dprintf', '&dprint', '&eprintf', '&eprint',
 		    '&handle_signal', '&handle_fatal_signal', '&handle_warning',
-		    '&mkdirhier', '&nuke_tree', '&move_files', '&getcwd', '&basename', '&dirname', '&grepdir',
+		    '&mkdirhier', '&nuke_tree', '&move_files', '&basename', '&dirname', '&grepdir',
 		    '&xpush',
 		    '&cat_file',
                     '&parse_rpm_name',
@@ -84,7 +84,6 @@ sub handle_warning(@);
 sub mkdirhier($);
 sub nuke_tree($);
 sub move_files($ $);
-sub getcwd();
 sub basename($);
 sub dirname($);
 sub grepdir(& $);
@@ -331,16 +330,6 @@ move_files($ $)
         $fcnt++;
     }
     return $fcnt;
-}
-
-# Get the current path
-sub
-getcwd()
-{
-    my $cwd;
-
-    chomp($cwd = `/bin/pwd`);
-    return $cwd;
 }
 
 # Strip the leading path off a directory/file name

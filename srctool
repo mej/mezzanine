@@ -23,12 +23,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.10 2001/04/02 07:53:39 mej Exp $
+# $Id: srctool,v 1.11 2001/04/07 02:22:39 mej Exp $
 #
 
 # Include the Perl Modules we need
 require POSIX;
 require Getopt::Long;
+use Cwd;
 use Avalon::Util;
 use Avalon::Srctool;
 
@@ -328,7 +329,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.10 $ created on $Date: 2001/04/02 07:53:39 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.11 $ created on $Date: 2001/04/07 02:22:39 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
