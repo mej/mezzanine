@@ -4,7 +4,7 @@
 #  Written by:  Michael Jennings
 #               Ted T'so
 #
-#  $Id: README,v 1.6 2000/06/14 20:34:05 mej Exp $
+#  $Id: README,v 1.7 2000/06/18 06:48:44 mej Exp $
 #
 ########################################################################
 
@@ -285,7 +285,124 @@ may want to stop before getting to the complicated parts.
 3.1.  Running a Simple Build
 ----------------------------
 
+The simplest build you can do is one where everything is defined in a
+product file and for which you only want to build package files.  If
+you know the product and version you wish to build, it's as easy as:
 
+buildtool -p product-1.0
+
+Of course, you would replace "product" with the name and "1.0" with
+the version of the product you wish to build.
+
+Assuming buildtool is able to locate the appropriate product file, it
+will begin the build by parsing that file.  Once it is finished
+parsing, buildtool will know which packages are needed to create the
+product you requested.  It will then proceed to build all the
+packages, one by one, until all packages for that product have been
+built.  It will then place the built packages into the appropriate
+directories inside the CD image tree.
+
+3.2.  Changing the Output
+-------------------------
+
+Running a build can generate a large amount of output as buildtool
+keeps informing you of what it's doing.  This isn't always desireable,
+so buildtool supports some options that allow you to change how much
+detail buildtool gives you about its progress.  The "-q" option
+activates "quiet" mode, in which only important messages and general
+progress are shown.  The "-Q" option tells buildtool to use "silent"
+mode; nothing but error messages will be displayed.
+
+The "-d" option, on the other hand, requests that buildtool report
+debugging information as it runs.  This produces extremely large
+amounts of output but can be very helpful in determining how buildtool
+works or investigating problems.
+
+Sometimes it is desireable to direct the output from a build to a
+particular file in addition to viewing it on the screen.  For this
+purpose, buildtool provides the "-l" option, which specifies the
+filename for a log file to receive output.
+
+3.3.  Additional Options
+------------------------
+
+You already have enough knowledge to start building products.
+However, buildtool supports some additional options you may find
+useful.
+
+By default, a failure in any single package will result in the
+termination of buildtool.  This is because, excluding products under
+development, builds should never fail.  However, developers doing test
+builds will want to specify the "-f" option which will force buildtool
+to continue until as much of the product as possible has been built.
+
+For the larger products, build times can be extremely high.  To help
+reduce the time required to build large products, buildtool allows the
+build process to be parallelized using the "-P" option.  This will
+cause the main buildtool to act like a master process which spawns
+slave processes to build individual packages.  The number of
+simultaneous slaves spawned is determined by the number of CPU's in
+the build machine.
+
+Finally, you can tell buildtool which stage to stop at by using the
+"-b" option.  The build stages will be discussed in more detail in the
+next section.  Commonly-used stopping points are the ISO image stage
+("-bi"), the bootstrap stage ("-bs"), and of course the default
+stopping point, the package accumulation stage ("-bp").  If you want
+to go all the way through the cleanup stage, use "-ba".
+
+3.4.  The Build Process in Detail
+---------------------------------
+
+The build process has 7 stages, and buildtool will let you stop at any
+stage.  It also tries to avoid doing unnecessary work, so if it
+detects that a particular stage has already been completed (it doesn't
+care *who* completed it, as long as it seems to be done), it will not
+perform any actions for that stage.
+
+First is the bootstrap stage.  Several things can happen here if they
+haven't already been done.  First off, $BASE_DIR/build is created if
+it doesn't already exist, as are the BUILD, SOURCES, SRPMS, RPMS, and
+SPECS subdirectories for building SRPM's.  ($BASE_DIR is the base
+directory used for the build.  This is generally the "base" module
+from CVS.)  Next, if no rpmrc or rpmmacros files exist in $BASE_DIR,
+skeleton ones are created which point to the right places.  If those
+files do exist, they are not created/modified.  The bootstrap stage
+also takes care of checking out the necessary modules if they are not
+already present.  For any file or module that does not exist,
+buildtool executes revtool to obtain the appropriate source files from
+the repository.
+
+The next stage is the compose stage.  Nothing is done here for SRPM's,
+because this is where SRPM's are built from the modules.  The details
+of how to modules are constructed and how they are translated into
+vendor sources and patches are discussed later in this document.  For
+now, all you need to know is that the SRPM ends up in
+$BASE_DIR/build/SRPMS/.
+
+The explode stage takes all the SRPMS and does "rpm -U" on them to
+"explode" them into their component tarballs, patches, and spec files
+in the appropriate places that rpm expects them to be under
+$BASE_DIR/build.
+
+The build stage is where all the packages are rebuilt from their
+exploded components into source and binary RPM's using "rpm -ba".
+
+The package accumulation stage is where all the new source and binary
+RPM's are copied into the image directories for the product being
+built.  At this point, you have a completed product.
+
+The compose, explode, build, and package accumulation stages are the
+ones which are parallelized if the "-P" option is specified.  The
+other stages are not able to be parallelized.
+
+The ISO image stage builds ISO 9660 files (with RockRidge and Joliet
+extensions, as well as optional El Torito boot images) of the image
+directories created previously.
+
+Finally, the cleanup stage removes all the intermediate build steps,
+including all files pulled from the repository, all RPM directories
+(BUILD, SOURCES, etc.), and so forth.
 
 
 4.  PACKAGE MAINTAINER'S GUIDE
