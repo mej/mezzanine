@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.4 2000/05/09 23:51:08 mej Exp $
+# $Id: buildtool,v 1.5 2000/05/10 00:12:53 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -51,9 +51,9 @@ print_usage_info {
 
 # Generate timestamp for debugging/log file
 sub
-get_time_stamp {
+get_timestamp {
 
-    $ts = POSIX::strftime("[%A, %e %B %Y %H:%M:%S %Z]", localtime);
+    $ts = POSIX::strftime("%A, %d %B %Y %H:%M:%S %Z", localtime);
     return $ts;
 }
 
@@ -218,6 +218,7 @@ parse_product_def {
 sub
 do_bootstrap_stage {
 
+    qprint "$progname:  Entering the bootstrap stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (grep $pkgs->{$_}{TYPE} ne "srpm", @packages) {
         nprint "$progname:  Starting bootstrap stage for the \"$pkg\" package....\n";
 
@@ -225,11 +226,13 @@ do_bootstrap_stage {
 
         nprint "$progname:  Bootstrap stage for \"$pkg\" is complete.\n";
     }
+    qprint "$progname:  Bootstrap stage is now complete.  (${\(&get_timestamp())})\n";
 }
 
 sub
 do_compose_stage {
 
+    qprint "$progname:  Entering the compose stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (grep $pkgs->{$_}{TYPE} ne "srpm", @packages) {
         nprint "$progname:  Starting compose stage for the \"$pkg\" package....\n";
 
@@ -237,11 +240,13 @@ do_compose_stage {
 
         nprint "$progname:  Compose stage for \"$pkg\" is complete.\n";
     }
+    qprint "$progname:  Compose stage is now complete.  (${\(&get_timestamp())})\n";
 }
 
 sub
 do_explode_stage {
 
+    qprint "$progname:  Entering the explode stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (@packages) {
         nprint "$progname:  Starting explode stage for the \"$pkg\" package....\n";
 
@@ -249,11 +254,13 @@ do_explode_stage {
 
         nprint "$progname:  Explode stage for \"$pkg\" is complete.\n";
     }
+    qprint "$progname:  Explode stage is now complete.  (${\(&get_timestamp())})\n";
 }
 
 sub
 do_build_stage {
 
+    qprint "$progname:  Entering the build stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (@packages) {
         nprint "$progname:  Starting build stage for the \"$pkg\" package....\n";
 
@@ -261,11 +268,13 @@ do_build_stage {
 
         nprint "$progname:  Build stage for \"$pkg\" is complete.\n";
     }
+    qprint "$progname:  Build stage is now complete.  (${\(&get_timestamp())})\n";
 }
 
 sub
 do_package_stage {
 
+    qprint "$progname:  Entering the package accumulation stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (@packages) {
         nprint "$progname:  Starting package accumulation stage for the \"$pkg\" package....\n";
 
@@ -273,11 +282,13 @@ do_package_stage {
 
         nprint "$progname:  Package accumulation stage for \"$pkg\" is complete.\n";
     }
+    qprint "$progname:  Package accumulation stage is now complete.  (${\(&get_timestamp())})\n";
 }
 
 sub
 do_iso_stage {
 
+    qprint "$progname:  Entering the ISO image stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (@packages) {
         nprint "$progname:  Starting ISO image stage for the \"$pkg\" package....\n";
 
@@ -285,6 +296,7 @@ do_iso_stage {
 
         nprint "$progname:  ISO image stage for \"$pkg\" is complete.\n";
     }
+    qprint "$progname:  ISO image stage is now complete.  (${\(&get_timestamp())})\n";
 }
 
 # main() here is basically the same as main() in C
@@ -303,7 +315,7 @@ main {
         eprint "$opt_p does not seem to be a product.  Perhaps you made a typo?\n";
         return;
     }
-    @packages = sort keys %{$pkgs};
+    @packages = keys %{$pkgs};
 
     # Perform the build in stages, checking after each one to see if we should stop
     &do_bootstrap_stage();

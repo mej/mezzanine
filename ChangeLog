@@ -75,3 +75,7 @@ Tue May  9 16:50:34 2000                        Michael Jennings (mej)
 Added -q and -Q options to shut buildtool up if needed, and fixed the
 redhat-6.2 product file.  "CVS" is not a package. :-)
 ----------------------------------------------------------------------
+Tue May  9 17:12:33 2000                        Michael Jennings (mej)
+
+Timestamping and general stage notices.
+----------------------------------------------------------------------
