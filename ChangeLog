@@ -1031,3 +1031,7 @@ Support tarballs as packages (rpm -ta).  Also moved the symlink
 creation to revtool from buildtool.  I need to put together a fake
 project tomorrow to test this with.
 ----------------------------------------------------------------------
+Tue Feb 27 14:09:19 2001                        Michael Jennings (mej)
+
+Getting things in order and marking off things already done.
+----------------------------------------------------------------------
