@@ -170,3 +170,8 @@ tarballs that explode into the current directory, or into multiple
 directories.   Ugh.  So I've had to change the syntax from what I
 told you last night.
 ----------------------------------------------------------------------
+Fri May 19 17:29:14 2000                        Michael Jennings (mej)
+
+Implemented a fairly sophisticated product file finder along with
+product variable fallbacks for package variables.
+----------------------------------------------------------------------

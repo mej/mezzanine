@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.18 2000/05/19 20:14:07 mej Exp $
+# $Id: buildtool,v 1.19 2000/05/20 00:37:01 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -186,16 +186,88 @@ get_var_name
     return $var;
 }
 
+# Locate the product file for a particular product
+sub
+find_product_file
+{
+    my ($prodname, $version) = @_;
+    my $prod = "$prodname-$prodver";
+    my $prodfile;
+    my @contents;
+
+    # If it already has the .prod extension, and it exists, return that
+    if ($prod =~ /\.prod$/) {
+        if (-f $prod) {
+            return $prod;
+        } elsif (-f "$proddir/$prod") {
+            # Just needed a path
+            return "$proddir/$prod";
+        } else {
+            $prod =~ s/\.prod$//;
+        }
+    } else {
+        # It has no .prod extension.  Let's try just giving it one.
+        if (-f "$prod.prod") {
+            return "$prod.prod";
+        } elsif (-f "$proddir/$prod.prod") {
+            # Extension and path needed...
+            return "$proddir/$prod.prod";
+        }
+    }
+
+    # Try just the product name
+    if ($prodname =~ /\.prod$/) {
+        if (-f $prodname) {
+            return $prodname;
+        } elsif (-f "$proddir/$prodname") {
+            # Just needed a path
+            return "$proddir/$prodname";
+        } else {
+            $prodname =~ s/\.prod$//;
+        }
+    } else {
+        # It has no .prod extension.  Let's try just giving it one.
+        if (-f "$prodname.prod") {
+            return "$prodname.prod";
+        } elsif (-f "$proddir/$prodname.prod") {
+            # Extension and path needed...
+            return "$proddir/$prodname.prod";
+        }
+    }
+
+    # Well, rats.  We've eliminated the simple cases.  Time to get creative.
+    # Find all the product files and search for one that matches
+    opendir(DIR, "$proddir");
+    @contents = grep($_ =~ /\.prod$/, readdir(DIR));
+    closedir(DIR);
+    foreach $prodfile (@contents) {
+        my (@lines, @names, @versions);
+
+        dprint "Searching product file $prodfile for a match...\n";
+        open(PRODFILE, "$proddir/$prodfile") || next;
+        @lines = <PRODFILE>;
+        @names = grep($_ =~ /^\s*name\s*:/i, @lines);
+        @versions = grep($_ =~ /^\s*ver(sion)?\s*:/i, @lines);
+        if (grep($_ =~ /$prodname/, @names) && grep($_ =~ /$prodver/, @versions)) {
+            # Found it.
+            dprint "Match found!\n";
+            return "$proddir/$prodfile";
+        }
+    }
+    # Give up.  It doesn't exist.
+    return 0;
+}
+
+# Parse a product entry line from a file or the command line
 sub
 parse_product_entry
 {
-    my ($line, $prod) = @_;
-    my ($type, $name, $module, $filename);
+    my ($line, $prodname, $prodver) = @_;
+    my ($type, $name, $module, $filename, $pkgvar);
     my $type_guess = 0;
+    my %pkgvars;
+    my $prod = "$prodname-$prodver";
 
-    $line =~ s/^\s+//;
-    $line =~ s/\s+$//;
-    next if ($line !~ /\S/ || $line =~ /^\#/);  # Ignore blank lines and comment lines
     undef %pkgvars;
     undef $module;
     undef $type;
@@ -253,25 +325,41 @@ parse_product_entry
         $module = $name;
     }
     dprint "Module is $module, name is $name\n";
-    if ($type eq "product") {
-        # Recursively convert products into their component packages
-        if (! &parse_prod_file($name)) {
-            if ($type_guess) {
-                # If this was a guess, a potential infinite loop exists if we try
-                # to parse the product entry again.  So just punt at this point.
-                return 0;
-            } else {
-                $line =~ s/^[^:]+://;
-                return &parse_product_entry($line, $prod);
-            }
-        }
-    }
     # The rest of the line is whitespace-delimited sets of var=value
     foreach $varval (@inp) {
         ($var, $val) = split("=", $varval);
         $var = &get_var_name($var);
         $pkgvars{$var} = $val;
     }
+    if ($type eq "product") {
+        my ($pname, $pver);
+
+        # Separate name and version
+        if ($pkgvars{VERSION}) {
+            ($pname, $pver) = ($name, $pkgvars{VERSION});
+            $name = "$pname-$pver";
+        } elsif ($name =~ /^(\S+)-((?:\d|us|a|alpha|b|beta)[^-]+)$/) {
+            ($pname, $pver) = ($1, $2);
+        } else {
+            eprint "I can't figure out what to do with the product \"$name\"\n";
+            next;
+        }
+
+        # Recursively convert products into their component packages
+        if (! &parse_prod_file($pname, $pver)) {
+            if ($type_guess) {
+                # If this was a guess, a potential infinite loop exists if we try
+                # to parse the product entry again.  So just punt at this point.
+                return 0;
+            } else {
+                $line =~ s/^[^:]+://;
+                return &parse_product_entry($line, $prodname, $prodver);
+            }
+        } else {
+            $prods->{$name}{PRODUCT} = $prod;
+        }
+    }
+
     # Add defaults for stuff that is required
     if ($type eq "module") {
         if ($pkgvars{REVISION} =~ /^head$/i) {
@@ -281,7 +369,7 @@ parse_product_entry
         $name =~ s/\.src\.rpm$//;
         if (!defined $pkgvars{RELEASE}) {
             if ($name !~ /^\S+-[^-]+-[^-]+$/) {
-                eprint "I wasn't given enough information about the $name package in ${prod}.prod.  For SRPM\n";
+                eprint "I wasn't given enough information about the $name package in $prodfile.  For SRPM\n";
                 eprint "packages, the version and release information must be specified as variables or\n";
                 eprint "embedded in the package name.  I'm going to have to skip that one.\n";
                 next;
@@ -293,7 +381,7 @@ parse_product_entry
         }
         if (!defined $pkgvars{VERSION}) {
             if ($name !~ /^\S+-[^-]+$/) {
-                eprint "I wasn't given enough information about the $name package in ${prod}.prod.  For SRPM\n";
+                eprint "I wasn't given enough information about the $name package in $prodfile.  For SRPM\n";
                 eprint "packages, the version and release information must be specified as variables or\n";
                 eprint "embedded in the package name.  I'm going to have to skip that one.\n";
                 next;
@@ -316,13 +404,33 @@ parse_product_entry
             dprint "Added variable $pkgvar to package $name with value \"$pkgs->{$name}{$pkgvar}\"\n";
         }
     }
+    # Go through each propogated variable.  If there is no assigned value for that
+    # variable for the current package, see if it has a value for the parent product
+    # of that package.  If not, try the parent product of that product, and continue
+    # going back through the product hierarchy until we find a value or run out.
+    foreach $pkgvar ("REVISION", "LOCATIONS", "RPMCMD", "TAR", "ZIP", "STAGES", "CVSROOT") {
+        if (! $pkgs->{$pkg}{$pkgvar}) {
+            my ($pkg, $val) = undef;
+
+            dprint "No value for the variable $pkgvar for $name.\n";
+            for ($pkg = $prod; $pkg; $pkg = $prods->{$pkg}{PRODUCT}) {
+                dprint "Checking $pkg for $pkgvar\n";
+                if ($prods->{$pkg}{$pkgvar}) {
+                    $val = $prods->{$pkg}{$pkgvar};
+                    dprint "Found fallback value $val in product $pkg\n";
+                    last;
+                }
+            }
+            if ($val) {
+                $pkgs->{$name}{$pkgvar} = $val;
+            }
+        }
+    }
     if (!defined $pkgs->{$name}{STAGES}) {
         $pkgs->{$name}{STAGES} = "scebpia";
     }
     push @packages, $name;
-    if ($prod) {
-        $pkgs->{$name}{PRODUCT} = $prod;
-    }
+    $pkgs->{$name}{PRODUCT} = $prod;
     return 1;
 }
 
@@ -332,36 +440,63 @@ parse_product_entry
 sub
 parse_prod_file
 {
-    my $prod = $_[0];
+    my ($prodname, $prodver) = @_;
+    my ($prodfile, $skip_to_name, $skip_to_next_ver, $found);
+    my $prod = "$prodname-$prodver";
 
-    open(PROD, "$proddir/${prod}.prod") || return 0;
+    if (!($prodfile = &find_product_file($prodname, $prodver))) {
+        return 0;
+    }
+    open(PROD, "$prodfile") || return 0;
 
-    # Read and parse the product information
+    ($skip_to_name, $skip_to_next_ver, $found) = (1, 0, 0); 
     while (<PROD>) {
         chomp($line = $_);
-        next if ($line =~ /^\#/);
-        if ($line =~ /^name:/i) {
-            # Official name for the product
-            ($prod = $line) =~ s/^[^:]+:\s*//;
-            push @products, $prod;
-            dprint "Product name is now $prod\n";
-        } elsif ($line =~ /^([^:]+):(.*)$/) {
-            my ($var, $val);
-
-            ($var, $val) = ($1, $2);
-            $var = &get_var_name($var);
-            dprint "Product variable for $prod:  $var -> $val\n";
-            $prods->{$prod}{$var} = $val;
-        } else {
+        dprint "Parsing $prodfile:  \"$line\"\n";
+        $line =~ s/^\s*(.*\S)\s*$/$1/;  # Strip leading and trailing whitespace
+        next if ($line =~ /^\#/ || $line !~ /\S/);
+        next if ($skip_to_name && $line !~ /^name\s*:/i);
+        next if ($skip_to_next_ver && $line !~ /^ver(sion)?\s*:/i);
+        if ($skip_to_name) {
+            $line =~ s/^[^:]+:\s*//;
+            if ($line eq $prodname) {
+                $skip_to_name = 0;
+                $skip_to_next_ver = 1;
+                next;
+            }
+        } elsif ($line =~ /^name\s*:/) {
+            # New product.  Time to quit.
             last;
+        } elsif ($skip_to_next_ver) {
+            $line =~ s/^[^:]+:\s*//;
+            if ($line eq $prodver) {
+                # Found it!
+                ($found, $skip_to_next_ver) = (1, 0);
+                push @products, $prod;
+                next;
+            }
+        } elsif ($line =~ /^ver(sion)?\s*:/) {
+            # New version.  Time to quit.
+            last;
+        } else {
+            if ($line =~ /^(prod|mod|srpm)/i && $line =~ /^([^ \t:]+)\s*:\s*(\S+.*)$/) {
+                my ($var, $val);
+
+                # The regexp above should only match var:value (a product variable)
+                ($var, $val) = ($1, $2);
+                $var = &get_var_name($var);
+                dprint "Product variable for $prod:  $var -> $val\n";
+                $prods->{$prod}{$var} = $val;
+                if ($prods->{$prod}{VARS} !~ /$var/) {
+                    $prods->{$prod}{VARS} .= "$var ";
+                }
+            } else {
+                &parse_product_entry($line, $prodname, $prodver);  # Ignore return value
+            }
         }
     }
-    while (<PROD>) {
-        chomp($line = $_);
-        &parse_product_entry($line, $prod);  # Ignore return value
-    }
     close(PROD);
-    return 1;
+    return (found ? 1 : 0);
 }
 
 # What to do if a package fails
@@ -892,6 +1027,7 @@ do_package_stage
         opendir(DIR, "$builddir/SRPMS") || die "Cannot open directory $builddir/SRPMS -- $!\n";
         @contents = readdir(DIR);
         foreach $rpm (@contents) {
+            dprint "Checking $builddir/SRPMS/$rpm\n";
             if ($rpm =~ /^$pkg-\S*$version-$release\.src\.rpm/) {
                 dprint "Got output file $rpm\n";
                 push @outfiles, "$builddir/SRPMS/$rpm";
@@ -900,21 +1036,19 @@ do_package_stage
         closedir(DIR);
 
         dprint "Opening directory $builddir/RPMS to scan for output files.\n";
-        opendir(DIR, "$builddir/RPMS") || die "Cannot open directory $builddir/RPMS -- $!\n";
-        @contents = readdir(DIR);
-        closedir(DIR);
-        foreach $dir (@contents) {
-            opendir(DIR, "$builddir/RPMS/$dir") || die "Cannot open directory $builddir/RPMS/$dir -- $!\n";
-            @tmp = readdir(DIR);
-            closedir(DIR);
-            foreach $rpm (@tmp) {
-                if ($rpm =~ /^$pkg-\S*$version-$release\.\S+\.rpm/) {
-                    dprint "Got output file $rpm\n";
-                    push @outfiles, "$builddir/RPMS/$dir/$rpm";
-                }
+        @contents = glob("$builddir/RPMS/*/$pkg*.rpm");
+        foreach $rpm (@contents) {
+            dprint "Checking $rpm\n";
+            if ($rpm =~ /^$pkg-\S*$version-$release\.\S+\.rpm/) {
+                dprint "Got output file $rpm\n";
+                push @outfiles, $rpm;
             }
         }
 
+        if ($#outfiles == -1) {
+            &fail_package($pkg, "package accumulation", "No output RPM's were found");
+            next;
+        }
         dprint "Output files for $pkg:  ", join(" ", @outfiles), "\n";
 
         # Move each RPM into the appropriate place
@@ -1023,16 +1157,21 @@ sub
 main
 {
     $prod = $opt_p;
-    ($prodname, $prodver) = split("-", $prod);
-
-    if (! $prod) {
+    if ($prod =~ /^(\S+)-((?:\d|us|a|alpha|b|beta)[^-]+)$/) {
+        ($prodname, $prodver) = ($1, $2);
+    } else {
+        ($prodname, $prodver) = ($prod, 0);
+    }
+    if ($prod) {
+        qprint "$progname:  Building product $prodname version $prodver\n";
+    } else {
         eprint "You didn't tell me what to build, so I'm not quite sure what to do.\n";
         eprint "If you aren't familiar with how to use $progname, try $progname --help.\n";
         return;
     }
 
     # Parse the product definition files to figure out what the heck we need to build. :)
-    if (! &parse_prod_file($prod)) {
+    if (! &parse_prod_file($prodname, $prodver)) {
         if (! &parse_product_entry($prod)) {
             eprint "$prod does not seem to be a valid product or product entry.\n";
             eprint "Perhaps you made a typo?\n";
