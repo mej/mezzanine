@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.25 2003/12/31 19:40:25 mej Exp $
+# $Id: Build.pm,v 1.26 2004/01/03 23:17:14 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -512,7 +512,7 @@ build_topdir
 sub
 build_spm
 {
-    my ($specfile, $topdir);
+    my ($specfile, $topdir, $instroot);
     my (@tmp, @tmp2);
 
     dprint &print_args(@_);
@@ -522,11 +522,8 @@ build_spm
         &fatal_error("Call to build_spm() in non-SPM module.\n");
     }
     &prepare_build_tree();
-    if (&pkgvar_instroot()) {
-        $topdir = &pkgvar_instroot() . '/' . &pkgvar_topdir();
-    } else {
-        $topdir = &pkgvar_topdir();
-    }
+    $topdir = &pkgvar_topdir();
+    $instroot = &pkgvar_instroot();
 
     @tmp = &grepdir(sub {-f $_ && -s _}, "F");
     if (!scalar(@tmp)) {
@@ -534,7 +531,7 @@ build_spm
     } elsif (scalar(@tmp) > 1) {
         return (MEZZANINE_BAD_MODULE, "Only one specfile/script dir allowed per package (@tmp)", undef);
     }
-    &copy_files($tmp[0], "$topdir/SPECS");
+    &copy_files($tmp[0], "$instroot$topdir/SPECS");
     $specfile = "$topdir/SPECS/" . &basename($tmp[0]);
     &pkgvar_instructions($specfile);
     @tmp = &grepdir(sub {-f $_ && -s _}, "S");
@@ -545,7 +542,7 @@ build_spm
         push @tmp, @tmp2;
     }
     if (scalar(@tmp)) {
-        &copy_files(@tmp, "$topdir/SOURCES");
+        &copy_files(@tmp, "$instroot$topdir/SOURCES");
     }
 
     # Parse the prod file for this SPM if it exists.
@@ -705,6 +702,7 @@ build_srpm
 {
     my ($pkg, $topdir, $instroot, $err);
     my (@tmp, @specs);
+    my %preserve_pkg_vars;
 
     dprint &print_args(@_);
 
@@ -712,6 +710,7 @@ build_srpm
     $topdir = &pkgvar_topdir();
     $pkg = &pkgvar_filename();
     $instroot = &pkgvar_instroot();
+    %preserve_pkg_vars = &pkgvar_get_all();
 
     @tmp = &rpm_show_contents();
     if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
@@ -735,6 +734,8 @@ build_srpm
     if (scalar(@specs) != 1) {
         return (MEZZANINE_NO_SOURCES, "Found ${\(scalar(@specs))} spec files in $pkg?!", undef);
     }
+    &pkgvar_reset(%preserve_pkg_vars);
+
     &pkgvar_instructions("$topdir/SPECS/$specs[0]");
     return &build_topdir();
 }

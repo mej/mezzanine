@@ -240,3 +240,7 @@ Wed Dec 31 16:08:26 2003                        Michael Jennings (mej)
 
 Working on hint and chroot-resync support.
 ----------------------------------------------------------------------
+Sat Jan  3 19:45:10 2004                        Michael Jennings (mej)
+
+Fix rebuild of SRPM's.
+----------------------------------------------------------------------
