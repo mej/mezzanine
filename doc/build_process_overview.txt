@@ -1,0 +1,136 @@
+First off, there is revtool.  It is intended to satisfy Walt's
+requirement that the build system not depend on the revision control
+system.  revtool is an encapsulation layer that performs the basic
+functions needed to manipulate a revision control system, but its
+interface is designed in such a way that changing control systems
+would require only changing the commands revtool executes and should
+be a fairly straight-forward process.
+
+Here's a basic overview of revtool's syntax:
+
+  revtool -g [files]        Retrieves one or more files or modules
+                            from the master repository.  Does a CVS
+                            checkout or update.  Like a "pull" in bk.
+
+  revtool -p                Uploads changes to the master repository.
+                            A commit in CVS, or a commit and push in
+                            bk.  'p' is for "put," like 'g' for "get."
+
+  revtool -a                Mark new files for addition to the
+                            repository.  "add" in cvs, "new" in bk.
+
+  revtool -r                Mark files for removal from the
+                            repository.  "rm -f" in cvs, either "rm"
+                            or "gone" in bk.
+
+There's more, but that's the basic idea.  The cool stuff:  a put will
+actually generate a ChangeLog header for you and open your editor
+automatically.  It'll even create the ChangeLog if it isn't there, and
+add it too.  Also, you can do an add or a remove and immediately
+commit it using -ap or -rp.  (Short options can be combined like that
+if they don't take a value.)
+
+Next comes buildtool.  buildtool is the primary interface for the
+average user to the build system.  It is designed to use product
+manifest files (.prod files) to define what pieces make up a
+particular product.
+
+(This is the system Ted and I agreed on.  Walt asked why we don't just
+use tags as the product name and just checkout the tag.  Ted, you had
+a good response to this, but I forgot it.  Care to repeat it?) :-)
+
+There are already some sample .prod files in CVS, but the basic idea
+is that a product is composed of packages and (possibly) other
+products.  A package is either an SRPM or a CVS module.  buildtool
+parses the .prod file for the product name you give it, as well as the
+.prod files of any products which may be components of that primary
+product.  (For example, "buildtool -p redhat-6.2" will parse
+$PROD_DIR/redhat-6.2.prod.)
+
+For example:
+
+# Sample product
+name:foo
+version:1.0
+
+module:vacm rev=VACM-2-0-0-BETA
+module:Eterm
+srpm:contrib-rh/imlib ver=1.9.8 rel=1
+srpm:contrib-rh/epplets-0.6-1.src.rpm tag=VA-6-2-1
+prod:bar-1.0
+
+Everything up until the first blank line is ignored for now.  It will
+do something later, but I want to get it working first. :-)
+
+Then you have the components of "foo-1.0".  You've got a CVS module
+called "vacm" which should be retrieved using the "VACM-2-0-0-BETA"
+tag.  You have another module called "Eterm" whose head branch should
+be used.  You have an SRPM of imlib on the head branch of the
+contrib-rh module, and an epplets SRPM on the "VA-6-2-1" branch.
+(tag= and rev= are synonyms.)  Finally, you have a child product
+called "bar" at version 1.0; it's .prod file will be parsed and
+included in the build process.
+
+Once all product files are parsed, the build process begins.  This
+process has 7 stages, and buildtool will let you stop at any stage.
+It also tries to avoid doing unnecessary work, so if it detects that a
+particular stage has already been completed (it doesn't care *who*
+completed it, as long as it seems to be done), it will not perform any
+actions for that stage.
+
+First is the bootstrap stage.  Several things can happen here if they
+haven't already been done.  First off, $BASE_DIR/build is created if
+it doesn't already exist, as are the BUILD, SOURCES, SRPMS, RPMS, and
+SPECS subdirectories for building SRPM's.  Next, if no rpmrc or
+rpmmacros files exist either in $BASE_DIR or as dot-files in $HOME,
+skeleton ones are created which point to the right places.  I chose
+"-O2 -march=pentium" for the optflags for now.  If those files do
+exist, they are not created/modified.  It is assumed that the user
+created them and that he/she is With Clue(tm).  The bootstrap stage
+also takes care of checking out the necessary modules if they are not
+already present.  Now, I know I can assume that the SRPM is the
+correct one if it exists, since no two SRPMS should exist in the tree
+with the same name and not be the same.  But can I assume that about
+modules, given that it could require a tag?
+
+Anyway, the next stage is the compose stage.  Nothing is done here for
+SRPM's, because this is where SRPM's are built from the modules.
+There should be exactly one directory (other than "CVS" or "SCCS" or
+"BitKeeper") inside the module, and that directory should contain an
+untarred copy of the pristine vendor source.  buildtool will tar it up
+(ignoring the aforementioned revision control directories) and use
+that tarball in combination with a spec file named
+<package>-<distro>.spec to build an SRPM.  The SRPM then ends up in
+$BASE_DIR/build/SRPMS/.
+
+Now that we have *everything* in SRPM form, the explode stage takes
+all the SRPMS and does "rpm -U" on them to "explode" them into their
+component tarballs, patches, and spec files in the appropriate places
+that rpm expects them to be under $BASE_DIR/build.
+
+The build stage is where all the packages are rebuilt from their
+exploded components into source and binary RPM's using "rpm -ba".
+
+The package accumulation stage is where all the new source and binary
+RPM's are copied (or moved, not sure) into a single directory under
+$BASE_DIR (name undetermined).  At this point you have a completed
+product.
+
+There are two more stages, the ISO image stage where ISO images are
+created, and the cleanup stage, where all the intermediate crap
+(namely the build directory and all the checkouts) are removed.  These
+stages usually will not be reached, because most developers will want
+to use -bp (stop after package accumulation stage) instead of -bi
+(after ISO stage) or -ba (don't stop).
+
+Now the concern that was raised was about having buildtool do the
+repository retrievals automatically.  Given that it's all encapsulated
+within revtool and that it won't happen if it's not needed, I really
+don't see a problem.  If you wanted to switch to bitkeeper, the
+fastest way would be to check everything out using bitkeeper, and as
+long as it's all in the right place, buildtool will just go on its
+merry way and not complain.
+
+But I definitely think buildtool should be robust enough to know if
+something isn't there that should be and to go fetch it without giving
+the user a hard time.
