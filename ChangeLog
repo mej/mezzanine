@@ -513,8 +513,8 @@ Fixed CVS logins.
 Thu Jun 24 19:34:07 2004                        Michael Jennings (mej)
 
 Update spec file with new release number.
-Pray that this message goes to list.  ;-)
 
+Pray that this message goes to list.  ;-)
 ----------------------------------------------------------------------
 Thu Jun 24 19:37:22 2004                        Michael Jennings (mej)
 
@@ -531,4 +531,8 @@ Fixed regexp quoting error in specgen.
 Reworked banner and spacing in commit message to be a little more
 friendly and seamless.  Also fixed the gratuitous removal of blank
 lines in the message.
+----------------------------------------------------------------------
+Wed Jul 21 20:30:58 2004                        Michael Jennings (mej)
+
+gmkurtzer is helping me track down a cache bug....
 ----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.190 2004/06/24 03:01:07 mej Exp $
+# $Id: buildtool,v 1.191 2004/07/22 00:32:21 mej Exp $
 #
 
 use strict;
@@ -301,9 +301,13 @@ scan_rpm_dirs
             my @tmp;
 
             $srpm = `rpm -qp $rpm --queryformat \"%{SOURCERPM}\"`;
-            @{$siblings{$rpmfile}} = $srpm;
+            if (! $srpm) {
+                eprint "Unable to find SRPM for $rpm.  This could be bad.\n";
+            } else {
+                $siblings{$rpmfile}} = [ $srpm ];
+            }
             if (!defined($siblings{$srpm})) {
-                @{$siblings{$srpm}} = ($rpmfile);
+                $siblings{$srpm} = [ $rpmfile ];
             } else {
                 push @{$siblings{$srpm}}, $rpmfile;
             }
@@ -316,6 +320,7 @@ scan_rpm_dirs
     foreach my $rpm (sort(keys(%siblings))) {
         my $aref = $rpm_cache->get($rpm);
 
+        dprint "Recording cache info for $rpm.\n"
         if (! $aref || ref($aref) ne "ARRAY") {
             eprint "EEEEP!  Caching mechanism fell apart for $rpm!\n";
             next;
@@ -996,7 +1001,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.190 $ created on $Date: 2004/06/24 03:01:07 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.191 $ created on $Date: 2004/07/22 00:32:21 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
