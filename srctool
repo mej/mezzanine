@@ -23,13 +23,16 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.12 2001/04/11 02:10:34 mej Exp $
+# $Id: srctool,v 1.13 2001/04/12 07:52:32 mej Exp $
 #
 
 # Include the Perl Modules we need
 require POSIX;
 require Getopt::Long;
 use Cwd;
+use File::Copy ('&cp', '&mv');
+
+# Avalon modules
 use Avalon::Util;
 use Avalon::Srctool;
 
@@ -51,7 +54,7 @@ print_usage_info
     print "    -i --import                      Import a new package/source tree\n";
     print "    -p --prepare                     Prepare a working tree\n";
     print "    -M --merge                       Merge one or more raw files into an SPM\n";
-    print "    -n --name <pkg>-<version>        Specify the package name and version for an import\n";
+    print "    -n --name <name>                 Specify the name of a package (-i) or patch (-a)\n";
     print "\n";
     exit(AVALON_SUCCESS);
 }
@@ -280,7 +283,7 @@ prepare_tree
 	    eprint "Unable to cd to $pkg -- $!\n";
 	    return AVALON_INVALID_PACKAGE;
 	}
-	chomp($pkgdir = `/bin/pwd`);
+	$pkgdir = &getcwd();
     } else {
 	($pkg = $pwd) =~ s/^.*\/([^\/]+)$/$1/;
 	$pkgdir = $pwd;
@@ -307,14 +310,101 @@ prepare_tree
     if (($err = shift @tmp) != AVALON_SUCCESS) {
         eprint "Creation of working directory failed -- $tmp[$#tmp]\n";
     }
+    chdir($pwd);
     return $err;
+}
+
+sub
+gen_patch($$)
+{
+    my ($pkg, $patch) = @_;
+    my ($old_wd, $new_wd, $err);
+    my @output;
+
+    $old_wd = ($pkg ? "$pkg/$WORK_DIR" : $WORK_DIR);
+    $new_wd = $old_wd . "+patched";
+
+    if (! &mv($old_wd, $new_wd)) {
+    }
+    if (($err = &prepare_tree($pkg)) != AVALON_SUCCESS) {
+    }
+
+    @output = run_cmd("diff", "-Nur $old_wd $new_wd", 0);
+    if (($err = shift @output) != AVALON_SUCCESS) {
+    }
+
 }
 
 sub
 merge_file($$)
 {
     my ($pkg, $new_file) = @_;
+    my ($type, $dest, $pwd, $err);
 
+    if ($new_file =~ /^([SPRF]):(.*)$/) {
+        ($type, $new_file) = ($1, $2);
+    } elsif ($new_file =~ /\.(patch|diff)(\.gz|\.bz2|\.Z)?$/) {
+        $type = 'P';
+    } elsif ($new_file =~ /\.(cpio|tar|cgz|tgz)(\.gz|\.bz2|\.Z)?$/) {
+        $type = 'S';
+    } elsif ($new_file =~ /\.spec(\.in)?$/) {
+        $type = 'F';
+    } elsif ($new_file =~ /\.(no)?src\.rpm$/) {
+        $type = 'R';
+    } elsif ($new_file =~ /^\.avalon/) {
+        $type = 'E';
+    } else {
+        if (-t STDIN) {
+            print "Please specify whether $new_file is a Source file, Patch, spec File, or an Extra file ";
+            for (; $type !~ /^[SPFE]$/; ) {
+                print "[S/P/F/E]:  ";
+                ($type = <STDIN>) =~ tr/a-z/A-Z/;
+            }
+        } else {
+            eprint "Unable to guess the type of merge file $new_file.  You must specify it.\n";
+            return AVALON_BAD_ADDITION;
+        }
+    }
+
+    dprint "Merging $new_file ($type) into $pkg\n";
+    $pwd = &getcwd();
+    if (!chdir($pkg)) {
+        eprint "Unable to chdir into $pkg -- $!\n";
+        return AVALON_BAD_PACKAGE;
+    }
+    if ($type eq 'R') {
+        # Merge in new files from an SRPM.  TODO
+    } else {
+        my @output;
+
+        # Copy the file into the appropriate directory
+        if ($type eq 'E') {
+            $dest = "";
+        } else {
+            $dest = "$type/";
+            if (! -d $type && !mkdir($type)) {
+                eprint "Unable to create directory $type -- $!\n";
+                return AVALON_SYSTEM_ERROR;
+            }
+        }
+        $dest .= &basename($new_file);
+        if (! &cp($new_file, $dest)) {
+            eprint "Unable to copy $new_file to $dest -- $!\n";
+            return AVALON_SYSTEM_ERROR;
+        }
+
+        # Add the file to be committed later via "srctool -m" or "avmod"
+        @output = &run_av_cmd("revtool", "-a $dest", 0);
+        if (($err = shift @output) != AVALON_SUCCESS) {
+            print @output;
+            eprint "Addition of $dest failed.\n";
+            return $err;
+        } else {
+            print "$new_file merged successfully.\n";
+        }
+    }
+    chdir($pwd);
+    return AVALON_SUCCESS;
 }
 
 # main() here is basically the same as main() in C
@@ -336,7 +426,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.12 $ created on $Date: 2001/04/11 02:10:34 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.13 $ created on $Date: 2001/04/12 07:52:32 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -403,7 +493,7 @@ main
             }
         }
         if (! $pkg) {
-            if (-d "S") {
+            if (-d "F") {
                 $pkg = &basename(&getcwd());
             } else {
                 eprint "No valid module specified.\n";
@@ -418,6 +508,38 @@ main
         }
     } elsif ($0 =~ /avmod$/ || $opt_m) {
     } elsif ($0 =~ /avpatch$/ || $opt_a) {
+        my ($pkg, $patch);
+
+        if (scalar(@flist) == 2) {
+            if (-d $flist[0]) {
+                ($pkg, $patch) = @flist;
+            } elsif (-d $flist[1]) {
+                ($patch, $pkg) = @flist;
+            }
+        } elsif (scalar(@flist) == 1) {
+            if (-d $flist[0]) {
+                $pkg = $flist[0];
+            } else {
+                $patch = $flist[0];
+            }
+        }
+        if (! $pkg) {
+            if (-d 'F') {
+                $pkg = "";
+            } else {
+                eprint "No package was specified, and the current directory doesn't look like one.\n";
+                return AVALON_SYNTAX_ERROR;
+            }
+        }
+        if (! $patch) {
+            if ($pkgname) {
+                $patch = $pkgname;
+            } else {
+                eprint "No patch name was specified.\n";
+                return AVALON_SYNTAX_ERROR;
+            }
+        }
+        return &gen_patch($pkg, $patch);
     } elsif ($opt_r) {
     } else {
     }
