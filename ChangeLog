@@ -697,3 +697,7 @@ Added the --tree option to buildtool.  This will allow you to specify
 a $CVSROOT variable (or the equivalent for the revision control
 system du jour) which will override the defaults in the product files.
 ----------------------------------------------------------------------
+Tue Jul 18 21:47:28 2000                        Michael Jennings (mej)
+
+Parsing bug.  Ick. =P
+----------------------------------------------------------------------
