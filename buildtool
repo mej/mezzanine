@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.90 2000/07/14 19:03:08 mej Exp $
+# $Id: buildtool,v 1.91 2000/07/14 19:08:32 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -757,8 +757,8 @@ parse_product_entry
         # Recursively convert products into their component packages
         $prods->{$name}{PRODUCT} = $prod;
         dprint "parse_product_entry():  Parent product of $name is $prod.\n";
-        if (! &parse_prod_file($pname, $pver)) {
-            dprint "parse_product_entry():  parse_prod_file($pname, $pver) failed.\n";
+        if (! &parse_prod_file($pname, $pver, $prod)) {
+            dprint "parse_product_entry():  parse_prod_file($pname, $pver, $prod) failed.\n";
             undef $prods->{$name}{PRODUCT};
             if ($type_guess) {
                 # If this was a guess, a potential infinite loop exists if we try
@@ -774,7 +774,7 @@ parse_product_entry
                 return $tmp;
             }
         }
-        dprint "parse_product_entry():  parse_prod_file($pname, $pver) succeeded, so I'm returning 1.\n";
+        dprint "parse_product_entry():  parse_prod_file($pname, $pver, $prod) succeeded, so I'm returning 1.\n";
         return 1;
     }
 
@@ -879,7 +879,7 @@ parse_prod_file
     my $prod = $prodname;
     local *PROD;
 
-    dprint "parse_prod_file($prodname, $prodver)\n";
+    dprint "parse_prod_file($prodname, $prodver, $parent_prod)\n";
     if (!($prodfile = &find_product_file($prodname, $prodver))) {
         dprint "parse_prod_file():  find_product_file() failed.  Returning 0.\n";
         return 0;
@@ -923,9 +923,11 @@ parse_prod_file
                 ($found, $skip_to_next_ver) = (1, 0);
                 push @products, $prod;
                 if ($parent_prod) {
-                    $prods->{$name}{PRODUCT} = $parent_prod;
+                    $prods->{$prod}{PRODUCT} = $parent_prod;
+                    dprint "parse_prod_file():  Parent product of $prod is $prods->{$prod}{PRODUCT}.\n";
                 } elsif ($prods->{$prodname}{PRODUCT}) {
-                    $prods->{$name}{PRODUCT} = $prods->{$prodname}{PRODUCT};
+                    $prods->{$prod}{PRODUCT} = $prods->{$prodname}{PRODUCT};
+                    dprint "parse_prod_file():  Parent product of $prod is $prods->{$prod}{PRODUCT}.\n";
                 }
                 next;
             } else {
@@ -1838,7 +1840,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.90 $ created on $Date: 2000/07/14 19:03:08 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.91 $ created on $Date: 2000/07/14 19:08:32 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1968,7 +1970,7 @@ main
 
     # Parse the product definition files to figure out what the heck we need to build. :)
     # If we're a slave process, we know it's going to be a straight product entry.
-    if ($slave || ! &parse_prod_file($prodname, $prodver)) {
+    if ($slave || ! &parse_prod_file($prodname, $prodver, 0)) {
         if (! &parse_product_entry($prod)) {
             eprint "$prod does not seem to be a valid product or product entry.\n";
             eprint "Perhaps you made a typo?\n";
