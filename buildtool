@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.110 2000/11/07 18:46:34 mej Exp $
+# $Id: buildtool,v 1.111 2000/11/07 19:03:29 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -472,31 +472,6 @@ place_file
         dprint "Non-exclusive match.  Continuing on....\n";
     }
     return $found;
-}
-
-sub
-setup_macros
-{
-    my @macro;
-
-    foreach $prod (grep(defined($prods->{$_}{MACROS}), @products)) {
-        push @macros, split(",", $prods->{$prod}{MACROS});
-    }
-    foreach $pkg (grep(defined($pkgs->{$_}{MACROS}), @packages)) {
-        push @macros, split(",", $pkgs->{$pkg}{MACROS});
-    }
-
-    foreach $macro (@macros) {
-        my ($name, $expr) = split(/:/, $macro, 2);
-
-        $name =~ s/^\%?\{?(\w+)\}?$/\%$1/;
-        dprint "Macro:  $name -> $expr\n";
-        if (defined($macros_hash{$name})) {
-            eprint "Duplicate macro $name.\n";
-        } else {
-            $macros_hash{$name} = $expr;
-        }
-    }
 }
 
 # Do the initial directory/file creation stuff.  Used to be in the
@@ -1040,12 +1015,6 @@ build_pkgs
     local *PKGTOOL;
 
     $prog = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
-    $target = ($main::target ? " --target=$main::target" : ($pkgs->{$pkg}{ARCH} ? " --target=$pkgs->{$pkg}{ARCH}" : ""));
-    $prog = "-P '$prog$target'";
-    $cmd = "$pkgtool $prog -b -R \"/usr/lib/rpm/rpmrc:$rpmrc\" --root \"$buildroot/$pkg-root\" -s $specfile";
-    if ($pkgs->{$pkg}{TAGFILE}) {
-        $cmd .= " --tagfile $pkgs->{$pkg}{TAGFILE}";
-    }
     if ($pkgs->{$pkg}{MACROS}) {
         my @macro_list = split(",", $pkgs->{$pkg}{MACROS});
         my $macro;
@@ -1053,8 +1022,14 @@ build_pkgs
         foreach $macro (@macro_list) {
             my ($name, $value) = split(":", $macro);
 
-            $cmd .= " --define '$name $value'";
+            $prog .= " --define '$name $value'";
         }
+    }
+    $target = ($main::target ? " --target=$main::target" : ($pkgs->{$pkg}{ARCH} ? " --target=$pkgs->{$pkg}{ARCH}" : ""));
+    $prog = "-P '$prog$target'";
+    $cmd = "$pkgtool $prog -b -R \"/usr/lib/rpm/rpmrc:$rpmrc\" --root \"$buildroot/$pkg-root\" -s $specfile";
+    if ($pkgs->{$pkg}{TAGFILE}) {
+        $cmd .= " --tagfile $pkgs->{$pkg}{TAGFILE}";
     }
     dprint "About to run \"$cmd\"\n";
     if (!open(PKGTOOL, "$cmd </dev/null 2>&1 |")) {
@@ -1879,7 +1854,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.110 $ created on $Date: 2000/11/07 18:46:34 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.111 $ created on $Date: 2000/11/07 19:03:29 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
