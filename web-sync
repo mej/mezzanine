@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 28 Sept 2000
 #
-# $Id: web-sync,v 1.2 2000/09/30 05:06:04 mej Exp $
+# $Id: web-sync,v 1.3 2000/09/30 08:13:38 mej Exp $
 #
 
 if [ ! -z "$SUDO_USER" ]; then
@@ -57,7 +57,7 @@ for i in $* ; do
       echo "*** Synchronizing network install image ***"
       $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-7.0-net/ $LOCAL_DIR/$i/os/image/
       echo "*** Copying ISO images ***"
-      $SCP_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-os-'*'-$i.iso $LOCAL_DIR/$i/os/iso/
+      $SCP_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-os-$i'*'.iso $LOCAL_DIR/$i/os/iso/
       echo "*** Synchronizing extras ***"
       $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-7.0-extras/ $LOCAL_DIR/$i/extras/image/
       echo "*** Copying ISO images ***"
