@@ -256,3 +256,8 @@ Tue Jan  6 17:20:29 2004                        Michael Jennings (mej)
 
 Added support for setting hints/hint installer from environment.
 ----------------------------------------------------------------------
+Sat Jan 10 10:07:58 2004                        Michael Jennings (mej)
+
+Install BuildRequires and BuildPrereq's in addition to Hints before
+building.
+----------------------------------------------------------------------

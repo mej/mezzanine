@@ -172,22 +172,22 @@ pkgvar_reset(%)
 }
 
 # Default set routines for backward compatability.
-sub pkgvar_name($) {&pkgvar_set("name", @_);}
-sub pkgvar_target($) {&pkgvar_set("target", @_);}
-sub pkgvar_srcs($) {&pkgvar_set("srcs", @_);}
-sub pkgvar_hints($) {&pkgvar_set("hints", @_);}
-sub pkgvar_hint_installer($) {&pkgvar_set("hint_installer", @_);}
-sub pkgvar_instructions($) {&pkgvar_set("instructions", @_);}
-sub pkgvar_topdir($) {&pkgvar_set("topdir", @_);}
-sub pkgvar_instroot($) {&pkgvar_set("instroot", @_);}
-sub pkgvar_buildroot($) {&pkgvar_set("buildroot", @_);}
-sub pkgvar_architecture($) {&pkgvar_set("architecture", @_);}
-sub pkgvar_parameters($) {&pkgvar_set("parameters", @_);}
-sub pkgvar_command($) {&pkgvar_set("command", @_);}
-sub pkgvar_rcfile($) {&pkgvar_set("rcfile", @_);}
-sub pkgvar_tar($) {&pkgvar_set("tar", @_);}
-sub pkgvar_zip($) {&pkgvar_set("zip", @_);}
-sub pkgvar_cleanup($) {&pkgvar_set("cleanup", @_);}
+sub pkgvar_name($) {return &pkgvar_set("name", @_);}
+sub pkgvar_target($) {return &pkgvar_set("target", @_);}
+sub pkgvar_srcs($) {return &pkgvar_set("srcs", @_);}
+sub pkgvar_hints($) {return &pkgvar_set("hints", @_);}
+sub pkgvar_hint_installer($) {return &pkgvar_set("hint_installer", @_);}
+sub pkgvar_instructions($) {return &pkgvar_set("instructions", @_);}
+sub pkgvar_topdir($) {return &pkgvar_set("topdir", @_);}
+sub pkgvar_instroot($) {return &pkgvar_set("instroot", @_);}
+sub pkgvar_buildroot($) {return &pkgvar_set("buildroot", @_);}
+sub pkgvar_architecture($) {return &pkgvar_set("architecture", @_);}
+sub pkgvar_parameters($) {return &pkgvar_set("parameters", @_);}
+sub pkgvar_command($) {return &pkgvar_set("command", @_);}
+sub pkgvar_rcfile($) {return &pkgvar_set("rcfile", @_);}
+sub pkgvar_tar($) {return &pkgvar_set("tar", @_);}
+sub pkgvar_zip($) {return &pkgvar_set("zip", @_);}
+sub pkgvar_cleanup($) {return &pkgvar_set("cleanup", @_);}
 
 # Convert a module and a filename to a full path
 sub

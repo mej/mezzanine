@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.18 2004/01/05 18:05:23 mej Exp $
+# $Id: Prod.pm,v 1.19 2004/01/10 13:40:58 mej Exp $
 #
 
 package Mezzanine::Prod;
@@ -287,12 +287,11 @@ parse_product_entry
 	}
     }
 
-    if ($name =~ /\/.+$/) {
+    if ($name =~ /^(.*)\/([^\/]+)$/) {
 	# If the name contains a / and at least *something* after it, split out the module name
 	# (the part before the /) and the actual package name (the part after the /).  Otherwise,
 	# assume that the module name is exactly the same as the package name.
-        ($module = $name) =~ s/^([^\/]+)(.+)$/$1/;
-        $name =~ s/^(.*)\/([^\/]+)$/$2/;
+        ($module, $name) = ($1, $2);
     } else {
         $module = $name;
     }
@@ -343,7 +342,7 @@ parse_product_entry
 
                 $line =~ s/^[^:]+://;
                 $tmp = &parse_product_entry($line, $prodname, $prodver);
-                dprint "parse_product_entry(\"$line\", $prodname, $prodver) returned $tmp, so I will to.\n";
+                dprint "parse_product_entry(\"$line\", $prodname, $prodver) returned $tmp, so I will too.\n";
                 return $tmp;
             }
         }

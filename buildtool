@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.165 2004/01/07 18:56:37 mej Exp $
+# $Id: buildtool,v 1.166 2004/01/10 13:40:58 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -62,6 +62,7 @@ print_usage_info
     print "    -C --cflags <flags>              Specify the \$CFLAGS variable to use for building\n";
     print "    -U --user <userid>               Specify a userid for the repository (overrides product files)\n";
     print "    -T --tag <tag>                   Specify a tag to use (overrides all product files)\n";
+    print "    -L --location <location_spec>    Specify where packages should be placed (as in product file)\n";
     print "    -i --instroot --jail <dir>       Specify chroot jail to build in\n";
     print "    -H --hints <file_or_dir>         Specify location of pre-build hints or hint files\n";
     print "       --hi --hint-installer <prog>  Specify the mechanism used to install the hints\n";
@@ -226,14 +227,14 @@ build_single_package
             if (! -e $pkgs->{$pkg}{"INSTROOT"} && $pkgs->{$pkg}{"INSTROOT_INIT"}) {
                 my @output;
 
-                @output = &run_cmd($pkgs->{$pkg}{"INSTROOT_INIT"}, $instroot, "instroot-init:  ");
+                @output = &run_cmd($pkgs->{$pkg}{"INSTROOT_INIT"}, $pkgs->{$pkg}{"INSTROOT"}, "instroot-init:  ");
                 if ($output[0] != MEZZANINE_SUCCESS) {
                     wprint "Initialization of install root failed.\n";
                 }
             } elsif (-e $pkgs->{$pkg}{"INSTROOT"} && $pkgs->{$pkg}{"INSTROOT_RESET"}) {
                 my @output;
 
-                @output = &run_cmd($pkgs->{$pkg}{"INSTROOT_RESET"}, $instroot, "instroot-reset:  ");
+                @output = &run_cmd($pkgs->{$pkg}{"INSTROOT_RESET"}, $pkgs->{$pkg}{"INSTROOT"}, "instroot-reset:  ");
                 if ($output[0] != MEZZANINE_SUCCESS) {
                     wprint "Reset of install root failed.\n";
                 }
@@ -379,6 +380,7 @@ sub
 place_package_files
 {
     my ($pkg, $outfiles, $locations) = @_;
+    my $instroot;
     my @outfiles;
     my @contents;
 
@@ -389,9 +391,18 @@ place_package_files
     }
     if (! $locations) {
         wprint "No locations specified for $pkg.\n";
-        return MEZZANINE_SUCCESS;
+        $locations = "/.*/=.";
     }
     dprint "Output files for $pkg:  $outfiles\n";
+
+    $instroot = $pkgs->{$pkg}{"INSTROOT"};
+    if ($instroot) {
+        foreach my $file (split(' ', $outfiles)) {
+            if (-e "$instroot$file") {
+                &move_files("$instroot$file", "$file");
+            }
+        }
+    }
 
     # Copy each package into the appropriate place
     foreach my $file (split(' ', $outfiles)) {
@@ -634,9 +645,10 @@ main
                    "p|prod|product|prodfile=s", "D|dir|tree=s",
                    "l|log=s", "P|parallel:s", "t|target=s",
                    "C|cflags=s", "T|tag=s", "nocache", "clean:s",
-                   "U|user=s", "i|instroot|jail=s", "H|hints=s",
-                   "hi|hint-installer=s", "ii|instroot-init=s",
-                   "ir|instroot-reset=s", "ic|instroot-copy=s");
+                   "U|user=s", "L|location=s", "i|instroot|jail=s",
+                   "H|hints=s", "hi|hint-installer=s",
+                   "ii|instroot-init=s", "ir|instroot-reset=s",
+                   "ic|instroot-copy=s");
 
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
@@ -646,7 +658,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.165 $ created on $Date: 2004/01/07 18:56:37 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.166 $ created on $Date: 2004/01/10 13:40:58 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -682,37 +694,6 @@ main
     &pkgvar_cleanup($opt_clean);
     &pkgvar_target($opt_t);
 
-    if ($opt_i) {
-        my ($instroot, $instroot_init, $instroot_reset, $instroot_copy) = ($opt_i, $opt_ii, $opt_ir, $opt_ic);
-
-        # If we have $MEZZANINE_INSTROOT_SOURCE_RSYNC and we don't have the options,
-        # automagically fill the commands in appropriately.  If needed, authentication
-        # info and other flags can be added to $MEZZANINE_INSTROOT_SOURCE_RSYNC.
-        if ($ENV{"MEZZANINE_INSTROOT_SOURCE_RSYNC"}) {
-            if (! $instroot_init) {
-                $instroot_init = "rsync -PHavz --delete --delete-after $ENV{MEZZANINE_INSTROOT_SOURCE_RSYNC}";
-            }
-            if (! $instroot_reset) {
-                $instroot_reset = "rsync -PHavz --delete --delete-after $ENV{MEZZANINE_INSTROOT_SOURCE_RSYNC}";
-            }
-            if (! $instroot_copy) {
-                $instroot_copy = "rsync -PHav --delete --delete-after";
-            }
-        }
-
-        # Now set all the variables using fallbacks.
-        ($instroot, $instroot_init, $instroot_reset, $instroot_copy)
-            = &set_instroot_info($instroot, $instroot_init, $instroot_reset, $instroot_copy);
-        &assign_product_variable($prod, "INSTROOT", $instroot);
-
-        # If we have $instroot_init, the other two are guaranteed to be set by fallbacks.
-        if ($instroot_init) {
-            &assign_product_variable($prod, "INSTROOT_INIT", $instroot_init);
-            &assign_product_variable($prod, "INSTROOT_RESET", $instroot_reset);
-            &assign_product_variable($prod, "INSTROOT_COPY", $instroot_copy);
-        }
-    }
-
     # Handle hint file/directory specification
     if ($opt_H) {
         $ENV{"MEZZANINE_HINTS"} = $opt_H;
@@ -744,10 +725,44 @@ main
     } elsif (!scalar(@opt_s)) {
         $prod = $prodname = &basename(&getcwd());
     }
-    if (scalar(@opt_s) {
-        if (! $prod) {
-            $prod = "autoprod-1.0";
+    if (scalar(@opt_s) && ! $prod) {
+        # This must happen *before* the instroot stuff below.
+        $prod = "autoprod-1.0";
+    }
+
+    if ($opt_i) {
+        my ($instroot, $instroot_init, $instroot_reset, $instroot_copy) = ($opt_i, $opt_ii, $opt_ir, $opt_ic);
+
+        # If we have $MEZZANINE_INSTROOT_SOURCE_RSYNC and we don't have the options,
+        # automagically fill the commands in appropriately.  If needed, authentication
+        # info and other flags can be added to $MEZZANINE_INSTROOT_SOURCE_RSYNC.
+        if ($ENV{"MEZZANINE_INSTROOT_SOURCE_RSYNC"}) {
+            if (! $instroot_init) {
+                $instroot_init = "rsync -PHavz --delete --delete-after --exclude=/proc $ENV{MEZZANINE_INSTROOT_SOURCE_RSYNC}";
+            }
+            if (! $instroot_reset) {
+                $instroot_reset = "rsync -PHavz --delete --delete-after --exclude=/proc $ENV{MEZZANINE_INSTROOT_SOURCE_RSYNC}";
+            }
+            if (! $instroot_copy) {
+                $instroot_copy = "rsync -PHav --delete --delete-after";
+            }
         }
+
+        # Now set all the variables using fallbacks.
+        ($instroot, $instroot_init, $instroot_reset, $instroot_copy)
+            = &set_instroot_info($instroot, $instroot_init, $instroot_reset, $instroot_copy);
+        &assign_product_variable($prod, "INSTROOT", $instroot);
+
+        # If we have $instroot_init, the other two are guaranteed to be set by fallbacks.
+        if ($instroot_init) {
+            &assign_product_variable($prod, "INSTROOT_INIT", $instroot_init);
+            &assign_product_variable($prod, "INSTROOT_RESET", $instroot_reset);
+            &assign_product_variable($prod, "INSTROOT_COPY", $instroot_copy);
+        }
+    }
+
+    if (scalar(@opt_s)) {
+        # This must happen *after* the instroot stuff above.
         foreach my $srcdir (@opt_s) {
             my @pkg_list;
 
@@ -756,6 +771,23 @@ main
                 &parse_product_entry($pkg, $prod);
             }
         }
+    }
+
+    if ($opt_L) {
+        my $locations = $opt_L;
+
+        if (-d $locations) {
+            $locations = "/.*/=$locations";
+        } elsif ($locations !~ m,/[^/]+/[\@=],) {
+            if (&mkdir($locations, 0775)) {
+                dprint "Created location $locations.\n";
+                $locations = "/.*/=$locations";
+            } else {
+                eprint "Bad location $locations, can't mkdir -- $!\n";
+                $locations = "/.*/=.";
+            }
+        }
+        &assign_product_variable($prod, "LOCATIONS", $locations);
     }
 
     &pkgvar_buildroot($ENV{"MEZZANINE_BUILDROOT"});
@@ -794,7 +826,7 @@ main
                   . ":/usr/kerberos/bin:.";
 
     # Parse the product definition files to figure out what the heck we need to build. :)
-    if (! &parse_prod_file($prod, 0, 0)) {
+    if ((substr($prod, 0, 8) ne "autoprod") && !&parse_prod_file($prod, 0, 0)) {
         if (! &parse_product_entry($prod)) {
             if (!scalar(@packages)) {
                 eprint "$prod does not seem to be a valid product or product entry.\n";

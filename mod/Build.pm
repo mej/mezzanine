@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.28 2004/01/06 20:53:05 mej Exp $
+# $Id: Build.pm,v 1.29 2004/01/10 13:40:58 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -48,13 +48,13 @@ BEGIN {
 
     @EXPORT = ('&count_cpus', '&set_hints_info', '&set_instroot_info',
                '&prepare_build_tree', '&install_hints',
-               '&get_source_list', '&create_source_file',
-               '&create_source_files', '&cleanup_build_tree',
-               '&build_rpms_from_tarball', '&build_debs_from_tarball',
-               '&build_rpms_from_topdir', '&build_debs_from_topdir',
-               '&build_topdir', '&build_spm', '&build_cfst',
-               '&build_fst', '&build_srpm', '&build_tarball',
-               '&build_package');
+               '&install_deps', '&get_source_list',
+               '&create_source_file', '&create_source_files',
+               '&cleanup_build_tree', '&build_rpms_from_tarball',
+               '&build_debs_from_tarball', '&build_rpms_from_topdir',
+               '&build_debs_from_topdir', '&build_topdir',
+               '&build_spm', '&build_cfst', '&build_fst',
+               '&build_srpm', '&build_tarball', '&build_package');
 
     %EXPORT_TAGS = ( );
 
@@ -76,6 +76,7 @@ sub set_hints_info($);
 sub set_instroot_info($$$$);
 sub prepare_build_tree($$$);
 sub install_hints();
+sub install_deps($);
 sub get_source_list($$$$);
 sub create_source_file($$$$$);
 sub create_source_files($$$\@);
@@ -263,6 +264,9 @@ install_hints($)
 
     if (-d $hints) {
         $hints = "$hints/" . &pkgvar_name();
+        if (! -e $hints) {
+            return "";
+        }
     }
 
     if (!open(HINTFILE, $hints)) {
@@ -277,13 +281,27 @@ install_hints($)
     close(HINTFILE);
 
     # Install hints.
+    return &install_deps(join(' ', @hint_packages));
+}
+
+# Install dependencies.
+sub
+install_deps($)
+{
+    my $deps = $_[0];
+    my $inst;
+
+    if (! $deps) {
+        return "";
+    }
+
     if (&pkgvar_instroot()) {
         $inst = "chroot " . &pkgvar_instroot() . ' ';
     } else {
         $inst = "";
     }
     $inst .= &pkgvar_get("hint_installer");
-    @tmp = &run_cmd($inst, join(' ', @hint_packages), "hint-installer:  ");
+    @tmp = &run_cmd($inst, $deps, "pkg-installer:  ");
     if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
         return "Unable to install $pkg ($err)";
     }
@@ -564,10 +582,24 @@ build_spm
         return (MEZZANINE_MISSING_FILES, "@{[getcwd()]} does not seem to contain build instructions", undef);
     } elsif (scalar(@tmp) > 1) {
         return (MEZZANINE_BAD_MODULE, "Only one specfile/script dir allowed per package (@tmp)", undef);
+    } else {
+        &copy_files($tmp[0], "$instroot$topdir/SPECS");
+        $specfile = "$topdir/SPECS/" . &basename($tmp[0]);
+
+        &pkgvar_instructions($instroot . $specfile);
+        &parse_spec_file();
+
+        if ($specdata && $specdata->{"BUILD_DEPS"} && scalar(@{$specdata->{"BUILD_DEPS"}})) {
+            my $ret;
+
+            $ret = &install_deps(join(' ', @{$specdata->{"BUILD_DEPS"}}));
+            if ($ret) {
+                wprint "Build dependency installation failed:  $ret\n";
+            }
+        }
+        &pkgvar_instructions($specfile);
     }
-    &copy_files($tmp[0], "$instroot$topdir/SPECS");
-    $specfile = "$topdir/SPECS/" . &basename($tmp[0]);
-    &pkgvar_instructions($specfile);
+
     @tmp = &grepdir(sub {-f $_ && -s _}, "S");
     @tmp2 = &grepdir(sub {-f $_ && -s _}, "P");
     if (!scalar(@tmp)) {
@@ -705,6 +737,15 @@ build_fst
     if (! &copy($specfile, "$instroot$topdir/SPECS/")) {
         return (MEZZANINE_SYSTEM_ERROR, "Unable to copy $specfile to $instroot$topdir/SPECS/ -- $!\n", undef);
     } else {
+        &parse_spec_file();
+        if ($specdata && $specdata->{"BUILD_DEPS"} && scalar(@{$specdata->{"BUILD_DEPS"}})) {
+            my $ret;
+
+            $ret = &install_deps(join(' ', @{$specdata->{"BUILD_DEPS"}}));
+            if ($ret) {
+                wprint "Build dependency installation failed:  $ret\n";
+            }
+        }
         &pkgvar_instructions("$topdir/SPECS/" . &basename($specfile));
     }
 
@@ -734,7 +775,7 @@ build_fst
 sub
 build_srpm
 {
-    my ($pkg, $topdir, $instroot, $err);
+    my ($pkg, $topdir, $instroot, $err, $sdata);
     my (@tmp, @specs);
     my %preserve_pkg_vars;
 
@@ -750,12 +791,13 @@ build_srpm
     if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
         return (MEZZANINE_NO_SOURCES, "Unable to examine the contents of ${\(&pkgvar_filename())} ($err)", undef);
     }
+
     foreach my $f (grep(/spec(\.in)?$/, @tmp)) {
         my @fields;
 
         chomp($f);
         @fields = split(' ', $f);
-        push @specs, $fields[8];
+        push @specs, $fields[$#fields];
     }
     if (scalar(@specs) != 1) {
         wprint "Found ${\(scalar(@specs))} spec files in $pkg?!\n";
@@ -769,6 +811,19 @@ build_srpm
         return (MEZZANINE_NO_SOURCES, "Found ${\(scalar(@specs))} spec files in $pkg?!", undef);
     }
     &pkgvar_reset(%preserve_pkg_vars);
+
+    &pkgvar_instructions("$instroot$topdir/SPECS/$specs[0]");
+    &parse_spec_file();
+    if ($specdata && $specdata->{"BUILD_DEPS"} && scalar(@{$specdata->{"BUILD_DEPS"}})) {
+        my $ret;
+
+        $ret = &install_deps(join(' ', @{$specdata->{"BUILD_DEPS"}}));
+        if ($ret) {
+            wprint "Build dependency installation failed:  $ret\n";
+        }
+    } else {
+        dprint "No build deps?\n";
+    }
 
     &pkgvar_instructions("$topdir/SPECS/$specs[0]");
     return &build_topdir();

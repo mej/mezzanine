@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.17 2003/12/30 23:02:55 mej Exp $
+# $Id: RPM.pm,v 1.18 2004/01/10 13:40:58 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -54,7 +54,7 @@ use vars ('@EXPORT_OK');
 ### Private global variables
 
 ### Initialize exported package variables
-$specdata = 0;
+$specdata = undef;
 
 # Constants
 
@@ -74,6 +74,7 @@ sub rpm_compare_versions($$);
 # Private functions
 sub add_define($$);
 sub replace_defines($);
+sub parse_deps($);
 
 ### Module cleanup
 END {
@@ -173,12 +174,19 @@ parse_spec_file
     local *SPECFILE;
 
     if (! $specfile) {
+        wprint "How can I parse a spec file with no name?\n";
+        undef $specdata;
         return 0;
     }
 
-    open(SPECFILE, $specfile) || return 0;
+    if (!open(SPECFILE, $specfile)) {
+        wprint "Unable to open spec file $specfile -- $!\n";
+        undef $specdata;
+        return 0;
+    }
+
     $stage = 0;
-    $specdata->{SPECFILE} = $specfile;
+    $specdata->{"SPECFILE"} = $specfile;
     while (<SPECFILE>) {
         chomp($line = $_);
         next if ($line =~ /^\s*\#/ || $line =~ /^\s*$/);
@@ -186,77 +194,88 @@ parse_spec_file
         $line = &replace_defines($oldline);
         $line =~ s/^\s+//;
         $line =~ s/\s+$//;
-        push @{$specdata->{FILE}}, $line;
+        push @{$specdata->{"FILE"}}, $line;
         if ($oldline ne $line) {
-            dprint "Parsing from $specfile, line $.: \"$oldline\" -> \"$line\"\n";
+            #dprint "Parsing from $specfile, line $.: \"$oldline\" -> \"$line\"\n";
         } else {
-            dprint "Parsing from $specfile, line $.: \"$line\"\n";
+            #dprint "Parsing from $specfile, line $.: \"$line\"\n";
         }
         if ($line =~ /^\%(prep|build|install|clean|changelog|trigger|triggerpostun|triggerun|triggerin|verifyscript)\s*$/
             || $line =~ /^\%(package|preun|pre|postun|post|files|description)(\s+\w+)?$/) {
             my $param = $2;
 
             $stage = $1;
-            dprint "Switching to stage \"$stage\"\n";
+            #dprint "Switching to stage \"$stage\"\n";
+            push @{$specdata->{"STAGES"}}, $stage;
             if ($stage eq "package" && $param) {
-                $pkg = $specdata->{PKGS}[0] . "-$param";
-                push @{$specdata->{PKGS}}, $pkg;
+                $pkg = $specdata->{"PKGS"}[0] . "-$param";
+                push @{$specdata->{"PKGS"}}, $pkg;
             }
         } elsif ((! $stage) && $line =~ /^\s*(\w+)\s*:\s*(.*)\s*$/) {
             my ($var, $value) = ($1, $2);
 
             $var = lc($var);
+            dprint "Header:  $var -> $value\n";
             if ($var eq "name") {
                 $pkg = $value;
-                @{$specdata->{PKGS}} = ($pkg);
+                @{$specdata->{"PKGS"}} = ($pkg);
                 &add_define("PACKAGE_NAME", $value);
-                &add_define("name", $value) if (! $specdata->{DEFINES}{"name"});
+                &add_define("name", $value) if (! $specdata->{"DEFINES"}{"name"});
             } elsif ($var =~ /^source(\d*)$/) {
                 my $key = ($1 ? $1 : "0");
 
                 $value =~ s/^.*\/([^\/]+)$/$1/;
-                $specdata->{SOURCE}{$key} = $value;
+                $specdata->{"SOURCE"}{$key} = $value;
                 &add_define("SOURCE$key", $value);
             } elsif ($var =~ /^patch(\d*)$/) {
                 my $key = ($1 ? $1 : "0");
 
                 $value =~ s/^.*\/([^\/]+)$/$1/;
-                $specdata->{PATCH}{$key} = $value;
+                $specdata->{"PATCH"}{$key} = $value;
                 &add_define("PATCH$key", $value);
             } else {
-                $specdata->{HEADER}{$var} = $value;
+                $specdata->{"HEADER"}{$var} = $value;
                 if ($var eq "version") {
                     &add_define("PACKAGE_VERSION", $value);
-                    &add_define("version", $value) if (! $specdata->{DEFINES}{"version"});
+                    &add_define("version", $value) if (! $specdata->{"DEFINES"}{"version"});
                 } elsif ($var eq "release") {
                     &add_define("PACKAGE_RELEASE", $value);
-                    &add_define("release", $value) if (! $specdata->{DEFINES}{"release"});
+                    &add_define("release", $value) if (! $specdata->{"DEFINES"}{"release"});
+                } elsif ($var =~ /^(prereq|requires)$/) {
+                    dprint "Got dep $value\n";
+                    push @{$specdata->{"DEPS"}}, &parse_deps($value);
+                } elsif ($var =~ /^build(prereq|requires)$/) {
+                    dprint "Got build dep $value\n";
+                    push @{$specdata->{"BUILD_DEPS"}}, &parse_deps($value);
                 }
             }
         } elsif ($line =~ /^%\s*define\s*(\w+)\s*(.*)$/) {
             &add_define($1, $2);
+        } else {
+            push @{$specdata->{$stage}}, $line;
         }
     }
     close(SPECFILE);
 
-    @{$specdata->{SOURCES}} = sort {$a <=> $b} keys %{$specdata->{SOURCE}};
-    @{$specdata->{PATCHES}} = sort {$a <=> $b} keys %{$specdata->{PATCH}};
-    @{$specdata->{HEADERS}} = sort {uc($a) cmp uc($b)} keys %{$specdata->{HEADER}};
+    @{$specdata->{"SOURCES"}} = sort {$a <=> $b} keys %{$specdata->{"SOURCE"}};
+    @{$specdata->{"PATCHES"}} = sort {$a <=> $b} keys %{$specdata->{"PATCH"}};
+    @{$specdata->{"HEADERS"}} = sort {uc($a) cmp uc($b)} keys %{$specdata->{"HEADER"}};
 
     if ($debug) {
         dprint "Got the following sources:\n";
-        foreach $src (@{$specdata->{SOURCES}}) {
+        foreach $src (@{$specdata->{"SOURCES"}}) {
             dprint "    Source $src -> $specdata->{SOURCE}{$src}\n";
         }
         dprint "Got the following patches:\n";
-        foreach $p (@{$specdata->{PATCHES}}) {
+        foreach $p (@{$specdata->{"PATCHES"}}) {
             dprint "    Patch $p -> $specdata->{PATCH}{$p}\n";
         }
         dprint "Got the following header info:\n";
-        foreach $h (@{$specdata->{HEADERS}}) {
+        foreach $h (@{$specdata->{"HEADERS"}}) {
             dprint "    $h -> $specdata->{HEADER}{$h}\n";
         }
     }
+    dprint "Returning $specdata\n";
     return $specdata;
 }
 
@@ -598,8 +617,8 @@ add_define($$)
 {
     my ($var, $value) = @_;
 
-    $specdata->{DEFINES}{$var} = $value;
-    dprint "Added \%define:  $var -> $specdata->{DEFINES}{$var}\n";
+    $specdata->{"DEFINES"}{$var} = $value;
+    #dprint "Added \%define:  $var -> $specdata->{DEFINES}{$var}\n";
 }
 
 # Replace %define's in a spec file line with their values
@@ -611,28 +630,54 @@ replace_defines($)
     while ($line =~ /\%(\w+)/g) {
         my $var = $1;
 
-        dprint "Found macro:  $var\n";
-        if (defined $specdata->{DEFINES}{$var}) {
-            dprint "Replacing with:  $specdata->{DEFINES}{$var}\n";
-            $line =~ s/\%$var/$specdata->{DEFINES}{$var}/g;
-            reset;
+        #dprint "Found macro:  $var\n";
+        if (defined $specdata->{"DEFINES"}{$var}) {
+            #dprint "Replacing with:  $specdata->{DEFINES}{$var}\n";
+            $line =~ s/\%$var/$specdata->{"DEFINES"}{$var}/g;
+            #reset;
         } else {
-            dprint "Definition not found.\n";
+            #dprint "Definition not found.\n";
         }
     }
     while ($line =~ /\%\{([^\}]+)\}/g) {
         my $var = $1;
 
-        dprint "Found macro:  $var\n";
-        if (defined $specdata->{DEFINES}{$var}) {
-            dprint "Replacing with:  $specdata->{DEFINES}{$var}\n";
-            $line =~ s/\%\{$var\}/$specdata->{DEFINES}{$var}/g;
-            reset;
+        #dprint "Found macro:  $var\n";
+        if (defined $specdata->{"DEFINES"}{$var}) {
+            #dprint "Replacing with:  $specdata->{DEFINES}{$var}\n";
+            $line =~ s/\%\{$var\}/$specdata->{"DEFINES"}{$var}/g;
+            #reset;
         } else {
-            dprint "Definition not found.\n";
+            #dprint "Definition not found.\n";
         }
     }
     return $line;
+}
+
+# Parse out a dependencies statement into packages
+sub
+parse_deps($)
+{
+    my $deps = $_[0];
+    my @pkgs;
+    my @tmp;
+
+    @tmp = split(/\s*,\s*/, $deps);
+    if (scalar(@tmp) == 1) {
+        @tmp = split(/\s+/, $deps);
+        if ((scalar(@tmp) > 1) && ($tmp[1] =~ /[<>=]/)) {
+            push @pkgs, $tmp[0];
+        } else {
+            @pkgs = @tmp;
+        }
+    } else {
+        foreach my $pkg (@tmp) {
+            $pkg =~ s/ .*$//;
+            push @pkgs, $pkg;
+        }
+    }
+    dprint "Dep packages:  ", join('|', @pkgs), "\n";
+    return @pkgs;
 }
 
 1;
