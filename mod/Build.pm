@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.5 2001/07/26 03:13:50 mej Exp $
+# $Id: Build.pm,v 1.6 2001/07/27 01:45:37 mej Exp $
 #
 
 package Avalon::Build;
@@ -30,6 +30,9 @@ BEGIN {
     use Exporter   ();
     use Avalon::Util;
     use Avalon::Pkg;
+    use Avalon::RPM;
+    use Avalon::Deb;
+    use Avalon::Tar;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
@@ -37,7 +40,7 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('&count_cpus', '&prepare_build_tree', '&get_source_list', '&create_source_file', '&create_source_files', '&cleanup_build_tree', '&build_spm', '&build_cfst', '&build_fst', '&build_srpm', '&build_tarball', '&build_package');
+    @EXPORT      = ('&count_cpus', '&prepare_build_tree', '&get_source_list', '&create_source_file', '&create_source_files', '&cleanup_build_tree', '&build_rpms_from_topdir', '&build_debs_from_topdir', '&build_topdir', '&build_spm', '&build_cfst', '&build_fst', '&build_srpm', '&build_tarball', '&build_package');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -58,6 +61,9 @@ sub get_source_list($$$$);
 sub create_source_file($$$$$);
 sub create_source_files($$$\@);
 sub cleanup_build_tree($$$);
+sub build_rpms_from_topdir($$);
+sub build_debs_from_topdir($$);
+sub build_topdir($$$);
 sub build_spm($$$$);
 sub build_cfst($$$$);
 sub build_fst($$$$);
@@ -136,23 +142,6 @@ prepare_build_tree(\$\$\$)
         &nuke_tree($buildroot);
     }
     mkdir($buildroot, 0775);
-
-    # Create basic rpmmacros
-    $rpmmacros = "$buildroot/$pkg-rpmmacros";
-    open(RPMMACROS, ">$rpmmacros") || &fatal_error("Cannot create $rpmmacros -- $!\n");
-    print RPMMACROS "\%_topdir           $topdir\n";
-    close(RPMMACROS);
-
-    # Create basic rpmrc
-    $rpmrc = "$buildroot/$pkg-rpmrc";
-    open(RPMRC, ">$rpmrc") || &fatal_error("Cannot create $rpmrc -- $!\n");
-    print RPMRC "optflags:   i386 $$ENV{CFLAGS}\n";
-    print RPMRC "optflags:   i486 $$ENV{CFLAGS}\n";
-    print RPMRC "optflags:   i586 $$ENV{CFLAGS}\n";
-    print RPMRC "optflags:   i686 $$ENV{CFLAGS}\n";
-    print RPMRC "macrofiles: /usr/lib/rpm/macros:/usr/lib/rpm/\%{_target}/macros:/etc/rpm/macros.specspo:",
-                "/etc/rpm/macros:/etc/rpm/\%{_target}/macros:~/.rpmmacros:$rpmmacros\n";
-    close(RPMRC);
 
     return ($name, $topdir, $buildroot);
 
@@ -317,6 +306,60 @@ cleanup_build_tree
     }
 }
 
+# Builds RPM's
+sub
+build_rpms_from_topdir
+{
+    my ($topdir, $buildroot) = @_;
+    my ($cmd, $specfile);
+    my @tmp;
+
+    $cmd = "/bin/rpm --define '_topdir $topdir' --define 'optflags $ENV{CFLAGS}'"
+    if ($buildroot) {
+        $cmd .= " --buildroot=\"$buildroot\"";
+    }
+    @tmp = &grepdir(sub {$_ !~ /^\.\.?$/}, "$topdir/SPECS");
+    if (!($specfile = $tmp[0])) {
+        &show_backtrace();
+        return (AVALON_FILE_NOT_FOUND, "No specfile?  Somebody screwed up!", undef);
+    }
+    $cmd .= " -ba $specfile";
+    return &rpm_build($cmd);
+}
+
+# Builds DEB files
+sub
+build_debs_from_topdir
+{
+    my ($topdir, $buildroot) = @_;
+    my $cmd;
+
+    # Goop goes here.
+    return &deb_build($cmd);
+}
+
+# build_topdir() is called once the RPM/DEB directories have been propogated with all
+# the right stuff.  It, in turn, calls the target-specific function above.
+sub
+build_topdir
+{
+    my ($topdir, $buildroot, $target_format) = @_;
+
+    if ($target_format eq "rpms") {
+        return &build_rpms_from_topdir($topdir, $buildroot);
+    } elsif ($target_format eq "debs") {
+        return &build_debs_from_topdir($topdir, $buildroot);
+    } else {
+        my ($err, $msg, $outfiles);
+
+        ($err, $msg, $outfiles) = &build_rpms_from_topdir($topdir, $buildroot);
+        if ($err) {
+            return ($err, $msg, $outfiles);
+        }
+        return &build_debs_from_topdir($topdir, $buildroot);
+    }
+}
+
 # This function knows how to build packages from Source Package Modules (SPM's).  It
 # is usually called by build_package() but can be called directly as long as the
 # chdir() has been done already and we're 100% certain that it's an SPM.
@@ -324,7 +367,23 @@ sub
 build_spm
 {
     my ($pkg, $topdir, $buildroot, $target_format) = @_;
+    my @tmp;
 
+    if (! -d "F") {
+        &show_backtrace();
+        &fatal_error("Call to build_spm() in non-SPM module.\n");
+    }
+    &prepare_build_tree($pkg, $topdir, $buildroot);
+
+    @tmp = &grepdir(sub {$_ !~ /^\.\.?$/}, "F");
+    if (!scalar(@tmp)) {
+        return (AVALON_BAD_PACKAGE, "$pkg does not seem to contain build instructions", undef);
+    }
+    &copy_files(@tmp, "$topdir/SPECS");
+    @tmp = (&grepdir(sub {$_ !~ /^\.\.?$/}, "S"), &grepdir(sub {$_ !~ /^\.\.?$/}, "P"));
+    &copy_files(@tmp "$topdir/SOURCES");
+
+    return &build_topdir($topdir, $buildroot, $target_format);
 }
 
 # This function handles the "special case" FST's which have their very own
@@ -394,11 +453,11 @@ build_fst
 
     # Look for the build instructions (spec file, debian/ directory, etc.)
     if ($target_format eq "rpms") {
-        @tmp = &grep_dir(sub {/spec(\.in)?$/}, ".");
+        @tmp = &grepdir(sub {/spec(\.in)?$/}, ".");
     } elsif ($target_format eq "debs") {
-        @tmp = &grep_dir(sub {$_ =~ m/debian/ && -d $_}, ".");
+        @tmp = &grepdir(sub {$_ =~ m/debian/ && -d $_}, ".");
     } else {
-        @tmp = &grep_dir(sub {/spec(\.in)?$/ || ($_ =~ m/debian/ && -d $_)}, ".");
+        @tmp = &grepdir(sub {/spec(\.in)?$/ || ($_ =~ m/debian/ && -d $_)}, ".");
     }
     if (!scalar(@tmp)) {
         return (AVALON_BAD_PACKAGE, "I'm sorry, but \"$pkg\" doesn't seem to have instructions for building $target_format", undef);

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.9 2001/07/26 03:13:50 mej Exp $
+# $Id: Util.pm,v 1.10 2001/07/27 01:45:37 mej Exp $
 #
 
 package Avalon::Util;
@@ -40,11 +40,11 @@ BEGIN {
 
                     '&debug_get', '&debug_set',
 		    '&get_timestamp', '&fatal_error', '&dprintf', '&dprint', '&eprintf', '&eprint', '&wprintf', '&wprint',
-		    '&handle_signal', '&handle_fatal_signal', '&handle_warning',
-		    '&mkdirhier', '&nuke_tree', '&move_files', '&basename', '&dirname', '&grepdir',
+		    '&handle_signal', '&handle_fatal_signal', '&handle_warning', '&show_backtrace',
+		    '&mkdirhier', '&nuke_tree', '&move_files', '&copy_files', '&basename', '&dirname', '&grepdir',
 		    '&xpush',
 		    '&cat_file',
-                    '&parse_rpm_name',
+                    '&parse_rpm_name', '&should_ignore', '&touch_file',
 
 		    '&AVALON_SUCCESS', '&AVALON_FATAL_ERROR', '&AVALON_SYNTAX_ERROR', '&AVALON_SYSTEM_ERROR',
 		    '&AVALON_COMMAND_FAILED', '&AVALON_DUPLICATE', '&AVALON_FILE_NOT_FOUND', '&AVALON_FILE_OP_FAILED',
@@ -82,15 +82,19 @@ sub eprint(@);
 sub handle_signal(@);
 sub handle_fatal_signal(@);
 sub handle_warning(@);
+sub show_backtrace();
 sub mkdirhier($);
 sub nuke_tree($);
-sub move_files($ $);
+sub move_files(@);
+sub copy_files(@);
 sub basename($);
 sub dirname($);
 sub grepdir(& $);
 sub xpush(\@; @);
 sub cat_file($);
 sub parse_rpm_name($);
+sub should_ignore($);
+sub touch_file($);
 
 ### Module cleanup
 END {
@@ -327,7 +331,7 @@ nuke_tree($)
 
 # Move files, a la "mv"
 sub
-move_files($ $)
+move_files
 {
     # Last arg is destination
     my $dest = pop;
@@ -352,6 +356,40 @@ move_files($ $)
         dprint "Moving $f to $target\n";
         if (!&File::Copy::move($f, $target)) {
             eprint "Unable to move $f to $target -- $!\n";
+            return $fcnt;
+        }
+        $fcnt++;
+    }
+    return $fcnt;
+}
+
+# Copy files, a la "cp"
+sub
+copy_files
+{
+    # Last arg is destination
+    my $dest = pop;
+    my @flist = @_;
+    my $fcnt = 0;
+    my $addname = 0;
+
+    if (-d $dest) {
+        # We'll need to add the filename to the dest each time
+        $dest .= '/' if ($dest !~ /\/$/);
+        $addname = 1;
+    }
+    dprint "\$dest is $dest, \$addname is $addname\n";
+    foreach my $f (@flist) {
+        my $target;
+
+        if ($addname) {
+            ($target = $f) =~ s/^(.*\/)?([^\/]+)$/$dest$2/;
+        } else {
+            $target = $dest;
+        }
+        dprint "Copying $f to $target\n";
+        if (!&File::Copy::copy($f, $target)) {
+            eprint "Unable to copy $f to $target -- $!\n";
             return $fcnt;
         }
         $fcnt++;
@@ -427,6 +465,34 @@ parse_rpm_name($)
 
     $rpm =~ m/^(\S+)-([^-]+)-([^-]+)\.([^\.]+)\.rpm$/;
     return ($1, $2, $3, $4);
+}
+
+sub
+should_ignore
+{
+    my $fname = $_[0];
+
+    # Ignore revision control goop
+    return 1 if ($fname =~ /^(CVS|SCCS|RCS|BitKeeper)$/);
+    # Ignore the revtool-generated ChangeLog
+    return 1 if ($fname =~ /^[Cc]hanges?\.?[Ll]og$/);
+    # Ignore dotfiles
+    return 1 if ($fname =~ /^\./);
+    # Ignore spec files
+    return 1 if ($fname =~ /\.spec(\.in)?$/);
+    # Ignore the debian/ directory
+    return 1 if ($fname =~ /^debian$/ && -d $fname);
+
+    return 0;
+}
+
+sub
+touch_file
+{
+    my $file = $_[0];
+    local *TMP;
+
+    open(TMP, ">$file") && close(TMP);
 }
 
 1;
