@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.23 2004/08/25 21:34:39 mej Exp $
+# $Id: Src.pm,v 1.24 2005/02/04 02:42:48 mej Exp $
 #
 
 package Mezzanine::Src;
@@ -182,7 +182,7 @@ convert_srpm_to_spm($)
         eprint "Unable to parse spec file.\n";
         return MEZZANINE_SPEC_ERRORS;
     } elsif (exists($specdata->{"HEADER"}{"epoch"})) {
-        eprintf("Epoch %s not allowed", $specdata->{"HEADER"}{"epoch"});
+        wprintf("Epoch of %s present!\n", $specdata->{"HEADER"}{"epoch"});
         return MEZZANINE_SPEC_ERRORS;
     }
 

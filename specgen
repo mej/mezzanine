@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: specgen,v 1.8 2005/01/03 01:34:49 mej Exp $
+# $Id: specgen,v 1.9 2005/02/04 02:42:48 mej Exp $
 #
 
 use strict;
@@ -127,7 +127,7 @@ parse_tarball_name($)
         $href->{"EXTRACTWITH"} = "compress -d -c \@\@ | tar -xf -";
         $pkg =~ s/$1$//;
     } elsif ($pkg =~ /(\.zip)$/i) {
-        $href->{"EXTRACTWITH"} = "unzip";
+        $href->{"EXTRACTWITH"} = "unzip \@\@";
         $pkg =~ s/$1$//;
     } elsif ($pkg =~ /(\.(c|cpio\.)gz)$/i) {
         $href->{"EXTRACTWITH"} = "gzip -d -c \@\@ | cpio -iud";
@@ -143,6 +143,9 @@ parse_tarball_name($)
         $pkg =~ s/$1$//;
     } elsif ($pkg =~ /(\.[^\.]+\.rpm)$/i) {
         $href->{"EXTRACTWITH"} = "rpm2cpio \@\@ | cpio -iud";
+        $pkg =~ s/$1$//;
+    } elsif ($pkg =~ /(\.jar)$/i) {
+        $href->{"EXTRACTWITH"} = "true \@\@";
         $pkg =~ s/$1$//;
     } else {
         wprint "Unrecognized package file format.\n";
@@ -195,7 +198,7 @@ scan_package(\%)
     my $template = $href->{"TEMPLATE"};
     my $pkgname = $href->{"NAME"};
     my $tarball = $href->{"TARBALL"};
-    my ($tmpdir, $savecwd, $cmd);
+    my ($tmpdir, $savecwd, $cmd, $topdir);
     my @filelist;
 
     $tmpdir = &create_temp_space($pkgname, "dironly");
@@ -210,91 +213,103 @@ scan_package(\%)
     }
     $cmd = $href->{"EXTRACTWITH"};
     $cmd =~ s/\@\@/$tarball/eg;
-    &run_cmd($cmd, "", "extract");
+    &run_cmd($cmd, "", "extract:  ");
     &File::Find::find({ "no_chdir" => 1, "wanted" => sub { s/^\.\/?//; if ($_) {push @filelist, $_;} } }, '.');
     @filelist = sort(@filelist);
     dprint "Archive contents:\n", join("\n", @filelist), "\n";
 
-    if (scalar(@filelist)) {
-        my $topdir = shift @filelist;
+    if (!scalar(@filelist)) {
+        @filelist = (&basename($tarball));
+    } else {
+        $topdir = shift @filelist;
+    }
 
-        # Find top-level source directory name.
-        if (!scalar(grep { $_ !~ /^\Q$topdir\E/ } @filelist)) {
-            if ($topdir ne "$href->{NAME}-$href->{VERSION}") {
-                $href->{"SETUP"} = "-n $topdir";
-            }
-        } else {
-            $href->{"SETUP"} = "-T -c -a 0";
-            $topdir = "$href->{NAME}-$href->{VERSION}";
-            unshift @filelist, $topdir;
+    # Find top-level source directory name.
+    if (scalar(@filelist) == 1) {
+        dprint "Single-source detected.  Compensating.\n";
+        $href->{"SETUP"} = "-T -c";
+        unshift @filelist, $topdir;
+        $topdir = "$href->{NAME}-$href->{VERSION}";
+        unshift @filelist, $topdir;
+        dprint "Filelist is now ", join(' ', @filelist), "\n";
+    } elsif (!scalar(grep { $_ !~ /^\Q$topdir\E/ } @filelist)) {
+        if ($topdir ne "$href->{NAME}-$href->{VERSION}") {
+            $href->{"SETUP"} = "-n $topdir";
         }
+    } else {
+        $href->{"SETUP"} = "-T -c -a 0";
+        $topdir = "$href->{NAME}-$href->{VERSION}";
+        unshift @filelist, $topdir;
+    }
 
-        # Strip top-level directory from all files.
-        @filelist = map { $_ =~ s/^$topdir\///; $_ } @filelist;
-        #dprint "Topdir removal of $topdir gives:\n", join("\n", @filelist), "\n";
+    # Strip top-level directory from all files.
+    @filelist = map { $_ =~ s/^$topdir\///; $_ } @filelist;
+    dprint "Topdir removal of $topdir gives:\n", join("\n", @filelist), "\n";
 
-        # Scan for documentation files and directories.
-        foreach my $doc ("README", "INSTALL", "COPYING", "LICENSE", "LICENCE",
-                         "TODO", "MANIFEST", "BUGS", "AUTHORS", "CONTRIBUTORS",
-                         "FAQ", "NEWS", "MANUAL", "CHANGES", "ChangeLog",
-                         "WHATSNEW", "ReleaseNotes", "RELNOTES", "doc", "dox") {
-            dprint "Checking for $doc.\n";
-            $href->{"DOCFILES"} .= ' ' . join(' ', grep { $_ =~ /^\Q$doc\E/ && $_ !~ /\// } @filelist);
+    ### Scan for signs of package type.
+    if (! $OPTION{"template"}) {
+        if (grep { $_ =~ /^configure(\.ac|\.in)?$/ } @filelist) {
+            $template->file("GNU-autosplat.spec");
+        } elsif (grep { $_ =~ /\.jar$/i } @filelist) {
+            $template->file("jar.spec");
+        } elsif (grep { $_ eq "Imakefile" } @filelist) {
+            $template->file("imake.spec");
+        } elsif (grep { $_ =~ /^makefile\.pro$/i } @filelist) {
+            $template->file("qmake.spec");
+        } elsif (grep { $_ =~ /^makefile$/i } @filelist) {
+            $template->file("make.spec");
         }
-        $href->{"DOCFILES"} =~ s/^\s*//;
-        $href->{"DOCFILES"} =~ s/\s+/ /g;
+        $template->find();
+    }
 
+    # Scan for documentation files and directories.
+    foreach my $doc ("README", "INSTALL", "COPYING", "LICENSE", "LICENCE",
+                     "TODO", "MANIFEST", "BUGS", "AUTHORS", "CONTRIBUTORS",
+                     "FAQ", "NEWS", "MANUAL", "CHANGES", "ChangeLog", "CHANGELOG",
+                     "WHATSNEW", "ReleaseNotes", "RELNOTES", "doc", "dox") {
+        dprint "Checking for $doc.\n";
+        $href->{"DOCFILES"} .= ' ' . join(' ', grep { $_ =~ /^\Q$doc\E/ && $_ !~ /\// } @filelist);
+    }
+    $href->{"DOCFILES"} =~ s/^\s*//;
+    $href->{"DOCFILES"} =~ s/\s+/ /g;
+    $href->{"DOCFILES"} =~ s/\s*$//;
 
-        ### Scan for signs of package type.
-        if (! $OPTION{"template"}) {
-            if (grep { $_ =~ /^configure(\.ac|\.in)?$/ } @filelist) {
-                $template->file("GNU-autosplat.spec");
-            } elsif (grep { $_ eq "Imakefile" } @filelist) {
-                $template->file("imake.spec");
-            } elsif (grep { $_ =~ /^makefile$/i } @filelist) {
-                $template->file("make.spec");
-            }
-            $template->find();
+    ### Scan for license.
+    foreach my $license (grep { $_ =~ /^(COPYING|LICEN[CS]E)$/ } @filelist) {
+        my $contents = &cat_file("$topdir/$license");
+
+        $contents =~ s/\s+/ /gs;
+        if ($contents =~ /GNU GENERAL PUBLIC LICEN[CS]E/) {
+            $href->{"LICENSE"} = "GPL";
+        } elsif ($contents =~ /GNU (LESSER|LIBRARY) GENERAL PUBLIC LICEN[CS]E/) {
+            $href->{"LICENSE"} = "LGPL";
+        } elsif ($contents =~ /The Apache Software Licen[cs]e/) {
+            $href->{"LICENSE"} = "Apache";
+        } elsif ($contents =~ /^\s*Apache Licen[cs]e/) {
+            $href->{"LICENSE"} = "Apache";
+        } elsif ($contents =~ /"Freely Available" means that no fee is charged for the item/) {
+            $href->{"LICENSE"} = "Artistic";   
+        } elsif ($contents =~ /Regents of the University of California/) {
+            $href->{"LICENSE"} = "BSD";
+        } elsif ($contents =~ /IBM PUBLIC LICEN[CS]E VERSION (\S+)/) {
+            $href->{"LICENSE"} = "IBM Public License, Version $1";
+        } elsif ($contents =~ /PSF LICEN[CS]E AGREEMENT/) {
+            $href->{"LICENSE"} = "Python License";
+        } elsif ($contents =~ /Mozilla Public License/) {
+            $href->{"LICENSE"} = "Mozilla Public License (MPL)";
+        } elsif ($contents =~ /copyright notice and this permission notice/) {
+            $href->{"LICENSE"} = "BSD-like";
+        } elsif ($contents =~ /must include the following acknowledgment/) {
+            $href->{"LICENSE"} = "BSD with mandatory acknowledgement clause";
+        } elsif ($contents =~ /all copies of the Software, its documentation and marketing/) {
+            $href->{"LICENSE"} = "BSD with advertising clause";
+        } elsif ($contents =~ /Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions/) {
+            $href->{"LICENSE"} = "BSD-like";
+        } elsif ($contents =~ /Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions/) {
+            $href->{"LICENSE"} = "BSD-like";
+        } elsif ($contents =~ /copyright notice and this permission notice/) {
+            $href->{"LICENSE"} = "BSD-like";
         }
-
-        ### Scan for license.
-        foreach my $license (grep { $_ =~ /^(COPYING|LICEN[CS]E)$/ } @filelist) {
-            my $contents = &cat_file("$topdir/$license");
-
-            $contents =~ s/\s+/ /gs;
-            if ($contents =~ /GNU GENERAL PUBLIC LICEN[CS]E/) {
-                $href->{"LICENSE"} = "GPL";
-            } elsif ($contents =~ /GNU (LESSER|LIBRARY) GENERAL PUBLIC LICEN[CS]E/) {
-                $href->{"LICENSE"} = "LGPL";
-            } elsif ($contents =~ /The Apache Software Licen[cs]e/) {
-                $href->{"LICENSE"} = "Apache";
-            } elsif ($contents =~ /^\s*Apache Licen[cs]e/) {
-                $href->{"LICENSE"} = "Apache";
-            } elsif ($contents =~ /"Freely Available" means that no fee is charged for the item/) {
-                $href->{"LICENSE"} = "Artistic";   
-            } elsif ($contents =~ /Regents of the University of California/) {
-                $href->{"LICENSE"} = "BSD";
-            } elsif ($contents =~ /IBM PUBLIC LICEN[CS]E VERSION (\S+)/) {
-                $href->{"LICENSE"} = "IBM Public License, Version $1";
-            } elsif ($contents =~ /PSF LICEN[CS]E AGREEMENT/) {
-                $href->{"LICENSE"} = "Python License";
-            } elsif ($contents =~ /Mozilla Public License/) {
-                $href->{"LICENSE"} = "Mozilla Public License (MPL)";
-            } elsif ($contents =~ /copyright notice and this permission notice/) {
-                $href->{"LICENSE"} = "BSD-like";
-            } elsif ($contents =~ /must include the following acknowledgment/) {
-                $href->{"LICENSE"} = "BSD with mandatory acknowledgement clause";
-            } elsif ($contents =~ /all copies of the Software, its documentation and marketing/) {
-                $href->{"LICENSE"} = "BSD with advertising clause";
-            } elsif ($contents =~ /Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions/) {
-                $href->{"LICENSE"} = "BSD-like";
-            } elsif ($contents =~ /Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions/) {
-                $href->{"LICENSE"} = "BSD-like";
-            } elsif ($contents =~ /copyright notice and this permission notice/) {
-                $href->{"LICENSE"} = "BSD-like";
-            }
-        }
-
     }
 
     chdir($savecwd);
@@ -373,7 +388,7 @@ watch_install(\%)
     my ($tmpdir, $savecwd, $buildroot, $err, $msg, $outfiles);
     my @filelist;
     my %replace_paths = (
-                         "/var/www" -> "%{webroot}",
+                         "/var/www" => "%{webroot}",
                          "/usr/bin" => "%{_bindir}",
                          "/usr/sbin" => "%{_sbindir}",
                          "/usr/libexec" => "%{_libexecdir}",
@@ -417,6 +432,8 @@ watch_install(\%)
 
         @filelist = grep { $_ !~ /^d/ && $_ !~ m^/usr/share/doc^ } @filelist;
         for (my $i = 0; $i < scalar(@filelist); $i++) {
+            chomp($filelist[$i]);
+            $filelist[$i] =~ s/\s+->\s+.*$//;
             $filelist[$i] =~ s/^[-a-z]+\s+\d+\s+.{16}\s+\d+\s+\w+\s+\d+\s+[\d:]+\s+//;
             if (! $filelist[$i]) {
                 splice(@filelist, $i, 1);
@@ -451,7 +468,7 @@ main
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.8 $ created on $Date: 2005/01/03 01:34:49 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.9 $ created on $Date: 2005/02/04 02:42:48 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || !scalar(@ARGV)) {
 	&print_usage_info();
     }

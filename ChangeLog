@@ -697,3 +697,55 @@ Fri Jan 28 19:35:42 2005                        Michael Jennings (mej)
 Keep logfile if we actually built the package, even if it succeeded
 before.  This should fix bug#744.
 ----------------------------------------------------------------------
+Thu Feb  3 21:30:05 2005                        Michael Jennings (mej)
+
+This is a pretty huge changeset, and I've been working on parts of it
+for ages, so bear with me.  Here's the list:
+
+Added --allow-epoch (and --noallow-epoch) to build configuration
+(ALLOW_EPOCH) and buildtool/pkgtool command lines.  This will allow
+handling of non-cAos epoch-encumbered packages (like those from
+CentOS).  The default is to allow, so the cAos build system will need
+to be updated to pass --noallow-epoch.
+
+Cleaned up the ordering of some things in the spec file.
+
+Fixed a bug in specgen with *.zip source tarballs.
+
+Added support for .jar files.  To go along with this, I added a
+template which will create a proper package from nothing but a single
+JAR file.  It autocreates a script in /usr/bin/ to invoke it.
+
+Added a qmake template for packages with Makefile.pro.
+
+Fixed a typo in the replacement macro paths.
+
+Fixed the extra newline on the end of the filelist items and removed
+the symlink target info.
+
+Added a "move" method to the CVS module which now replaces the
+&move_package_files() functionality that was in srctool.  This will be
+a big help when doing Subversion too.
+
+Added taint checks to Config module and fixed an issue with get/set
+for empty/zero/undefined data.
+
+Changed Epoch error to warning when converting an SRPM to an SPM.
+
+Added the ability to have text-only templates in the Template module;
+i.e., no on-disk file is needed.  This is helpful for doing
+single-string token replacement.
+
+Added taint checks to the Util module along with some new routines to
+convert an integer into an expression of bytes (kB, MB, GB, etc.), to
+remove leading/trailing whitespace, and to forceably truncate a file
+in a safe-for-open-files manner.
+
+Moved the mzsync functionality to the CVS module in a similar manner
+as the mzmv functionality (see above).
+
+Fixed some symlink-handling bugs in the CVS module.
+
+I expect to have caused some problems, so please test this one, but
+don't get rid of your 1.8-0.19 RPM just yet. :-)
+----------------------------------------------------------------------

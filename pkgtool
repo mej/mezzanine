@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.66 2004/09/01 00:26:19 mej Exp $
+# $Id: pkgtool,v 1.67 2005/02/04 02:42:48 mej Exp $
 #
 
 use strict;
@@ -44,7 +44,7 @@ my $config;
 my @config_vars = ("DEBUG", "TARGET", "CLEAN", "LOGFILE", "HINTS",
                    "DEP_INSTALLER", "LOCATIONS", "BUILDUSER",
                    "INSTROOT", "BUILDROOT", "TMPDIR", "MAKE",
-                   "MFLAGS", "CFLAGS", "PATH");
+                   "MFLAGS", "CFLAGS", "PATH", "ALLOW_EPOCH");
 
 # Print usage information
 sub
@@ -82,6 +82,7 @@ print_usage_info
     print "       --di --dep-installer <prog>   Specify the mechanism used to install build dependencies\n";
     print "       --tar <tarcmd>                Use <tarcmd> as the \"tar\" command\n";
     print "       --zip <zipcmd>                Use <zipcmd> as the compression program\n";
+    print "       --allow-epoch                 Allow Epoch in spec file (prepend \"no\" to disallow)\n";
     print "\n";
     exit(MEZZANINE_SUCCESS);
 }
@@ -99,12 +100,12 @@ main
                "rcfile|R=s", "tar=s", "zip=s", "destdir|D=s",
                "root|r=s", "hints|H=s",
                "depinstaller|dep-installer|hint-installer|hi|di=s",
-               "user|u=s", "savecfg|save-config");
+               "user|u=s", "allow-epoch!", "savecfg|save-config");
 
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.66 $ created on $Date: 2004/09/01 00:26:19 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.67 $ created on $Date: 2005/02/04 02:42:48 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || (!scalar(@ARGV) && !scalar(%OPTION) && &basename($0) !~ /^mz/)) {
         &print_usage_info();
     }
@@ -167,6 +168,14 @@ main
             &pkgvar_filename(".");
         }
     }
+
+    # Epoch toggle
+    if (defined($OPTION{"allow-epoch"})) {
+        &pkgvar_set("allow_epoch", $OPTION{"allow-epoch"});
+    } elsif (defined($config->get("ALLOW_EPOCH"))) {
+        &pkgvar_set("allow_epoch", $config->get("ALLOW_EPOCH"));
+    }
+    $config->set("ALLOW_EPOCH", &pkgvar_get("allow_epoch"));
 
     # Handle hint file/directory specification
     $config->set("HINTS", $OPTION{"hints"} || $config->get("HINTS") || $ENV{"MEZZANINE_HINTS"} || "");

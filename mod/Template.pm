@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Template.pm,v 1.3 2004/06/04 17:16:40 mej Exp $
+# $Id: Template.pm,v 1.4 2005/02/04 02:42:48 mej Exp $
 #
 
 package Mezzanine::Template;
@@ -55,6 +55,7 @@ sub import { goto &Exporter::import }
 # Constants
 
 struct "Mezzanine::Template" => {
+    "text" => "\$",
     "file" => "\$",
     "directory" => "\$",
     "delimiter" => "\$",
@@ -101,15 +102,10 @@ sub
 add_var($$)
 {
     my ($self, $var, $val) = @_;
-    my $fref;
     my $href;
 
-    # Make sure we have that property (really a method) before calling it.
-    $fref = $self->can($var);
-    if (defined($fref)) {
-        $href = &{$fref}($self);
-        $href->{$var} = $val;
-    }
+    $href = $self->vars();
+    $href->{$var} = $val;
     return $val;
 }
 
@@ -118,13 +114,12 @@ sub
 del_var($$)
 {
     my ($self, $var) = @_;
-    my $fref;
     my $href;
 
-    # Make sure we have that property (really a method) before calling it.
-    $fref = $self->can($var);
-    if (defined($fref)) {
-        $href = &{$fref}($self);
+    my $href;
+
+    $href = $self->vars();
+    if (exists($href->{$var})) {
         delete $href->{$var};
         return 1;
     } else {
@@ -140,6 +135,9 @@ find(@)
     my @dirs = @_;
     my $template = $self->file();
 
+    if ($self->text()) {
+        return "";
+    }
     push @dirs, @INC;
     push @dirs, &getcwd();
     foreach my $dir (@dirs) {
@@ -162,7 +160,9 @@ verify()
     my $self = shift;
     my $pathname = sprintf("%s/%s", $self->directory(), $self->file());
 
-    if (-f $pathname) {
+    if ($self->text()) {
+        return 1;
+    } elsif (-f $pathname) {
         return 1;
     } else {
         return 0;
@@ -193,11 +193,15 @@ generate($)
     my ($filename, $directory, $contents);
     local *DATAFILE;
 
-    $filename = $self->file();
-    $directory = $self->directory();
-    open(DATAFILE, "$directory/$filename") || return undef;
-    $contents = join("", <DATAFILE>);
-    close(DATAFILE);
+    if ($self->text()) {
+        $contents = $self->text();
+    } else {
+        $filename = $self->file();
+        $directory = $self->directory();
+        open(DATAFILE, "$directory/$filename") || return undef;
+        $contents = join("", <DATAFILE>);
+        close(DATAFILE);
+    }
 
     $contents = $self->subst($contents);
 

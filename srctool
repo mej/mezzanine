@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.55 2004/10/29 20:35:28 mej Exp $
+# $Id: srctool,v 1.56 2005/02/04 02:42:48 mej Exp $
 #
 
 use strict;
@@ -763,62 +763,13 @@ move_package_files
     $scm->propset("handle_output", 0);
     $scm->propset("saved_output", \@output);
 
-    if ((scalar(@flist) > 1) && (! -d $target)) {
-        # When moving multiple files, the target must be a directory.
-        # It's not there, so create it for the user and add it.
-        mkdir $target, 0775;
-        if (! $local_mode) {
-            $err = $scm->add($target);
-            if ($err != MEZZANINE_SUCCESS && $err != MEZZANINE_DUPLICATE) {
-                print @output;
-                eprint "Unable to add target directory $target to repository.  (See above error(s).)\n";
-                return $err;
-            }
-        }
-    }
-
-    if (&move_files(@flist, $target) != scalar(@flist)) {
-        eprint "Error moving files.\n";
-        return MEZZANINE_SYSTEM_ERROR;
-    }
-
-    if ($local_mode && $scm) {
-        print "Files have been moved, but no contact was made with the respository.  Run \"mzsync\" when ready.\n";
-        return MEZZANINE_SUCCESS;
-    } elsif ($local_mode) {
-        print "Move complete.\n";
-        return MEZZANINE_SUCCESS;
-    }
-
-    @rm = @flist;
-    if (-d $target) {
-        $target .= '/' if ($target !~ /\/$/);
-        foreach my $f (@flist) {
-            push @add, $target . &basename($f);
-        }
-    } else {
-        push @add, $target;
-    }
-
-    @output = ();
-    $err = $scm->remove(@rm);
+    $err = $scm->move(@flist, $target);
     if ($err != MEZZANINE_SUCCESS) {
         print @output;
-        eprint "Unable to remove files from repository.  (See above error(s).)\n";
+        eprint "Unable to move files.  (See above error(s).)\n";
         return $err;
     }
 
-    @output = ();
-    $err = $scm->add(@add);
-    if ($err != MEZZANINE_SUCCESS && $err != MEZZANINE_DUPLICATE) {
-        print @output;
-        eprint "Unable to add files/directories to repository.  (See above error(s).)\n";
-        return $err;
-    }
-
-    print "Removed files:  " . join(" ", @rm) . "\n";
-    print "Added files:  " . join(" ", @add) . "\n";
-    print "Move complete.  Your changes will not be finalized until you 'mzput' them.\n";
     return MEZZANINE_SUCCESS;
 }
 
@@ -837,7 +788,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.55 $ created on $Date: 2004/10/29 20:35:28 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.56 $ created on $Date: 2005/02/04 02:42:48 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();

@@ -83,6 +83,7 @@ $orig_pkg_vars{"zip"} = "";
 $orig_pkg_vars{"cleanup"} = "none";
 $orig_pkg_vars{"builduser"} = $ENV{"USER"};
 $orig_pkg_vars{"buildpkglist_filename"} = "";
+$orig_pkg_vars{"allow_epoch"} = 1;
 %{$orig_pkg_vars{"type"}} = ();
 %{$orig_pkg_vars{"subtype"}} = ();
 
@@ -126,7 +127,7 @@ sub
 pkgvar_get($)
 {
     dprintf("Package variable \"%s\" -> \"%s\"\n", $_[0],
-            (($pkg_vars{$_[0]}) ? ($pkg_vars{$_[0]}) : ("")));
+            ((defined($pkg_vars{$_[0]})) ? ($pkg_vars{$_[0]}) : ("<undef>")));
     return $pkg_vars{$_[0]};
 }
 
@@ -156,11 +157,12 @@ pkgvar_set(%)
         my $param = $new_pkg_vars{$var};
 
         if (defined($param)) {
-            $pkg_vars{$var} = ($param ?  $param : $orig_pkg_vars{$var});
+            dprint "Setting $var\n";
+            $pkg_vars{$var} = $param;
         }
         $ret = $pkg_vars{$var};
         dprintf("Package variable \"%s\" -> \"%s\"\n", $var,
-                (($ret) ? ($ret) : ("")));
+                ((defined($ret)) ? ($ret) : ("<undef>")));
     }
     return $ret;
 }

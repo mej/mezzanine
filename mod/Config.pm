@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Config.pm,v 1.4 2004/06/22 23:10:07 mej Exp $
+# $Id: Config.pm,v 1.5 2005/02/04 02:42:48 mej Exp $
 #
 
 package Mezzanine::Config;
@@ -46,6 +46,7 @@ BEGIN {
 use vars ('@EXPORT_OK');
 
 ### Private global variables
+my $UNDEF_SENTINAL = "!!<undef>!!";
 
 ### Initialize exported package variables
 
@@ -71,6 +72,11 @@ load($)
 
     $config_type =~ s/::/\//g;
     $filename = sprintf("%s/.mezz/%s", $ENV{"HOME"}, $config_type);
+    if ($filename =~ m!^(/[^\`\'\"]*)$!) {
+        $filename = $1;
+    } else {
+        return;
+    }
 
     $path = &dirname($filename);
     if (! -d $path) {
@@ -146,6 +152,7 @@ get($)
     my $self = shift;
     my $key = shift;
 
+    dprintf("Config::get(%s):  %s\n", $key, ((exists($self->{$key})) ? ($self->{$key}) : ("<undef>")));
     return ((exists($self->{$key})) ? ($self->{$key}) : (undef));
 }
 
@@ -155,6 +162,7 @@ set($)
     my $self = shift;
     my $key = shift;
 
+    dprintf("Config::set(%s):  %s\n", $key, ((defined($_[0])) ? ($_[0]) : ("<undef>")));
     return ($self->{$key} = $_[0]);
 }
 
@@ -194,9 +202,9 @@ save_config_cdf()
         eprint "Unable to open $self->{__FILENAME} -- $!\n";
         return;
     }
-        foreach my $key (sort(grep { substr($_, 0, 2) ne "__" } keys(%{$self}))) {
-            print CFG "$key:", join(':', @{$self->{$key}}), "\n";
-        }
+    foreach my $key (sort(grep { substr($_, 0, 2) ne "__" } keys(%{$self}))) {
+        print CFG "$key:", join(':', @{$self->{$key}}), "\n";
+    }
     close(CFG);
 }
 
@@ -238,7 +246,11 @@ load_config_vars()
         chomp($line = $_);
         ($key, $value) = split(/ = /, $line, 2);
         xpush @{$self->{"__KEYS"}}, $key;
-        $self->{$key} = $value;
+        if ($value eq $UNDEF_SENTINAL) {
+            $self->{$key} = undef;
+        } else {
+            $self->{$key} = $value;
+        }
 
         # Create an anonymous subroutine which matches the given key
         # as an "accessor" member function to the Mezzanine::Config class.
@@ -266,7 +278,7 @@ save_config_vars()
     }
 
     foreach my $key (sort(grep { substr($_, 0, 2) ne "__" } keys(%{$self}))) {
-        printf CFG "%s = %s\n", $key, (($self->{$key}) ? ($self->{$key}) : (""));
+        printf CFG "%s = %s\n", $key, ((defined($self->{$key})) ? ($self->{$key}) : ($UNDEF_SENTINAL));
     }
     close(CFG);
 }

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.202 2005/01/29 00:36:40 mej Exp $
+# $Id: buildtool,v 1.203 2005/02/04 02:42:48 mej Exp $
 #
 
 use strict;
@@ -68,7 +68,8 @@ my @config_vars = ("DEBUG", "VERBOSITY", "TARGET", "BUILDTREE_LAYOUT",
                    "INSTROOT", "INSTROOT_INIT", "INSTROOT_COPY",
                    "INSTROOT_RESET", "INSTROOT_SOURCE_RSYNC",
                    "BUILDROOT", "TMPDIR", "MAKE", "MFLAGS", "CFLAGS",
-                   "PATH", "RETRY", "REBUILD", "PRODUCTS", "LOGDIR");
+                   "PATH", "RETRY", "REBUILD", "PRODUCTS", "LOGDIR",
+                   "ALLOW_EPOCH");
 
 # Print usage information
 sub
@@ -111,6 +112,7 @@ print_usage_info
     print "       --retry                       Retry packages which have previously failed to build\n";
     print "       --rebuild                     Rebuild previously successful packages for verification\n";
     print "       --clean                       Clean up RPM and buildroot directories when done\n";
+    print "       --allow-epoch                 Allow Epoch in spec file (prepend \"no\" to disallow)\n";
     print "       --savecfg                     Preserve current settings for future use\n";
     print "\n";
     exit(MEZZANINE_SUCCESS);
@@ -1065,11 +1067,12 @@ main
                "depinstaller|dep-installer|hint-installer|hi|di=s",
                "instroot-init|ii=s", "instroot-reset|ir=s",
                "instroot-copy|ic=s", "user|u=s", "buildtree|b=s",
-               "builddir=s", "retry", "rebuild", "savecfg!");
+               "builddir=s", "retry", "rebuild", "allow-epoch!",
+               "savecfg!");
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.202 $ created on $Date: 2005/01/29 00:36:40 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.203 $ created on $Date: 2005/02/04 02:42:48 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
@@ -1123,6 +1126,14 @@ main
     $config->set("CLEAN", &pkgvar_cleanup($OPTION{"clean"} || $config->get("CLEAN") || $config->get("BUILDTREE_LAYOUT")));
     $config->set("TARGET", &pkgvar_target($OPTION{"target"} || $config->get("TARGET") || ""));
     $config->set("REBUILD", $OPTION{"rebuild"} || $config->get("REBUILD") || 0);
+
+    # Epoch toggle
+    if (defined($OPTION{"allow-epoch"})) {
+        &pkgvar_set("allow_epoch", $OPTION{"allow-epoch"});
+    } elsif (defined($config->get("ALLOW_EPOCH"))) {
+        &pkgvar_set("allow_epoch", $config->get("ALLOW_EPOCH"));
+    }
+    $config->set("ALLOW_EPOCH", &pkgvar_get("allow_epoch"));
 
     # SCM stuff.
     $config->set("DEFAULT_SCM", $config->get("DEFAULT_SCM") || "cvs");

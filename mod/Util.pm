@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.49 2004/10/29 20:35:28 mej Exp $
+# $Id: Util.pm,v 1.50 2005/02/04 02:42:48 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -49,13 +49,14 @@ BEGIN {
                '&eprint', '&wprintf', '&wprint', '&handle_signal',
                '&handle_fatal_signal', '&install_signal_handlers',
                '&handle_warning', '&show_backtrace', '&print_args',
-               '&mkdirhier', '&nuke_tree', '&move_files',
-               '&copy_files', '&copy_tree', '&get_temp_dir',
-               '&create_temp_space', '&clean_temp_space', '&basename',
-               '&dirname', '&grepdir', '&limit_files', '&xpush',
+               '&int_to_bytes', '&mkdirhier', '&nuke_tree',
+               '&move_files', '&copy_files', '&copy_tree',
+               '&get_temp_dir', '&create_temp_space',
+               '&clean_temp_space', '&basename', '&dirname',
+               '&grepdir', '&limit_files', '&str_trim', '&xpush',
                '&cat_file', '&parse_rpm_name', '&should_ignore',
-               '&touch_file', '&newest_file', '&run_cmd',
-               '&run_mz_cmd', '&MEZZANINE_SUCCESS',
+               '&trunc_file', '&touch_file', '&newest_file',
+               '&run_cmd', '&run_mz_cmd', '&MEZZANINE_SUCCESS',
                '&MEZZANINE_FATAL_ERROR', '&MEZZANINE_SYNTAX_ERROR',
                '&MEZZANINE_SYSTEM_ERROR', '&MEZZANINE_COMMAND_FAILED',
                '&MEZZANINE_DUPLICATE', '&MEZZANINE_FILE_NOT_FOUND',
@@ -118,6 +119,7 @@ sub install_signal_handlers();
 sub handle_warning(@);
 sub show_backtrace();
 sub print_args(@);
+sub int_to_bytes($);
 sub mkdirhier($$);
 sub nuke_tree($);
 sub move_files(@);
@@ -129,11 +131,13 @@ sub clean_temp_space($);
 sub basename($);
 sub dirname($);
 sub grepdir(& $);
+sub str_trim(\$);
 sub xpush(\@; @);
 sub limit_files(@ $);
 sub cat_file($);
 sub parse_rpm_name($);
 sub should_ignore($);
+sub trunc_file($);
 sub touch_file($);
 sub newest_file($);
 sub handle_alarm_for_subcommand(@);
@@ -495,6 +499,25 @@ print_args(@)
     return "Args:  \"" . join("\", \"", @args) . "\"\n";
 }
 
+# Convert an integer to a bytes term.
+sub
+int_to_bytes($)
+{
+    my $num = $_[0];
+    my ($suffix, $remainder);
+    my @suffixes = ('B', "kB", "MB", "GB", "TB", "PB", "EB");
+
+    for ($suffix = 0; $num >= 1024; $suffix++) {
+        $remainder = $num % 1024;
+        $num = sprintf("%7.6f", ($num / 1024));
+    }
+    $num = sprintf("%2.1f", $num);
+    if (substr($num, -2, 2) eq ".0") {
+        $num = int($num);
+    }
+    return $num . $suffixes[$suffix];
+}
+
 # Make a directory hierarchy
 sub
 mkdirhier($$)
@@ -544,6 +567,11 @@ nuke_tree($)
     my @files;
     local *DIR;
 
+    if ($path =~ /^([^\0\`]+)$/) {
+        $path = $1;
+    } else {
+        return;
+    }
     if ((-d $path) && !(-l $path)) {
         opendir(DIR, $path) || return 0;
         @files = readdir(DIR);
@@ -629,9 +657,18 @@ copy_files(@)
     my $addname = 0;
 
     if (!scalar(@flist)) {
+        # Nothing to do!
         return 0;
-    }
-    if (-d $dest) {
+    } elsif ((! -d $dest) && (! -d $flist[0]) && (scalar(@flist) == 1)) {
+        my $fname = $flist[0];
+
+        # One-to-one file copy.
+        dprint "Copying file $fname to $dest.\n";
+        if (&File::Copy::copy($fname, $dest)) {
+            $fcnt = 1;
+        }
+        return $fcnt;
+    } elsif (-d $dest) {
         # We'll need to add the filename to the dest each time
         $dest .= '/' if ($dest !~ /\/$/);
         $addname = 1;
@@ -784,7 +821,9 @@ basename($)
 {
     my $path = $_[0];
 
-    $path =~ s/^.*\/([^\/]+)$/$1/;
+    if ($path) {
+        $path =~ s/^.*\/([^\/]+)$/$1/;
+    }
     return $path;
 }
 
@@ -794,7 +833,9 @@ dirname($)
 {
     my $path = $_[0];
 
-    $path =~ s/^(.*)\/[^\/]+$/$1/;
+    if ($path) {
+        $path =~ s/^(.*)\/[^\/]+$/$1/;
+    }
     return $path;
 }
 
@@ -829,13 +870,32 @@ limit_files(@ $)
     local *DIR;
 
     @contents = &grepdir(sub {! -d $_}, $dir);
+    if (!scalar(@contents)) {
+        # Nothing to remove.
+        return 1;
+    }
     foreach my $f (@contents) {
-        if (!grep($_ eq &basename($f), @files)) {
+        if (!scalar(@files) || !grep($_ eq &basename($f), @files)) {
             dprint "Removing $f\n";
             unlink($f) || eprint "Unable to remove $f -- $!\n";
         }
     }
     return 1;
+}
+
+# Trim whitespace
+sub
+str_trim(\$)
+{
+    my $str_ref = shift;
+
+    if (ref($str_ref)) {
+        ${$str_ref} =~ s/^\s*(.*)\s*$/$1/g;
+        return ${$str_ref};
+    } else {
+        $str_ref =~ s/^\s*(.*)\s*$/$1/g;
+        return $str_ref;
+    }
 }
 
 # Exclusive push.  Only push if the item(s) aren't already in the list
@@ -857,6 +917,11 @@ cat_file($)
     my $filename = $_[0];
     my $contents = "";
 
+    if ($filename =~ /^([^\0\`]+)$/) {
+        $filename = $1;
+    } else {
+        return;
+    }
     open(FF, "$filename") || return undef;
     $contents = join("", <FF>);
     close(FF);
@@ -895,11 +960,31 @@ should_ignore($)
 }
 
 sub
+trunc_file($)
+{
+    my $file = $_[0];
+    local *TMP;
+
+    if ($file =~ /^([^\0\`]+)$/) {
+        $file = $1;
+    } else {
+        return;
+    }
+    open(TMP, ">$file") && close(TMP);
+    chown($mz_uid, $mz_gid, $file);
+}
+
+sub
 touch_file($)
 {
     my $file = $_[0];
     local *TMP;
 
+    if ($file =~ /^([^\0\`]+)$/) {
+        $file = $1;
+    } else {
+        return;
+    }
     open(TMP, ">$file") && close(TMP);
     chown($mz_uid, $mz_gid, $file);
 }

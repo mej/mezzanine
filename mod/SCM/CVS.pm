@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: CVS.pm,v 1.10 2004/08/25 21:34:39 mej Exp $
+# $Id: CVS.pm,v 1.11 2005/02/04 02:42:48 mej Exp $
 #
 
 package Mezzanine::SCM::CVS;
@@ -54,6 +54,10 @@ my %DEFAULT_VALUES = (
                       "command" => "cvs",
                       "repository" => "",
                       "operation" => "",
+                      "private" => {
+                                    "files" => [ '' ],
+                                    "dirs" => [ '^CVS$' ]
+                                   },
 
                       # Options
                       "local_mode" => 0,
@@ -455,7 +459,9 @@ sub
 add(@)
 {
     my ($self, @files) = @_;
+    my $err;
     my @params = ("add");
+    my @dirs = ();
 
     dprint &print_args(@_);
     if ($self->{"local_mode"}) {
@@ -467,6 +473,7 @@ add(@)
         return MEZZANINE_BAD_ADDITION;
     }
 
+    # Set up our parameters.
     if ($self->{"keyword_expansion"} eq "auto") {
         push @params, $KEYWORD_EXPANSION{&get_file_type($files[0])};
     } elsif ($self->{"keyword_expansion"}) {
@@ -474,7 +481,36 @@ add(@)
     } else {
         push @params, $KEYWORD_EXPANSION{"default"};
     }
-    return $self->talk_to_server("add", @params, @files);
+
+    # Find all the directories so we can add them first.
+    for (my $i = 0; $i < scalar(@files); $i++) {
+        if (-d $files[$i]) {
+            # It's a directory.  Put it in the dirs list.
+            push @dirs, $files[$i];
+            &find({ "no_chdir" => 1, "wanted" => sub { ($_ ne $files[$i]) && -d $_ && push @dirs, $_ } }, $files[$i]);
+            splice(@files, $i, 1);
+            $i--;
+        }
+    }
+
+    dprintf("Adding dirs:  \"%s\"\n", join("\", \"", @dirs));
+    if (scalar(@dirs)) {
+        $err = $self->talk_to_server("add", @params, @dirs);
+        if ($err != MEZZANINE_SUCCESS) {
+            return $err;
+        }
+    }
+
+    foreach my $dir (@dirs) {
+        xpush @files, &grepdir(sub { -f $_ && -s _ }, $dir);
+    }
+    dprintf("Adding files:  \"%s\"\n", join("\", \"", @files));
+
+    if (scalar(@files)) {
+        return $self->talk_to_server("add", @params, @files);
+    } else {
+        return MEZZANINE_SUCCESS;
+    }
 }
 
 sub
@@ -495,6 +531,167 @@ remove()
 
     push @params, (($self->{"recursion"}) ? ("-R") : ("-l"));
     return $self->talk_to_server("remove", @params, @files);
+}
+
+sub
+move(@)
+{
+    my ($self, @flist) = @_;
+    my ($target, $err, $done);
+    my (@output, @add, @rm);
+
+    $target = pop(@flist);
+
+    if ((scalar(@flist) == 1) && (-d $flist[0])) {
+        if (&copy_tree($flist[0], $target) < 1) {
+            my_eprint($self, "Error moving files.\n");
+            return MEZZANINE_SYSTEM_ERROR;
+        }
+
+        # Get rid of any metadata files/directories in the new copy.
+        @rm = $self->find_metadata($target);
+        foreach my $dir (@rm) {
+            dprint "Removing metadata $dir.\n";
+            &nuke_tree($dir);
+        }
+    } else {
+        if ((scalar(@flist) > 1) && (! -d $target)) {
+            # When moving multiple files, the target must be a directory.
+            # It's not there, so create it for the user.
+            if (&mkdirhier($target) != MEZZANINE_SUCCESS) {
+                my_eprint($self, "Unable to create $target -- $!\n");
+                return MEZZANINE_SYSTEM_ERROR;
+            }
+        }
+
+        if (&copy_files(@flist, $target) < scalar(@flist)) {
+            my_eprint($self, "Error moving files.\n");
+            return MEZZANINE_SYSTEM_ERROR;
+        }
+    }
+
+    if ($self->{"local_mode"}) {
+        my_print($self, "Files have been moved, but no contact was made with the respository.  Run \"mzsync\" when ready.\n");
+        return MEZZANINE_SUCCESS;
+    }
+
+    @rm = @flist;
+    if (-d $target) {
+        if ((scalar(@rm) == 1) && (-d $rm[0])) {
+            push @add, $target;
+        } else {
+            $target .= '/' if ($target !~ /\/$/);
+            foreach my $f (@flist) {
+                push @add, $target . &basename($f);
+            }
+        }
+    } else {
+        push @add, $target;
+    }
+
+    $err = $self->remove(@rm);
+    if ($err != MEZZANINE_SUCCESS) {
+        my_eprint($self, "Unable to remove files from repository.  (See above error(s).)\n");
+        return $err;
+    }
+
+    $err = $self->add(@add);
+    if ($err != MEZZANINE_SUCCESS && $err != MEZZANINE_DUPLICATE) {
+        my_eprint($self, "Unable to add files/directories to repository.  (See above error(s).)\n");
+        return $err;
+    }
+
+    my_print($self, "Removed files:  " . join(" ", @rm) . "\n");
+    my_print($self, "Added files:  " . join(" ", @add) . "\n");
+    my_print($self, "Move complete.  Your changes will not be finalized until you 'mzput' them.\n");
+    return MEZZANINE_SUCCESS;
+}
+
+# Sync SCM state with your current working copy.
+sub
+sync(@)
+{
+    my ($self, $dir) = @_;
+    my ($err, $done, $savecwd, $handle_output, $saved_output);
+    my (@output, @new, @old, @add, @rm);
+
+    $savecwd = &getcwd();
+    if ($dir && !chdir($dir)) {
+        my_eprint($self, "Unable to chdir to $dir -- $!\n");
+        return MEZZANINE_SYSTEM_ERROR;
+    }
+
+    # Save previous values, then redirect output to @output.
+    $handle_output = $self->propget("handle_output");
+    $saved_output = $self->propget("saved_output");
+    $self->propset("handle_output", 0);
+    $self->propset("saved_output", \@output);
+    $err = $self->get();
+    if ($err != MEZZANINE_SUCCESS) {
+        $self->propset("handle_output", $handle_output);
+        $self->propset("saved_output", $saved_output);
+        my_print($self, @output);
+        my_eprint($self, "Unable to sync repository to working copy in $dir.  (See above error(s).)\n");
+        return $err;
+    }
+    foreach my $a (grep(/^\?\s/, @output)) {
+        chomp($a);
+        $a =~ s/^\?\s+//;
+        if (($a ne "build.mezz") && ($a ne "work") && ($a ne "work+patched")
+            && ($a !~ /\.rpm$/) && ($a !~ /\.deb$/)) {
+            push @add, $a;
+        }
+    }
+    push @new, @add;
+    foreach my $r (grep(/^U\s/, @output)) {
+        chomp($r);
+        $r =~ s/^U\s+//;
+        push @rm, $r;
+    }
+    push @old, @rm;
+    if (! $self->{"local_mode"}) {
+        for (@output = (); scalar(@add); ) {
+            dprint "Adding...  ", join(" ", @add), "\n";
+            if ($self->add(@add) != MEZZANINE_SUCCESS) {
+                my_print($self, @output);
+                my_eprint($self, "Add for ", join(' ', @add), " failed.  (See above error(s).)\n");
+                next;
+            }
+            @add = ();
+            foreach my $a (grep(/^\?\s/, @output)) {
+                chomp($a);
+                $a =~ s/^\?\s+//;
+                push @add, $a;
+            }
+            push @new, @add;
+        }
+    }
+    if (scalar(@rm)) {
+        dprint "Removing...  ", join(" ", @rm), "\n";
+        if ($self->{"local_mode"}) {
+            foreach my $path (@rm) {
+                &nuke_tree($path);
+            }
+        } else {
+            if ($self->remove(@rm) != MEZZANINE_SUCCESS) {
+                my_eprint($self, "Remove for ", join(' ', @rm), " failed.  (See above error(s).)\n");
+                @old = ();
+            }
+        }
+    }
+
+    if (!scalar(@new) && !scalar(@old)) {
+        my_print($self, "No additions or removals were needed.\n");
+    } else {
+        if (scalar(@new)) {
+            my_print($self, "Added files/directories:  ", join(" ", sort(@new)), "\n");
+        }
+        if (scalar(@old)) {
+            my_print($self, "Removed files/directories:  ", join(" ", sort(@old)), "\n");
+        }
+    }
+    chdir($savecwd) if ($savecwd);
+    return MEZZANINE_SUCCESS;
 }
 
 sub
@@ -540,7 +737,7 @@ status(@)
     my @params = ("");
 
     dprint &print_args(@_);
-    eprint "This command is not supported by CVS.\n";
+    my_eprint($self, "This command is not supported by CVS.\n");
     return MEZZANINE_UNSUPPORTED;
 }
 
@@ -701,6 +898,32 @@ imprt()
     return $err;
 }
 
+# Find all internal SCM housekeeping files in a tree.
+
+sub
+find_metadata(@)
+{
+    my ($self, $dir) = @_;
+    my $save_cwd;
+    my @metadata;
+
+    dprint &print_args(@_);
+    File::Find::find({ "no_chdir" => 1,
+                       "wanted" => sub {
+                                       my $name = $File::Find::name;
+
+                                       if (-f $name && grep(&basename($name) =~ $_, @{$self->{"private"}{"files"}})) {
+                                           dprint "Found metadata file:  $name.\n";
+                                           push @metadata, $name;
+                                       } elsif (-d $name && grep(&basename($name) =~ $_, @{$self->{"private"}{"dirs"}})) {
+                                           dprint "Found metadata dir:  $name.\n";
+                                           push @metadata, $name;
+                                       }
+                                   }
+                     }, $dir);
+    return @metadata;
+}
+
 
 ### Private functions
 
@@ -719,7 +942,7 @@ create_symlink_file(@)
     if ($cnt) {
         dprint "Found $cnt symlinks.\n";
         if (!open(SYMLINKS, ">$path/.mezz.symlinks")) {
-            eprint "Unable to open $path/.mezz.symlinks for writing -- $!\n";
+            my_eprint($self, "Unable to open $path/.mezz.symlinks for writing -- $!\n");
             return MEZZANINE_SYSTEM_ERROR;
         }
         foreach my $link (sort keys %links) {
@@ -758,12 +981,12 @@ parse_symlink_file(@)
                 if (-l "$dirname/$link_from") {
                     unlink("$dirname/$link_from");
                 } else {
-                    eprint "Non-link file $link_from exists; can't create symlink to $link_to!\n";
+                    my_eprint($self, "Non-link file $link_from exists; can't create symlink to $link_to!\n");
                     next;
                 }
             }
             if (!symlink($link_to, "$dirname/$link_from")) {
-                eprint "Unable to symlink $link_from to $link_to -- $!\n";
+                my_eprint($self, "Unable to symlink $link_from to $link_to -- $!\n");
             }
         }
         close(SL);
