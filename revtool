@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.81 2002/02/26 19:59:03 mej Exp $
+# $Id: revtool,v 1.82 2003/06/02 17:06:11 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -112,6 +112,9 @@ main
     } elsif ($0 =~ /log$/) {
 	$mode = "query";
 	$query = 'l';
+    } elsif ($0 =~ /(ann|annotate|blame)$/) {
+	$mode = "query";
+	$query = 'a';
     } elsif ($0 =~ /(add|new)$/) {
         $mode = "add";
         $opt_a = 1;
@@ -152,7 +155,7 @@ main
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.81 $ created on $Date: 2002/02/26 19:59:03 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.82 $ created on $Date: 2003/06/02 17:06:11 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.18 2001/09/22 13:22:34 mej Exp $
+# $Id: Pkg.pm,v 1.19 2003/06/02 17:06:11 mej Exp $
 #
 
 package Mezzanine::Pkg;
@@ -41,7 +41,9 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('&fetch_package', '&package_install', '&package_show_contents', '&package_query');
+    @EXPORT      = ('&fetch_package', '&package_install',
+                    '&package_show_contents', '&package_query',
+                    '&package_compare_versions');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -60,6 +62,7 @@ sub fetch_package();
 sub package_install();
 sub package_show_contents();
 sub package_query($);
+sub package_compare_versions($$);
 
 # Private functions
 
@@ -158,6 +161,28 @@ package_query
         return &deb_query($query_type);
     } elsif ($pkg_type eq "tar") {
         return &tar_query($query_type);
+    }
+    return (MEZZANINE_BAD_PACKAGE, "Unable to identify package $pkg_file.\n");
+}
+
+sub
+package_compare_versions
+{
+    my ($v1, $v2) = @_;
+    my ($pkg_file, $pkg_type);
+
+    $pkg_file = &pkgvar_filename();
+    $pkg_type = &pkgvar_type();
+
+    if (! $pkg_file) {
+        return (MEZZANINE_SYNTAX_ERROR, "You cannot compare versions without specifying a package.\n");
+    }
+    if ($pkg_type eq "rpm") {
+        return &rpm_compare_versions($v1, $v2);
+    } elsif ($pkg_type eq "deb") {
+        return &deb_compare_versions($v1, $v2);
+    } elsif ($pkg_type eq "tar") {
+        return &tar_compare_versions($v1, $v2);
     }
     return (MEZZANINE_BAD_PACKAGE, "Unable to identify package $pkg_file.\n");
 }

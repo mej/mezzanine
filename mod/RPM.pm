@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.11 2002/06/24 15:51:55 mej Exp $
+# $Id: RPM.pm,v 1.12 2003/06/02 17:06:11 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -37,7 +37,9 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('$specdata', '&rpm_form_command', '&parse_spec_file', '&rpm_install', '&rpm_show_contents', '&rpm_query', '&rpm_build');
+    @EXPORT      = ('$specdata', '&rpm_form_command', '&parse_spec_file',
+                    '&rpm_install', '&rpm_show_contents', '&rpm_query',
+                    '&rpm_build', '&rpm_compare_versions');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -61,6 +63,7 @@ sub rpm_install();
 sub rpm_show_contents();
 sub rpm_query($);
 sub rpm_build($);
+sub rpm_compare_versions($$);
 
 # Private functions
 sub add_define($$);
@@ -368,6 +371,101 @@ rpm_build
     }
 
     return ($err, $msg, join(' ', @out_files));
+}
+
+#define CHAR_CLASS_MATCH(a, b)      ((isalpha(a) && isalpha(b)) \
+                                     || (isdigit(a) && isdigit(b)) \
+                                     || (!isalnum(a) && !isalnum(b)))
+
+sub
+rpm_compare_versions($$)
+{
+    my ($v1, $v2) = @_;
+
+    # Downcase everything right off the bat.
+    $v1 =~ tr/[A-Z]/[a-z]/;
+    $v2 =~ tr/[A-Z]/[a-z]/;
+
+    for (; 1; ) {
+        my ($s1, $s2);
+        my ($ival1, $ival2) = (0, 0);
+
+        if (($v1 =~ /^[a-z]+/) && ($v2 =~ /^[a-z]+/)) {
+
+            # Copy the initial alphanumeric portion of each version number
+            # into $s1 and $s2 for comparison.
+            $v1 =~ m/^([a-z]+)/;
+            $s1 = $1;
+            $v2 =~ m/^([a-z]+)/;
+            $s2 = $1;
+
+            # Some strings require special handling.
+            if ($v1 eq "snap") {
+                $ival1 = 1;
+            } elsif ($v1 eq "pre") {
+                $ival1 = 2;
+            } elsif ($v1 eq "alpha") {
+                $ival1 = 3;
+            } elsif ($v1 eq "beta") {
+                $ival1 = 4;
+            } elsif ($v1 eq "rc") {
+                $ival1 = 5;
+            }
+            if ($v2 eq "snap") {
+                $ival2 = 1;
+            } elsif ($v2 eq "pre") {
+                $ival2 = 2;
+            } elsif ($v2 eq "alpha") {
+                $ival2 = 3;
+            } elsif ($v2 eq "beta") {
+                $ival2 = 4;
+            } elsif ($v2 eq "rc") {
+                $ival2 = 5;
+            }
+            if ($ival1 != $ival2) {
+                # If the values are different, compare them.
+                return ($ival1 - $ival2);
+            } elsif ($s1 ne $s2) {
+                # Two arbitrary strings that differ.  Compare those normally.
+                return ($s1 <=> $s2);
+            }
+        } elsif (($v1 =~ /^\d+/) && ($v2 =~ /^\d+/)) {
+            # Copy the initial alphanumeric portion of each version number
+            # into $s1 and $s2 for comparison.
+            $v1 =~ m/^(\d+)/;
+            $s1 = $1;
+            $v2 =~ m/^(\d+)/;
+            $s2 = $1;
+
+            if ($s1 != $s2) {
+                return ($s1 <=> $s2);
+            }
+        } else {
+            # Copy the initial alphanumeric portion of each version number
+            # into $s1 and $s2 for comparison.
+            $v1 =~ m/^([^a-z0-9]+)/;
+            $s1 = $1;
+            $v2 =~ m/^([^a-z0-9]+)/;
+            $s2 = $1;
+
+            if ($s1 ne $s2) {
+                return ($s1 <=> $s2);
+            }
+        }
+        $v1 =~ s/^$s1//;
+        $v2 =~ s/^$s2//;
+        if (!length($v1) || !length($v2)) {
+            last;
+        }
+    }
+
+    # We've reached the end of one of the strings.
+    if (length($v1) {
+        return (($v1 =~ /^(snap|pre|alpha|beta|rc)/) ? (-1) : (1));
+    } elsif (length($v2)) {
+        return (($v2 =~ /^(snap|pre|alpha|beta|rc)/) ? (1) : (-1));
+    }
+    return 0;
 }
 
 ### Private functions

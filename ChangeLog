@@ -175,3 +175,8 @@ Mon Jun  2 12:30:45 2003                        Michael Jennings (mej)
 
 Don't commit right away, just add/remove stuff.
 ----------------------------------------------------------------------
+Mon Jun  2 14:42:30 2003                        Michael Jennings (mej)
+
+Working on fixing uptool to not nuke packages of other architectures
+than the current one.
+----------------------------------------------------------------------

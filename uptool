@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: uptool,v 1.13 2003/06/02 16:31:02 mej Exp $
+# $Id: uptool,v 1.14 2003/06/02 17:06:11 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -32,6 +32,8 @@ require Getopt::Long;
 use Cwd;
 use Net::FTP;
 use Mezzanine::Util;
+use Mezzanine::Pkg;
+use Mezzanine::RPM;
 
 # Print usage information
 sub
@@ -143,6 +145,7 @@ compare_packages()
             }
         }
     }
+
     print "Is $p2 more recent than $p1 [y/n]? ";
     chomp($ans = <STDIN>);
     if ($ans =~ /^\s*y(es)?\s*$/i) {
@@ -165,6 +168,7 @@ compare_lists($$)
 
     foreach my $pkg (sort keys %{$rpkgs}) {
         my @remote_list = @{$rpkgs->{$pkg}{FILES}};
+        my @tmp;
         my ($rpm, $i);
 
         # @remote_list contains an array of all RPM files for that particular
@@ -172,27 +176,45 @@ compare_lists($$)
         print "Checking $pkg...\n";
 
         # Find the most recent version of that package on the remote site.
-        $rpm = $remote_list[0];
-        for ($i = 1; $i < scalar(@remote_list); $i++) {
-            if (&compare_packages($rpm, $remote_list[$i])) {
+        for ($rpm = 0, $i = 1; $i < scalar(@remote_list); $i++) {
+            my ($v1, $v2);
+
+            $v1 = "$rpkgs->{$pkg}{VER}[$rpm]-$rpkgs->{$pkg}{REL}[$rpm]";
+            $v2 = "$rpkgs->{$pkg}{VER}[$i]-$rpkgs->{$pkg}{REL}[$i]";
+            if (&rpm_compare_versions($v1, $v2)) {
+                $rpm = $i;
+            } elsif (0 && &compare_packages($rpm, $remote_list[$i])) {
                 $rpm = $remote_list[$i];
             }
         }
-        dprint "Going with $rpm\n";
 
-        # If we have it, continue.
-        if (defined($lpkgs->{$pkg}) && grep(/^\Q$rpm\E$/, @{$lpkgs->{$pkg}{FILES}})) {
-            next;
+        for ($i = 0; $i < scalar(@remote_list); $i++) {
+            if (($rpkgs->{$pkg}{VER}[$i] eq $rpkgs->{$pkg}{REL}[$rpm])
+                && ($rpkgs->{$pkg}{VER}[$i] eq $rpkgs->{$pkg}{REL}[$rpm])) {
+                xpush @tmp, $rpkgs->{$pkg}{FILES}[$i];
+            }
         }
 
-        # We don't have it, so get it.
-        print "Downloading $rpm...\n";
-        if (! $session->get($rpm, "$dest/$rpm")) {
-            eprint "Unable to download $rpm\n";
-        } else {
-            push @{$adds{$dest}}, $rpm;
-            if (defined($lpkgs->{$pkg})) {
-                push @{$removes{$dest}}, @{$lpkgs->{$pkg}{FILES}};
+        # Now, download all the matching files.
+        foreach $rpm (@tmp) {
+            # If we have it, continue.
+            if (defined($lpkgs->{$pkg}) && grep(/^\Q$rpm\E$/, @{$lpkgs->{$pkg}{FILES}})) {
+                next;
+            }
+
+            # We don't have it, so get it.
+            print "Downloading $rpm...\n";
+            if (! $session->get($rpm, "$dest/$rpm")) {
+                eprint "Unable to download $rpm\n";
+            } else {
+                my $arch;
+
+                $rpm =~ m/\.([^\.]+)\.rpm$/;
+                $arch = $1;
+                push @{$adds{$dest}}, $rpm;
+                if (defined($lpkgs->{$pkg})) {
+                    push @{$removes{$dest}}, grep(/\.$arch\.rpm/, @{$lpkgs->{$pkg}{FILES}});
+                }
             }
         }
     }
@@ -346,7 +368,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.13 $ created on $Date: 2003/06/02 16:31:02 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.14 $ created on $Date: 2003/06/02 17:06:11 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
