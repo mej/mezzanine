@@ -1277,3 +1277,7 @@ Thu Jun 14 20:23:56 2001                        Michael Jennings (mej)
 For the sake of paranoia, Avalon tools will now enforce a umask of
 0022.
 ----------------------------------------------------------------------
+Mon Jun 18 10:18:21 2001                        Michael Jennings (mej)
+
+Better handling of commits inside modules.
+----------------------------------------------------------------------
