@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.29 2000/05/25 21:02:07 mej Exp $
+# $Id: buildtool,v 1.30 2000/05/26 20:16:52 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1420,10 +1420,11 @@ sub
 parallel_build
 {
     my ($pid, $err, $idx, $pkg, $logfile, $line, $nprocs, $done, $left);
-    my (@children, @vars);
+    my (@children, @vars, @p);
     my %child_pkg;
     local *ERRLOG;
 
+    @p = ($#_ >= 0 ? @_ : @packages);
     if (! -d "$basedir/logs") {
         mkdir("$basedir/logs", 0755) || &fatal_error("Unable to mkdir $basedir/logs -- $!\n");
     }
@@ -1432,11 +1433,11 @@ parallel_build
     $nprocs = $num_cpus - 1;
     # The "!$idx || " part of the test below is required because perl's do...while construct
     # sucks.  You can't use next/last from within it.  Someone shoot whoever decided that.
-    qprintf "$progname:  Beginning $num_cpus-way build of %d packages.  (${\(&get_timestamp())})\n", $#packages + 1;
+    qprintf "$progname:  Beginning $num_cpus-way build of %d packages.  (${\(&get_timestamp())})\n", $#p + 1;
     while (!$idx || $#children >= 0) {
-        for (; $idx <= $#packages && $#children < $nprocs; $idx++) {
+        for (; $idx <= $#p && $#children < $nprocs; $idx++) {
             # Spawn a buildtool child process to handle the next package
-            $pkg = $packages[$idx];
+            $pkg = $p[$idx];
             $logfile = "$basedir/logs/$pkg.log";
             $pid = &spawn_cmd($pkg, $logfile);
             push @children, $pid;
@@ -1450,7 +1451,7 @@ parallel_build
         }
         nprint "$progname:  Currently building:  $line\n";
         $done = $idx - $#children - 1;
-        $left = $#packages + 1 - $done;
+        $left = $#p + 1 - $done;
         nprint "$progname:  $done packages completed, $left to go.\n";
 
         # Wait for a child to die
@@ -1600,7 +1601,9 @@ main
     $ENV{MAKE} = "make";  # Make sure we don't parallel build, because it doesn't work.
     $ENV{CFLAGS} = "-O2 -march=pentium";  # A bit of optimization, but not much.
     $ENV{LD_LIBRARY_PATH} = "";  # Make glibc happy
-    $ENV{PATH} = "/usr/build/bin:/usr/local/build/bin:/usr/lib/qt-2.1.0/bin:/usr/lib/qt-1.45/bin:$ENV{PATH}";
+    $ENV{PATH} = "/usr/build/bin:/usr/local/build/bin:/usr/lib/qt-2.1.0/bin:/usr/lib/qt-1.45/bin"
+                  . ":/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/X11R6/bin:/usr/kerberos/sbin"
+                  . ":/usr/kerberos/bin";
 
     # Try to parse the product name we were given into a name or a name-version combo
     $prod = $opt_p;

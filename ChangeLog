@@ -234,3 +234,7 @@ Thu May 25 14:14:07 2000                        Michael Jennings (mej)
 By removing the need to exec itself, buildtool's speed seems to have
 just increased by a factor of 6.  Time to try a full build. :-)
 ----------------------------------------------------------------------
+Fri May 26 13:29:14 2000                        Michael Jennings (mej)
+
+Doh!
+----------------------------------------------------------------------
