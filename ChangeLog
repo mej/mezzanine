@@ -269,3 +269,7 @@ Fri Jan 23 08:30:25 2004                        Michael Jennings (mej)
 
 Working on parallel build fixes.
 ----------------------------------------------------------------------
+Fri Jan 23 19:20:23 2004                        Michael Jennings (mej)
+
+Fixes for parallel chrooted builds.
+----------------------------------------------------------------------

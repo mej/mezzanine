@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.168 2004/01/23 12:04:28 mej Exp $
+# $Id: buildtool,v 1.169 2004/01/23 22:54:48 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -298,6 +298,7 @@ build_package_forked
             if ($pkgs->{$pkg}{"INSTROOT"}) {
                 # This package build is chrooted.
                 &pkgvar_instroot(&pkgvar_buildroot() . "/instroot");
+                &mkdirhier(&pkgvar_instroot());
 
                 if ($pkgs->{$pkg}{"INSTROOT_COPY"}) {
                     # Copy COPY command to INIT so that we only use it if the build is needed.
@@ -656,7 +657,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.168 $ created on $Date: 2004/01/23 12:04:28 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.169 $ created on $Date: 2004/01/23 22:54:48 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

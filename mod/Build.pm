@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.30 2004/01/15 01:20:06 mej Exp $
+# $Id: Build.pm,v 1.31 2004/01/23 22:54:48 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -233,8 +233,9 @@ prepare_build_tree
         }
     }
 
-    # If the build root exists, get rid of it, then make a new (empty) one.
-    if (-d $buildroot) {
+    # If the build root exists and we're not already using it,
+    # get rid of it and create a new (empty) one.
+    if (-d $buildroot && !grep(/$buildroot/, @my_dirs)) {
         &nuke_tree($buildroot);
     }
     mkdir($buildroot, 0775);
