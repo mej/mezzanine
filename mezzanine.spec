@@ -46,7 +46,7 @@ done
   for i in get co put ci info add new rm purge rtag tag reset login ; do
     ln revtool av$i
   done
-  for i in import prep mod ; do
+  for i in import prep mod merge ; do
     ln srctool av$i
   done
   for i in rpm pkg ; do

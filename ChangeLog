@@ -1094,3 +1094,7 @@ Moved the common functions into a Perl module and began adding other
 Perl modules for interoperation between tools.  Doing this right will
 take some time, but it doesn't all have to be done right away.
 ----------------------------------------------------------------------
+Tue Mar 27 04:43:21 2001                        Michael Jennings (mej)
+
+More module work and the beginnings of source/patch merges.
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.7 2001/03/26 09:48:54 mej Exp $
+# $Id: srctool,v 1.8 2001/03/27 05:44:39 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -53,6 +53,7 @@ print_usage_info
     print "    -v --version                     Show version and copyright\n";
     print "    -i --import                      Import a new package/source tree\n";
     print "    -p --prepare                     Prepare a working tree\n";
+    print "    -M --merge                       Merge one or more raw files into an SPM\n";
     print "    -n --name <pkg>-<version>        Specify the package name and version for an import\n";
     print "\n";
     exit(AVALON_SUCCESS);
@@ -209,31 +210,16 @@ import_package
         }
         $spec = $tmp[0];
         # Get a list of all source and patch files
-        @tmp = &run_av_cmd("pkgtool", "-P '$rpmcmd' -Cs $spec", 0);
-        if (($err = shift @tmp) != 0) {
-            eprint "Unable to catalog $pkgfile\n";
+        if (!&parse_spec_file($spec)) {
+            eprint "Unable to parse spec file.\n";
             return AVALON_COMMAND_FAILED;
         }
-        foreach my $line (@tmp) {
-            my ($type, $num, $filename) = split(":", $line);
-
-            if ($type eq "S") {
-                push @srcs, $filename;
-            } elsif ($type eq "P") {
-                push @patches, $filename;
-            }
-        }
+        @srcs = values %{$specdata->{SOURCE}};
+        @patches = values %{$specdata->{PATCH}};
         # Move the patches to $tmpdir/P/
-        foreach my $patch (@patches) {
-            if (! -f "$tmpdir/S/$patch") {
-                eprint "Missing patch file $patch?!\n";
-                return AVALON_FILE_OP_FAILED;
-            } else {
-                if (!link("$tmpdir/S/$patch", "$tmpdir/P/$patch") || !unlink("$tmpdir/S/$patch")) {
-                    eprint "Unable to move $patch to $tmpdir/P/ -- $!\n";
-                    return AVALON_FILE_OP_FAILED;
-                }
-            }
+        if (&move_files(@patches, "$tmpdir/P/") < scalar(@patches)) {
+            eprint "One or more patches could not be moved into place.\n";
+            return AVALON_FILE_OP_FAILED;
         }
         chdir($tmpdir);
         $tag = "$pkg-$ver-$rel";
@@ -357,7 +343,7 @@ main
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "i|import", "p|prepare", "m|mod|modify",
-                   "r|resync", "a|apply:s", "n|name=s");
+                   "M|merge", "r|resync", "a|apply:s", "n|name=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -365,7 +351,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.7 $ created on $Date: 2001/03/26 09:48:54 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.8 $ created on $Date: 2001/03/27 05:44:39 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -379,7 +365,7 @@ main
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
         # This is a really silly way to shut up the "used only once" warnings.
-        $opt_h = $opt_v = $opt_a = $opt_i = $opt_m = $opt_p = $opt_r = 0;
+        $opt_h = $opt_v = $opt_a = $opt_i = $opt_m = $opt_p = $opt_r = $opt_M = 0;
     }
 
     $debug = ($opt_d ? $opt_d : 0);
@@ -425,6 +411,26 @@ main
 	} else {
 	    return &prepare_tree("");
 	}
+    } elsif ($0 =~ /avmerge$/ || $opt_M) {
+        my $pkg;
+
+        foreach my $f (@flist) {
+            if (-d $f) {
+                $pkg = $f;
+                last;
+            }
+        }
+        if (! $pkg) {
+            if (-d "S") {
+                $pkg = &basename(&getcwd());
+            } else {
+                eprint "No valid module specified.\n";
+                return AVALON_BAD_MODULE;
+            }
+        }
+        foreach my $f (grep($_ ne $pkg, @flist)) {
+
+        }
     } elsif ($0 =~ /avmod$/ || $opt_m) {
     } elsif ($0 =~ /avpatch$/ || $opt_a) {
     } elsif ($opt_r) {

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.1 2001/03/26 09:48:54 mej Exp $
+# $Id: Util.pm,v 1.2 2001/03/27 05:44:39 mej Exp $
 #
 
 package Avalon::Util;
@@ -39,7 +39,7 @@ BEGIN {
 
 		    '&get_timestamp', '&fatal_error', '&dprintf', '&dprint', '&eprintf', '&eprint',
 		    '&handle_signal', '&handle_fatal_signal', '&handle_warning',
-		    '&mkdirhier', '&nuke_tree', '&grepdir',
+		    '&mkdirhier', '&nuke_tree', '&move_file', '&getcwd', '&basename', '&dirname', '&grepdir',
 		    '&xpush',
 		    '&cat_file',
 
@@ -79,6 +79,10 @@ sub handle_fatal_signal(@);
 sub handle_warning(@);
 sub mkdirhier($);
 sub nuke_tree($);
+sub move_files($ $);
+sub getcwd();
+sub basename($);
+sub dirname($);
 sub grepdir(& $);
 sub xpush(\@; @);
 sub cat_file($);
@@ -267,6 +271,72 @@ nuke_tree($)
         unlink($path) || return 0;
     }
     return 1;
+}
+
+# Move files, a la "mv"
+sub
+move_files($ $)
+{
+    # Last arg is destination
+    my $dest = pop;
+    my @flist = @_;
+    my $fcnt = 0;
+    my $addname = 0;
+
+    if (-d $dest) {
+        # We'll need to add the filename to the dest each time
+        $dest .= '/' if ($dest !~ /\/$/);
+        $addname = 1;
+    }
+    foreach my $f (@flist) {
+        my $target;
+
+        if ($addname) {
+            ($target = $f) =~ s/^.*\/([^\/]+)$/$1/;
+        } else {
+            $target = $dest;
+        }
+        if (!link($f, $target)) {
+            eprint "Unable to copy $f to $target -- $!\n";
+            return $fcnt;
+        }
+        if (!unlink($f)) {
+            eprint "Unable to remove $f -- $!\n";
+            return $fcnt;
+        }
+        $fcnt++;
+    }
+    return $fcnt;
+}
+
+# Get the current path
+sub
+getcwd()
+{
+    my $cwd;
+
+    chomp($cwd = `/bin/pwd`);
+    return $cwd;
+}
+
+# Strip the leading path off a directory/file name
+sub
+basename($)
+{
+    my $path = $_[0];
+
+    $path =~ s/^.*\/([^\/]+)$/$1/;
+    return $path;
+}
+
+# Return the leading path of a directory/file name
+sub
+dirname($)
+{
+    my $path = $_[0];
+
+    $path =~ s/^(.*)\/[^\/]+$/$1/;
+    return $path;
 }
 
 # Grep a directory for files matching a particular expression

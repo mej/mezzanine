@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.33 2001/03/26 09:48:54 mej Exp $
+# $Id: pkgtool,v 1.34 2001/03/27 05:44:39 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -728,10 +728,10 @@ rpm_generate_source_files
     @contents = readdir(DIR);
     closedir(DIR);
 
-    &parse_spec_file($specfile, 0) if ($specfile);
+    &parse_spec_file($specfile) if ($specfile);
 
     if (! $release_tag) {
-        ($release_tag = "$define{PACKAGE_NAME}-$define{PACKAGE_VERSION}") =~ tr/[a-z]/[A-Z]/;
+        ($release_tag = "$specdata->{DEFINES}{PACKAGE_NAME}-$specdata->{DEFINES}{PACKAGE_VERSION}") =~ tr/[a-z]/[A-Z]/;
         $release_tag =~ s/[^-A-Z0-9]/-/g;
     }
     $tag_prefix = $release_tag;
@@ -759,8 +759,8 @@ rpm_generate_source_files
     }
 
     dprint "Preparing to generate sources \"", join(" ", @srcs), "\".\n";
-    dprint "Sources:  ", join(", ", @sources), "\n";
-    dprint "Patches:  ", join(", ", @patches), "\n";
+    dprint "Sources:  ", join(", ", @{$specdata->{SOURCES}}), "\n";
+    dprint "Patches:  ", join(", ", @{$specdata->{PATCHES}}), "\n";
 
     if ($#patches >= 0) {
         @tags = grep($tag_type{$_} eq "revision", &get_tag_list($tagfile));
@@ -783,21 +783,21 @@ rpm_generate_source_files
             if ($tags[$i] =~ /^$tag_prefix-PATCH-(\d+)$/) {
                 my $num = $1;
 
-                if (!defined($patch{$num})) {
+                if (!defined($specdata->{PATCH}{$num})) {
                     print "$progname:  Warning:  Patch $num exists as a tag but is not referenced in the spec file.\n";
                     next;
                 }
-                $last_tag{$patch{$num}} = $tags[$i - 1];
-                dprint "Previous tag for patch $num ($patch{$num}) is $last_tag{$patch{$num}}\n";
+                $last_tag{$specdata->{PATCH}{$num}} = $tags[$i - 1];
+                dprint "Previous tag for patch $num ($specdata->{PATCH}{$num}) is $last_tag{$specdata->{PATCH}{$num}}\n";
             } elsif ($tags[$i] =~ /^$tag_prefix-SOURCE-(\d+)$/) {
                 my $num = $1;
 
-                if (!defined($source{$num})) {
+                if (!defined($specdata->{SOURCE}{$num})) {
                     print "$progname:  Warning:  Source $num exists as a tag but is not referenced in the spec file.\n";
                     next;
                 }
-                $last_tag{$source{$num}} = $tags[$i - 1];
-                dprint "Previous tag for source $num ($source{$num}) is $last_tag{$source{$num}}\n";
+                $last_tag{$specdata->{SOURCE}{$num}} = $tags[$i - 1];
+                dprint "Previous tag for source $num ($specdata->{SOURCE}{$num}) is $last_tag{$specdata->{SOURCE}{$num}}\n";
             } elsif ($tags[$i] =~ /^(.*)-(SOURCE|PATCH)-\d+$/) {
                 my $tmp = $1;
                 my @tmp;
@@ -856,14 +856,14 @@ rpm_generate_source_files
                     return $err;
                 }
             }
-            foreach $num (@sources) {
-                if (($tarball && $source{$num} =~ /$tarball$/)
-                    || (! $tarball && $src_files =~ /^(.*\s+)?$source{$num}(\s+.*)?$/)) {
+            foreach $num (@{$specdata->{SOURCES}}) {
+                if (($tarball && $specdata->{SOURCE}{$num} =~ /$tarball$/)
+                    || (! $tarball && $src_files =~ /^(.*\s+)?$specdata->{SOURCE}{$num}(\s+.*)?$/)) {
                     dprint "Undefining source $num\n";
-                    delete $source{$num};
+                    delete $specdata->{SOURCE}{$num};
                 }
             }
-            @sources = sort {$a <=> $b} keys %source;
+            @{$specdata->{SOURCES}} = sort {$a <=> $b} keys %source;
         }
 
         # Clean the checkout we did.
@@ -877,14 +877,14 @@ rpm_generate_source_files
 
         $prev_tag = "";
         dprint "Beginning final source file generation....\n";
-        foreach $num (@sources) {
-            my $source = $source{$num};
+        foreach $num (@{$specdata->{SOURCES}}) {
+            my $source = $specdata->{SOURCE}{$num};
             my ($tag, $files);
             my @new_files;
 
             dprint "Generating source $num ($source)\n";
             $tag = "$tag_prefix-SOURCE-$num";
-            if (!defined $last_tag{$source{$num}}) {
+            if (!defined $last_tag{$specdata->{SOURCE}{$num}}) {
                 eprint "No tag exists for $source ($tag).  I'll create an empty file for it, but this may cause problems.\n";
                 &touch_file("$destdir$source");
                 next;
@@ -893,7 +893,7 @@ rpm_generate_source_files
                 dprint "Not creating $source -- Already exists.\n";
                 next;
             }
-            &update_to_tag($last_tag{$source{$num}}) if ($prev_tag ne $last_tag{$source{$num}});
+            &update_to_tag($last_tag{$specdata->{SOURCE}{$num}}) if ($prev_tag ne $last_tag{$specdata->{SOURCE}{$num}});
             @new_files = &update_to_tag($tag);
             @new_files = grep(! &should_ignore($_), @new_files);
             $prev_tag = $tag;
@@ -906,22 +906,22 @@ rpm_generate_source_files
         }
 
         # For patches, diff between the two tags to generate the patch files.
-        foreach $num (@patches) {
-            my $patch = $patch{$num};
+        foreach $num (@{$specdata->{PATCHES}}) {
+            my $patch = $specdata->{PATCH}{$num};
             my $tag;
 
             dprint "Generating diff for patch $num ($patch)\n";
             $tag = "$tag_prefix-PATCH-$num";
-            if (!defined $last_tag{$patch{$num}}) {
-                eprint "No tag exists for $patch{$num} ($tag).  I'll create an empty file for it, but this may cause problems.\n";
-                &touch_file("$destdir$patch{$num}");
+            if (!defined $last_tag{$specdata->{PATCH}{$num}}) {
+                eprint "No tag exists for $specdata->{PATCH}{$num} ($tag).  I'll create an empty file for it, but this may cause problems.\n";
+                &touch_file("$destdir$specdata->{PATCH}{$num}");
                 next;
             }
             if (&check_for_source_files($patch, 0, $destdir)) {
                 dprint "Not creating $patch -- Already exists.\n";
                 next;
             }
-            $err = &gen_diff($modname, $src_files, $last_tag{$patch{$num}}, $tag, "$destdir$patch{$num}");
+            $err = &gen_diff($modname, $src_files, $last_tag{$specdata->{PATCH}{$num}}, $tag, "$destdir$specdata->{PATCH}{$num}");
             if ($err) {
                 return $err;
             }
@@ -958,9 +958,9 @@ main
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "b|build", "i|install", "c|contents", "q|query=s",
-                   "g|generate", "u|unarch|unarchive", "C|catalog", "o|sources:s", "p|package=s",
-                   "s|specfile|scripts=s", "m|module=s", "r|release-tag=s", "t|head-tag=s", "P|program=s",
-                   "R|rcfile=s", "tar=s", "zip=s", "tagfile=s", "D|destdir=s", "root=s");
+                   "g|generate", "u|unarch|unarchive", "o|sources:s", "p|package=s", "s|specfile|scripts=s",
+                   "m|module=s", "r|release-tag=s", "t|head-tag=s", "P|program=s", "R|rcfile=s", "tar=s",
+                   "zip=s", "tagfile=s", "D|destdir=s", "root=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -968,7 +968,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.33 $ created on $Date: 2001/03/26 09:48:54 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.34 $ created on $Date: 2001/03/27 05:44:39 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -982,7 +982,7 @@ main
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
         # This is a really silly way to shut up the "used only once" warnings.
-        $opt_h = $opt_v = $opt_b = $opt_c = $opt_i = $opt_g = $opt_u = $opt_C = 0;
+        $opt_h = $opt_v = $opt_b = $opt_c = $opt_i = $opt_g = $opt_u = 0;
     }
 
     if ($opt_b) {
@@ -993,8 +993,6 @@ main
         $mode = "unarchive";
     } elsif ($opt_c) {
         $mode = "contents";
-    } elsif ($opt_C) {
-        $mode = "catalog";
     } elsif ($opt_g) {
         $mode = "generate";
     } elsif ($opt_q) {
@@ -1103,16 +1101,6 @@ main
             $ret = &deb_show_contents($pkg_file);
         } elsif ($type eq "tar") {
             $ret = &tar_show_contents($pkg_file);
-        }
-    } elsif ($mode eq "catalog") {
-        if (! $specfile) {
-            eprint "Please specify a spec file/script directory\n";
-            return AVALON_SYNTAX_ERROR;
-        }
-        if ($type eq "rpm") {
-            $ret = &parse_spec_file($specfile, 1);
-        } elsif ($type eq "deb") {
-        } elsif ($type eq "tar") {
         }
     } elsif ($mode eq "generate") {
         if (! $specfile) {
