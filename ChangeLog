@@ -72,3 +72,8 @@ Tue Feb 26 15:49:08 2002                        Michael Jennings (mej)
 
 Fixed the usage of $EDITOR in case it's more than one word.
 ----------------------------------------------------------------------
+Tue Feb 26 15:58:10 2002                        Michael Jennings (mej)
+
+If arguments are given to mzput without -a or -r, assume -x, but do
+the ChangeLog.
+----------------------------------------------------------------------
