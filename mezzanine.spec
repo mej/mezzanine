@@ -32,6 +32,14 @@ mkdir -p $RPM_BUILD_ROOT%{prefix}/man/man1
 for i in *tool ; do
   install -m 755 $i $RPM_BUILD_ROOT%{prefix}/bin/
 done
+(
+  cd $RPM_BUILD_ROOT%{prefix}/bin
+  for i in get co put ci import query info add new rm purge rtag tag reset login ; do
+    ln revtool av$i
+  done
+  ln buildtool avbuild
+  ln pkgtool avrpm
+)
 
 for i in *.1 ; do
   install -m 644 $i $RPM_BUILD_ROOT%{prefix}/man/man1/
