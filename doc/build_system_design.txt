@@ -1,0 +1,537 @@
+########################################################################
+#           Design of the VA Software Engineering Build System
+#
+#  Written by:  Michael Jennings
+#
+#  $Id: build_system_design.txt,v 1.15 2003/11/30 20:17:45 mej Exp $
+#
+########################################################################
+
+This document describes the philosophies and strategies behind the
+design of the VA Software Engineering Build System.  Hopefully, by
+establishing and documenting policies, procedures, and priorities up
+front, the resultant product will better suit the needs of all
+concerned:  users, administrators, and customers.
+
+The Build System is the collection of all the various tools, including
+servers, scripts, etc., which are used in concert to create software
+products.  Avalon refers to the set of custom tools which simplify and
+streamline the process of using the Build System and are generally
+considered a part, though not the whole, of the Build System itself.
+However, since so much of the Build System is implemented in Avalon,
+the terms may be used somewhat interchangeably.
+
+1.  PROJECT GOALS AND REQUIREMENTS
+----------------------------------
+
+Before we design the system, we need to establish a clear set of
+guidelines for what it must be able to do.  These are not only
+priorities of design, but absolute requirements for the finished
+product.  Anything else is simply a benefit, not a necessity.
+
+ - The Build System must create software products.  It must be able to
+   create these products in a commonly-acceptable complete form, such
+   as a CD image, which can be marketed to customers.
+ - The Build System must also be capable of creating package
+   collections suitable for use with Build-to-Order Software, either
+   as an intermediate step of the above, or in its own right.
+ - The Build System must preserve each state of each product
+   permanently.  In other words, it should be possible at any point in
+   time to retrieve a particular product which was released at any
+   previous point in time.
+ - The Build System should enforce good structure and policy for
+   maintaining products and packages.  That is, it should do its best
+   to assert proper, logical organization amongst all products and
+   within each product.
+ - The Build System should be robust enough to be as tolerant of
+   mistakes as possible.  Specifically, violations of policy should be
+   handled as sanely as they can be, but should not be allowed to
+   happen directly.
+ - The Build System should enforce and encourage well-organized and
+   structured package maintenance, but it should also make alterations
+   and updates to packages as simple and straight-forward as possible,
+   whether through simplicity of design or simplicity of tools.
+ - The Build System must allow for the complete testing of builds
+   without requiring an update of the master repository.  In other
+   words, changes must be able to be tested prior to being pushed to
+   the master server.
+
+
+2.  BUILD SYSTEM TOOLS AND COMPONENTS
+-------------------------------------
+
+Facilitation and satisfaction of the above design goals will require a
+complete system composed of many individual pieces working in
+concert.  Almost all of these pieces, except for those which are
+provided by outside sources, will be engineered as part of Avalon, the
+build system toolkit.
+
+2.1.  Source Code Management
+----------------------------
+
+The backbone of any good software management system is source code
+control.  There are many choices, of varying degrees of quality,
+supportability, and functionality, including CVS, RCS, SCCS,
+BitKeeper, Aegis, and ClearCase.  The Build System is designed in such
+a way as to minimalize dependency on any one source code management
+system.  However, for various reasons, it has been designed thus far
+for use with CVS.  Therefore, a CVS server will be present on the
+build server.  This CVS server will be responsible for containing all
+build system files in a revision-controlled environment.
+
+For simplicity, this document may refer to the "CVS server" rather
+than trying to come up with a generic acronym for a revision control
+system that isn't the name of one of the above systems.  If you choose
+to use a different backend for your repository, make appropriate
+substitutions where necessary.
+
+2.2.  Repository Interaction
+----------------------------
+
+In order to retrieve software packages from the master repository,
+Avalon will have to provide some mechanism for interacting with that
+repository for purposes of package retrieval and package management.
+
+All direct interaction with the master repository will be encapsulated
+by a single tool, known as revtool, whose interface will be generic
+enough to be applicable to any source code management system.  Should
+it be determined that CVS is no longer the ideal choice for the back
+end, the inner workings of revtool would require modification to
+"talk the new language," so to speak, but its external interface (and
+by extension, all other Avalon tools) would remain unchanged.
+
+The following tasks will be accomplished via revtool:
+ - retrieving data from the master repository
+ - committing changes to the master repository
+ - generating diffs by querying the master repository
+ - tagging particular changes or changesets in the master repository
+
+Additional tasks may also be performed by revtool to provide a more
+complete interface for developers to a particular source code system,
+but any functionality not listed here is not critical to proper
+operation of the build environment and is therefore subject to changes
+in interface, syntax, etc.
+
+2.3.  Package Management
+------------------------
+
+In order to simplify working with individual package files, as well as
+to facilitate some level of package portability between differing
+packaging systems, Avalon will employ an encapsulation layer, in the
+form of a program called pkgtool, for managing package files directly.
+The approach for this tool is analogous to that of revtool; i.e., the
+interface should be consistent regardless of package type, and should
+be generic enough to be applicable to an arbitrary package format.
+Initially, only RPM support is required; however, pkgtool will be
+written in such a way as to be extensible in the future to work with
+other package types (notably DEB's).
+
+The following tasks will be accomplished via pkgtool:
+ - building binary packages from a source package or equivalent
+ - install packages, with or without a virtual root
+ - examine the contents of a package
+ - identify dependencies of a package
+ - generate source package from a repository module
+
+Additional tasks may also be performed by pkgtool to provide a more
+complete interface to the various package management tasks, but any
+functionality not listed here is not critical to proper operation of
+the build environment and is therefore subject to changes in
+interface, syntax, etc.
+
+2.4.  Package Maintenance
+-------------------------
+
+Since the most efficient and most feasible way to store and manage
+packages is not necessarily the most efficient way of actually making
+changes to and working with those packages, Avalon will provide a
+source management tool, srctool, to automate many of the routine tasks
+performed by package maintainers.  This program will fulfill several
+requirements of the build system not directly addressed by the
+back-end implementation.
+
+The following tasks will be accomplished via srctool:
+ - importing source packages into the repository
+ - adding, removing, and altering patches
+ - resynchronizing patches with current source
+ - generating patches based on new changes
+ - preparing a module for active development
+
+Since srctool is a developer utility and will not be used directly by
+any other build system component, its interface will be geared toward
+developer simplicity but may change as needed.
+
+2.5.  Product Creation
+----------------------
+
+The culminating force of the build system is the piece that creates
+the end result -- products.  Avalon employs a single program,
+buildtool, which takes product description files ("prod files") and
+creates products from their component packages based on the
+information in those files.  It will utilize some of the other Avalon
+components to perform this task.
+
+Product files are designed to be a very powerful engine for describing
+products in terms of their components -- packages and other products.
+For example, a RedHat-based distribution could be divided into the OS
+and the Powertools packages.  The OS could be further subdivided into
+a minimal package set and server/workstation package sets.  Each
+high-level product file simply references the sub-products and
+packages which compose it; buildtool handles the task of recursing
+through product files until a complete list of packages is made.  This
+facilitates the creation of layered products while encouraging
+cooperative reuse of the underlying packages.
+
+For instance, an embedded solution product such as VANA (VA NetAttach)
+requires a basic operating system from which to build, but the
+maintainers of VANA should not have to duplicate the effort of the
+distribution team by maintaining their own OS packages.  Therefore,
+the VANA product file can reference the base OS as a sub-product and
+add/replace packages from it as needed.  This way, VANA automatically
+incorporates the latest distribution work with no additional effort on
+the part of the VANA maintainers, who can thus focus their attention
+and expertise where it is most appropriate:  VANA itself.
+
+The sole purpose of buildtool is to create products from individual
+packages.  However, it should be as flexible as possible in doing so,
+leaving as much power in the hands of the developer as it can.
+Specifically, builds should be distributable and parallelizable.
+
+2.6.  Additional Utilities
+--------------------------
+
+Over time, extraneous tools will be added to Avalon as specific needs
+arise.  These tools are not a part of the build system proper, since
+they are not specifically a part of managing generic software
+products, but are nonetheless used in the ongoing maintenance of the
+distribution specifically.
+
+Existing utilities which fall into this category include:
+ - compstool - A script for sanity-checking RH comps files
+ - imgtool - Creates chrooted install images and tarballs
+ - pkgsort - Sorts packages and creates list/prod files
+ - redhat-*-cdtool - Scripts for creating RH install CD's
+ - safetool - Enforces instroot's
+ - websync - Updates the web site with the latest build
+
+
+3.  IMPLEMENTATION DETAILS
+--------------------------
+
+The fundamental purpose of the Build System is to automate the
+creation and management of software products.  Every task performed by
+Avalon could be done by hand instead.  However, part of the purpose of
+the Avalon toolkit is to automate complex processes and hide the
+details of their implementation from the end user.  That said, those
+who design and maintain the Build System need to know how things
+actually work in case something goes wrong, be it with the back-end
+system itself or one of the Avalon tools.
+
+3.1.  Server Setup
+------------------
+
+The build server will be responsible for running the CVS daemon
+process.  Due to the number of trees which must be provided by this
+server, the following script is recommended:
+
+    #!/bin/sh
+    #
+    # /usr/local/bin/cvs_server
+    #
+
+    CVSBASE=/cvs
+
+    cd $CVSBASE
+    TREES=`find . -maxdepth 1 -user build -group build -type d \
+        -print | sed "s%^\.%$CVSBASE%g" | egrep -v "^$CVSBASE$"`
+
+    for i in $TREES ; do
+      ROOTS="$ROOTS --allow-root=$i"
+    done
+    exec /usr/bin/cvs $ROOTS -b /usr/bin pserver
+
+Once this script is in place as /usr/local/bin/cvs_server, the
+following line should be added to /etc/inetd.conf (or the equivalent
+if stock inetd is not in use):
+
+cvspserver stream tcp nowait.2048 build /usr/sbin/tcpd /usr/local/bin/cvs_server
+
+Naturally, the "build" user/group should be created first, along with
+the /cvs directory, and the following should be added to
+/etc/services:
+
+cvspserver        2401/tcp         # CVS client/server operations
+cvspserver        2401/udp         # CVS client/server operations
+
+The /cvs directory should be owned by build:build with permissions
+2775.  A cron job may be employed to maintain appropriate ownerships
+and permissions (2775 for directories, 0664 for files).
+
+A single skeleton directory, .skel, will be located under /cvs and
+will contain the basic template for all new CVS trees which will
+subsequently be created.  All global modifications to CVS management
+files should be done first in the .skel directory, then pushed out to
+the other trees.
+
+3.2.  Directory Structure
+-------------------------
+
+All build system data will be stored in directories underneath the
+global CVS root directory, /cvs.  Each individual product should have
+its own tree.  A master project called "build" will contain the Avalon
+tools as well as product files for all products in the system.
+
+Within each product tree will be located individual modules, one per
+component package or package set.  Package set modules (the individual
+modules containing the package sets) should be named starting with
+either "contrib-" (for source packages) or "bin-" (for binary
+packages), followed by an indication of the platform for which they
+are intended (e.g., "rh" for RedHat, "deb" for Debian, etc.).  Other
+modules should have the same name as their respective packages.
+
+3.3.  Module Structure
+----------------------
+
+The build system will contain three types of modules: package sets,
+source package modules (SPM's), and full source trees (FST's).
+Package sets are groups of packages which are not maintained locally
+and can therefore be used exclusively in their package form.  Any
+locally-maintained or locally-modified packages must be in separate
+modules.
+
+Source package modules are single-level modules containing an exploded
+source package.  Most packages which are modified from the originals
+by VA will be maintained in SPM's.  SPM's contain actual source files,
+patches, tarballs, and spec files.
+
+Full source trees are complete directory hierarchies which are
+actively maintained within the build system.  An FST module should
+contain the spec file (named <pkg>.spec(.in), or
+<pkg>-<distro>.spec(.in), or as a last resort, *.spec(.in)),
+individual source files, and unarchived source trees.  No patches can
+be generated from this tree; if patches are required, use an SPM and
+maintain the package elsewhere.
+
+
+4.  HIGH-LEVEL PROCESS OVERVIEW
+-------------------------------
+
+This section gives a detailed procedure for many of the high-level
+tasks performed by engineers using the build system.  Each sub-section
+or sub-sub-section will outline a specific procedures and processes
+step-by-step, including as much detail as is appropriate.
+
+4.1.  Importing New Packages
+----------------------------
+
+As new packages need to be maintained temporarily or permanently by
+internal personnel, they must be added to the build system so that all
+changes can be tracked and managed in an organized manner.  The
+addition of packages to the build system is called an "import."  There
+are three types of imports which may be done, each of which will be
+outlined in one of the following sections.
+
+4.1.1.  Importing SRPM Packages into SPM's
+------------------------------------------
+
+At times, an external vendor will publish a particular package which
+contains errors in function or judgment on the part of that vendor.
+In order to preserve the integrity of the VA-supplied distribution,
+sometimes we must assume responsibility for a particular package until
+the vendor corrects its error.  If this occurs, the simplest solution
+is to import the vendor SRPM into the build system and modify it to
+correct the error.  The following procedure outlines the steps to
+follow in this situation.
+
+    Pre-conditions:  A vendor SRPM has been downloaded and has proven
+                     faulty.
+
+    1.  Using srctool, import the SRPM into a module.
+        $ srctool -i pkg-1.0-1.src.rpm
+           or
+        $ avimport pkg-1.0-1.src.rpm
+
+Avalon will automatically explode the SRPM into its component parts
+and commit them as a new SPM (source package module).  It will also
+detect if the module already exists and attempt to merge the changes,
+noting which files are duplicates.
+
+4.1.2.  Importing Full Source Trees (FST's)
+-------------------------------------------
+
+Some work takes place on code that is actually stored and maintained
+inside the build system.  These packages are generally best stored as
+untarred source trees and modifed normally.  Since no patches need to
+be generated for the SRPM's which will be built from this module,
+developers are free to modify, tag, import, etc. at their leisure.
+
+    Pre-conditions:  A directory containing the files and
+                     subdirectories which are to be imported into the
+                     new module.
+
+    1.  Using srctool, import the directory into a module.
+        $ srctool -i pkg -n pkg-1.0
+           or
+        $ avimport -n pkg-1.0 pkg
+
+Note that you must specify the package name and version for this type
+of import since they cannot be automatically determined.  The source
+tree will be imported using a branch tag of PKG-1-0 and a vendor tag
+of PKG and can be used for old and new trees alike, just as "cvs
+import" can be.
+
+4.2.  Retrieving Products and Packages
+--------------------------------------
+
+There are several different reasons one might want to retrieve one or
+more packages from the master server.  Depending on what you want to
+end up with, there are different ways to go about downloading these
+packages.
+
+4.2.1.  For a Build
+-------------------
+
+As part of the build process, Avalon will automatically download all
+packages needed for a particular product and place them in the correct
+locations.  No manual intervention is needed.
+
+However, some modules which are checked out by a build must also be
+used to commit changes (e.g., CD images).  For this, you must specify
+an alternative CVSROOT for buildtool to use, because the default is to
+check things out anonymously.  Use the --tree option for this.
+
+4.2.2.  For Read-Only Access
+----------------------------
+
+Generally avget (or revtool -g) is used to download individual
+packages.  However, when dealing with entire products, use buildtool
+instead and pass the "-bs" option to halt processing after the
+bootstrap stage completes.
+
+4.2.3.  For Modification
+------------------------
+
+For individual packages, use avget.  For entire products, use
+buildtool as suggested in section 4.2.2, but don't forget the --tree
+option mentioned in section 4.2.1 in order to have write access from
+the checkout.
+
+4.3.  Making Alterations
+------------------------
+
+The distribution process is a repetitive loop of making changes,
+building those packages which changed, and testing the results.  Thus,
+the build system must make each of these tasks as simple and
+straight-forward as possible.
+
+The following sections cover changes to SRPM-based modules only.
+Source tree modules and SRPM collections (like contrib-rh) are altered
+through a simple add/remove/commit process as normal.
+
+4.3.1.  Applying Existing Patch Files
+-------------------------------------
+
+Often, updates to modules maintained internally come from outside
+sources and must be merged in with the internal changes.  The build
+system makes it easy to add new patches to an existing SRPM module.
+
+/* More needed here, depending on how we decide to do this. */
+
+4.3.2.  Making Your Own Changes
+-------------------------------
+
+Packages maintained internally will often need patches to fix bugs
+reported on engr SourceForge.  For packages maintained as source
+trees, simply make and commit the appropriate changes.  The process
+for source package modules is a little longer, but still quite
+straightforward.
+
+    Pre-conditions:  A source package module (SPM) which needs a
+                     patch.
+
+    1.  Retrieve the module.
+        $ avget pkg
+    2.  Prepare a working tree with all sources unarchived and all
+        patches applied.
+        $ avprep [ dir ]
+    3.  Make changes to working tree; build and test inside tree as
+        needed.
+    4.  Update the spec file to include a reference to a new patch
+        file for the changes you made.
+    5.  Generate the new patch file from your changes.
+        $ avmod [ dir ]
+    6.  Commit the new changes.
+        $ avput
+
+4.4.  Building
+--------------
+
+The building of complete products, the end result of which is some
+type of product media, is the culmination of a lot of time and
+effort.  As with everything else, Avalon strives to automate as much
+as possible on behalf of the developers.
+
+4.4.1.  Individual Packages
+---------------------------
+
+After making changes to a package, the engineer is responsible for
+testing those changes prior to committing them.  This insures that the
+build tree will always be intact and buildable at all times.  To build
+an individual product in place, simply run buildtool (or avbuild) and
+pass a directory path to the -p option.  You need not commit your
+changes prior to doing this; in fact, you should not.
+
+4.4.2.  Entire Products
+-----------------------
+
+Once all changes to all packages have been committed, a complete
+product build should be done to verify that everything fits together
+properly.  Product builds are done using buildtool/avbuild.  The
+product name and version should be passed to buildtool using the -p
+option.
+
+4.5.  Publishing and Media Management
+-------------------------------------
+
+/* This whole section is here because I felt that some information was
+needed about post-build processing.  But I can't know how that will
+work until we determine where the build actually ends. */
+
+4.5.1.  Creating Package CD's
+-----------------------------
+
+4.5.2.  Generating/Syncing Web Sites
+------------------------------------
+
+5.  TOOL SUMMARY
+----------------
+
+All the Avalon tools and tool aliases are listed here along with brief
+descriptions of their purpose.  This will assist in providing a
+high-level glimpse at basic tool usage.
+
+ - buildtool -- Drives all product/package builds
+    - avbuild -- Simply an alias for buildtool; does not invoke any
+                 particular functionality.
+
+ - pkgtool -- Handles all package file manipulation
+    - avrpm -- Simply an alias for pkgtool
+
+ - revtool -- Handles all direct interaction with the master
+              repository
+    - avlogin -- Login to the master repository (revtool -l)
+    - avget -- Retrieve files from the master repository (revtool -g)
+    - avput -- Store changed files in the master repository (revtool -p)
+    - avadd -- Add files to the master repository (revtool -a)
+    - avrm -- Remove files from the master repository (revtool -r)
+    - avtag -- Tag files or modules (revtool -t)
+    - avrtag -- Tag the master repository (revtool -T)
+    - avreset -- Clear all sticky attributes (revtool -g --reset)
+
+ - srctool -- High-level manipulation of source and package
+              modules
+    - avimport -- Import new package or source tree (srctool -i)
+    - avprep -- Prepare a source package module for active development
+                (srctool -p)
+    - avmod -- Generate a new patch file from modifications made to an
+               avprep'd tree (srctool -m)
