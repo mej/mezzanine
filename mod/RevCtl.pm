@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.20 2004/03/31 02:11:36 mej Exp $
+# $Id: RevCtl.pm,v 1.21 2004/05/10 14:39:43 mej Exp $
 #
 
 package Mezzanine::RevCtl;
@@ -167,7 +167,7 @@ END {
 
 ### These functions set the private globals used by this module.
 sub
-revctl_reset
+revctl_reset()
 {
     &revctl_system("");
     &revctl_command("");
@@ -183,7 +183,7 @@ revctl_reset
 }
 
 sub
-revctl_system
+revctl_system($)
 {
     my $param = $_[0];
 
@@ -195,7 +195,7 @@ revctl_system
 }
 
 sub
-revctl_command
+revctl_command($)
 {
     my $param = $_[0];
 
@@ -207,7 +207,7 @@ revctl_command
 }
 
 sub
-revctl_repository
+revctl_repository($)
 {
     my $param = $_[0];
 
@@ -222,7 +222,7 @@ revctl_repository
 }
 
 sub
-revctl_keyword_expansion
+revctl_keyword_expansion($)
 {
     my $param = $_[0];
 
@@ -237,7 +237,7 @@ revctl_keyword_expansion
 }
 
 sub
-revctl_recursion
+revctl_recursion($)
 {
     my $param = $_[0];
 
@@ -252,7 +252,7 @@ revctl_recursion
 }
 
 sub
-revctl_branching
+revctl_branching($)
 {
     my $param = $_[0];
 
@@ -267,7 +267,7 @@ revctl_branching
 }
 
 sub
-revctl_sticky_clear
+revctl_sticky_clear($)
 {
     my $param = $_[0];
 
@@ -282,7 +282,7 @@ revctl_sticky_clear
 }
 
 sub
-revctl_exclusive
+revctl_exclusive($)
 {
     my $param = $_[0];
 
@@ -297,7 +297,7 @@ revctl_exclusive
 }
 
 sub
-revctl_strict_tagging
+revctl_strict_tagging($)
 {
     my $param = $_[0];
 
@@ -308,7 +308,7 @@ revctl_strict_tagging
 }
 
 sub
-revctl_tag
+revctl_tag($)
 {
     my $param = $_[0];
 
@@ -319,7 +319,7 @@ revctl_tag
 }
 
 sub
-revctl_rtag
+revctl_rtag($)
 {
     my $param = $_[0];
 
@@ -331,7 +331,7 @@ revctl_rtag
 
 # Check tags for validity
 sub
-check_tags
+check_tags($)
 {
     my $module = $_[0];
 
@@ -362,7 +362,7 @@ check_tags
 }
 
 sub
-make_repository_path
+make_repository_path($$$$)
 {
     my ($proto, $user, $host, $path) = @_;
     my $login;
@@ -396,7 +396,7 @@ make_repository_path
 
 # Login to the repository
 sub
-login_to_master
+login_to_master()
 {
     dprint &print_args(@_);
 
@@ -437,7 +437,7 @@ login_to_master
 
 # Find the base level of a module
 sub
-find_module_changelog
+find_module_changelog($)
 {
     my ($pwd, $rel_dir, $repo);
 
@@ -468,7 +468,7 @@ find_module_changelog
 
 # Compose a new entry for the ChangeLog
 sub
-do_changelog_entry
+do_changelog_entry()
 {
     my $log = $_[0];
     my ($pwd, $username, $fullname, $line, $module, $rel_dir);
@@ -549,7 +549,7 @@ do_changelog_entry
 
 # Commit changes to the master repository
 sub
-commit_to_master
+commit_to_master(@)
 {
     my $logfile = shift;
     my $cmd;
@@ -562,7 +562,7 @@ commit_to_master
 
 # Update from the master repository
 sub
-update_from_master
+update_from_master(@)
 {
     my $file_list = join(' ', @_);
     my @file_list = split(' ', $file_list);
@@ -619,7 +619,7 @@ update_from_master
 
 # Add new files
 sub
-add_new_files
+add_new_files(@)
 {
     my $cmd;
 
@@ -634,7 +634,7 @@ add_new_files
 
 # Delete old files
 sub
-delete_old_files
+delete_old_files(@)
 {
     my $cmd;
 
@@ -649,7 +649,7 @@ delete_old_files
 
 # Query file/directory status
 sub
-query_status
+query_status(@)
 {
     my $cmd;
 
@@ -660,7 +660,7 @@ query_status
 }
 
 sub
-query_log
+query_log(@)
 {
     my $cmd;
 
@@ -671,7 +671,7 @@ query_log
 }
 
 sub
-query_annotation
+query_annotation(@)
 {
     my $cmd;
 
@@ -683,7 +683,7 @@ query_annotation
 }
 
 sub
-query_diff
+query_diff(@)
 {
     my ($cmd, $t1, $t2);
 
@@ -697,7 +697,7 @@ query_diff
 }
 
 sub
-query_release_diff
+query_release_diff(@)
 {
     my ($cmd, $t1, $t2);
 
@@ -712,7 +712,7 @@ query_release_diff
 
 # Tag the sources
 sub
-tag_local_sources
+tag_local_sources(@)
 {
     my ($cmd, $t);
 
@@ -725,7 +725,7 @@ tag_local_sources
 
 # Tag the repository
 sub
-tag_repository_sources
+tag_repository_sources(@)
 {
     my ($cmd, $t);
 
@@ -738,7 +738,7 @@ tag_repository_sources
 
 # Import a new set of vendor sources for a new module
 sub
-import_vendor_sources
+import_vendor_sources($)
 {
     my $module = $_[0];
 
@@ -771,7 +771,7 @@ import_vendor_sources
 # This routine dispatches server requests to the appropriate
 # routine based on the selected protocol (cvs or bk).
 sub
-talk_to_server
+talk_to_server($$)
 {
     if ($revctl_system eq "cvs") {
         return &talk_to_cvs_server(@_);
@@ -784,7 +784,7 @@ talk_to_server
 
 # This routine handles interaction with the master CVS server
 sub
-talk_to_cvs_server
+talk_to_cvs_server($$)
 {
     my ($type, $cmd) = @_;
     my ($err, $tries, $line);
@@ -932,7 +932,7 @@ talk_to_cvs_server
 
 # This routine handles interaction with the master BK server
 sub
-talk_to_bk_server
+talk_to_bk_server($$)
 {
     my ($type, $cmd) = @_;
 
@@ -940,7 +940,7 @@ talk_to_bk_server
 }
 
 sub
-talk_to_svn_server
+talk_to_svn_server($$)
 {
     my ($type, $cmd) = @_;
     my ($err, $tries, $line);

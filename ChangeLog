@@ -445,3 +445,7 @@ Removed unused member functions based on key names.  Too hairy.
 
 Enabled configuration file for buildtool.
 ----------------------------------------------------------------------
+Mon May 10 10:39:31 2004                        Michael Jennings (mej)
+
+Minor module changes to help prevent warnings.
+----------------------------------------------------------------------

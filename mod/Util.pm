@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.34 2004/04/12 00:09:27 mej Exp $
+# $Id: Util.pm,v 1.35 2004/05/10 14:39:43 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -117,6 +117,8 @@ sub dprintf(@);
 sub dprint(@);
 sub eprintf(@);
 sub eprint(@);
+sub wprintf(@);
+sub wprint(@);
 sub handle_signal(@);
 sub handle_fatal_signal(@);
 sub install_signal_handlers();
@@ -333,6 +335,9 @@ dprintf(@)
 
     return if (! $debug);
     $format = shift;
+    if (!scalar(@_)) {
+        return dprint($format);
+    }
     (undef, undef, undef, $s) = caller(1);
     if (!defined($s)) {
         $s = "MAIN";
@@ -341,6 +346,15 @@ dprintf(@)
     $f =~ s/^.*\/([^\/]+)$/$1/;
     $s =~ s/^\w+:://g;
     $s .= "()" if ($s =~ /^\w+$/);
+    $f = "" if (!defined($f));
+    $l = "" if (!defined($l));
+    $format = "" if (!defined($format));
+    for (my $i = 0; $i < scalar(@_); $i++) {
+        if (!defined($_[$i])) {
+            wprint "Undefined value passed to dprintf() parameter $i from $f line $l.\n";
+            $_[$i] = "0";
+        }
+    }
     printf("[$f/$l/$s] $format", @_);
 }
 
@@ -358,6 +372,9 @@ dprint(@)
     $f =~ s/^.*\/([^\/]+)$/$1/;
     $s =~ s/\w+:://g;
     $s .= "()" if ($s =~ /^\w+$/);
+    $f = "" if (!defined($f));
+    $l = "" if (!defined($l));
+    $s = "" if (!defined($s));
     print "[$f/$l/$s] ", @_;
 }
 
@@ -445,7 +462,7 @@ BEGIN {
 
 # Print a stack trace
 sub
-show_backtrace
+show_backtrace()
 {
     my ($file, $line, $subroutine, $i);
     my @tmp;
@@ -462,7 +479,7 @@ show_backtrace
 
 # Print function arguments
 sub
-print_args
+print_args(@)
 {
     my @args;
 
@@ -537,7 +554,7 @@ nuke_tree($)
 
 # Move files, a la "mv"
 sub
-move_files
+move_files(@)
 {
     # Last arg is destination
     my $dest = pop;
@@ -588,7 +605,7 @@ move_files
 
 # Copy files, a la "cp"
 sub
-copy_files
+copy_files(@)
 {
     # Last arg is destination
     my $dest = pop;
@@ -606,7 +623,7 @@ copy_files
     } elsif (! -l $dest) {
         unlink($dest);
     }
-    #dprint "Copying ", join(' ', @flist), " to $dest.\n";
+    dprint "Copying ", join(' ', @flist), " to $dest.\n";
     foreach my $f (grep(-f $_, @flist)) {
         my ($target, $mode);
 
@@ -686,7 +703,7 @@ copy_tree($$)
 
 # Create temporary working space in /var/tmp
 sub
-create_temp_space($$)
+create_temp_space($$$)
 {
     my ($pkg, $type, $tmpdir) = @_;
     my ($dir, $d);
@@ -821,7 +838,7 @@ parse_rpm_name($)
 }
 
 sub
-should_ignore
+should_ignore($)
 {
     my $fname = $_[0];
 
@@ -840,7 +857,7 @@ should_ignore
 }
 
 sub
-touch_file
+touch_file($)
 {
     my $file = $_[0];
     local *TMP;
