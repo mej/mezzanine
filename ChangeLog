@@ -615,3 +615,8 @@ Mostly small fixes and touch-ups.  I also added more mzimport
 debugging so I can determine exactly how gmkurtzer is managing to
 screw the pooch. :-)
 ----------------------------------------------------------------------
+Tue Aug 31 12:59:32 2004                        Michael Jennings (mej)
+
+Hopefully this will fix the relative path problems with importing an
+FST from the current directory.
+----------------------------------------------------------------------

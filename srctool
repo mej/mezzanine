@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.52 2004/08/25 21:34:39 mej Exp $
+# $Id: srctool,v 1.53 2004/08/31 16:59:59 mej Exp $
 #
 
 use strict;
@@ -191,6 +191,8 @@ import_package()
         dprint "Importing FST.\n";
         if ($pkgfile) {
             $pkg = &basename($pkgfile);
+        } elsif (! $pkg) {
+            $pkg = &basename(&getcwd());
         }
         if (! $name || $name !~ /-/) {
             if (-t STDIN) {
@@ -239,6 +241,9 @@ import_package()
                 $tmp = $scm->relative_path();
                 if (!defined($tmp)) {
                     $tmp = $scm->relative_path("..");
+                    if ($tmp eq "..") {
+                        $tmp = "";
+                    }
                 }
             } else {
                 # Supplied path doesn't exist, so take it as gospel.
@@ -635,8 +640,12 @@ clean_package
             } elsif ($item =~ /skipping directory/) {
                 $item =~ s/^.*skipping directory\s*//;
             }
-            print "Removing $item...\n";
-            &nuke_tree($item);
+            print "Removing $item...";
+            if ((!&nuke_tree($item)) && (-e $item)) {
+                print "unable:  $!.\n";
+            } else {
+                print ".\n";
+            }
         }
     }
 
@@ -827,7 +836,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.52 $ created on $Date: 2004/08/25 21:34:39 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.53 $ created on $Date: 2004/08/31 16:59:59 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();
