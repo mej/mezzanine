@@ -1,5 +1,5 @@
 %define name     avalon
-%define ver      1.0
+%define ver      1.1
 %define rel      1
 %define prefix   /usr
 
@@ -22,7 +22,7 @@ Requires: perl
 %changelog
 
 %prep
-%setup -n %{name} -c -a 0
+%setup -n %{name} -T -c -a 0
 
 %install
 rm -rf $RPM_BUILD_ROOT

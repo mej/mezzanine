@@ -4,7 +4,7 @@
 #  Written by:  Michael Jennings
 #               Ted T'so
 #
-#  $Id: README,v 1.11 2000/07/01 02:19:04 mej Exp $
+#  $Id: README,v 1.12 2000/07/08 03:04:54 mej Exp $
 #
 ########################################################################
 
@@ -263,7 +263,6 @@ Examples:
   To generate a diff between two tags on a directory:
      revtool -qd -t 'FOO-1-0 FOO-1-0-PATCH-1' foo-1.0
 
-
 2.5.  Creating Modules for New Packages
 ---------------------------------------
 
@@ -303,7 +302,6 @@ Examples:
 
   To import a directory containing binary files:
      revtool -kb -xit SUSE-6-4 contrib-suse
-
 
 2.6.  Tagging Sources
 ---------------------
@@ -524,21 +522,187 @@ Cow.  Version 4.2.8 of Cow has just been released to the public, and
 you feel that it is ready to be included into a product.  So what do
 you do?
 
+(NOTE:  Just in case some people might not have seen it before, the
+lines in the sections below which start with dollar signs ('$') are
+commands you should type at your shell prompt.  The dollar sign
+represents the shell prompt, so don't type it.  Type what's after it,
+changing the package name/version as needed.)
+
 4.1.  Adding a New Package
 --------------------------
+
+First, you need to import the new module into the revision control
+system.  You use revtool to do this.  Create a directory somewhere
+(e.g., in /tmp) with the same name you want to use for the new
+package.
+
+$ mkdir /tmp/cow
+
+Then cd into that directory and untar the vendor src tarball.
+
+$ cd /tmp/cow
+$ tar -zxvf ~/cow-4.2.8.tar.gz
+
+You also need to make sure you have a spec file in there.  If there is
+no spec file for the package, take the time now to create one.  It
+doesn't need to work just yet; it only needs to exist.  (The sections
+below assume that you have a working spec file, however, so be sure to
+flesh it out before going too much farther.)
+
+$ cp ~/cow.spec .
+
+At this point, you are ready for the import.  Make sure that there are
+no symlinks in your new module.  If there are, ask for help; the
+handling of symlinks is not yet documented.  When you're ready, import
+the module using revtool.
+
+$ revtool -xit COW-4-2-8
+
+Notice that the tag specified for the import was the package name, a
+hyphen, and the version number.  Also note that all letters must be
+uppercase, and all characters that are not letters, numbers, or a
+hyphen, should be replaced by hyphens.  The tag you have specified
+here is called a "release tag."  Remember it; you'll need it later.
+
+If something should go wrong during the import, ask for help.
+
+If you plan to apply patches to this package, or may do so in the
+future, you must now branch the tree.  The "branch tag" is exactly the
+same as the release tag you specified in the import (see above),
+except that it was "VA-" in front of it.
+
+$ revtool -bt VA-COW-4-2-8 cow
+
+If, on the other hand, this package is maintained by you (and therefore
+the SRPM would not ever contain patches, only new versions), this step
+would not be necessary.  Also, packages that are actively developed in
+this tree (such as Avalon) would not need to be branched.
 
 4.2.  Patches
 -------------
 
+Let's say you fix a bug in cow.  This fix needs to be included in the
+SRPM as a patch.  Your first step here is to check out the module you
+created earlier.  When you do the checkout, make sure to check out the
+branch you created in the step above using the branch tag.
+
+$ revtool -gt VA-COW-4-2-8 cow
+$ cd cow
+
+Now, if you have a patch file, you should go ahead and apply it at
+this time.  If not, just make the appropriate source file changes to
+the vendor sources.  (Having a patch already is highly recommended...
+avoids mishaps.)  The line below shows a sample patch command; note
+that you may need to use a different prune value (the -p option).
+
+$ patch -p0 < cow-4.2.8-fix.patch
+
+Next, edit the spec file to add the appropriate "Patch:" line and
+%patch macro.  Your %patch macros should *always* use -p1 because of
+how pkgtool generates patches.  Once you've done this, use revtool to
+make sure that no files have been added or removed.
+
+$ revtool -g
+
+Watch the output of that command carefully.  Any filename that is
+listed with a question mark ('?') in front of its name is a new file
+that you must add.  Any file with an uppercase 'U' in front of its
+name is a file that must be removed.  Be very careful of new
+directories!  After you add new directories, you must then add all the
+files and directories inside them, and then you must add all the files
+and directories inside *those* directories, and so forth.  So continue
+doing adds and gets until no more question marks appear.
+
+$ revtool -a cow-4.2.8/fix.h cow-4.2.8/fix_dir
+$ revtool -g
+$ revtool -a cow-4.2.8/fix_dir/fix.txt
+$ revtool -g
+
+(To clarify the above example....  Our first "revtool -g" showed 2
+files with a ? in front of their names.  So we use "revtool -a" to add
+those.  One of them happened to be a directory, so our next get showed
+another file with a ? in front of it, cow-4.2.8/fix_dir/fix.txt.  So
+we added that file and did another get.  The last get showed no new
+files, so we are finished with this part.  If any files had been
+removed by the patch...rare, but it does happen...use "revtool -r" to
+remove them.)
+
+Once all the adds/removes are squared away, we're ready to upload our
+changes to the master server.
+
+$ revtool -p
+
+You will be asked to create a ChangeLog entry for the change you
+made.  Try to give a brief description of what the patch fixes.  Save
+and exit your editor when done.
+
+After you've uploaded your changes, you must mark ("tag") the change
+so pkgtool can come in later and generate the patch file for it.  The
+patch tag should be the release tag for the module (see section 4.1
+above) followed by a hyphen, the word PATCH, and the number of the
+patch as it appears in the spec file.  For instance, if this was patch
+1, the tag would be COW-4-2-8-PATCH-1.  Use revtool to apply the tag.
+
+$ revtool -t COW-4-2-8-PATCH-1
+
+Repeat this entire process, starting with applying the patch and
+continuing to this point, for each patch you have for the package.
+The patches should be done in the order in which they are applied in
+the spec file, which may not be numerical order.  Make sure to add any
+additional sources in spec file order as well.  (See below for how to
+do source files.)
+
+If you make a mistake, stop IMMEDIATELY and ask for help.  The sooner
+you stop, the more likely it is that we can repair your problem
+without too much extra work on your part.  Or ours, for that matter.
+
 4.3.  Additional Source Files
 -----------------------------
+
+Additional source files covers anything that has a "Source:" line in
+the spec file.  These can be tarballs or single files.  Tarballs
+should be unarchived into the right place.  Single files should be
+placed in their proper location in the vendor source tree, or in the
+module directory itself if they don't belong in the vendor source
+tree.  The tag for sources should use "SOURCE" instead of "PATCH."
+Apart from that, follow the instructions for applying and committing a
+patch in section 4.2.
+
+$ cp ~/cow-README ./README
+$ revtool -a README
+$ revtool -p
+$ revtool -t COW-4-2-8-SOURCE-1
 
 4.4.  Creating a Product File
 -----------------------------
 
+[Author's Note:  Product files are powerful little buggers that need a
+lot more documentation than I can take time to write at the moment.
+If you can't figure out how to do one from the existing examples, ask
+for help.  I'll be happy to assist.  I just can't afford to take time
+to flesh out this section right now.  Sorry. :-)    -- mej]
+
 4.5.  Finally, Build That Sucker
 --------------------------------
 
+Once you have a product file ready and all your changes have been
+uploaded to the master server, you're ready to build the package.
+
+$ buildtool -p cow
+
+By default, buildtool looks in $PROD_DIR for product files.  If
+they're not there, or if $PROD_DIR isn't set, it will try
+"$BASE_DIR/products" and "$BASE_DIR/../products" before giving up.
+($BASE_DIR defaults to `pwd` if not defined.)  If your product files
+aren't in one of those places, you'll need to set $BASE_DIR or
+$PROD_DIR.  See your shell's man page for help on setting/exporting
+environment variables.
+
+Downloaded modules, RPM's which are built, etc. will end up in
+$BUILD_DIR (which is set to "$BASE_DIR/build" if not defined).  If you
+want buildtool to use sources that you already have checked out, make
+sure to set $BUILD_DIR to the parent directory which contains the
+checked-out module.
 
 5.  STANDARDS AND CONVENTIONS
 -----------------------------

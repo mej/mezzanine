@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.39 2000/07/01 02:19:04 mej Exp $
+# $Id: revtool,v 1.40 2000/07/08 03:04:54 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1296,7 +1296,7 @@ BEGIN {
 
     # Set up the basic variables
     $progname = "revtool";
-    $version = "1.0";
+    $version = "1.1";
     $argc = $#ARGV + 2;
     $retval = 0;
 
@@ -1350,7 +1350,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.39 $ created on $Date: 2000/07/01 02:19:04 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.40 $ created on $Date: 2000/07/08 03:04:54 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
