@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.164 2004/01/06 20:53:05 mej Exp $
+# $Id: buildtool,v 1.165 2004/01/07 18:56:37 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -563,9 +563,12 @@ build_product
     &download_packages(@packages);
     &update_package_list(\@packages);
 
-    # Call build_package() for each package; we don't care how that works as long as it does. :-)
+    # Call build_single_package() for each package; we don't care how that works as long as it does. :-)
     foreach my $pkg (@packages) {
+        my %preserve_pkg_vars = &pkgvar_get_all();
+
         &build_single_package($pkg);
+        &pkgvar_reset(%preserve_pkg_vars);
     }
 
     # Now we clean up.
@@ -643,7 +646,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.164 $ created on $Date: 2004/01/06 20:53:05 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.165 $ created on $Date: 2004/01/07 18:56:37 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -700,7 +703,7 @@ main
         # Now set all the variables using fallbacks.
         ($instroot, $instroot_init, $instroot_reset, $instroot_copy)
             = &set_instroot_info($instroot, $instroot_init, $instroot_reset, $instroot_copy);
-        &pkgvar_instroot($instroot);
+        &assign_product_variable($prod, "INSTROOT", $instroot);
 
         # If we have $instroot_init, the other two are guaranteed to be set by fallbacks.
         if ($instroot_init) {
