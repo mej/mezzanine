@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgsort,v 1.14 2001/04/18 04:16:57 mej Exp $
+# $Id: pkgsort,v 1.15 2001/04/20 04:20:53 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -59,6 +59,7 @@ print_usage_info
     print "                       p for provisions\n";
     print "                       s for alphabetical by source package\n";
     print "                       r to reverse the sort order (in addition to one of the above flags)\n";
+    print "                       n for no sorting\n";
     print "\n";
     exit(AVALON_SUCCESS);
 }
@@ -195,6 +196,16 @@ find_packages
         }
         xpush @new_pkgs, $pkg;
         xpush @{$rpm_list{$pkg}}, $rpm;
+    }
+    if ($sort_method eq "n") {
+        my @tmp;
+
+        foreach my $pkg (@pkgs) {
+            if (grep($_ eq $pkg, @new_pkgs)) {
+                push @tmp, $pkg;
+            }
+        }
+        @new_pkgs = @tmp;
     }
     return @new_pkgs;
 }
@@ -664,7 +675,7 @@ sort_packages
         }
     } elsif ($sort_method eq "a") {
         @pkgs = sort {$src_package{$a} cmp $src_package{$b}} @pkgs;
-    } else {
+    } elsif ($sort_method eq "s") {
         @pkgs = sort {$a cmp $b} @pkgs;
     }
     if ($reverse_sort) {
@@ -807,7 +818,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.14 $ created on $Date: 2001/04/18 04:16:57 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.15 $ created on $Date: 2001/04/20 04:20:53 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -856,9 +867,9 @@ main
     } else {
         $reverse_sort = 0;
     }
-    if ($sort_method !~ /^[adps]$/i) {
+    if ($sort_method !~ /^[adpsn]$/i) {
         eprint "Invalid sort flags:  $sort_method\n";
-        eprint "Must be exactly one of a, d, p, or s, with an optional r\n";
+        eprint "Must be exactly one of a, d, p, s, or n, with an optional r\n";
         $sort_method = "d";
     }
     if ($opt_D) {

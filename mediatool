@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: mediatool,v 1.5 2001/04/07 02:22:39 mej Exp $
+# $Id: mediatool,v 1.6 2001/04/20 04:20:53 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -106,18 +106,18 @@ create_iso
 {
     my ($iso, $imagedir) = @_;
     my ($cmd, $ignore, $bootimg, $line, $err);
-    local *MKHYBRID;
+    local *MKISOFS;
 
     $bootimg = ($boot_image ? "-b $boot_image -c boot.cat" : "");
     $ignore = "-m CVS -m RCS -m BitKeeper -m SCCS -m .cvsignore -m '.avalon.*'";
-    $cmd = "mkhybrid -o $iso -a $ignore $bootimg -T -r -J -v $imagedir";
+    $cmd = "mkisofs -o $iso $ignore $bootimg -T -r -R -J -v $imagedir";
     dprint "About to run \"$cmd\"\n";
     print "Creating ISO image $iso from $imagedir....\n";
-    if (!open(MKHYBRID, "$cmd </dev/null 2>&1 |")) {
-        &fatal_error("Execution of \"$cmd\" failed -- $!");
+    if (!open(MKISOFS, "$cmd </dev/null 2>&1 |")) {
+        &fatal_error("Execution of \"$cmd\" failed -- $!\n");
     }
     $err = 0;
-    while (<MKHYBRID>) {
+    while (<MKISOFS>) {
         chomp($line = $_);
         if (&debug_get()) {
             dprint "$line\n";
@@ -129,10 +129,10 @@ create_iso
             print "\rISO creation complete, total size $1.\n";
         }
     }
-    close(MKHYBRID);
+    close(MKISOFS);
     dprint "\"$cmd\" returned $?\n";
     if ($? != 0 && $err == 0) {
-        &fatal_error("mkhybrid failed");
+        &fatal_error("mkisofs failed [$line]\n");
     }
 }
 
@@ -155,7 +155,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.5 $ created on $Date: 2001/04/07 02:22:39 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.6 $ created on $Date: 2001/04/20 04:20:53 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -174,7 +174,7 @@ main
     if (scalar(@opt_D)) {
         @dirs = @opt_D;
     } else {
-        &fatal_error("No source directories specified.");
+        &fatal_error("No source directories specified.\n");
     }
     $iso = ($opt_i ? $opt_i : 0);
     $tarball = ($opt_t ? $opt_t : 0);
