@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: imgtool,v 1.15 2001/10/05 16:14:52 mej Exp $
+# $Id: imgtool,v 1.16 2001/10/10 15:12:25 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -111,16 +111,13 @@ find_packages
 
         @tmp = &grepdir(sub {$_ =~ /\.rpm$/ && $_ !~ /\.(no)?src\.rpm$/}, $dir);
         push @contents, @tmp;
-        foreach $tmp (@tmp) {
-            $path{$tmp} = $dir;
-        }
     }
 
     foreach $rpm (@contents) {
         my ($pkg, $ver, $rel, $arch);
 
-        $rpm =~ m/^([^\/]+)-([^-\/]+)-([^-\/]+)\.(\w+)\.rpm$/;
-        ($pkg, $ver, $rel, $arch) = ($1, $2, $3, $4);
+        $rpm =~ m/^(\S*\/)?([^\/]+)-([^-\/]+)-([^-\/]+)\.(\w+)\.rpm$/;
+        ($pkg, $ver, $rel, $arch) = ($2, $3, $4, $5);
         if (!defined($rpm_name{$pkg})) {
             $rpm_name{$pkg} = $rpm;
             $arch{$pkg} = $arch;
@@ -189,11 +186,12 @@ install_packages
         } else {
             $prog = "";
         }
+        $prog .= " -d" if (&debug_get());
         $rpm = $rpm_name{$pkg};
-        $cmd = "pkgtool $prog --root=$imagedir -ip $path{$rpm}/$rpm";
+        $cmd = "pkgtool $prog --root=$imagedir -ip $rpm";
 
         open(CMD, "$cmd 2>&1 |") || &fatal_error("Unable to execute pkgtool -- $!\n");
-        print "Installing $pkg ($rpm) from $path{$rpm} into $imagedir....\n";
+        print "Installing $pkg ($rpm) into $imagedir....\n";
         dprint "$cmd\n";
         while (<CMD>) {
             chomp($line = $_);
@@ -275,7 +273,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.15 $ created on $Date: 2001/10/05 16:14:52 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.16 $ created on $Date: 2001/10/10 15:12:25 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -291,13 +289,15 @@ main
     }
 
     &debug_set($opt_d);
-    $imagedir = abs_path($opt_i ? $opt_i : ($ENV{"MEZZANINE_IMAGEDIR"} ? $ENV{"MEZZANINE_IMAGEDIR"} : "./img"));
+    $imagedir = ($opt_i ? $opt_i : ($ENV{"MEZZANINE_IMAGEDIR"} ? $ENV{"MEZZANINE_IMAGEDIR"} : "./img"));
+    mkdir($imagedir, 0700) if (! -d $imagedir);
+    $imagedir = abs_path($imagedir);
     if ($opt_D) {
         @pkgdirs = split(/[:\s]/, $opt_D);
     } elsif ($ENV{MEZZANINE_BUILDDIR}) {
         @pkgdirs = glob('$ENV{MEZZANINE_BUILDDIR}/RPMS/*');
     } else {
-        @pkgdirs = glob('build.mezz/RPMS/*');
+        @pkgdirs = glob('build.mezzanine/RPMS/*');
     }
     $keep = ($opt_k ? 1 : 0);
     $force = ($opt_f ? 1 : 0);
@@ -316,9 +316,10 @@ main
     } else {
         @arch_list = ("i386", "noarch", "i586", "i686");
     }
+    dprint "Creating image $imagedir ", ($archive ? "and tarball $archive " : ""), "from packages in $opt_l\n";
 
     # Oops-proofing
-    if (abs_path($imagedir) eq "/" && ! $keep) {
+    if ($imagedir eq "/" && ! $keep) {
         &fatal_error("Sorry, I refuse to remove /.\n");
     }
 
