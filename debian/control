@@ -1,0 +1,13 @@
+Source: mezzanine
+Section: devel
+Priority: optional
+Maintainer: Michael Jennings <mej@kainx.org>
+Standards-Version: 3.0.1
+
+Package: mezzanine
+Architecture: all
+Depends: ${perl:Depends}
+Description: A Software Product Management System
+ Mezzanine is a collection of tools, written primarily in Perl, which
+ automate and simplify many of the tasks associated with maintaining,
+ building, and releasing software products.

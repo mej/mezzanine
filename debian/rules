@@ -1,0 +1,152 @@
+#!/usr/bin/make -f
+# Sample debian/rules that uses debhelper. 
+# GNU copyright 1997 by Joey Hess.
+#
+# This version is for a hypothetical package that builds an
+# architecture-dependant package, as well as an architecture-independent
+# package.
+
+# Uncomment this to turn on verbose mode. 
+export DH_VERBOSE=1
+
+# This is the debhelper compatability version to use.
+export DH_COMPAT=1
+
+# This has to be exported to make some magic below work.
+export DH_OPTIONS
+
+export prefix=/usr
+export DESTDIR=$(shell pwd)/debian/tmp
+
+build: build-stamp
+build-stamp:
+	dh_testdir
+
+	(cd doc ; \
+	for i in *.sgml ; do \
+	  FNAME=`echo $$i | sed 's/\.sgml//'` ; \
+	  jade -t sgml -i html -d mezzanine.dsl \
+	    -D /usr/lib/sgml/stylesheet/dsssl/docbook/nwalsh \
+	    -V "%stylesheet%=$${FNAME}.css" \
+	    -V "%root-filename%=$${FNAME}" \
+	    -V nochunks -V rootchunk \
+	    $$i ; \
+	done ; \
+	rm -f book[0-9]*.html t[0-9]*.html c[0-9]*.html x[0-9]*.html)
+
+	touch build-stamp
+
+clean:
+	dh_testdir
+	rm -f build-stamp 
+	dh_clean
+
+install: DH_OPTIONS=
+install: build
+	dh_testdir
+	dh_testroot
+	dh_clean -k
+	dh_installdirs
+
+	rm -rf $(DESTDIR)
+	mkdir -p $(DESTDIR)$(prefix)/bin
+	mkdir -p $(DESTDIR)$(prefix)/lib/perl5/Mezzanine
+	mkdir -p $(DESTDIR)$(prefix)/man/man1
+
+	for i in *tool pkgsort ; do \
+	  install -m 755 $$i $(DESTDIR)$(prefix)/bin/ ; \
+	done
+
+	for i in mod/*.pm ; do \
+	  install -m 644 $$i $(DESTDIR)$(prefix)/lib/perl5/Mezzanine/ ; \
+	done
+
+	for i in doc/man/*.1 ; do \
+	  install -m 644 $$i $(DESTDIR)$(prefix)/man/man1/ ; \
+	done
+
+	for i in get co put ci info add new rm purge rtag tag reset login diff stat status log ; do \
+	  ln -s revtool $(DESTDIR)$(prefix)/bin/mz$$i ; \
+	  echo ".so revtool.1" > $(DESTDIR)$(prefix)/man/man1/mz$$i.1 ; \
+	done
+	for i in import prep mod merge patch clean sync ; do \
+	  ln -s srctool $(DESTDIR)$(prefix)/bin/mz$$i ; \
+	  echo ".so srctool.1" > $(DESTDIR)$(prefix)/man/man1/mz$$i.1 ; \
+	done
+	for i in rpm pkg build inst ; do \
+	  ln -s pkgtool $(DESTDIR)$(prefix)/bin/mz$$i ; \
+	  echo ".so pkgtool.1" > $(DESTDIR)$(prefix)/man/man1/mz$$i.1 ; \
+	done
+	for i in prod pbuild prodbuild ; do \
+	  ln -s buildtool $(DESTDIR)$(prefix)/bin/mz$$i ; \
+	  echo ".so buildtool.1" > $(DESTDIR)$(prefix)/man/man1/mz$$i.1 ; \
+	done
+
+	dh_movefiles
+
+# Build architecture-independent files here.
+# Pass -i to all debhelper commands in this target to reduce clutter.
+binary-indep: DH_OPTIONS=-i
+binary-indep: build install
+	# Need this version of debhelper for DH_OPTIONS to work.
+	dh_testversion 1.1.17
+	dh_testdir
+	dh_testroot
+#	dh_installdebconf
+	dh_installdocs
+#	dh_installexamples
+#	dh_installmenu
+#	dh_installemacsen
+#	dh_installpam
+#	dh_installinit
+#	dh_installcron
+#	dh_installmanpages
+#	dh_installinfo
+#	dh_undocumented
+	dh_installchangelogs 
+	dh_link
+	dh_compress
+	dh_fixperms
+	dh_suidregister
+	dh_installdeb
+	dh_perl
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+# Build architecture-dependent files here.
+# Pass -a to all debhelper commands in this target to reduce clutter.
+binary-arch: DH_OPTIONS=-a
+binary-arch: build install
+	# Need this version of debhelper for DH_OPTIONS to work.
+#	dh_testversion 1.1.17
+#	dh_testdir
+#	dh_testroot
+#	dh_installdebconf
+#	dh_installdocs
+#	dh_installexamples
+#	dh_installmenu
+#	dh_installemacsen
+#	dh_installpam
+#	dh_installinit
+#	dh_installcron
+#	dh_installmanpages
+#	dh_installinfo
+#	dh_undocumented
+#	dh_installchangelogs 
+#	dh_strip
+#	dh_link
+#	dh_compress
+#	dh_fixperms
+	# You may want to make some executables suid here.
+#	dh_suidregister
+#	dh_installdeb
+#	dh_makeshlibs
+#	dh_perl
+#	dh_shlibdeps
+#	dh_gencontrol
+#	dh_md5sums
+#	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install

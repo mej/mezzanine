@@ -1,0 +1,9 @@
+mezzanine (1.1-1) unstable; urgency=low
+
+  * Initial Debian build.
+
+ -- Michael Jennings <mej@kainx.org>  Wed,  2 Jan 2002 16:15:29 -0500
+
+Local variables:
+mode: debian-changelog
+End:
