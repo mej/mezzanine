@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.10 2001/08/20 22:21:29 mej Exp $
+# $Id: Prod.pm,v 1.11 2001/09/05 19:26:28 mej Exp $
 #
 
 package Avalon::Prod;
@@ -316,6 +316,13 @@ parse_product_entry
         } else {
             $pname = $name;
             $pver = 0;
+        }
+
+        foreach my $pkgvar (keys %pkgvars) {
+            if ($pkgvars{$pkgvar} !~ /^$/) {
+                $prods->{$name}{$pkgvar} = $pkgvars{$pkgvar};
+                xpush(@allvars, $pkgvar);
+            }
         }
 
         # Recursively convert products into their component packages

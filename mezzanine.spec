@@ -1,7 +1,7 @@
 Summary: Avalon -- The VA Software Engineering Build System
 Name: avalon
 Version: 2.1
-Release: 0.12
+Release: 0.13
 Copyright: BSD with Advertising Clause
 Group: Development/Tools
 Source: %{name}.tar.gz
