@@ -215,3 +215,8 @@ Looks like I've fixed that "can't find specfile" bug.  I've also added
 a variable for specifying the build architecture which will hopefully
 keep stuff from choking on i386 vs. i686.
 ----------------------------------------------------------------------
+Wed May 24 15:38:44 2000                        Michael Jennings (mej)
+
+Fixed some typos in the product files and got the prep work ready for
+parallelizing.
+----------------------------------------------------------------------

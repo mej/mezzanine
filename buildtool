@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.25 2000/05/23 23:34:16 mej Exp $
+# $Id: buildtool,v 1.26 2000/05/24 22:32:23 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -58,6 +58,15 @@ sub REVTOOL_NEED_UPDATE()         {61;}
 # 127 is a catch-all
 sub REVTOOL_UNSPECIFIED_ERROR()   {127;}
 
+
+# Return codes for buildtool
+sub BUILDTOOL_SUCCESS()           {0;}
+sub BUILDTOOL_PACKAGE_FAILED()    {1;}
+sub BUILDTOOL_BAD_PRODUCT()       {2;}
+sub BUILDTOOL_FATAL_ERROR()       {3;}
+sub BUILDTOOL_TERMINATED()        {50;}
+sub BUILDTOOL_CRASHED()           {60;}
+
 # Print usage information
 sub
 print_usage_info
@@ -79,8 +88,11 @@ print_usage_info
     print "    -Q --really-quiet --silent       Be very quiet.  Only errors are reported\n";
     print "    -D --dir [directory]             Specify \"directory\" as the base directory for the build\n";
     print "    -f --force                       Ignore errors, build as much as possible\n";
+    print "    -l --log [logfile]               Specify a log file to send informational output to\n";
+    print "    -P --parallel                    Parallelize the build process based on the number of CPU's\n";
+    print "    -t --target [arch]               Tell rpm to build for a particular target architecture\n";
     print "\n";
-    exit(0);
+    exit(BUILDTOOL_SUCCESS);
 }
 
 # Generate timestamp for debugging/log file
@@ -99,7 +111,7 @@ fatal_error
 
     print STDERR $msg;
     print $GLOBAL_LOG $msg if ($GLOBAL_LOG);
-    exit(-1);
+    exit(BUILDTOOL_FATAL_ERROR);
 }
 
 # Debugging output
@@ -193,7 +205,7 @@ handle_signal
     eprint "Someone sent me a SIG$sig asking me to exit, so I shall.\n";
     &summarize_failures();
     close($GLOBAL_LOG) if ($GLOBAL_LOG);
-    exit(-125);
+    exit BUILDTOOL_TERMINATED;
 }
 
 # Handle a fatal signal
@@ -204,7 +216,7 @@ handle_fatal_signal
 
     eprint "Caught fatal signal SIG$sig.  Cleaning up and aborting...\n";
     close($GLOBAL_LOG) if ($GLOBAL_LOG);
-    exit(-123);
+    exit BUILDTOOL_CRASHED;
 }
 
 # Handle a perl warning
@@ -212,6 +224,23 @@ sub
 handle_warning
 {
     dprint @_;
+}
+
+# Count CPU's
+sub
+count_cpus
+{
+    my $cpus;
+    my @lines;
+    local *CPU;
+
+    open(CPU, "/proc/cpuinfo") || return 1;
+    @lines = <CPU>;
+    close(CPU);
+    @lines = grep(/^processor/, @lines);
+    $cpus = $#lines + 1;
+    dprint "Found $cpus processors.\n";
+    return ($cpus >= 1 ? $cpus : 1);
 }
 
 # Make a directory hierarchy
@@ -343,8 +372,18 @@ parse_product_entry
     my ($type, $name, $module, $filename, $pkgvar, $var, $val);
     my $type_guess = 0;
     my (%pkgvars, @inp);
-    my $prod = "$prodname-$prodver";
+    my $prod;
 
+    if ($prodname) {
+        if ($prodver) {
+            $prod = "$prodname-$prodver";
+        } else {
+            $prod = $prodname;
+            $prodver = 0;
+        }
+    } else {
+        $prod = $prodname = $prodver = 0;
+    }
     dprint "parse_product_entry(\"$line\", \"$prodname\", \"$prodver\")\n";
     undef %pkgvars;
     undef $module;
@@ -448,7 +487,7 @@ parse_product_entry
     dprint "parse_product_entry():  Module is $module, name is $name\n";
     # Add defaults for stuff that is required
     if ($type eq "module") {
-        if ($pkgvars{REVISION} =~ /^head$/i) {
+        if (defined($pkgvars{REVISION}) && $pkgvars{REVISION} =~ /^head$/i) {
             undef $pkgvars{REVISION};
         }
     } elsif ($type eq "srpm") {
@@ -626,7 +665,7 @@ fail_package
     } else {
         eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage.\n";
     }
-    exit(-1) if (! $opt_f);
+    exit(BUILDTOOL_PACKAGE_FAILED) if (! $opt_f);
     @packages = grep($_ ne $pkg, @packages);
     return 0;
 }
@@ -674,7 +713,7 @@ build_rpms
     local *RPM;
 
     $rpm = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
-    $target = ($pkgs->{$pkg}{ARCH} ? "--target=$pkgs->{$pkg}{ARCH}" : "");
+    $target = ($pkgs->{$pkg}{ARCH} ? "--target=$pkgs->{$pkg}{ARCH}" : ($main::target ? $main::target : ""));
     $cmd = "$rpm --rcfile \"/usr/lib/rpm/rpmrc:$rpmrc\" $target -ba $specfile";
     dprint "About to run \"$cmd\"\n";
     if (!open(RPM, "$cmd </dev/null 2>&1 |")) {
@@ -714,10 +753,11 @@ build_rpms
                  || $line =~ /^Bad file: (.*): No such file or directory$/
                  || $line =~ /^File is not a regular file: (.*)$/
                  || $line =~ /^Unable to open icon (\S+):$/
-                 || $line =~ /^Could not open \%files file \S+: No such file or directory$/
+                 || $line =~ /^No (patch number \d+)$/
+                 || $line =~ /^Could not open \%files file (\S+): No such file or directory$/
                  || $line =~ /^File not found(?: by glob)?: (.*)$/) {
             $err = 1;
-            push @not_found, $line;
+            push @not_found, $1;
         }
     }
     close(RPM);
@@ -726,10 +766,10 @@ build_rpms
         $err = 1;
         $msg = "Unhandled RPM build error";
     } elsif ($#not_found != -1) {
-        $msg = sprintf("The following were expected by rpm, but no matching files were found:  %s",
-                       join(" ", @not_found));
+        $msg = sprintf("The following were expected by rpm, but no matching files were found:  \"%s\"",
+                       join("\", \"", @not_found));
     } elsif ($#spec_errors != -1) {
-        $msg = sprintf("The spec file contains the following errors:  \"%s\"", join("\" \"", @spec_errors));
+        $msg = sprintf("The spec file contains the following errors:  \"%s\"", join("\", \"", @spec_errors));
     }
     dprint "build_rpms():  Returning $err, $msg, $srpm\n";
     return ($err, $msg, $srpm);
@@ -1292,6 +1332,7 @@ build_process
     $ENV{MAKE} = "make";  # Make sure we don't parallel build, because it doesn't work.
     $ENV{CFLAGS} = "-O2 -march=pentium";  # A bit of optimization, but not much.
     $ENV{LD_LIBRARY_PATH} = "";  # Make glibc happy
+    $ENV{PATH} = "/usr/build/bin:/usr/local/build/bin:/usr/lib/qt-2.1.0/bin:/usr/lib/qt-1.45/bin:$ENV{PATH}";
 
     # Perform the build in stages, checking after each one to see if we should stop
     &do_bootstrap_stage();
@@ -1326,14 +1367,14 @@ main
     # See the Getopt::Mixed man page for details on the syntax of this line
     $valid_opts = "h help>h v version>v d debug>d b=s build>b p=s product>p package>p"
                    . " q quiet>q Q really-quiet>Q silent>Q D=s dir>D f force>f l=s log>l"
-                   . " P parallel>P t=s target>t";
+                   . " P parallel>P t=s target>t master=i";
     Getopt::Mixed::getOptions($valid_opts);
 
     # Post-parse the options stuff
     if ($opt_v) {
 	print "$progname $version by Michael Jennings\n";
         print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
-	exit(0);
+	return BUILDTOOL_SUCCESS;
     }
     if ($opt_h) {
 	&print_usage_info();   # Never returns
@@ -1342,6 +1383,20 @@ main
     $verbosity = ($opt_Q ? 0 : ($opt_q ? 1 : 2));
     $target = ($opt_t ? $opt_t : 0);
     $opt_b = "p" if (! $opt_b);
+    if ($opt_master) {
+        $master_pid = $opt_master;
+        $slave = 1;
+        $master = 0;
+    } elsif ($opt_P) {
+        $master = 1;
+        $master_pid = $$;
+        $slave = 0;
+        $num_cpus = &count_cpus();
+    } else {
+        $master = 0;
+        $slave = 0;
+        $num_cpus = 1;
+    }
     $GLOBAL_LOG = 0;
     if ($opt_l) {
         if (!open(LOGFILE, ">$opt_l")) {
@@ -1361,6 +1416,7 @@ main
     $builddir = ($ENV{BUILD_DIR} ? $ENV{BUILD_DIR} : "$basedir/build");
     $proddir = ($ENV{PROD_DIR} ? $ENV{PROD_DIR} : "$basedir/products");
     $revtool = sprintf("revtool%s", ($opt_d ? " --debug" : ""));
+    $buildtool = sprintf("$progname%s", ($opt_d ? " --debug" : ""));
 
     # Signal handling
     $SIG{HUP} = 'IGNORE';
@@ -1389,15 +1445,16 @@ main
     } else {
         eprint "You didn't tell me what to build, so I'm not quite sure what to do.\n";
         eprint "If you aren't familiar with how to use $progname, try $progname --help.\n";
-        return;
+        return BUILDTOOL_BAD_PRODUCT;
     }
 
     # Parse the product definition files to figure out what the heck we need to build. :)
-    if (! &parse_prod_file($prodname, $prodver)) {
+    # If we're a slave process, we know it's going to be a straight product entry.
+    if ($slave || ! &parse_prod_file($prodname, $prodver)) {
         if (! &parse_product_entry($prod)) {
             eprint "$prod does not seem to be a valid product or product entry.\n";
             eprint "Perhaps you made a typo?\n";
-            return;
+            return BUILDTOOL_BAD_PRODUCT;
         }
     }
     dprint "Products to be built:  ", join(" ", @products), "\n";
@@ -1407,8 +1464,7 @@ main
         &summarize_failures();
     }
     close(LOGFILE) if ($GLOBAL_LOG);
+    return (defined(@failed_pkgs) && $#failed_pkgs != -1) ? BUILDTOOL_PACKAGE_FAILED : BUILDTOOL_SUCCESS;
 }
 
-&main();
-
-exit 0;
+exit &main();
