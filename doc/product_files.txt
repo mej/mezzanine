@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: product_files.txt,v 1.1 2001/02/07 08:37:36 mej Exp $
+#  $Id: product_files.txt,v 1.2 2001/02/07 22:04:49 mej Exp $
 #
 ########################################################################
 
@@ -240,6 +240,8 @@ ends up in the comment field on the CD image, if there is one.  This
 will be a product variable since it will most definitely contain
 spaces.
 
+Aliases:  DESC
+
 Example:  description:  RedHat Linux with VA Linux Enhancements
 
 2.6.  Making CD's from Images:  ISO
@@ -261,6 +263,40 @@ Example:  label=RH/VALE
 2.8.  Placing Packages into Image Trees:  LOCATIONS
 ---------------------------------------------------
 
+The LOCATIONS variable is probably the most complicated of all
+component variables.  It is used to determine the location(s) within
+an image module where packages will be placed.  The value consists of
+a series of regular expressions which are matched with the package
+filenames, and the relative paths into which matching package files
+should be placed.  Commas separate multiple location specifiers from
+one another.
+
+There are two types of specifiers, differentiated by the character
+which separates the regular expression from the directory path.  If an
+equals sign ('=') is used, a package file matching the regexp will be
+placed in that location, and no subsequent patterns will be tested for
+that package file.  If a colon (':') is used instead, Avalon will keep
+testing the regexp's, even after finding a match, until it reaches a
+match with an equals sign or the end of the list.
+
+When a match is found, the package file is linked into the directory
+specified.  The directory path should include the image module name
+followed by the path within that image.
+
+The basic syntax is:
+
+/regexp/:image/path/,/regexp/=image/path/
+
+Note that the example shown here has line breaks after the commas for
+readability, but in the actual product file there should be no line
+breaks or intervening whitespace.
+
+Aliases:  LOC
+
+Example:  locations:/src\.rpm$/:va-os-srpms/VALinux/SRPMS,
+                    /src\.rpm$/=va-os-srpms/SRPMS,
+                    /\.rpm$/:va-os-rpms/VALinux/RPMS,
+                    /\.rpm$/:va-os-rpms/RedHat/RPMS
 
 2.9.  Forcing RPM into Submission:  MACROS
 ------------------------------------------
@@ -271,6 +307,8 @@ outright.  The difference is that instead of specifying compiler
 flags, the MACROS variable creates or overrides rpm macros.  The macro
 name is separated from its value by a colon; multiple macro
 definitions may be given by placing commas between definitions.
+
+Aliases:  MACRO
 
 Example:  macros=release_version:6.2,release_name:Piglet
 
@@ -292,6 +330,8 @@ As with the MODULE variable, the RELEASE variable can be used to force
 a particular release number for a package file.  As a rule, don't use
 it.
 
+Aliases:  REL
+
 Example:  release=4
 
 2.12.  Getting What You Want:  REVISION
@@ -303,6 +343,8 @@ specifies a revision number or tag to use when obtaining the package
 from the master repository.  If you specify a value of "head" for this
 variable, it will forceably turn off any previously-defined tags (such
 as may be defined as a product variable).
+
+Aliases:  REV, TAG
 
 Example:  revision=VA-REDHAT-6-2-3
 
@@ -339,6 +381,8 @@ present, it will be created from all the source files and directories
 listed in its source definition.  If no tarball is present, the source
 file(s) are interpreted as separate sources and are simply copied into
 place.  Note that wildcards are valid for source files/directories.
+
+Aliases:  SOURCE, SOURCES
 
 Example:  srcs=etc&usr&README:VAmoo_cow-1.0.0.tar.bz2,moo_cow.init&*.1
 
@@ -381,6 +425,8 @@ Example:  tar:  gtar -zcvf %t %f
 The VERSION variable specifies the version of a package or product.
 It should only be used for versions which don't conform to standard
 conventions.
+
+Aliases:  VER
 
 Example:  version=1.0.1
 

@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 28 Sept 2000
 #
-# $Id: web-sync,v 1.7 2001/01/25 00:18:23 mej Exp $
+# $Id: web-sync,v 1.8 2001/02/07 22:04:49 mej Exp $
 #
 
 if [ ! -z "$SUDO_USER" ]; then
@@ -38,7 +38,7 @@ for i in $* ; do
         $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-$j-rpms/ $LOCAL_DIR/$i/$j/cd/
         echo "*** Copying ISO images ***"
         mkdir -p $LOCAL_DIR/$i/$j/iso
-        $SCP_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-$j-'*'.iso $LOCAL_DIR/$i/$j/iso/
+        $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-$j-'*'.iso $LOCAL_DIR/$i/$j/iso/
         echo "*** Creating RPMS directory ***"
         mkdir -p $LOCAL_DIR/$i/$j/RPMS
         rm -f RPMS/*.rpm

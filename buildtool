@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.115 2001/01/04 02:31:50 mej Exp $
+# $Id: buildtool,v 1.116 2001/02/07 22:04:49 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -811,6 +811,10 @@ parse_product_entry
     # variable for the current package, see if it has a value for the parent product
     # of that package.  If not, try the parent product of that product, and continue
     # going back through the product hierarchy until we find a value or run out.
+    #
+    # FIXME:  Perhaps these shouldn't be hard-coded.  Perhaps we should keep a list of
+    #         all package/product variables we've encountered thus far and iterate
+    #         through those only, since we're guaranteed no others will have a fallback.
     foreach $pkgvar ("REVISION", "LOCATIONS", "RPMCMD", "TAR", "ZIP", "STAGES", "CVSROOT", "ARCH", "MACROS") {
         if (! $pkgs->{$name}{$pkgvar}) {
             my ($pkg, $val) = undef;
@@ -1873,7 +1877,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.115 $ created on $Date: 2001/01/04 02:31:50 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.116 $ created on $Date: 2001/02/07 22:04:49 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

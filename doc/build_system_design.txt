@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: build_system_design.txt,v 1.9 2001/01/31 21:31:16 mej Exp $
+#  $Id: build_system_design.txt,v 1.10 2001/02/07 22:04:49 mej Exp $
 #
 ########################################################################
 
@@ -442,39 +442,70 @@ Often, updates to modules maintained internally come from outside
 sources and must be merged in with the internal changes.  The build
 system makes it easy to add new patches to an existing SRPM module.
 
-(** Do we make them copy the patch in, add it, edit spec file, and
-commit?  or do we make srctool handle everything, maybe even open up
-the spec file in an editor? **)
+/* More needed here, depending on how we decide to do this. */
 
 4.3.2.  Making Your Own Changes
 -------------------------------
 
-avget to get the module, avprep to generate the patched tree, make
-changes, avmod to generate patch from changes, avput to commit.
+Packages maintained internally will often need patches to fix bugs
+reported on engr SourceForge.  For packages maintained as source
+trees, simply make and commit the appropriate changes.  The process
+for source package modules is a little longer, but still quite
+straightforward.
+
+    Pre-conditions:  A source package module (SPM) which needs a
+                     patch.
+
+    1.  Retrieve the module.
+        $ avget pkg
+    2.  Prepare a working tree with all sources unarchived and all
+        patches applied.
+        $ avprep [ dir ]
+    3.  Make changes to working tree; build and test inside tree as
+        needed.
+    4.  Update the spec file to include a reference to a new patch
+        file for the changes you made.
+    5.  Generate the new patch file from your changes.
+        $ avmod [ dir ]
+    6.  Commit the new changes.
+        $ avput
 
 4.4.  Building
 --------------
 
+The building of complete products, the end result of which is some
+type of product media, is the culmination of a lot of time and
+effort.  As with everything else, Avalon strives to automate as much
+as possible on behalf of the developers.
+
 4.4.1.  Individual Packages
 ---------------------------
 
-avbuild -p <dir>, no commit needed.  Should always precede a commit.
+After making changes to a package, the engineer is responsible for
+testing those changes prior to committing them.  This insures that the
+build tree will always be intact and buildable at all times.  To build
+an individual product in place, simply run buildtool (or avbuild) and
+pass a directory path to the -p option.  You need not commit your
+changes prior to doing this; in fact, you should not.
 
 4.4.2.  Entire Products
 -----------------------
 
-avbuild -p <product>
+Once all changes to all packages have been committed, a complete
+product build should be done to verify that everything fits together
+properly.  Product builds are done using buildtool/avbuild.  The
+product name and version should be passed to buildtool using the -p
+option.
 
 4.5.  Publishing and Media Management
 -------------------------------------
 
-(** This section, and 4.5.2, are mainly for helpful hints, I
-think. **)
+/* This whole section is here because I felt that some information was
+needed about post-build processing.  But I can't know how that will
+work until we determine where the build actually ends. */
 
 4.5.1.  Creating Package CD's
 -----------------------------
-
-(** Not sure here.  mediatool anyone? **)
 
 4.5.2.  Generating/Syncing Web Sites
 ------------------------------------
