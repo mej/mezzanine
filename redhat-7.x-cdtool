@@ -5,7 +5,7 @@
 # Michael Jennings <mej@eterm.org>
 # 21 July 2000
 #
-# $Id: redhat-7.x-cdtool,v 1.23 2002/07/10 02:47:16 mej Exp $
+# $Id: redhat-7.x-cdtool,v 1.24 2002/07/10 14:06:43 mej Exp $
 #
 
 umask 022
@@ -126,8 +126,11 @@ done
 test -d vermillion-${V_VER}-extras && mediatool -i vermillion-extras-${V_VER}.iso -D vermillion-${V_VER}-extras
 
 if (apt-get -v >/dev/null 2>&1); then
+    echo "apt not found.  Not generating repository list."
+else
     cd $NET/RedHat
     ln -s RPMS RPMS.all
     ln -s hdlist base/hdlist.all
-    genbasedir --topdir=$BUILDDIR/$NET RedHat all
+    ln -s ../vermillion-7.3.1-www/SRPMS ../SRPMS.all
+    genbasedir --topdir=$BUILDDIR/$NET --progress --bz2only RedHat all
 fi
