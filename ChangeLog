@@ -335,3 +335,7 @@ Thu Jun  8 16:53:30 2000                        Michael Jennings (mej)
 
 Use the head branch for mount.
 ----------------------------------------------------------------------
+Fri Jun  9 13:22:37 2000                        Michael Jennings (mej)
+
+Added support for separate buildroot's for each buildtool session.
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.46 2000/06/08 23:11:52 mej Exp $
+# $Id: buildtool,v 1.47 2000/06/09 20:12:04 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -408,7 +408,6 @@ sub
 initial_setup
 {
     if (! -d "$builddir") {
-        # There is a race condition here in the parallel build.
         if (!mkdir("$builddir", 0755)) {
             &fatal_error("Cannot create $builddir -- $!\n");
         }
@@ -416,6 +415,11 @@ initial_setup
             mkdir("$builddir/$dir", 0755);
         }
     }
+    if (-d $buildroot) {
+        nprint "Buildroot $buildroot exists.  I am removing it.\n";
+        &nuke_tree($buildroot);
+    }
+    mkdir($buildroot, 0775);
     if (-f "$ENV{HOME}/.rpmmacros" && -s _) {
         $rpmmacros = "$ENV{HOME}/.rpmmacros";
     } else {
@@ -462,14 +466,14 @@ nuke_tree
         closedir(DIR);
         foreach $f (@files) {
             if ($f ne "." && $f ne "..") {
-                &nuke_tree("$path/$f") || return 0;
+                &nuke_tree("$path/$f");
             }
         }
         dprint "Removing directory $path\n";
-        #rmdir $path || return 0;
+        rmdir $path || return 0;
     } else {
-        dprint "Unlinking $path/$f\n";
-        # unlink("$path/$f") || return 0;
+        dprint "Unlinking $path\n";
+        unlink($path) || return 0;
     }
     return 1;
 }
@@ -912,7 +916,7 @@ build_rpms
 
     $rpm = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
     $target = ($pkgs->{$pkg}{ARCH} ? "--target=$pkgs->{$pkg}{ARCH}" : ($main::target ? $main::target : ""));
-    $cmd = "$rpm --rcfile \"/usr/lib/rpm/rpmrc:$rpmrc\" $target -ba $specfile";
+    $cmd = "$rpm --rcfile \"/usr/lib/rpm/rpmrc:$rpmrc\" --buildroot=\"$buildroot/$pkg-root\" $target -ba $specfile";
     dprint "About to run \"$cmd\"\n";
     if (!open(RPM, "$cmd </dev/null 2>&1 |")) {
         return (1, "Execution of \"$cmd\" failed -- $!", undef);
@@ -1565,7 +1569,7 @@ do_cleanup_stage
         }
         nprint "$progname:  Cleanup stage for \"$pkg\" is complete.\n";
     }
-    foreach $f ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SPECS", "$basedir/rpmrc", "$basedir/rpmmacros") {
+    foreach $f ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SPECS", "$basedir/rpmrc", "$basedir/rpmmacros", $buildroot) {
         &nuke_tree($f) || qprint "Warning:  Removal of $f failed -- $!\n";
     }
 
@@ -1724,7 +1728,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.46 $ created on $Date: 2000/06/08 23:11:52 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.47 $ created on $Date: 2000/06/09 20:12:04 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1778,6 +1782,7 @@ main
     }
     $builddir = ($ENV{BUILD_DIR} ? $ENV{BUILD_DIR} : "$basedir/build");
     $proddir = ($ENV{PROD_DIR} ? $ENV{PROD_DIR} : "$basedir/products");
+    $buildroot = ($ENV{BUILDROOT} ? $ENV{BUILDROOT} : "/var/tmp/buildtool.$$");
     $revtool = sprintf("revtool%s", ($opt_d ? " --debug" : ""));
 
     # Signal handling
