@@ -676,3 +676,8 @@ Fri Jul 14 12:16:05 2000                        Michael Jennings (mej)
 
 Too much of a hurry.  Not thinking.  Screwed up.
 ----------------------------------------------------------------------
+Tue Jul 18 12:12:23 2000                        Michael Jennings (mej)
+
+Back to -march=pentium, since -march=pentiumpro doesn't work and play
+well with -m486.
+----------------------------------------------------------------------
