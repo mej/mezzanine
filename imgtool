@@ -23,32 +23,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: imgtool,v 1.6 2001/04/02 07:53:39 mej Exp $
+# $Id: imgtool,v 1.7 2001/04/05 01:35:27 mej Exp $
 #
 
 # Include the Perl Modules we need
 require POSIX;
 require Getopt::Long;
 use Avalon::Util;
-
-# Constants
-#
-# Return codes for pkgtool
-sub AVALON_SUCCESS()           {0;}
-sub AVALON_FATAL_ERROR()       {1;}
-sub AVALON_SYNTAX_ERROR()      {2;}
-sub AVALON_COMMAND_FAILED()    {3;}
-
-sub AVALON_MISSING_FILES()     {10;}
-sub AVALON_SPEC_ERRORS()       {11;}
-sub AVALON_DEPENDENCIES()      {12;}
-sub AVALON_ARCH_MISMATCH()     {13;}
-sub AVALON_BUILD_FAILURE()     {14;}
-sub AVALON_BAD_MODULE()        {15;}
-
-sub AVALON_TERMINATED()        {50;}
-sub AVALON_CRASHED()           {60;}
-sub AVALON_UNSPECIFIED_ERROR   {127;}
 
 # Print usage information
 sub
@@ -257,7 +238,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.6 $ created on $Date: 2001/04/02 07:53:39 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.7 $ created on $Date: 2001/04/05 01:35:27 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

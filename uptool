@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: uptool,v 1.1 2001/04/04 09:36:56 mej Exp $
+# $Id: uptool,v 1.2 2001/04/05 01:35:27 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -48,6 +48,8 @@ print_usage_info
     print "    -h --help                        Show this usage information\n";
     print "    -d --debug                       Turn on debugging\n";
     print "    -v --version                     Show version and copyright\n";
+    print "    -D --dir <arch>:<directory>      Map an arch (SRPMS, i386, etc.) to a download path\n";
+    print "    -m --match --regexp <regexp>     Only pay attention to files that match this regexp\n";
     print "\n";
     exit(AVALON_SUCCESS);
 }
@@ -111,36 +113,56 @@ get_local_listing($)
 }
 
 sub
+compare_packages()
+{
+    my ($p1, $p2) = @_;
+    my $ans;
+
+    print "Is $p2 more recent than $p1 [y/n]? ";
+    chomp($ans = <STDIN>);
+    return ($ans =~ /^\s*y(es)?\s*$/i);
+}
+
+sub
 compare_lists()
 {
     foreach my $pkg (keys $rpkgs) {
         # Check if we even have that package at all.
         if (defined($lpkgs->{$pkg})) {
-            # How many files for that package exist remotely?
-            if (scalar(@{$rpkgs->{$pkg}{FILES}}) == 1) {
-                my $rpm = $rpkgs->{$pkg}{FILES}[0];
+            my @remote_list = @{$rpkgs->{$pkg}{FILES}};
+            my ($i, $rpm);
 
-                # Just one.  Do we have it?
-                if (!grep(/^\Q$rpm\E$/, @{$lpkgs->{$pkg}{FILES}})) {
-                    # Nope, download it
-                    if (! $session->get($rpm)) {
-                        eprint "Unable to download $rpm\n";
-                    } else {
-                        $cmd->{$pkg} = "revtool -a $rpm ; revtool -r " . join(" ", @{$lpkgs->{$pkg}{FILES}});
-                    }
-                } else {
-                    dprint "Found $rpm locally.\n";
+            # Find the most recent version of that package on the remote site.
+            $rpm = $remote_list[0];
+            for ($i = 1; $i < scalar(@remote_list); $i++) {
+                if (&compare_packages($rpm, $remote_list[$i])) {
+                    $rpm = $remote_list[$i];
                 }
-            } else {
             }
-        } else {
-            # Nope, download it
-            if (! $session->get($rpm)) {
-                eprint "Unable to download $rpm\n";
-            } else {
-                $cmd->{$pkg} = "revtool -a $rpm";
+
+            # If we have it, continue.
+            if (grep(/^\Q$rpm\E$/, @{$lpkgs->{$pkg}{FILES}})) {
+                next;
             }
         }
+        # We don't have it, so get it.
+        if (! $session->get($rpm)) {
+            eprint "Unable to download $rpm\n";
+        } else {
+            $cmd{$pkg} = "revtool -a $rpm";
+            if (defined($lpkgs->{$pkg})) {
+                $cmd{$pkg} .= " ; revtool -r " . join(" ", @{$lpkgs->{$pkg}{FILES}});
+            }
+        }
+    }
+}
+
+sub
+show_cmds()
+{
+    print "Some or all of the following commands will be required:\n";
+    foreach my $pkg (keys %cmd) {
+        print "$cmd{$pkg}\n";
     }
 }
 
@@ -196,6 +218,7 @@ fetch_updates($)
         @rpkgs = &get_remote_listing($session, "$path/$p");
         @lpkgs = &get_local_listing("$path/$dir{$p}");
         &compare_lists();
+        &show_cmds();
     }
 
     print "Closing session...\n";
@@ -215,7 +238,7 @@ main
     &print_usage_info() if (!scalar(@ARGV));
 
     # See the Getopt::Long man page for details on the syntax of this line
-    @valid_opts = ("h|help", "v|version", "d|debug", "D|dir=s@", "m|match|regex=s");
+    @valid_opts = ("h|help", "v|version", "d|debug", "D|dir=s@", "m|match|regexp=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -223,7 +246,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.1 $ created on $Date: 2001/04/04 09:36:56 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.2 $ created on $Date: 2001/04/05 01:35:27 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

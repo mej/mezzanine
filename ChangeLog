@@ -1121,3 +1121,8 @@ Wed Apr  4 02:36:05 2001                        Michael Jennings (mej)
 
 Oh look, it's a new automated update tool.  Well, most of one anyway.
 ----------------------------------------------------------------------
+Wed Apr  4 18:34:38 2001                        Michael Jennings (mej)
+
+Fixed a bug Shaleh found in imgtool.  Also finished initial work on
+uptool.  Time to test....
+----------------------------------------------------------------------
