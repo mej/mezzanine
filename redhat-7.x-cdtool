@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 21 July 2000
 #
-# $Id: redhat-7.x-cdtool,v 1.3 2000/09/28 22:43:44 mej Exp $
+# $Id: redhat-7.x-cdtool,v 1.4 2000/10/11 00:49:28 mej Exp $
 #
 
 trap 'exit -1' 1 2 15
@@ -61,7 +61,7 @@ fi
 
 # Copy over all the changed files
 rm -f $NET.sh
-grep '^Binary' $NET.patch | awk '{print "cp -a "$5" "$3}' > $NET.sh
+grep '^Binary' $NET.patch | awk '{print "cp -af "$5" "$3}' > $NET.sh
 sh $NET.sh
 
 # Re-create CD images from the altered net image

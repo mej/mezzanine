@@ -871,3 +871,7 @@ Sun Oct  1 19:27:26 2000                        Michael Jennings (mej)
 
 Removed gratuitous +s and fixed the extras ISO name.
 ----------------------------------------------------------------------
+Tue Oct 10 18:10:05 2000                        Michael Jennings (mej)
+
+Force copy so that we overwrite old symlinks.
+----------------------------------------------------------------------
