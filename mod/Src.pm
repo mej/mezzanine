@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.4 2001/04/17 04:29:12 mej Exp $
+# $Id: Src.pm,v 1.5 2001/04/26 23:43:11 mej Exp $
 #
 
 package Avalon::Srctool;
@@ -122,13 +122,13 @@ generate_symlink_file($)
 
     $path = '.' if (! $path);
     &find(sub {-l && ($links{$File::Find::name} = readlink($_));}, $path);
-    if (!open(SYMLINKS, ">$path/.avalon.symlinks")) {
-        eprint "Unable to open $path/.avalon.symlinks for writing -- $!\n";
-        return AVALON_SYSTEM_ERROR;
-    }
     $cnt = scalar(keys %links);
     if ($cnt) {
         dprint "Found $cnt symlinks.\n";
+        if (!open(SYMLINKS, ">$path/.avalon.symlinks")) {
+            eprint "Unable to open $path/.avalon.symlinks for writing -- $!\n";
+            return AVALON_SYSTEM_ERROR;
+        }
         foreach my $link (sort keys %links) {
             my $newlink;
 

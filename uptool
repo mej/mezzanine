@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: uptool,v 1.4 2001/04/07 02:22:39 mej Exp $
+# $Id: uptool,v 1.5 2001/04/26 23:43:11 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -50,6 +50,7 @@ print_usage_info
     print "    -v --version                     Show version and copyright\n";
     print "    -D --dir <arch>:<directory>      Map an arch (SRPMS, i386, etc.) to a download path\n";
     print "    -m --match --regexp <regexp>     Only pay attention to files that match this regexp\n";
+    print "    -H --hash [ <bytes> ]            Print hash marks every <bytes> bytes during download\n";
     print "\n";
     exit(AVALON_SUCCESS);
 }
@@ -262,19 +263,22 @@ fetch_updates($)
     }
 
     foreach my $p (keys %dir) {
+        undef $rpkgs;
+        undef $lpkgs;
         @rpkgs = &get_remote_listing($session, "$path/$p");
         if (scalar(@rpkgs)) {
             @lpkgs = &get_local_listing($dir{$p});
             &compare_lists($session, $dir{$p});
         }
-        if (defined(%cmd)) {
-            $pkgcnt = scalar(keys %cmd);
-            &show_cmds();
-        }
     }
 
     print "Closing session...\n";
     $session->quit();
+
+    if (defined(%cmd)) {
+        $pkgcnt = scalar(keys %cmd);
+        &show_cmds();
+    }
     print "Update complete.  Found $pkgcnt out-dated/missing packages.\n";
     return 1;
 }
@@ -299,7 +303,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.4 $ created on $Date: 2001/04/07 02:22:39 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.5 $ created on $Date: 2001/04/26 23:43:11 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
