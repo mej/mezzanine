@@ -23,18 +23,19 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: specgen,v 1.1 2004/03/25 02:58:40 mej Exp $
+# $Id: specgen,v 1.2 2004/03/25 16:10:56 mej Exp $
 #
 
 use strict;
 use vars '$progname', '$version', '$opt_v', '$opt_h', '$opt_d',
-    '$opt_t', '$opt_s', '$opt_p', '$opt_n', '$opt_u';
+    '$opt_t', '$opt_i', '$opt_p', '$opt_n', '$opt_u';
 use CPAN;
 use POSIX;
 use Getopt::Long;
 use Mezzanine::Util;
 use Mezzanine::Template;
 
+my $interactive = 0;
 my %package_start = (
                      "SUMMARY" => "FIXME -- Brief synopsis goes here",
                      "NAME" => "",
@@ -77,6 +78,7 @@ print_usage_info
     print "    -d --debug                       Turn on debugging\n";
     print "    -v --version                     Show version and copyright\n";
     print "    -t --template <path>             Use specified template file/directory\n";
+    print "    -i --interactive                 Confirm each setting interactively\n";
     print "\n";
     exit(MEZZANINE_SUCCESS);
 }
@@ -154,11 +156,17 @@ parse_tarball_name($)
         eprint "Unrecognized package file format.\n";
         return undef;
     } else {
+        if ($interactive) {
+            $href->{"EXTRACTWITH"} = &prompt_user("Please enter command to extract $href->{TARBALL} "
+                                                  . "(specify \@\@ for $href->{TARBALL})", $href->{"EXTRACTWITH"});
+        }
         dprint "Extraction command for $pkg is $href->{EXTRACTWITH}.\n";
     }
 
     # Parse out package name and version.
     if ($pkg =~ /^(.*)-(\d[^-]+)$/) {
+        @{$href}{("NAME", "VERSION")} = ($1, $2);
+    } elsif ($pkg =~ /^(.*)_(\d[^_]+)$/) {
         @{$href}{("NAME", "VERSION")} = ($1, $2);
     } else {
         wprint "Unable to parse package name/version from base name $pkg.\n";
@@ -169,6 +177,10 @@ parse_tarball_name($)
         eprint "Unparseable package file base name $pkg.\n";
         return undef;
     } else {
+        if ($interactive) {
+            $href->{"NAME"} = &prompt_user("Please enter package name", $href->{"NAME"});
+            $href->{"VERSION"} = &prompt_user("Please enter package version", $href->{"VERSION"});
+        }
         dprint "Package $href->{NAME}, version $href->{VERSION}.\n";
     }
     return 1;
@@ -247,7 +259,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.1 $ created on $Date: 2004/03/25 02:58:40 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.2 $ created on $Date: 2004/03/25 16:10:56 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -262,6 +274,7 @@ main
 	&print_usage_info();   # Never returns
     }
     &debug_set($opt_d);
+    $interactive = (($opt_i) ? (1) : (0));
 
     foreach my $pkg (@ARGV) {
         my $template = new Mezzanine::Template;
