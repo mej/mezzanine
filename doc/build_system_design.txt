@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: build_system_design.txt,v 1.5 2001/01/24 04:02:45 mej Exp $
+#  $Id: build_system_design.txt,v 1.6 2001/01/24 07:21:38 mej Exp $
 #
 ########################################################################
 
@@ -314,12 +314,67 @@ follow in this situation.
     Pre-conditions:  A vendor SRPM has been downloaded and has proven
                      faulty.
 
-    1.  
+    1.  Using srctool, import the SRPM into a module.
+        $ srctool -i pkg-1.0-1.src.rpm
+           or
+        $ avimport pkg-1.0-1.src.rpm
+
+Avalon will automatically explode the SRPM into its component parts
+and commit them as a new module.  It will also detect if the module
+already exists and attempt to merge the changes, noting which files
+are duplicates.
 
 4.1.2.  Importing Source Trees
+------------------------------
+
+Some work takes place on code that is actually stored and maintained
+inside the build system.  These packages are generally best stored as
+untarred source trees and modifed normally.  Since no patches need to
+be generated for the SRPM's which will be built from this module,
+developers are free to modify, tag, import, etc. at their leisure.
+
+    Pre-conditions:  A directory containing the files and
+                     subdirectories which are to be imported into the
+                     new module.
+
+    1.  Using srctool, import the directory into a module.
+        $ srctool -i pkg -n pkg-1.0
+           or
+        $ avimport -n pkg-1.0 pkg
+
+Note that you must specify the package name and version for this type
+of import since they cannot be automatically determined.
+(** Actually, I could look in the spec file if it's there, but would
+that be too confusing? **)  The source tree will be imported using a
+branch tag of PKG-1-0 and a vendor tag of PKG and can be used for old
+and new trees alike, just as "cvs import" can be.
+
 4.1.3.  Importing Exploded Packages
+-----------------------------------
+
+Normally, one will want to simply import SRPM's as shown in section
+4.1.1, as this mechanism is the simplest and most straight-forward of
+the choices available.  However, should the need arise, exploded
+SRPM's can also be imported directly.
+
+    Pre-conditions:  An exploded SRPM which is to be imported.
+
+    1.  Copy all component files (sources, patches, and spec file)
+        into a newly created directory.  The directory name should
+        match the package name.
+    2.  Follow the procedure outlined in section 4.1.2 above for
+        importing directories.
+
 4.2.  Retrieving Products and Packages
+--------------------------------------
+
+(** revtool -g foo, or avget foo...what more can I say? **)
+
 4.3.  Making Alterations
+------------------------
+
+
+
 4.3.1.  Applying Existing Patch Files
 4.3.2.  Making Your Own Changes
 4.4.  Building
