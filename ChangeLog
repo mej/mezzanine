@@ -691,3 +691,9 @@ plus sign ('+'), which will cause BB to be subtracted instead of
 added.  You can also omit either or both sections of this string.
 The default is, of course, "x1+0".
 ----------------------------------------------------------------------
+Tue Jul 18 14:54:06 2000                        Michael Jennings (mej)
+
+Added the --tree option to buildtool.  This will allow you to specify
+a $CVSROOT variable (or the equivalent for the revision control
+system du jour) which will override the defaults in the product files.
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.93 2000/07/18 21:26:20 mej Exp $
+# $Id: buildtool,v 1.94 2000/07/18 21:47:41 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -112,6 +112,7 @@ print_usage_info
     print "    -P --parallel [expr]             Parallelize the build process based on the number of CPU's\n";
     print "    -t --target <arch>               Tell rpm to build for a particular target architecture\n";
     print "    -C --cflags <flags>              Specify the \$CFLAGS variable to use for building\n";
+    print "       --tree <repository>           Specify the repository to use (overrides product files)\n";
     print "\n";
     print "The stages and their abbreviations (for use with the -b option) are:\n";
     print "  bootstrap (s), compose (c), explode (e), build (b), package accumulation (p), ISO image (i), cleanup (a)\n\n";
@@ -1138,7 +1139,9 @@ do_bootstrap_stage
         }
         nprint "$progname:  Starting bootstrap stage for the \"$pkg\" package....\n";
         $filename = $pkgs->{$pkg}{FILENAME};
-        if ($pkgs->{$pkg}{CVSROOT}) {
+        if ($opt_tree) {
+            $cvsroot = "-D $opt_tree";
+        } elsif ($pkgs->{$pkg}{CVSROOT}) {
             $cvsroot = "-D $pkgs->{$pkg}{CVSROOT}";
         } else {
             $cvsroot = "";
@@ -1833,14 +1836,14 @@ main
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "b|build=s", "p|product|package=s",
                    "q|quiet", "Q|really-quiet|silent", "D|dir=s", "f|force", "l|log=s",
-                   "P|parallel:s", "t|target=s", "C|cflags=s", "B|startbuild=s");
+                   "P|parallel:s", "t|target=s", "C|cflags=s", "B|startbuild=s", "tree=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.93 $ created on $Date: 2000/07/18 21:26:20 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.94 $ created on $Date: 2000/07/18 21:47:41 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
