@@ -1,6 +1,6 @@
 %define name     avalon
 %define ver      2.0
-%define rel      0.2
+%define rel      0.3
 %define prefix   /usr
 
 Summary: Avalon -- The VA Software Engineering Build System
@@ -30,11 +30,17 @@ building, and releasing software products.
 %install
 rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT%{prefix}/bin
+mkdir -p $RPM_BUILD_ROOT%{prefix}/lib/perl5/5.6.0/Avalon
 mkdir -p $RPM_BUILD_ROOT%{prefix}/man/man1
 
-for i in *tool ; do
+for i in *tool pkgsort ; do
   install -m 755 $i $RPM_BUILD_ROOT%{prefix}/bin/
 done
+
+for i in mod/*.pm ; do
+  install -m 644 $i $RPM_BUILD_ROOT%{prefix}/lib/perl5/5.6.0/Avalon/
+done
+
 (
   cd $RPM_BUILD_ROOT%{prefix}/bin
   for i in get co put ci info add new rm purge rtag tag reset login ; do

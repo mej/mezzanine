@@ -23,71 +23,18 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.6 2001/03/22 02:35:55 mej Exp $
+# $Id: srctool,v 1.7 2001/03/26 09:48:54 mej Exp $
 #
 
 # Include the Perl Modules we need
 require POSIX;
 require Getopt::Long;
+use Avalon::Util;
 
 # Constants
 #
 $WORK_DIR = "work";
 $TMP_DIR = "/var/tmp/srctool.$$";
-
-# Return codes for revtool
-sub REVTOOL_NO_SERVER()           {1;}
-sub REVTOOL_SERVER_CRASH()        {2;}
-sub REVTOOL_BAD_LOGIN()           {3;}
-sub REVTOOL_COMMAND_FAILED()      {4;}
-sub REVTOOL_ACCESS_DENIED()       {5;}
-sub REVTOOL_NO_SOURCES()          {6;}
-
-sub REVTOOL_FILE_NOT_FOUND()      {21;}
-sub REVTOOL_FILE_REMOVED()        {22;}
-sub REVTOOL_CONFLICT_FOUND()      {23;}
-sub REVTOOL_INVALID_TAG()         {24;}
-
-sub REVTOOL_BAD_ADDITION()        {41;}
-sub REVTOOL_BAD_REMOVAL()         {42;}
-
-sub REVTOOL_NEED_UPDATE()         {61;}
-sub REVTOOL_BAD_LOG_ENTRY()       {62;}
-
-sub REVTOOL_UNSPECIFIED_ERROR()   {127;}
-
-
-# Return codes for pkgtool
-sub PKGTOOL_SUCCESS()           {0;}
-sub PKGTOOL_FATAL_ERROR()       {1;}
-sub PKGTOOL_SYNTAX_ERROR()      {2;}
-sub PKGTOOL_COMMAND_FAILED()    {3;}
-
-sub PKGTOOL_MISSING_FILES()     {10;}
-sub PKGTOOL_SPEC_ERRORS()       {11;}
-sub PKGTOOL_DEPENDENCIES()      {12;}
-sub PKGTOOL_ARCH_MISMATCH()     {13;}
-sub PKGTOOL_BUILD_FAILURE()     {14;}
-sub PKGTOOL_BAD_MODULE()        {15;}
-
-sub PKGTOOL_TERMINATED()        {50;}
-sub PKGTOOL_CRASHED()           {60;}
-sub PKGTOOL_UNSPECIFIED_ERROR   {127;}
-
-# Return codes for srctool
-sub SRCTOOL_SUCCESS()         {0;}
-sub SRCTOOL_FATAL_ERROR()     {1;}
-sub SRCTOOL_SYNTAX_ERROR()    {2;}
-sub SRCTOOL_COMMAND_FAILED()  {3;}
-                                
-sub SRCTOOL_INVALID_PACKAGE() {10;}
-sub SRCTOOL_FILE_OP_FAILED()  {11;}
-sub SRCTOOL_MISSING_INFO()    {12;}
-sub SRCTOOL_SYSTEM_ERROR()    {13;}
-
-sub SRCTOOL_TERMINATED()      {50;}
-sub SRCTOOL_CRASHED()         {60;}
-sub SRCTOOL_UNSPECIFIED_ERROR {127;}
 
 # Print usage information
 sub
@@ -108,152 +55,7 @@ print_usage_info
     print "    -p --prepare                     Prepare a working tree\n";
     print "    -n --name <pkg>-<version>        Specify the package name and version for an import\n";
     print "\n";
-    exit(SRCTOOL_SUCCESS);
-}
-
-# Generate timestamp for debugging/log file
-sub
-get_timestamp
-{
-    return POSIX::strftime("%A, %d %B %Y %H:%M:%S %Z", localtime);
-}
-
-# Report a fatal error
-sub
-fatal_error
-{
-    my $msg = "$progname:  FATAL:  $_[0]";
-
-    print STDERR $msg;
-    exit(SRCTOOL_FATAL_ERROR);
-}
-
-# Debugging output
-sub
-dprintf
-{
-    return if (! $debug);
-    print "[debug:$progname] ";
-    printf @_;
-}
-sub
-dprint
-{
-    my @dbg;
-    my ($f, $l, $s);
-
-    return if (! $debug);
-    @dbg = caller(1);
-    ($f, $l, $s) = @dbg[1, 2, 3];
-    $f =~ s/^.*\/([^\/]+)$/$1/;
-    print "[$f/$l/$s()] ", @_;
-}
-
-# Print an error
-sub
-eprintf
-{
-    print "$progname:  Error:  ";
-    printf @_;
-}
-sub
-eprint
-{
-    print "$progname:  Error:  ", @_;
-}
-
-# Handle a terminate signal
-sub
-handle_signal
-{
-    my $sig = $_[0];
-
-    eprint "Someone sent me a SIG$sig asking me to exit, so I shall.\n";
-    close($GLOBAL_LOG) if ($GLOBAL_LOG);
-    exit SRCTOOL_TERMINATED;
-}
-
-# Handle a fatal signal
-sub
-handle_fatal_signal
-{
-    my $sig = $_[0];
-
-    eprint "Caught fatal signal SIG$sig.  Cleaning up and aborting...\n";
-    close($GLOBAL_LOG) if ($GLOBAL_LOG);
-    exit SRCTOOL_CRASHED;
-}
-
-# Handle a perl warning
-sub
-handle_warning
-{
-    dprint @_;
-}
-
-# Make a directory hierarchy
-sub
-mkdirhier
-{
-    my $dir = $_[0];
-    my @dirs = split("/", $dir);
-    my $path = "";
-
-    dprint "mkdirhier($dir) called.\n";
-    foreach $dir (@dirs) {
-        $path .= "$dir/";
-        if (! -d $path) {
-            dprint "mkdirhier() creating \"$path\"\n";
-            mkdir($path, 0755) || eprint("Unable to create $path -- $!\n");
-        }
-    }
-    if (! -d $_[0]) {
-        dprint "Something went wrong in mkdirhier()!\n";
-        return 0;
-    } else {
-        return 1;
-    }
-}
-
-# Emulate rm -rf
-sub
-nuke_tree
-{
-    my $path = $_[0];
-    my @files;
-    local *DIR;
-
-    if ((-d $path) && !(-l $path)) {
-        opendir(DIR, $path) || return 0;
-        @files = readdir(DIR);
-        closedir(DIR);
-        foreach $f (@files) {
-            if ($f ne "." && $f ne "..") {
-                &nuke_tree("$path/$f");
-            }
-        }
-        dprint "Removing directory $path\n";
-        rmdir $path || return 0;
-    } else {
-        dprint "Unlinking $path\n";
-        unlink($path) || return 0;
-    }
-    return 1;
-}
-
-# Grep a directory for files matching a particular expression
-sub grepdir(&$);
-sub
-grepdir(&$)
-{
-    my ($func, $dir) = @_;
-    my @files;
-    local *DIR;
-
-    opendir(DIR, $dir) || return 0;
-    @files = grep(&$func($_), readdir(DIR));
-    closedir(DIR);
-    return @files;
+    exit(AVALON_SUCCESS);
 }
 
 # Return the files in a particular directory
@@ -384,20 +186,20 @@ import_package
             ($pkg, $ver, $rel) = ($1, $2, $3);
         } else {
             eprint "Invalid package for import:  $pkgfile\n";
-            return SRCTOOL_INVALID_PACKAGE;
+            return AVALON_INVALID_PACKAGE;
         }
         print "Importing $pkgfile into $pkg tree....\n\n";
         # Create a working tree to be imported
         $tmpdir = &create_temp_space($pkg, "SPM");
 	if (! $tmpdir) {
-	    return SRCTOOL_SYSTEM_ERROR;
+	    return AVALON_SYSTEM_ERROR;
 	}
         $rpmcmd = "rpm --define \"_sourcedir $tmpdir/S\" --define \"_specdir $tmpdir/F\"";
         # Install the SRPM into the temporary directory
         @tmp = &run_av_cmd("pkgtool", "-P '$rpmcmd' -ip $pkgfile", 0);
         if (($err = shift @tmp) != 0) {
             eprint "Unable to install $pkgfile\n";
-            return SRCTOOL_COMMAND_FAILED;
+            return AVALON_COMMAND_FAILED;
         }
         # The spec file should be the only file in $tmpdir/F
         @tmp = &find_files("$tmpdir/F");
@@ -410,7 +212,7 @@ import_package
         @tmp = &run_av_cmd("pkgtool", "-P '$rpmcmd' -Cs $spec", 0);
         if (($err = shift @tmp) != 0) {
             eprint "Unable to catalog $pkgfile\n";
-            return SRCTOOL_COMMAND_FAILED;
+            return AVALON_COMMAND_FAILED;
         }
         foreach my $line (@tmp) {
             my ($type, $num, $filename) = split(":", $line);
@@ -425,11 +227,11 @@ import_package
         foreach my $patch (@patches) {
             if (! -f "$tmpdir/S/$patch") {
                 eprint "Missing patch file $patch?!\n";
-                return SRCTOOL_FILE_OP_FAILED;
+                return AVALON_FILE_OP_FAILED;
             } else {
                 if (!link("$tmpdir/S/$patch", "$tmpdir/P/$patch") || !unlink("$tmpdir/S/$patch")) {
                     eprint "Unable to move $patch to $tmpdir/P/ -- $!\n";
-                    return SRCTOOL_FILE_OP_FAILED;
+                    return AVALON_FILE_OP_FAILED;
                 }
             }
         }
@@ -464,7 +266,7 @@ import_package
 		print "For future reference, you can specify this information on the command line like this:  -n $name\n";
 	    } else {
 		eprint "No package name/version supplied for FST import\n";
-		return SRCTOOL_MISSING_INFO;
+		return AVALON_MISSING_INFO;
 	    }
 	}
 	chdir($pkgfile) if ($pkgfile);
@@ -477,7 +279,7 @@ import_package
         }
         chdir($pwd);
     }
-    return SRCTOOL_SUCCESS;
+    return AVALON_SUCCESS;
 }
 
 sub
@@ -493,7 +295,7 @@ prepare_tree
     if ($pkg) {
 	if (!chdir($pkg)) {
 	    eprint "Unable to cd to $pkg -- $!\n";
-	    return SRCTOOL_INVALID_PACKAGE;
+	    return AVALON_INVALID_PACKAGE;
 	}
 	chomp($pkgdir = `/bin/pwd`);
     } else {
@@ -504,7 +306,7 @@ prepare_tree
     &nuke_tree($WORK_DIR);
     if (!mkdir($WORK_DIR)) {
         eprint "Unable to create working directory -- $!\n";
-        return SRCTOOL_SYSTEM_ERROR;
+        return AVALON_SYSTEM_ERROR;
     }
     # Find all the sources and patches and the spec file.
     @srcs = &find_files("S");
@@ -518,7 +320,7 @@ prepare_tree
     # Create the RPM build tree
     $tmpdir = &create_temp_space($pkg, "build");
     if (! $tmpdir) {
-	return SRCTOOL_SYSTEM_ERROR;
+	return AVALON_SYSTEM_ERROR;
     }
     # Copy all the files into their proper places for RPM's use
     foreach my $f (@srcs, @patches) {
@@ -527,13 +329,13 @@ prepare_tree
         ($fname = $f) =~ s/^.\///;
 	if (!link($f, "$tmpdir/SOURCES/$fname")) {
 	    eprint "Unable to copy $f into $tmpdir/SOURCES -- $!\n";
-	    return SRCTOOL_SYSTEM_ERROR;
+	    return AVALON_SYSTEM_ERROR;
 	}
     }
     ($tmp = $spec) =~ s/^.\///;
     if (!link($spec, "$tmpdir/SPECS/$tmp")) {
 	eprint "Unable to copy $spec into $tmpdir/SPECS -- $!\n";
-	return SRCTOOL_SYSTEM_ERROR;
+	return AVALON_SYSTEM_ERROR;
     }
     print "Creating working directory $pkgdir/$WORK_DIR....\n";
     $rpmcmd = "--define \"_topdir $tmpdir\" --define \"_builddir $pkgdir/$WORK_DIR\" -bp $spec";
@@ -551,6 +353,7 @@ main
     # Set up the basic variables
     $progname = "srctool";
     $version = "1.0";
+    &print_usage_info() if (!scalar(@ARGV));
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "i|import", "p|prepare", "m|mod|modify",
@@ -562,7 +365,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.6 $ created on $Date: 2001/03/22 02:35:55 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.7 $ created on $Date: 2001/03/26 09:48:54 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -572,7 +375,7 @@ main
         print "Copyright (c) 2001, Michael Jennings and VA Linux Systems, Inc.\n";
         print "  ($rcs_info)\n";
         print "\n";
-	return SRCTOOL_SUCCESS;
+	return AVALON_SUCCESS;
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
         # This is a really silly way to shut up the "used only once" warnings.
@@ -627,7 +430,7 @@ main
     } elsif ($opt_r) {
     } else {
     }
-    return SRCTOOL_SUCCESS;
+    return AVALON_SUCCESS;
 }
 
 exit &main();

@@ -23,39 +23,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.60 2001/03/22 00:37:19 mej Exp $
+# $Id: revtool,v 1.61 2001/03/26 09:48:54 mej Exp $
 #
 
 # Include the Perl Modules we need
 use POSIX 'strftime';
 use Getopt::Long;
-
-# Constants
-#
-# 1-20 are generic errors
-sub REVTOOL_NO_SERVER()           {1;}
-sub REVTOOL_SERVER_CRASH()        {2;}
-sub REVTOOL_BAD_LOGIN()           {3;}
-sub REVTOOL_COMMAND_FAILED()      {4;}
-sub REVTOOL_ACCESS_DENIED()       {5;}
-sub REVTOOL_NO_SOURCES()          {6;}
-
-# 21-40 are retrieval/update errors
-sub REVTOOL_FILE_NOT_FOUND()      {21;}
-sub REVTOOL_FILE_REMOVED()        {22;}
-sub REVTOOL_CONFLICT_FOUND()      {23;}
-sub REVTOOL_INVALID_TAG()         {24;}
-
-# 41-60 are add/remove errors
-sub REVTOOL_BAD_ADDITION()        {41;}
-sub REVTOOL_BAD_REMOVAL()         {42;}
-
-# 61-80 are commit errors
-sub REVTOOL_NEED_UPDATE()         {61;}
-sub REVTOOL_BAD_LOG_ENTRY()       {62;}
-
-# 127 is a catch-all
-sub REVTOOL_UNSPECIFIED_ERROR()   {127;}
+use Avalon::Util;
 
 # Print usage information
 sub
@@ -94,56 +68,6 @@ print_usage_info
     print "    -P --protocol <proto>    Specify which protocol to use (cvs or bk)\n";
     print "\n";
     exit(0);
-}
-
-# Generate timestamp for debugging/log file
-sub
-get_timestamp
-{
-    strftime("%A, %d %B %Y %H:%M:%S %Z", localtime);
-}
-
-# Debugging output
-sub
-dprintf
-{
-    return if (! $debug);
-    print "[debug:$progname] ";
-    my $fmt = shift;
-    printf $fmt, @_;
-}
-sub
-dprint
-{
-    print "[debug:$progname] ", @_ if ($debug);
-}
-
-# Print an error
-sub
-eprintf
-{
-    print STDERR "$progname:  Error:  ";
-    my $fmt = shift;
-    printf STDERR $fmt, @_;
-}
-sub
-eprint
-{
-    print STDERR "$progname:  Error:  ", @_;
-}
-
-# Return the contents of a file as a string
-sub
-cat_file
-{
-    my $filename = $_[0];
-    my $contents = "";
-
-    open(FF, "$filename") || return undef;
-    while (<FF>) {
-        $contents .= $_;
-    }
-    return $contents;
 }
 
 # Check a tag for validity
@@ -204,7 +128,7 @@ talk_to_cvs_server
         dprint "About to run $cmd\n";
         if (!open(CMD, "$cmd 2>&1 |")) {
             eprint "Execution of \"$cmd\" failed -- $!";
-            return REVTOOL_COMMAND_FAILED;
+            return AVALON_COMMAND_FAILED;
         }
         while (<CMD>) {
             chomp($line = $_);
@@ -220,41 +144,41 @@ talk_to_cvs_server
             # First, fatal errors
             if ($line =~ /^cvs \w+: cannot find password/) {
                 eprint "You must login to the repository first.\n";
-                $err = REVTOOL_BAD_LOGIN;
+                $err = AVALON_BAD_LOGIN;
                 last;
             } elsif ($line =~ /^cvs \[\w+ aborted\]: authorization failed: server \S+ rejected access/) {
                 eprint "Your userid or password was not valid\n";
-                $err = REVTOOL_BAD_LOGIN;
+                $err = AVALON_BAD_LOGIN;
                 last;
             } elsif ($line =~ /^cvs \[\w+ aborted\]: \S+ requires write access to the repository/) {
                 eprint "You do not have write access to the master repository.\n";
-                $err = REVTOOL_ACCESS_DENIED;
+                $err = AVALON_ACCESS_DENIED;
                 last;
             } elsif ($line =~ /^cvs server: cannot find module .(\S+). /) {
                 push @not_found, $1;
-                $err = REVTOOL_FILE_NOT_FOUND;
+                $err = AVALON_FILE_NOT_FOUND;
             } elsif ($line =~ /^cvs server: warning: (.+) is not \(any longer\) pertinent/
                      || $line =~ /^cvs server: warning: newborn (\S+) has disappeared/) {
                 push @removed, $1;
                 if ($cmd =~ /$1/) {
                     # It's only an error if the removed file was specifically requested in the get
-                    $err = REVTOOL_FILE_REMOVED;
+                    $err = AVALON_FILE_REMOVED;
                 }
             } elsif ($line =~ /^C (.+)$/) {
                 push @conflicts, $1;
-                $err = REVTOOL_CONFLICT_FOUND;
+                $err = AVALON_CONFLICT_FOUND;
             } elsif ($line =~ /^cvs \[\w+ aborted\]: no such tag/
                      || $line =~ /^cvs \S+: warning: new-born \S+ has disappeared$/) {
                 eprint "$opt_t is not a valid tag for $file_list\n";
-                $err = REVTOOL_INVALID_TAG;
+                $err = AVALON_INVALID_TAG;
             } elsif ($line =~ /^cvs server: nothing known about/) {
                 $line =~ s/^cvs server: nothing known about//;
                 if ($type eq "add") {
                     eprint "You tried to add a file which does not exist locally ($line).\n";
-                    $err = REVTOOL_BAD_ADDITION;
+                    $err = AVALON_BAD_ADDITION;
                 } else {
                     eprint "You tried to remove a file which does not exist in the repository ($line).\n";
-                    $err = REVTOOL_BAD_REMOVAL;
+                    $err = AVALON_BAD_REMOVAL;
                 }
 
             # Retryable errors
@@ -265,7 +189,7 @@ talk_to_cvs_server
                     sleep 3;
                 } else {
                     eprint "The CVS server was unreachable.\n";
-                    $err = REVTOOL_NO_SERVER;
+                    $err = AVALON_NO_SERVER;
                     last;
                 }
             } elsif ($line =~ /^Unknown host (\S+)\.$/) {
@@ -275,7 +199,7 @@ talk_to_cvs_server
                     sleep 3;
                 } else {
                     eprint "The CVS server name ($1) does not resolve.\n";
-                    $err = REVTOOL_NO_SERVER;
+                    $err = AVALON_NO_SERVER;
                     last;
                 }
             } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
@@ -285,7 +209,7 @@ talk_to_cvs_server
                     sleep 3;
                 } else {
                     eprint "The CVS server kept crashing.\n";
-                    $err = REVTOOL_SERVER_CRASH;
+                    $err = AVALON_SERVER_CRASH;
                     last;
                 }
 
@@ -312,7 +236,7 @@ talk_to_cvs_server
     }
     if ($err == 0 && $? != 0 && $type !~ /^query_r?diff$/) {
         eprint "An unknown error must have occured, because the command returned $?\n";
-        $err = REVTOOL_UNSPECIFIED_ERROR;
+        $err = AVALON_UNSPECIFIED_ERROR;
     }
     if ($err) {
         if ($#conflicts != -1) {
@@ -348,7 +272,7 @@ talk_to_bk_server
 {
     my ($type, $cmd) = @_;
 
-    return REVTOOL_UNSPECIFIED_ERROR;
+    return AVALON_UNSPECIFIED_ERROR;
 }
 
 # Login to the repository
@@ -453,7 +377,7 @@ commit_to_master
     @stat_info = stat($logfile);
     if ($stat_info[7] <= 72) {
         print "Commit message was unmodified or is too short.  Aborting commit.\n";
-        return REVTOOL_BAD_LOG_ENTRY;
+        return AVALON_BAD_LOG_ENTRY;
     }
     if (! $opt_x) {
         open(LOGFILE, "<$logfile");
@@ -566,7 +490,7 @@ add_new_files
             $file_list = <STDIN>;
             @files = glob($file_list);
         } else {
-            return REVTOOL_BAD_ADDITION;
+            return AVALON_BAD_ADDITION;
         }
     }
     $file_list = join(" ", @files);
@@ -589,7 +513,7 @@ delete_old_files
             $file_list = <STDIN>;
             @files = glob($file_list);
         } else {
-            return REVTOOL_BAD_REMOVAL;
+            return AVALON_BAD_REMOVAL;
         }
     }
     $file_list = join(" ", @files);
@@ -666,7 +590,7 @@ query_diff
         $rev2 = $rtag;
     } elsif ($tag || $rtag) {
         eprint "Two tags (if any) are required to do a diff.\n";
-        return REVTOOL_INVALID_TAG;
+        return AVALON_INVALID_TAG;
     }
     $rev1 = "-r $rev1" if ($rev1);
     $rev2 = "-r $rev2" if ($rev2);
@@ -691,7 +615,7 @@ query_release_diff
         $rev2 = $rtag;
     } else {
         eprint "Two tags (if any) are required to do a diff.\n";
-        return REVTOOL_INVALID_TAG;
+        return AVALON_INVALID_TAG;
     }
     $cmd = "/bin/sh -c \"cvs $cvsroot rdiff -R -u -r $rev1 -r $rev2 $file_list\"";
     $err = &talk_to_server("query_rdiff", $cmd);
@@ -712,13 +636,13 @@ tag_local_sources
         $module = $_[0];
     } else {
         eprint "I don't see any CVS sources to tag here....\n";
-        return REVTOOL_NO_SOURCES;
+        return AVALON_NO_SOURCES;
     }
     ($mod_tag = $module) =~ tr/[a-z]/[A-Z]/;
 
     if (! &check_tag($mod_tag, $tag)) {
         eprint "Tag \"$tag\" is not valid for module $module\n";
-        return REVTOOL_INVALID_TAG;
+        return AVALON_INVALID_TAG;
     }
 
     $cmd = "/bin/sh -c \"cvs $cvsroot tag -F " . ($opt_b ? "-b " : "") . "$tag $file_list\"";
@@ -740,13 +664,13 @@ tag_repository_sources
         $module = $_[0];
     } else {
         eprint "I don't see any CVS sources to tag here....\n";
-        return REVTOOL_NO_SOURCES;
+        return AVALON_NO_SOURCES;
     }
     ($mod_tag = $module) =~ tr/[a-z]/[A-Z]/;
 
     if (! &check_tag($mod_tag, $rtag)) {
         eprint "Tag \"$rtag\" is not valid for module $module\n";
-        return REVTOOL_INVALID_TAG;
+        return AVALON_INVALID_TAG;
     }
 
     $cmd = "/bin/sh -c \"cvs $cvsroot rtag -F " . ($opt_b ? "-b " : "") . "$rtag $file_list\"";
@@ -779,14 +703,14 @@ import_vendor_sources
         $release_tag = <STDIN>;
     } else {
         eprint "No valid release tag was given.  I can't import without it.\n";
-        return REVTOOL_INVALID_TAG;
+        return AVALON_INVALID_TAG;
     }
     dprint "Using module name $module, vendor tag $vendor_tag, release tag $release_tag\n";
 
     $opt_b = 0;  # Stupidity protection  :-)
     if (! &check_tag($vendor_tag, $release_tag)) {
         eprint "Release tag \"$release_tag\" is not valid for module $module\n";
-        return REVTOOL_INVALID_TAG;
+        return AVALON_INVALID_TAG;
     }
     ($version = $release_tag) =~ s/^[^-]+-//;
     $version =~ tr/_/./;
@@ -870,7 +794,8 @@ BEGIN {
 
     # Set up the basic variables
     $progname = "revtool";
-    $version = "1.3";
+    $version = "2.0";
+    &print_usage_info() if (!scalar(@ARGV));
     $argc = $#ARGV + 2;
     $retval = 0;
     $defproto = "cvs";
@@ -959,7 +884,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.60 $ created on $Date: 2001/03/22 00:37:19 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.61 $ created on $Date: 2001/03/26 09:48:54 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

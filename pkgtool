@@ -23,61 +23,14 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.32 2001/03/20 03:45:36 mej Exp $
+# $Id: pkgtool,v 1.33 2001/03/26 09:48:54 mej Exp $
 #
 
 # Include the Perl Modules we need
 require POSIX;
 require Getopt::Long;
-
-# Constants
-#
-# Keep these in sync with the ones in revtool, or
-# talk perl into using headers and #define's.
-#
-# 1-20 are generic errors
-sub REVTOOL_NO_SERVER()           {1;}
-sub REVTOOL_SERVER_CRASH()        {2;}
-sub REVTOOL_BAD_LOGIN()           {3;}
-sub REVTOOL_COMMAND_FAILED()      {4;}
-sub REVTOOL_ACCESS_DENIED()       {5;}
-sub REVTOOL_NO_SOURCES()          {6;}
-
-# 21-40 are retrieval/update errors
-sub REVTOOL_FILE_NOT_FOUND()      {21;}
-sub REVTOOL_FILE_REMOVED()        {22;}
-sub REVTOOL_CONFLICT_FOUND()      {23;}
-sub REVTOOL_INVALID_TAG()         {24;}
-
-# 41-60 are add/remove errors
-sub REVTOOL_BAD_ADDITION()        {41;}
-sub REVTOOL_BAD_REMOVAL()         {42;}
-
-# 61-80 are commit errors
-sub REVTOOL_NEED_UPDATE()         {61;}
-sub REVTOOL_BAD_LOG_ENTRY()       {62;}
-
-# 127 is a catch-all
-sub REVTOOL_UNSPECIFIED_ERROR()   {127;}
-
-
-# Return codes for pkgtool
-sub PKGTOOL_SUCCESS()           {0;}
-sub PKGTOOL_FATAL_ERROR()       {1;}
-sub PKGTOOL_SYNTAX_ERROR()      {2;}
-sub PKGTOOL_COMMAND_FAILED()    {3;}
-sub PKGTOOL_COMMAND_INVALID()   {4;}
-
-sub PKGTOOL_MISSING_FILES()     {10;}
-sub PKGTOOL_SPEC_ERRORS()       {11;}
-sub PKGTOOL_DEPENDENCIES()      {12;}
-sub PKGTOOL_ARCH_MISMATCH()     {13;}
-sub PKGTOOL_BUILD_FAILURE()     {14;}
-sub PKGTOOL_BAD_MODULE()        {15;}
-
-sub PKGTOOL_TERMINATED()        {50;}
-sub PKGTOOL_CRASHED()           {60;}
-sub PKGTOOL_UNSPECIFIED_ERROR   {127;}
+use Avalon::Util;
+use Avalon::Pkgtool;
 
 # Print usage information
 sub
@@ -111,87 +64,7 @@ print_usage_info
     print "       --tar <tarcmd>                Use <tarcmd> as the \"tar\" command\n";
     print "       --zip <zipcmd>                Use <zipcmd> as the compression program\n";
     print "\n";
-    exit(PKGTOOL_SUCCESS);
-}
-
-# Generate timestamp for debugging/log file
-sub
-get_timestamp
-{
-    return POSIX::strftime("%A, %d %B %Y %H:%M:%S %Z", localtime);
-}
-
-# Report a fatal error
-sub
-fatal_error
-{
-    my $msg = "$progname:  FATAL:  $_[0]";
-
-    print STDERR $msg;
-    exit(PKGTOOL_FATAL_ERROR);
-}
-
-# Debugging output
-sub
-dprintf
-{
-    return if (! $debug);
-    print "[debug:$progname] ";
-    printf @_;
-}
-sub
-dprint
-{
-    my @dbg;
-    my ($f, $l, $s);
-
-    return if (! $debug);
-    @dbg = caller(1);
-    ($f, $l, $s) = @dbg[1, 2, 3];
-    $f =~ s/^.*\/([^\/]+)$/$1/;
-    print "[$f/$l/$s()] ", @_;
-}
-
-# Print an error
-sub
-eprintf
-{
-    print "$progname:  Error:  ";
-    printf @_;
-}
-sub
-eprint
-{
-    print "$progname:  Error:  ", @_;
-}
-
-# Handle a terminate signal
-sub
-handle_signal
-{
-    my $sig = $_[0];
-
-    eprint "Someone sent me a SIG$sig asking me to exit, so I shall.\n";
-    close($GLOBAL_LOG) if ($GLOBAL_LOG);
-    exit PKGTOOL_TERMINATED;
-}
-
-# Handle a fatal signal
-sub
-handle_fatal_signal
-{
-    my $sig = $_[0];
-
-    eprint "Caught fatal signal SIG$sig.  Cleaning up and aborting...\n";
-    close($GLOBAL_LOG) if ($GLOBAL_LOG);
-    exit PKGTOOL_CRASHED;
-}
-
-# Handle a perl warning
-sub
-handle_warning
-{
-    dprint @_;
+    exit(AVALON_SUCCESS);
 }
 
 sub
@@ -211,178 +84,6 @@ should_ignore
     return 1 if ($fname =~ /^debian$/ && -d $fname);
 
     return 0;
-}
-
-# Add a %define
-sub
-add_define
-{
-    my ($var, $value) = @_;
-
-    $define{$var} = $value;
-    dprint "Added \%define:  $var -> $define{$var}\n";
-}
-
-# Replace %define's in a spec file line with their values
-sub
-replace_defines
-{
-    my $line = $_[0];
-
-    while ($line =~ /\%(\w+)/g) {
-        my $var = $1;
-
-        dprint "Found macro:  $var\n";
-        if (defined $define{$var}) {
-            dprint "Replacing with:  $define{$var}\n";
-            $line =~ s/\%$var/$define{$var}/g;
-            reset;
-        } else {
-            dprint "Definition not found.\n";
-        }
-    }
-    while ($line =~ /\%\{([^\}]+)\}/g) {
-        my $var = $1;
-
-        dprint "Found macro:  $var\n";
-        if (defined $define{$var}) {
-            dprint "Replacing with:  $define{$var}\n";
-            $line =~ s/\%\{$var\}/$define{$var}/g;
-            reset;
-        } else {
-            dprint "Definition not found.\n";
-        }
-    }
-    return $line;
-}
-
-# Parse spec file
-sub
-parse_spec_file
-{
-    my ($specfile, $catalog) = @_;
-    my ($line, $oldline, $stage, $pkg);
-    local *SPECFILE;
-
-    if (! $specfile) {
-        # Look in the specified module
-    }
-
-    open(SPECFILE, $specfile) || &fatal_error("Unable to open $specfile -- $!\n");
-    $stage = 0;
-    while (<SPECFILE>) {
-        chomp($line = $_);
-        next if ($line =~ /^\s*\#/ || $line =~ /^\s*$/);
-        $oldline = $line;
-        $line = &replace_defines($oldline);
-        $line =~ s/^\s+//;
-        $line =~ s/\s+$//;
-        if ($oldline ne $line) {
-            dprint "Parsing from $specfile, line $.: \"$oldline\" -> \"$line\"\n";
-        } else {
-            dprint "Parsing from $specfile, line $.: \"$line\"\n";
-        }
-        if ($line =~ /^\%(prep|build|install|clean|changelog|trigger|triggerpostun|triggerun|triggerin|verifyscript)\s*$/
-            || $line =~ /^\%(package|preun|pre|postun|post|files|description)(\s+\w+)?$/) {
-            my $param = $2;
-
-            $stage = $1;
-            dprint "Switching to stage \"$stage\"\n";
-            if ($stage eq "package" && $param) {
-                $pkg = "$packages[0]-$param";
-                push @packages, $pkg;
-            }
-        } elsif ((! $stage) && $line =~ /^\s*(\w+)\s*:\s*(.*)\s*$/) {
-            my ($var, $value) = ($1, $2);
-
-            $var =~ tr/[A-Z]/[a-z]/;
-            if ($var eq "name") {
-                $pkg = $value;
-                @packages = ($pkg);
-                &add_define("PACKAGE_NAME", $value);
-                &add_define("name", $value) if (! $define{"name"});
-            } elsif ($var =~ /^source(\d*)$/) {
-                my $key = ($1 ? $1 : "0");
-
-                $value =~ s/^.*\/([^\/]+)$/$1/;
-                $source{$key} = $value;
-                &add_define("SOURCE$key", $value);
-            } elsif ($var =~ /^patch(\d*)$/) {
-                my $key = ($1 ? $1 : "0");
-
-                $value =~ s/^.*\/([^\/]+)$/$1/;
-                $patch{$key} = $value;
-                &add_define("PATCH$key", $value);
-            } else {
-                $header{$var} = $value;
-                if ($var eq "version") {
-                    &add_define("PACKAGE_VERSION", $value);
-                    &add_define("version", $value) if (! $define{"version"});
-                } elsif ($var eq "release") {
-                    &add_define("PACKAGE_RELEASE", $value);
-                    &add_define("release", $value) if (! $define{"release"});
-                }
-            }
-        } elsif ($line =~ /^%\s*define\s*(\w+)\s*(.*)$/) {
-            &add_define($1, $2);
-        }
-    }
-    close(SPECFILE);
-
-    @sources = sort {$a <=> $b} keys %source;
-    @patches = sort {$a <=> $b} keys %patch;
-    @headers = sort {uc($a) cmp uc($b)} keys %header;
-
-    if ($catalog) {
-        foreach $src (@sources) {
-            print "S:$src:$source{$src}\n";
-        }
-        foreach $p (@patches) {
-            print "P:$p:$patch{$p}\n";
-        }
-        foreach $h (@headers) {
-            print "H:$h:$header{$h}\n";
-        }
-    } elsif ($debug) {
-        dprint "Got the following sources:\n";
-        foreach $src (@sources) {
-            dprint "    Source $src -> $source{$src}\n";
-        }
-        dprint "Got the following patches:\n";
-        foreach $p (@patches) {
-            dprint "    Patch $p -> $patch{$p}\n";
-        }
-        dprint "Got the following header info:\n";
-        foreach $h (@headers) {
-            dprint "    $h -> $header{$h}\n";
-        }
-    }
-}
-
-# Emulate rm -rf
-sub
-nuke_tree
-{
-    my $path = $_[0];
-    my @files;
-    local *DIR;
-
-    if ((-d $path) && !(-l $path)) {
-        opendir(DIR, $path) || return 0;
-        @files = readdir(DIR);
-        closedir(DIR);
-        foreach $f (@files) {
-            if ($f ne "." && $f ne "..") {
-                &nuke_tree("$path/$f");
-            }
-        }
-        dprint "Removing directory $path\n";
-        rmdir $path || return 0;
-    } else {
-        dprint "Unlinking $path\n";
-        unlink($path) || return 0;
-    }
-    return 1;
 }
 
 sub
@@ -422,7 +123,7 @@ fetch_package
 
     dprint "About to run $cmd\n";
     if (!open(REVTOOL, "$cmd 2>&1 |")) {
-        $err = REVTOOL_COMMAND_FAILED;
+        $err = AVALON_COMMAND_FAILED;
         $msg = "Execution of \"$cmd\" failed -- $!";
         last;
     }
@@ -455,7 +156,7 @@ update_to_tag
     $cmd = "revtool -g $tag" . ($src_files ? " $src_files" : "");
     dprint "About to run $cmd\n";
     if (!open(REVTOOL, "$cmd 2>&1 |")) {
-        $err = REVTOOL_COMMAND_FAILED;
+        $err = AVALON_COMMAND_FAILED;
         $msg = "Execution of \"$cmd\" failed -- $!";
         last;
     }
@@ -538,7 +239,7 @@ create_source_file
         unlink($tarball);
         if (!open(CMD, "$cmd 2>&1 |")) {
             eprint "Execution of \"$cmd\" failed -- $!\n";
-            return PKGTOOL_COMMAND_FAILED;
+            return AVALON_COMMAND_FAILED;
         }
         while (<CMD>) {
             chomp($line = $_);
@@ -548,7 +249,7 @@ create_source_file
         dprint "Command returned $?\n";
         if ($?) {
             eprint "Creation of vendor source tarball $tarball failed\n";
-            return PKGTOOL_BUILD_FAILURE;
+            return AVALON_BUILD_FAILURE;
         }
     } else {
         my $rc;
@@ -557,24 +258,10 @@ create_source_file
         $rc = system("cp -f $src_files $destdir") >> 8;
         if ($rc) {
             eprint "Unable to copy $src_files to $destdir -- $!\n";
-            return PKGTOOL_BUILD_FAILURE;
+            return AVALON_BUILD_FAILURE;
         }
     }
-    return PKGTOOL_SUCCESS;
-}
-
-# Return the contents of a file as a string
-sub
-cat_file
-{
-    my $filename = $_[0];
-    my $contents = "";
-
-    open(FF, "$filename") || return undef;
-    while (<FF>) {
-        $contents .= $_;
-    }
-    return $contents;
+    return AVALON_SUCCESS;
 }
 
 sub
@@ -588,13 +275,13 @@ gen_diff
     @src_files = split(" ", $src_files);
     if (!open(PATCH, ">$patch")) {
         eprint "Unable to write to patch file $patch -- $!\n";
-        return PKGTOOL_BUILD_FAILURE;
+        return AVALON_BUILD_FAILURE;
     }
     $cmd = "revtool -qD -t '$prev_tag $tag' $module";
     dprint "About to run \"$cmd\"\n";
     if (!open(CMD, "$cmd 2>/dev/null |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
-        return PKGTOOL_COMMAND_FAILED;
+        return AVALON_COMMAND_FAILED;
     }
     $line_cnt = $ignore = 0;
     while (<CMD>) {
@@ -631,7 +318,7 @@ gen_diff
     close(PATCH);
     print "Generated $patch ($line_cnt lines).\n";
     dprint "\"$cmd\" returned $?\n";
-    return PKGTOOL_SUCCESS;
+    return AVALON_SUCCESS;
 }
 
 sub
@@ -658,12 +345,12 @@ rpm_install
     if (!open(RPM, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }
-    $err = PKGTOOL_SUCCESS;
+    $err = AVALON_SUCCESS;
     while (<RPM>) {
         chomp($line = $_);
         print "$line\n";
         if ($line =~ /^error: failed build dependencies:/) {
-            $err = PKGTOOL_DEPENDENCIES;
+            $err = AVALON_DEPENDENCIES;
             while (<RPM>) {
                 chomp($line = $_);
                 last if ($line !~ /is needed by/);
@@ -673,17 +360,17 @@ rpm_install
             $msg = sprintf("Installing this package requires the following:  %s", join(" ", @failed_deps));
             last;
         } elsif ($line =~ /^Architecture is not included:/) {
-            $err = PKGTOOL_ARCH_MISMATCH;
+            $err = AVALON_ARCH_MISMATCH;
             $line =~ s/^Architecture is not included:\s+//;
             $msg = "This package does not install on the $line architecture";
         }
     }
     close(RPM);
     dprint "\"$cmd\" returned $?\n";
-    if ($? != 0 && $err == PKGTOOL_SUCCESS) {
-        return PKGTOOL_UNSPECIFIED_ERROR;
+    if ($? != 0 && $err == AVALON_SUCCESS) {
+        return AVALON_UNSPECIFIED_ERROR;
     }
-    if ($err == PKGTOOL_SUCCESS) {
+    if ($err == AVALON_SUCCESS) {
         print "$pkg_file successfully installed.\n";
     } else {
         eprint "$msg\n";
@@ -711,10 +398,10 @@ deb_install
     close(DPKG);
     dprint "\"$cmd\" returned $?\n";
     if ($? != 0) {
-        return PKGTOOL_UNSPECIFIED_ERROR;
+        return AVALON_UNSPECIFIED_ERROR;
     }
     print "$pkg_file successfully installed.\n";
-    return PKGTOOL_SUCCESS;
+    return AVALON_SUCCESS;
 }
 
 sub
@@ -737,7 +424,7 @@ tar_install
     if (!open(TAR, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }
-    $err = PKGTOOL_SUCCESS;
+    $err = AVALON_SUCCESS;
     while (<TAR>) {
         chomp($line = $_);
         if ($line =~ /^tar: /) {
@@ -748,10 +435,10 @@ tar_install
     }
     close(TAR);
     dprint "\"$cmd\" returned $?\n";
-    if ($? != 0 && $err == PKGTOOL_SUCCESS) {
-        return PKGTOOL_UNSPECIFIED_ERROR;
+    if ($? != 0 && $err == AVALON_SUCCESS) {
+        return AVALON_UNSPECIFIED_ERROR;
     }
-    if ($err == PKGTOOL_SUCCESS) {
+    if ($err == AVALON_SUCCESS) {
         print "$pkg_file successfully installed.\n";
     } else {
         eprint "$pkg_file installation failed.\n";
@@ -779,9 +466,9 @@ rpm_show_contents
     close(RPM);
     dprint "\"$cmd\" returned $?\n";
     if ($? != 0) {
-        return PKGTOOL_UNSPECIFIED_ERROR;
+        return AVALON_UNSPECIFIED_ERROR;
     }
-    return PKGTOOL_SUCCESS;
+    return AVALON_SUCCESS;
 }
 
 sub
@@ -805,9 +492,9 @@ deb_show_contents
     close(DPKG);
     dprint "\"$cmd\" returned $?\n";
     if ($? != 0) {
-        return PKGTOOL_UNSPECIFIED_ERROR;
+        return AVALON_UNSPECIFIED_ERROR;
     }
-    return PKGTOOL_SUCCESS;
+    return AVALON_SUCCESS;
 }
 
 sub
@@ -834,9 +521,9 @@ tar_show_contents
     close(TAR);
     dprint "\"$cmd\" returned $?\n";
     if ($? != 0) {
-        return PKGTOOL_UNSPECIFIED_ERROR;
+        return AVALON_UNSPECIFIED_ERROR;
     }
-    return PKGTOOL_SUCCESS;
+    return AVALON_SUCCESS;
 }
 
 sub
@@ -853,7 +540,7 @@ rpm_query
         $rpm_opt = "-q --qf 'Source:  %{SOURCERPM}\n'";
     } else {
         eprint "Unrecognized query type \"$query_type\"\n";
-        return PKGTOOL_SYNTAX_ERROR;
+        return AVALON_SYNTAX_ERROR;
     }
     $rpm = ($pkg_prog ? $pkg_prog : "rpm");
     $rc = ($rcfile ? "--rcfile '/usr/lib/rpm/rpmrc:$rcfile'" : "");
@@ -868,9 +555,9 @@ rpm_query
     close(RPM);
     dprint "\"$cmd\" returned $?\n";
     if ($? != 0) {
-        return PKGTOOL_UNSPECIFIED_ERROR;
+        return AVALON_UNSPECIFIED_ERROR;
     }
-    return PKGTOOL_SUCCESS;
+    return AVALON_SUCCESS;
 }
 
 sub
@@ -884,7 +571,7 @@ deb_query
     if ($query_type eq "d") {
     } else {
         eprint "Unrecognized query type \"$query_type\"\n";
-        return PKGTOOL_SYNTAX_ERROR;
+        return AVALON_SYNTAX_ERROR;
     }
     $dpkg = ($pkg_prog ? $pkg_prog : "dpkg");
     $cmd = "$dpkg -I " . ($pkg_file ? "$pkg_file" : "");
@@ -907,7 +594,7 @@ deb_query
     close(DPKG);
     dprint "\"$cmd\" returned $?\n";
     if ($? != 0) {
-        return PKGTOOL_UNSPECIFIED_ERROR;
+        return AVALON_UNSPECIFIED_ERROR;
     }
     foreach $prov (@prov) {
         print "Capability:  $prov\n";
@@ -915,14 +602,14 @@ deb_query
     foreach $dep (@deps) {
         print "Dependency:  $dep\n";
     }   
-    return PKGTOOL_SUCCESS;
+    return AVALON_SUCCESS;
 }
 
 sub
 tar_query
 {
     eprint "Tar packages cannot be queried.\n";
-    return PKGTOOL_COMMAND_INVALID;
+    return AVALON_COMMAND_INVALID;
 }
 
 sub
@@ -947,9 +634,9 @@ rpm_build
     dprint "About to run \"$cmd\"\n";
     if (!open(RPM, "$cmd </dev/null 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
-        return PKGTOOL_COMMAND_FAILED;
+        return AVALON_COMMAND_FAILED;
     }
-    $err = PKGTOOL_SUCCESS;
+    $err = AVALON_SUCCESS;
     while (<RPM>) {
         chomp($line = $_);
         print "$line\n";
@@ -958,14 +645,14 @@ rpm_build
         } elsif ($line =~ /^line \d+: [^:]+: /
                  || $line =~ /^Failed to find \w+:/
                  || $line =~ /^Symlink points to BuildRoot: /) {
-            $err = PKGTOOL_SPEC_ERRORS;
+            $err = AVALON_SPEC_ERRORS;
             push @spec_errors, $line;
         } elsif ($line =~ /^Bad exit status from/) {
-            $err = PKGTOOL_BUILD_FAILURE;
+            $err = AVALON_BUILD_FAILURE;
             $line =~ s/^Bad exit status from \S+ \((%\w+)\)/$1/;
             $msg = "The RPM $line stage exited abnormally";
         } elsif ($line =~ /^error: failed build dependencies:/) {
-            $err = PKGTOOL_DEPENDENCIES;
+            $err = AVALON_DEPENDENCIES;
             while (<RPM>) {
                 chomp($line = $_);
                 last if ($line !~ /is needed by/);
@@ -975,7 +662,7 @@ rpm_build
             $msg = sprintf("Building this package requires the following:  %s", join(" ", @failed_deps));
             last;
         } elsif ($line =~ /^Architecture is not included:/) {
-            $err = PKGTOOL_ARCH_MISMATCH;
+            $err = AVALON_ARCH_MISMATCH;
             $line =~ s/^Architecture is not included:\s+//;
             $msg = "This package does not build on the $line architecture";
         } elsif ($line =~ /^File (.*): No such file or directory$/
@@ -985,14 +672,14 @@ rpm_build
                  || $line =~ /^No (patch number \d+)$/
                  || $line =~ /^Could not open \%files file (\S+): No such file or directory$/
                  || $line =~ /^File not found(?: by glob)?: (.*)$/) {
-            $err = PKGTOOL_MISSING_FILES;
+            $err = AVALON_MISSING_FILES;
             push @not_found, $1;
         }
     }
     close(RPM);
     dprint "\"$cmd\" returned $?\n";
-    if ($? != 0 && $err == PKGTOOL_SUCCESS) {
-        $err = PKGTOOL_UNSPECIFIED_ERROR;
+    if ($? != 0 && $err == AVALON_SUCCESS) {
+        $err = AVALON_UNSPECIFIED_ERROR;
         $msg = "Unhandled package build error";
     } elsif ($#not_found != -1) {
         $msg = sprintf("The following were expected by the build, but no matching files were found:  \"%s\"",
@@ -1025,14 +712,14 @@ rpm_generate_source_files
     local (*DIR, *CMD);
 
     if ($module && (!chdir($module))) {
-        return PKGTOOL_BAD_MODULE;
+        return AVALON_BAD_MODULE;
     }
     if (-f "CVS/Repository") {
         chomp($modname = &cat_file("CVS/Repository"));
     } elsif ($module) {
         ($modname = $module) =~ s/^.*\/([^\/]+)$/$1/;
     } else {
-        return PKGTOOL_BAD_MODULE;
+        return AVALON_BAD_MODULE;
     }
     if ($destdir && $destdir !~ /\/$/) {
         $destdir .= "/";
@@ -1128,7 +815,7 @@ rpm_generate_source_files
         #($err, $msg) = &fetch_package("revtool -gt $release_tag $modname");
         #if ($err) {
         #    eprint "Unable to obtain $modname using release tag $release_tag -- $msg\n";
-        #    return PKGTOOL_BAD_MODULE;
+        #    return AVALON_BAD_MODULE;
         #}
         #chdir($modname);
 
@@ -1255,7 +942,7 @@ rpm_generate_source_files
             }
         }
     }
-    return PKGTOOL_SUCCESS;
+    return AVALON_SUCCESS;
 }
 
 # main() here is basically the same as main() in C
@@ -1266,7 +953,8 @@ main
 
     # Set up the basic variables
     $progname = "pkgtool";
-    $version = "1.2";
+    $version = "2.0";
+    &print_usage_info() if (!scalar(@ARGV));
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "b|build", "i|install", "c|contents", "q|query=s",
@@ -1280,7 +968,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.32 $ created on $Date: 2001/03/20 03:45:36 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.33 $ created on $Date: 2001/03/26 09:48:54 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1290,7 +978,7 @@ main
         print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
         print "  ($rcs_info)\n";
         print "\n";
-	return PKGTOOL_SUCCESS;
+	return AVALON_SUCCESS;
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
         # This is a really silly way to shut up the "used only once" warnings.
@@ -1353,7 +1041,7 @@ main
             $type = "deb";
         } else {
             eprint "You must specify a valid spec file or script directory with -s\n";
-            return PKGTOOL_SYNTAX_ERROR;
+            return AVALON_SYNTAX_ERROR;
         }
     }
     if ($#ARGV >= 0) {
@@ -1399,7 +1087,7 @@ main
     } elsif ($mode eq "install") {
         if (! $pkg_file) {
             eprint "You cannot perform an install without specifying a package.\n";
-            return PKGTOOL_SYNTAX_ERROR;
+            return AVALON_SYNTAX_ERROR;
         }
         if ($type eq "rpm") {
             $ret = &rpm_install($pkg_file);
@@ -1419,7 +1107,7 @@ main
     } elsif ($mode eq "catalog") {
         if (! $specfile) {
             eprint "Please specify a spec file/script directory\n";
-            return PKGTOOL_SYNTAX_ERROR;
+            return AVALON_SYNTAX_ERROR;
         }
         if ($type eq "rpm") {
             $ret = &parse_spec_file($specfile, 1);
@@ -1429,7 +1117,7 @@ main
     } elsif ($mode eq "generate") {
         if (! $specfile) {
             eprint "Please specify a spec file/script directory\n";
-            return PKGTOOL_SYNTAX_ERROR;
+            return AVALON_SYNTAX_ERROR;
         }
         if ($type eq "rpm") {
             $ret = &rpm_generate_source_files($specfile, $module, $srcs, $head_tag, $release_tag);
@@ -1439,7 +1127,7 @@ main
     } elsif ($mode eq "query") {
         if (! $specfile && ! $pkg_file) {
             eprint "Please specify a spec file/script directory or a package file.\n";
-            return PKGTOOL_SYNTAX_ERROR;
+            return AVALON_SYNTAX_ERROR;
         }
         if ($type eq "rpm") {
             $ret = &rpm_query($pkg_file, $query_type);

@@ -23,24 +23,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: compstool,v 1.3 2000/11/11 05:14:08 mej Exp $
+# $Id: compstool,v 1.4 2001/03/26 09:48:54 mej Exp $
 #
 
 # Include the Perl Modules we need
 require POSIX;
 require Getopt::Long;
-
-# Constants
-#
-# Return codes for compstool
-sub COMPSTOOL_SUCCESS()           {0;}
-sub COMPSTOOL_FATAL_ERROR()       {1;}
-
-sub COMPSTOOL_MISSING_PKGS()      {10;}
-
-sub COMPSTOOL_TERMINATED()        {50;}
-sub COMPSTOOL_CRASHED()           {60;}
-sub COMPSTOOL_UNSPECIFIED_ERROR   {127;}
+use Avalon::Util;
 
 # Print usage information
 sub
@@ -60,113 +49,19 @@ print_usage_info
     print "    -D --dir <directory>             Specify \"directory\" as the full path to the CD image\n";
     print "    -a --arch <architecture>         Specify the architecture to check\n";
     print "\n";
-    exit(COMPSTOOL_SUCCESS);
-}
-
-# Generate timestamp for debugging/log file
-sub
-get_timestamp
-{
-    return POSIX::strftime("%A, %d %B %Y %H:%M:%S %Z", localtime);
-}
-
-# Report a fatal error
-sub
-fatal_error
-{
-    my $msg = "$progname:  FATAL:  $_[0]";
-
-    print STDERR $msg;
-    exit(COMPSTOOL_FATAL_ERROR);
-}
-
-# Debugging output
-sub
-dprintf
-{
-    return if (! $debug);
-    print "[debug:$progname] ";
-    printf @_;
-}
-sub
-dprint
-{
-    my @dbg;
-    my ($f, $l, $s);
-
-    return if (! $debug);
-    @dbg = caller(1);
-    ($f, $l, $s) = @dbg[1, 2, 3];
-    $f =~ s/^.*\/([^\/]+)$/$1/;
-    print "[$f/$l/$s()] ", @_;
-}
-
-# Print an error
-sub
-eprintf
-{
-    print "$progname:  Error:  ";
-    printf @_;
-}
-sub
-eprint
-{
-    print "$progname:  Error:  ", @_;
-}
-
-# Handle a terminate signal
-sub
-handle_signal
-{
-    my $sig = $_[0];
-
-    eprint "Someone sent me a SIG$sig asking me to exit, so I shall.\n";
-    close($GLOBAL_LOG) if ($GLOBAL_LOG);
-    exit COMPSTOOL_TERMINATED;
-}
-
-# Handle a fatal signal
-sub
-handle_fatal_signal
-{
-    my $sig = $_[0];
-
-    eprint "Caught fatal signal SIG$sig.  Cleaning up and aborting...\n";
-    close($GLOBAL_LOG) if ($GLOBAL_LOG);
-    exit COMPSTOOL_CRASHED;
-}
-
-# Handle a perl warning
-sub
-handle_warning
-{
-    dprint @_;
-}
-
-# Exclusive push.  Only push if the item(s) aren't already in the list
-sub
-xpush(\@; @)
-{
-    my $parray = shift;
-    my @items = @_;
-
-    foreach $item (@items) {
-        push @{$parray}, $item if (!grep($_ eq $item, @{$parray}));
-    }
+    exit(AVALON_SUCCESS);
 }
 
 sub
 parse_comps_file
 {
     my ($comps, $pkgdir, $arch) = @_;
-    local (*COMPS, *DIR);
+    local (*COMPS);
     my ($line, $pkg, $rpm);
     my (@pkgs, @rpms, @missing, @ignored);
 
     dprint "Parsing comps file at $comps using package directory $pkgdir\n";
-    opendir(DIR, $pkgdir) || &fatal_error("Unable to open package directory ($pkgdir) -- $!\n");
-    @rpms = grep($_ =~ /\.rpm$/, readdir(DIR));
-    closedir(DIR);
+    @rpms = grepdir {$_ =~ /\.rpm$/} $pkgdir;
 
     open(COMPS, $comps) || &fatal_error("Unable to open comps file ($comps) -- $!\n");
     while (<COMPS>) {
@@ -210,10 +105,10 @@ parse_comps_file
     }
     if (scalar(@missing)) {
         eprint "The following packages are missing:  \n   ", join("\n   ", sort(@missing)), "\n";
-        return COMPSTOOL_MISSING_PKGS;
+        return AVALON_MISSING_PKGS;
     } else {
         print "All packages verified.\n";
-        return COMPSTOOL_SUCCESS;
+        return AVALON_SUCCESS;
     }
 }
 
@@ -226,6 +121,7 @@ main
     # Set up the basic variables
     $progname = "compstool";
     $version = "1.0";
+    &print_usage_info() if (!scalar(@ARGV));
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "D|dir=s", "a|arch=s");
@@ -236,7 +132,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.3 $ created on $Date: 2000/11/11 05:14:08 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.4 $ created on $Date: 2001/03/26 09:48:54 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -246,7 +142,7 @@ main
         print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
         print "  ($rcs_info)\n";
         print "\n";
-	return COMPSTOOL_SUCCESS;
+	return AVALON_SUCCESS;
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
         # This is a really silly way to shut up the "used only once" warnings.

@@ -1088,3 +1088,9 @@ Thu Mar 22 01:35:54 2001                        Michael Jennings (mej)
 
 Update todo list.
 ----------------------------------------------------------------------
+Mon Mar 26 00:47:16 2001                        Michael Jennings (mej)
+
+Moved the common functions into a Perl module and began adding other
+Perl modules for interoperation between tools.  Doing this right will
+take some time, but it doesn't all have to be done right away.
+----------------------------------------------------------------------

@@ -23,41 +23,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: mediatool,v 1.2 2001/03/13 04:57:35 mej Exp $
+# $Id: mediatool,v 1.3 2001/03/26 09:48:54 mej Exp $
 #
 
 # Include the Perl Modules we need
 require POSIX;
 require Getopt::Long;
-
-# Constants
-#
-# Return codes for pkgtool
-sub PKGTOOL_SUCCESS()           {0;}
-sub PKGTOOL_FATAL_ERROR()       {1;}
-sub PKGTOOL_SYNTAX_ERROR()      {2;}
-sub PKGTOOL_COMMAND_FAILED()    {3;}
-
-sub PKGTOOL_MISSING_FILES()     {10;}
-sub PKGTOOL_SPEC_ERRORS()       {11;}
-sub PKGTOOL_DEPENDENCIES()      {12;}
-sub PKGTOOL_ARCH_MISMATCH()     {13;}
-sub PKGTOOL_BUILD_FAILURE()     {14;}
-sub PKGTOOL_BAD_MODULE()        {15;}
-
-sub PKGTOOL_TERMINATED()        {50;}
-sub PKGTOOL_CRASHED()           {60;}
-sub PKGTOOL_UNSPECIFIED_ERROR   {127;}
-
-# Return codes for mediatool
-sub MEDIATOOL_SUCCESS()         {0;}
-sub MEDIATOOL_FATAL_ERROR()     {1;}
-sub MEDIATOOL_SYNTAX_ERROR()    {2;}
-sub MEDIATOOL_COMMAND_FAILED()  {3;}
-                                
-sub MEDIATOOL_TERMINATED()      {50;}
-sub MEDIATOOL_CRASHED()         {60;}
-sub MEDIATOOL_UNSPECIFIED_ERROR {127;}
+use Avalon::Util;
 
 # Print usage information
 sub
@@ -81,132 +53,7 @@ print_usage_info
     print "    -c --cmd --command <command>     Specify an alternative command\n";
     print "       --boot <image>                Specify a boot image (for an ISO)\n";
     print "\n";
-    exit(MEDIATOOL_SUCCESS);
-}
-
-# Generate timestamp for debugging/log file
-sub
-get_timestamp
-{
-    return POSIX::strftime("%A, %d %B %Y %H:%M:%S %Z", localtime);
-}
-
-# Report a fatal error
-sub
-fatal_error
-{
-    my $msg = "$progname:  FATAL:  $_[0]";
-
-    print STDERR $msg;
-    exit(MEDIATOOL_FATAL_ERROR);
-}
-
-# Debugging output
-sub
-dprintf
-{
-    return if (! $debug);
-    print "[debug:$progname] ";
-    printf @_;
-}
-sub
-dprint
-{
-    my @dbg;
-    my ($f, $l, $s);
-
-    return if (! $debug);
-    @dbg = caller(1);
-    ($f, $l, $s) = @dbg[1, 2, 3];
-    $f =~ s/^.*\/([^\/]+)$/$1/;
-    print "[$f/$l/$s()] ", @_;
-}
-
-# Print an error
-sub
-eprintf
-{
-    print "$progname:  Error:  ";
-    printf @_;
-}
-sub
-eprint
-{
-    print "$progname:  Error:  ", @_;
-}
-
-# Handle a terminate signal
-sub
-handle_signal
-{
-    my $sig = $_[0];
-
-    eprint "Someone sent me a SIG$sig asking me to exit, so I shall.\n";
-    close($GLOBAL_LOG) if ($GLOBAL_LOG);
-    exit MEDIATOOL_TERMINATED;
-}
-
-# Handle a fatal signal
-sub
-handle_fatal_signal
-{
-    my $sig = $_[0];
-
-    eprint "Caught fatal signal SIG$sig.  Cleaning up and aborting...\n";
-    close($GLOBAL_LOG) if ($GLOBAL_LOG);
-    exit MEDIATOOL_CRASHED;
-}
-
-# Handle a perl warning
-sub
-handle_warning
-{
-    dprint @_;
-}
-
-# Make a directory hierarchy
-sub
-mkdirhier
-{
-    my $dir = $_[0];
-    my @dirs = split("/", $dir);
-    my $path = "";
-
-    dprint "mkdirhier($dir) called.\n";
-    foreach $dir (@dirs) {
-        $path .= "$dir/";
-        if (! -d $path) {
-            dprint "mkdirhier() creating \"$path\"\n";
-            mkdir($path, 0755) || eprint("Unable to create $path -- $!\n");
-        }
-    }
-    dprint "Something went wrong in mkdirhier()!\n" if (! -d $_[0]);
-}
-
-# Emulate rm -rf
-sub
-nuke_tree
-{
-    my $path = $_[0];
-    my @files;
-    local *DIR;
-
-    if ((-d $path) && !(-l $path)) {
-        opendir(DIR, $path) || return 0;
-        @files = readdir(DIR);
-        closedir(DIR);
-        foreach $f (@files) {
-            if ($f ne "." && $f ne "..") {
-                &nuke_tree("$path/$f");
-            }
-        }
-        dprint "Removing directory $path\n";
-        rmdir $path || return 0;
-    } else {
-        dprint "Unlinking $path\n";
-        unlink($path) || return 0;
-    }
-    return 1;
+    exit(AVALON_SUCCESS);
 }
 
 # Create a tarball from a directory
@@ -288,6 +135,7 @@ main
     # Set up the basic variables
     $progname = "mediatool";
     $version = "1.0";
+    &print_usage_info() if (!scalar(@ARGV));
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "i|iso=s", "t|tar|tarball=s",
@@ -299,7 +147,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.2 $ created on $Date: 2001/03/13 04:57:35 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.3 $ created on $Date: 2001/03/26 09:48:54 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -309,7 +157,7 @@ main
         print "Copyright (c) 2001, Michael Jennings and VA Linux Systems, Inc.\n";
         print "  ($rcs_info)\n";
         print "\n";
-	return MEDIATOOL_SUCCESS;
+	return AVALON_SUCCESS;
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
         # This is a really silly way to shut up the "used only once" warnings.
@@ -350,7 +198,7 @@ main
         &create_tarball($tarball, $dirs[0]);
     }
 
-    return MEDIATOOL_SUCCESS;
+    return AVALON_SUCCESS;
 }
 
 exit &main();

@@ -23,45 +23,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgsort,v 1.9 2000/09/28 05:08:46 mej Exp $
+# $Id: pkgsort,v 1.10 2001/03/26 09:48:54 mej Exp $
 #
 
 # Include the Perl Modules we need
 require POSIX;
 require Getopt::Long;
-
-# Constants
-#
-# Return codes for pkgtool
-sub PKGTOOL_SUCCESS()           {0;}
-sub PKGTOOL_FATAL_ERROR()       {1;}
-sub PKGTOOL_SYNTAX_ERROR()      {2;}
-sub PKGTOOL_COMMAND_FAILED()    {3;}
-
-sub PKGTOOL_MISSING_FILES()     {10;}
-sub PKGTOOL_SPEC_ERRORS()       {11;}
-sub PKGTOOL_DEPENDENCIES()      {12;}
-sub PKGTOOL_ARCH_MISMATCH()     {13;}
-sub PKGTOOL_BUILD_FAILURE()     {14;}
-sub PKGTOOL_BAD_MODULE()        {15;}
-
-sub PKGTOOL_TERMINATED()        {50;}
-sub PKGTOOL_CRASHED()           {60;}
-sub PKGTOOL_UNSPECIFIED_ERROR   {127;}
-
-# Return codes for pkgsort
-sub PKGSORT_SUCCESS()           {0;}
-sub PKGSORT_FATAL_ERROR()       {1;}
-sub PKGSORT_SYNTAX_ERROR()      {2;}
-sub PKGSORT_COMMAND_FAILED()    {3;}
-
-sub PKGSORT_UNRESOLVED_DEP()    {10;}
-sub PKGSORT_CIRCULAR_DEP()      {11;}
-
-sub PKGSORT_TERMINATED()        {50;}
-sub PKGSORT_CRASHED()           {60;}
-sub PKGSORT_UNSPECIFIED_ERROR   {127;}
-
+use Avalon::Util;
 
 # Print usage information
 sub
@@ -91,99 +59,7 @@ print_usage_info
     print "                       s for alphabetical by source package\n";
     print "                       r to reverse the sort order (in addition to one of the above flags)\n";
     print "\n";
-    exit(PKGSORT_SUCCESS);
-}
-
-# Generate timestamp for debugging/log file
-sub
-get_timestamp
-{
-    return POSIX::strftime("%A, %d %B %Y %H:%M:%S %Z", localtime);
-}
-
-# Report a fatal error
-sub
-fatal_error
-{
-    my $msg = "$progname:  FATAL:  $_[0]";
-
-    print STDERR $msg;
-    exit(PKGSORT_FATAL_ERROR);
-}
-
-# Debugging output
-sub
-dprintf
-{
-    return if (! $debug);
-    print "[debug:$progname] ";
-    printf @_;
-}
-sub
-dprint
-{
-    my @dbg;
-    my ($f, $l, $s);
-
-    return if (! $debug);
-    @dbg = caller(1);
-    ($f, $l, $s) = @dbg[1, 2, 3];
-    $f =~ s/^.*\/([^\/]+)$/$1/;
-    print "[$f/$l/$s()] ", @_;
-}
-
-# Print an error
-sub
-eprintf
-{
-    print "$progname:  Error:  ";
-    printf @_;
-}
-sub
-eprint
-{
-    print "$progname:  Error:  ", @_;
-}
-
-# Handle a terminate signal
-sub
-handle_signal
-{
-    my $sig = $_[0];
-
-    eprint "Someone sent me a SIG$sig asking me to exit, so I shall.\n";
-    close($GLOBAL_LOG) if ($GLOBAL_LOG);
-    exit PKGSORT_TERMINATED;
-}
-
-# Handle a fatal signal
-sub
-handle_fatal_signal
-{
-    my $sig = $_[0];
-
-    eprint "Caught fatal signal SIG$sig.  Cleaning up and aborting...\n";
-    close($GLOBAL_LOG) if ($GLOBAL_LOG);
-    exit PKGSORT_CRASHED;
-}
-
-# Handle a perl warning
-sub
-handle_warning
-{
-    dprint @_;
-}
-
-# Exclusive push.  Only push if the item(s) aren't already in the list
-sub
-xpush(\@; @)
-{
-    my $parray = shift;
-    my @items = @_;
-
-    foreach $item (@items) {
-        push @{$parray}, $item if (!grep($_ eq $item, @{$parray}));
-    }
+    exit(AVALON_SUCCESS);
 }
 
 sub
@@ -245,7 +121,7 @@ get_srpm_for_rpm
         }
     }
     close(CMD);
-    if ($? != PKGTOOL_SUCCESS) {
+    if ($? != AVALON_SUCCESS) {
         &fatal_error("Query of $rpm failed (error $?).\n");
     }
     return $srpm;
@@ -508,7 +384,7 @@ query_packages
                 }
             }
             close(CMD);
-            if ($? != PKGTOOL_SUCCESS) {
+            if ($? != AVALON_SUCCESS) {
                 &fatal_error("Query of $rpm failed (error $?).\n");
             }
         }
@@ -900,6 +776,7 @@ main
     # Set up the basic variables
     $progname = "pkgsort";
     $version = "1.0";
+    &print_usage_info() if (!scalar(@ARGV));
     undef %dep_error;
 
     # See the Getopt::Long man page for details on the syntax of this line
@@ -912,7 +789,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.9 $ created on $Date: 2000/09/28 05:08:46 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.10 $ created on $Date: 2001/03/26 09:48:54 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -922,7 +799,7 @@ main
         print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
         print "  ($rcs_info)\n";
         print "\n";
-	return PKGSORT_SUCCESS;
+	return AVALON_SUCCESS;
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
         # This is a really silly way to shut up the "used only once" warnings.
@@ -1000,7 +877,7 @@ main
     @pkgs = &sort_packages(@pkgs);
     &write_cache(@pkgs);
     &show_packages(@pkgs);
-    return PKGSORT_SUCCESS;
+    return AVALON_SUCCESS;
 }
 
 exit &main();

@@ -2,7 +2,7 @@
 #
 # buildtool -- Product Build Management Tool
 # 
-# Copyright (C) 2000, Michael Jennings
+# Copyright (C) 2000-2001, Michael Jennings
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -23,70 +23,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.124 2001/03/22 00:37:19 mej Exp $
+# $Id: buildtool,v 1.125 2001/03/26 09:48:54 mej Exp $
 #
 
 # Include the Perl Modules we need
 require POSIX;
 require Getopt::Long;
-
-# Constants
-#
-# Keep these in sync with the ones in revtool, or
-# talk perl into using headers and #define's.
-#
-# 1-20 are generic errors
-sub REVTOOL_NO_SERVER()           {1;}
-sub REVTOOL_SERVER_CRASH()        {2;}
-sub REVTOOL_BAD_LOGIN()           {3;}
-sub REVTOOL_COMMAND_FAILED()      {4;}
-sub REVTOOL_ACCESS_DENIED()       {5;}
-sub REVTOOL_NO_SOURCES()          {6;}
-
-# 21-40 are retrieval/update errors
-sub REVTOOL_FILE_NOT_FOUND()      {21;}
-sub REVTOOL_FILE_REMOVED()        {22;}
-sub REVTOOL_CONFLICT_FOUND()      {23;}
-sub REVTOOL_INVALID_TAG()         {24;}
-
-# 41-60 are add/remove errors
-sub REVTOOL_BAD_ADDITION()        {41;}
-sub REVTOOL_BAD_REMOVAL()         {42;}
-
-# 61-80 are commit errors
-sub REVTOOL_NEED_UPDATE()         {61;}
-sub REVTOOL_BAD_LOG_ENTRY()       {62;}
-
-# 127 is a catch-all
-sub REVTOOL_UNSPECIFIED_ERROR()   {127;}
-
-
-# Return codes for pkgtool
-sub PKGTOOL_SUCCESS()             {0;}
-sub PKGTOOL_FATAL_ERROR()         {1;}
-sub PKGTOOL_SYNTAX_ERROR()        {2;}
-sub PKGTOOL_COMMAND_FAILED()      {3;}
-
-sub PKGTOOL_MISSING_FILES()       {10;}
-sub PKGTOOL_SPEC_ERRORS()         {11;}
-sub PKGTOOL_DEPENDENCIES()        {12;}
-sub PKGTOOL_ARCH_MISMATCH()       {13;}
-sub PKGTOOL_BUILD_FAILURE()       {14;}
-sub PKGTOOL_BAD_MODULE()          {15;}
-
-sub PKGTOOL_TERMINATED()          {50;}
-sub PKGTOOL_CRASHED()             {60;}
-sub PKGTOOL_UNSPECIFIED_ERROR     {127;}
-
-
-# Return codes for buildtool
-sub BUILDTOOL_SUCCESS()           {0;}
-sub BUILDTOOL_PACKAGE_FAILED()    {1;}
-sub BUILDTOOL_BAD_PRODUCT()       {2;}
-sub BUILDTOOL_FATAL_ERROR()       {3;}
-sub BUILDTOOL_CHILD_EXEC_FAILED() {4;}
-sub BUILDTOOL_TERMINATED()        {50;}
-sub BUILDTOOL_CRASHED()           {60;}
+use Avalon::Util;
 
 # Print usage information
 sub
@@ -121,69 +64,7 @@ print_usage_info
     print "The stages and their abbreviations (for use with the -b option) are:\n";
     print "  bootstrap (s), component (c), build (b), package accumulation (p)\n\n";
     print "The default is \"-bp\" if you do not specify otherwise.\n\n";
-    exit(BUILDTOOL_SUCCESS);
-}
-
-# Generate timestamp for debugging/log file
-sub
-get_timestamp
-{
-    return POSIX::strftime("%A, %d %B %Y %H:%M:%S %Z", localtime);
-}
-
-# Report a fatal error
-sub
-fatal_error
-{
-    my $msg = "$progname:  FATAL:  $_[0]";
-
-    print STDERR $msg;
-    print $GLOBAL_LOG $msg if ($GLOBAL_LOG);
-    exit(BUILDTOOL_FATAL_ERROR);
-}
-
-# Debugging output
-sub
-dprintf
-{
-    return if (! $debug);
-    print "[debug:$progname] " if (! $slave);
-    printf @_ if (! $slave);
-    if ($GLOBAL_LOG) {
-        print $GLOBAL_LOG "[debug:$progname] ";
-        printf $GLOBAL_LOG @_;
-    }
-}
-sub
-dprint
-{
-    return if (! $debug);
-    if (! $slave) {
-        print "[debug:$progname] ", @_;
-    }
-    if ($GLOBAL_LOG) {
-        print $GLOBAL_LOG "[debug:$progname] ", @_;
-    }
-}
-
-# Print an error
-sub
-eprintf
-{
-    print "$progname:  Error:  ";
-    printf @_;
-    if ($GLOBAL_LOG) {
-        print $GLOBAL_LOG "$progname:  Error:  ";
-        printf $GLOBAL_LOG @_;
-    }
-}
-sub
-eprint
-{
-    print "$progname:  Error:  ", @_;
-    if ($GLOBAL_LOG) {
-        print $GLOBAL_LOG "$progname:  Error:  ", @_;
-    }
+    exit(AVALON_SUCCESS);
 }
 
 # Normal print (i.e., don't print this in -q or -Q mode)
@@ -226,36 +107,6 @@ qprint
     print @_;
 }
 
-# Handle a terminate signal (like SIGINT from Ctrl-C)
-sub
-handle_signal
-{
-    my $sig = $_[0];
-
-    &summarize_failures() if ($#failed_pkgs >= 0);
-    eprint "Someone sent me a SIG$sig asking me to exit, so I shall.\n";
-    close($GLOBAL_LOG) if ($GLOBAL_LOG);
-    exit BUILDTOOL_TERMINATED;
-}
-
-# Handle a fatal signal
-sub
-handle_fatal_signal
-{
-    my $sig = $_[0];
-
-    eprint "Caught fatal signal SIG$sig.  Cleaning up and aborting...\n";
-    close($GLOBAL_LOG) if ($GLOBAL_LOG);
-    exit BUILDTOOL_CRASHED;
-}
-
-# Handle a perl warning
-sub
-handle_warning
-{
-    dprint @_;
-}
-
 # Count CPU's for purposes of parallelization
 sub
 count_cpus
@@ -271,61 +122,6 @@ count_cpus
     $cpus = $#lines + 1;
     dprint "Found $cpus processors.\n";
     return ($cpus >= 1 ? $cpus : 1);
-}
-
-# Grep a directory for files matching a particular expression
-sub grepdir(&$);
-sub
-grepdir(&$)
-{
-    my ($func, $dir) = @_;
-    my @files;
-    local *DIR;
-
-    opendir(DIR, $dir) || return 0;
-    @files = grep(&$func($_), readdir(DIR));
-    closedir(DIR);
-    return @files;
-}
-
-# Make a directory hierarchy
-sub
-mkdirhier
-{
-    my $dir = $_[0];
-    my @dirs = split("/", $dir);
-    my $path = "";
-
-    dprint "mkdirhier($dir) called.\n";
-    foreach $dir (@dirs) {
-        $path .= "$dir/";
-        if (! -d $path) {
-            dprint "mkdirhier() creating \"$path\"\n";
-            mkdir($path, 0755) || eprint("Unable to create $path -- $!\n");
-        }
-    }
-    dprint "Something went wrong in mkdirhier()!\n" if (! -d $_[0]);
-}
-
-# Emulate rm -rf
-sub
-nuke_tree
-{
-    my $path = $_[0];
-    my @files;
-    local *DIR;
-
-    if ((-d $path) && !(-l $path)) {
-        foreach $f (&grepdir(sub {$_ !~ /^\.\.?$/}, $path)) {
-            &nuke_tree("$path/$f");
-        }
-        dprint "Removing directory $path\n";
-        rmdir $path || return 0;
-    } else {
-        dprint "Unlinking $path\n";
-        unlink($path) || return 0;
-    }
-    return 1;
 }
 
 # Spawn a child buildtool
@@ -365,7 +161,7 @@ spawn_cmd
             @failed_pkgs = ();
             &build_process();
             close(LOGFILE) if ($GLOBAL_LOG);
-            exit (BUILDTOOL_SUCCESS);
+            exit (AVALON_SUCCESS);
         } elsif ($! !~ /No more processes/ && $! !~ /Resource temporarily unavailable/) {
             &fatal_error("fork() failed -- $!\n");
         }
@@ -582,7 +378,7 @@ fail_package
     } else {
         eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage.\n";
     }
-    exit(BUILDTOOL_PACKAGE_FAILED) if (! $opt_f);
+    exit(AVALON_PACKAGE_FAILED) if (! $opt_f);
     @packages = grep($_ ne $pkg, @packages);
     return 0;
 }
@@ -1010,7 +806,7 @@ fetch_package
 
     dprint "About to run $cmd\n";
     if (!open(REVTOOL, "$cmd 2>&1 |")) {
-        $err = REVTOOL_COMMAND_FAILED;
+        $err = AVALON_COMMAND_FAILED;
         $msg = "Execution of \"$cmd\" failed -- $!";
         last;
     }
@@ -1271,7 +1067,7 @@ do_bootstrap_stage
             if (!((($pkgs->{$pkg}{TYPE} eq "module" || $pkgs->{$pkg}{TYPE} eq "image") && -d $filename)
                   || (($pkgs->{$pkg}{TYPE} eq "srpm" || $pkgs->{$pkg}{TYPE} eq "rpm" || $pkgs->{$pkg}{TYPE} eq "tar") && -f $filename && -s _))) {
                 # If it's not there, we must've missed the error.
-                $err = BUILDTOOL_PACKAGE_FAILED;
+                $err = AVALON_PACKAGE_FAILED;
                 &fail_package($pkg, "bootstrap", "Unhandled error condition");
                 next;
             }
@@ -1511,7 +1307,7 @@ do_build_stage
         nprint "$progname:  Starting build stage for the \"$pkg\" package....  (${\(&get_timestamp())})\n";
 
         if (! chdir("$builddir/$pkgs->{$pkg}{MODULE}")) {
-            return (BUILDTOOL_PACKAGE_FAILED, "Could not chdir into $builddir/$pkgs->{$pkg}{MODULE} -- $!", 0);
+            return (AVALON_PACKAGE_FAILED, "Could not chdir into $builddir/$pkgs->{$pkg}{MODULE} -- $!", 0);
         }
         if (defined($pkgs->{$pkg}{BINS})) {
             my ($arch, $rpm);
@@ -1757,7 +1553,7 @@ special_build
     local *MAKE;
 
     if (! chdir("$builddir/$pkgs->{$pkg}{MODULE}")) {
-        return (BUILDTOOL_PACKAGE_FAILED, "Could not chdir into $builddir/$pkgs->{$pkg}{MODULE} -- $!", 0);
+        return (AVALON_PACKAGE_FAILED, "Could not chdir into $builddir/$pkgs->{$pkg}{MODULE} -- $!", 0);
     }
 
     $make = ($pkgs->{$pkg}{MAKE} ? $pkgs->{$pkg}{MAKE} : "make");
@@ -1790,7 +1586,7 @@ special_build
             ($srpm = $out_files) =~ s/^(.*\s+)?(\S+src\.rpm)(\s+.*)?$/$2/;
         }
     } else {
-        $err = BUILDTOOL_PACKAGE_FAILED;
+        $err = AVALON_PACKAGE_FAILED;
         $msg = "No output files reported by make";
     }
     chdir($builddir);
@@ -1849,11 +1645,11 @@ parallel_build
             next;
         }
         @children = grep($_ != $pid, @children);
-        if ($err == BUILDTOOL_SUCCESS) {
+        if ($err == AVALON_SUCCESS) {
             nprint "Child process $pid for package $pkg completed successfully.  (${\(&get_timestamp())})\n";
         } else {
             dprint "Child process $pid for package $pkg failed, returning $err.\n";
-            if ($err == BUILDTOOL_CHILD_EXEC_FAILED) {
+            if ($err == AVALON_SPAWN_FAILED) {
                 &fail_package($pkg, "pre-build", "exec() of child failed");
             } else {
                 my @tmp;
@@ -1907,6 +1703,7 @@ main
     # Set up the basic variables
     $progname = "buildtool";
     $version = "2.0";
+    &print_usage_info() if (!scalar(@ARGV));
 
     # No input.
     open(STDIN, "</dev/null");
@@ -1922,7 +1719,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.124 $ created on $Date: 2001/03/22 00:37:19 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.125 $ created on $Date: 2001/03/26 09:48:54 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1932,12 +1729,12 @@ main
         print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
         print "  ($rcs_info)\n";
         print "\n";
-	return BUILDTOOL_SUCCESS;
+	return AVALON_SUCCESS;
     }
     if ($opt_h) {
 	&print_usage_info();   # Never returns
         # This is a really silly way to shut up the "used only once" warnings.
-        $opt_h = $opt_P = $opt_Q = $opt_p = $opt_q = $opt_v = $opt_nocache = 0;
+        $opt_h = $opt_P = $opt_Q = $opt_p = $opt_q = $opt_v = $opt_nocache = $opt_clean = 0;
     }
     $debug = $opt_d;
     $revtool = "revtool" . ($opt_d ? " --debug" : "");
@@ -2064,7 +1861,7 @@ main
     } else {
         eprint "You didn't tell me what to build, so I'm not quite sure what to do.\n";
         eprint "If you aren't familiar with how to use $progname, try $progname --help.\n";
-        return BUILDTOOL_BAD_PRODUCT;
+        return AVALON_BAD_PRODUCT;
     }
 
     # Parse the product definition files to figure out what the heck we need to build. :)
@@ -2073,7 +1870,7 @@ main
         if (! &parse_product_entry($prod)) {
             eprint "$prod does not seem to be a valid product or product entry.\n";
             eprint "Perhaps you made a typo?\n";
-            return BUILDTOOL_BAD_PRODUCT;
+            return AVALON_BAD_PRODUCT;
         }
     }
     dprint "Products to be built:  ", join(" ", @products), "\n";
@@ -2085,7 +1882,12 @@ main
         &summarize_failures();
     }
     close(LOGFILE) if ($GLOBAL_LOG);
-    return (defined(@failed_pkgs) && $#failed_pkgs != -1) ? BUILDTOOL_PACKAGE_FAILED : BUILDTOOL_SUCCESS;
+    return (defined(@failed_pkgs) && $#failed_pkgs != -1) ? AVALON_PACKAGE_FAILED : AVALON_SUCCESS;
 }
 
 exit &main();
+
+END {
+    &summarize_failures() if ($#failed_pkgs >= 0);
+    close($GLOBAL_LOG) if ($GLOBAL_LOG);
+}
