@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.43 2000/06/08 22:03:45 mej Exp $
+# $Id: buildtool,v 1.44 2000/06/08 23:04:50 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1401,7 +1401,7 @@ do_build_stage
 sub
 do_package_stage
 {
-    my ($path, $version, $release);
+    my ($path, $version, $release, $type);
     my @outfiles;
     my @contents;
     my @p;
@@ -1421,6 +1421,7 @@ do_package_stage
             next;
         }
         nprint "$progname:  Starting package accumulation stage for the \"$pkg\" package....\n";
+        $type = $pkgs->{$pkg}{TYPE};
         $version = $pkgs->{$pkg}{VERSION};
         $release = $pkgs->{$pkg}{RELEASE};
         undef @outfiles;
@@ -1430,25 +1431,37 @@ do_package_stage
             dprint "Output files [$pkgs->{$pkg}{OUTFILES}] saved from earlier.\n";
             @outfiles = split(" ", $pkgs->{$pkg}{OUTFILES});
         } else {
-            # Find all the RPM's installed by this package
-            dprint "Opening directory $builddir/SRPMS to scan for output files.\n";
-            opendir(DIR, "$builddir/SRPMS") || &fatal_error("Cannot open directory $builddir/SRPMS -- $!\n");
-            @contents = readdir(DIR);
-            foreach $rpm (@contents) {
-                if ($rpm =~ /^\Q$pkg-\E\S*\Q$version-$release\E\.(?:no)?src\.rpm$/) {
-                    dprint "Got output file $rpm\n";
-                    push @outfiles, "$builddir/SRPMS/$rpm";
+            if ($type eq "srpm" || $type eq "module") {
+                # Find all the RPM's installed by this package
+                dprint "Opening directory $builddir/SRPMS to scan for output files.\n";
+                opendir(DIR, "$builddir/SRPMS") || &fatal_error("Cannot open directory $builddir/SRPMS -- $!\n");
+                @contents = readdir(DIR);
+                foreach $rpm (@contents) {
+                    if ($rpm =~ /^\Q$pkg-\E\S*\Q$version-$release\E\.(?:no)?src\.rpm$/) {
+                        dprint "Got output file $rpm\n";
+                        push @outfiles, "$builddir/SRPMS/$rpm";
+                    }
                 }
-            }
-            closedir(DIR);
+                closedir(DIR);
 
-            dprint "Opening directory $builddir/RPMS to scan for output files.\n";
-            @contents = glob("$builddir/RPMS/*/$pkg*.rpm");
-            foreach $rpm (@contents) {
-                dprint "Checking $rpm\n";
-                if ($rpm =~ /$version-$release/) {
-                    dprint "Got output file $rpm\n";
-                    push @outfiles, $rpm;
+                dprint "Opening directory $builddir/RPMS to scan for output files.\n";
+                @contents = glob("$builddir/RPMS/*/$pkg*.rpm");
+                foreach $rpm (@contents) {
+                    dprint "Checking $rpm\n";
+                    if ($rpm =~ /$version-$release/) {
+                        dprint "Got output file $rpm\n";
+                        push @outfiles, $rpm;
+                    }
+                }
+            } else if ($type eq "rpm") {
+                my ($filename, $arch, $outfile);
+
+                $filename = $pkgs->{$pkg}{FILENAME};
+                ($arch = $filename) =~ s/^.*\.(\w+)\.rpm$/$1/;
+                $outfile = "$builddir/RPMS/$arch/$filename";
+                dprint "Output RPM is $outfile\n";
+                if (-f $outfile) {
+                    push @outfiles, $outfile;
                 }
             }
         }
@@ -1711,7 +1724,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.43 $ created on $Date: 2000/06/08 22:03:45 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.44 $ created on $Date: 2000/06/08 23:04:50 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -319,3 +319,7 @@ I also moved the howto module higher so it will start (and end)
 sooner, in theory.  Damn thing takes 15 minutes just to create and
 unarchive the source tarballs.
 ----------------------------------------------------------------------
+Thu Jun  8 16:15:48 2000                        Michael Jennings (mej)
+
+Fixes for those damned binary packages.
+----------------------------------------------------------------------
