@@ -570,3 +570,12 @@ Tue Jun 27 13:22:33 2000                        Michael Jennings (mej)
 *sigh*  I've lost the doc-writing mindset, so I think I'll write some
 more code now.
 ----------------------------------------------------------------------
+Wed Jun 28 16:21:10 2000                        Michael Jennings (mej)
+
+pkgtool is now up to the point where it can build RPM's either from
+SRPM's or from a spec file.  It can also install and/or query for
+contents RPM and DEB packages.  (The DEB build process is more
+complex, so I'll wait on it.)
+
+The source generation stuff is next.
+----------------------------------------------------------------------
