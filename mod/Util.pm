@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.20 2003/06/18 19:12:49 mej Exp $
+# $Id: Util.pm,v 1.21 2003/11/30 16:40:28 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -29,6 +29,7 @@ package Mezzanine::Util;
 BEGIN {
     use Exporter   ();
     use File::Copy;
+    use File::stat;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
@@ -41,7 +42,8 @@ BEGIN {
                     '&debug_get', '&debug_set',
 		    '&get_timestamp', '&fatal_error', '&dprintf', '&dprint', '&eprintf', '&eprint', '&wprintf', '&wprint',
 		    '&handle_signal', '&handle_fatal_signal', '&handle_warning', '&show_backtrace', '&print_args',
-		    '&mkdirhier', '&nuke_tree', '&move_files', '&copy_files', '&basename', '&dirname', '&grepdir', '&limit_files',
+		    '&mkdirhier', '&nuke_tree', '&move_files', '&copy_files', '&copy_tree',
+                    '&basename', '&dirname', '&grepdir', '&limit_files',
 		    '&xpush',
 		    '&cat_file',
                     '&parse_rpm_name', '&should_ignore', '&touch_file',
@@ -88,6 +90,7 @@ sub mkdirhier($);
 sub nuke_tree($);
 sub move_files(@);
 sub copy_files(@);
+sub copy_tree($$);
 sub basename($);
 sub dirname($);
 sub grepdir(& $);
@@ -430,6 +433,52 @@ copy_files
         $fcnt++;
     }
     return $fcnt;
+}
+
+# Copy an entire directory tree
+sub
+copy_tree($$)
+{
+    my ($old_path, $new_path) = @_;
+    my @files;
+    local *DIR;
+
+    if (-d $new_path) {
+        # The destination is a directory that already exists.
+        if (substr($new_path, -1, 1) ne '/') {
+            $new_path .= '/';
+        }
+        $new_path .= &basename($old_path);
+    }
+
+    if (-d $old_path && !(-l $old_path)) {
+        my $file_stats;
+        my $fcnt = 0;
+
+        # The source is a directory.
+        $file_stats = stat($old_path);
+
+        # Create the destination directory.
+        dprint "Creating target directory $new_path for $old_path.\n";
+        if (! mkdir($new_path, $file_stats->mode & 07777)) {
+            eprint "Unable to create directory $new_path -- $!\n";
+            return 0;
+        }
+
+        $fcnt += &copy_files(&grepdir(sub {! -d $_}, $old_path), $new_path);
+        @files = &grepdir(sub {-d $_}, $old_path);
+        foreach my $srcdir (@files) {
+            my $dir = &basename($srcdir);
+
+            next if ($dir eq "." || $dir eq "..");
+            $fcnt += &copy_tree($srcdir, "$new_path/$dir");
+        }
+        return $fcnt;
+    } else {
+        # The source is a file.
+        dprint "Direct copying $old_path to $new_path.\n";
+        return &copy_files($old_path, $new_path);
+    }
 }
 
 # Strip the leading path off a directory/file name

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.12 2003/04/10 17:15:39 mej Exp $
+# $Id: Src.pm,v 1.13 2003/11/30 16:40:28 mej Exp $
 #
 
 package Mezzanine::Src;
@@ -256,6 +256,7 @@ convert_srpm_to_spm($)
     # Move the patches to $destdir/P/
     if (scalar(@patches)) {
         chdir("$destdir/S");
+        mkdir("$destdir/P", 0777);
         dprint "Moving patches to $destdir/P/\n";
         if (&move_files(@patches, "$destdir/P/") < scalar(@patches)) {
             eprint "One or more patches could not be moved into place.\n";

@@ -199,3 +199,7 @@ Sat Aug  2 13:10:33 2003                        Michael Jennings (mej)
 
 Fix for newer (RH9) rpm.
 ----------------------------------------------------------------------
+Sun Nov 30 13:10:53 2003                        Michael Jennings (mej)
+
+Changed srctool test mode to "local" mode.  And made it work right.
+----------------------------------------------------------------------

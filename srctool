@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.33 2003/08/02 15:29:35 mej Exp $
+# $Id: srctool,v 1.34 2003/11/30 16:40:28 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -57,13 +57,13 @@ print_usage_info
     print "    -v --version                     Show version and copyright\n";
     print "    -i --import                      Import a new package/source tree\n";
     print "    -p --prepare                     Prepare a working tree\n";
-    print "    -M --merge                       Merge one or more raw files into an SPM\n";
+    print "    -m --merge                       Merge one or more raw files into an SPM\n";
     print "    -a --apply --patch               Apply changes in the working tree as a patch to the SPM\n";
     print "    -c --clean                       Clean up a package tree\n";
     print "    -r --resync                      Prepare to sync the repository with the current sources\n";
     print "    -n --name <name>                 Specify the name of a package (-i) or patch (-a)\n";
     print "    -D --dir <repository>            Specify the repository to use\n";
-    print "    -T --test                        Test only; do not talk to the master server\n";
+    print "    -L --local                       Local mode; do not talk to the master server\n";
     print "\n";
     exit(MEZZANINE_SUCCESS);
 }
@@ -97,13 +97,16 @@ import_package
         &convert_srpm_to_spm($pkgfile, $tmpdir);
 
         $tag = "$pkg-$ver-$rel";
-        if ($test_only) {
+        if ($local_mode) {
             chdir($pwd);
-            if (! &mv($tmpdir, "$pwd/$pkg")) {
+            if (! &copy_tree($tmpdir, "$pwd/$pkg")) {
                 eprint "Unable to move $tmpdir to $pwd/$pkg -- $!\n";
+                &nuke_tree("$pwd/$pkg");
                 return MEZZANINE_FILE_OP_FAILED;
+            } else {
+                &nuke_tree($tmpdir);
             }
-            print "You specified the \"test\" (-T) option.  You will need to import the new tree by hand (mzimport $pkg).\n";
+            print "You requested local mode.  You will need to import the new tree by hand (mzimport $pkg).\n";
         } else {
             chdir($tmpdir);
             $tag =~ tr/a-z/A-Z/;
@@ -142,8 +145,8 @@ import_package
 	    }
 	}
 
-        if ($test_only) {
-            print "You specified the \"test\" (-T) option.  You will need to import the new tree by hand (mzimport -n $name).\n";
+        if ($local_mode) {
+            print "You requested local mode.  You will need to import the new tree by hand (mzimport -n $name).\n";
         } else {
             chdir($pkgfile) if ($pkgfile);
             if (($err = &generate_symlink_file("")) != MEZZANINE_SUCCESS) {
@@ -223,13 +226,19 @@ gen_patch($$)
     local *PATCH;
 
     $pkg = &pkgvar_filename();
-    $patch = &pkgvar_name();
     if ($pkg) {
         $pwd = &getcwd();
         if (!chdir($pkg)) {
             eprint "Unable to chdir to $pkg -- $!\n";
             return MEZZANINE_SYSTEM_ERROR;
         }
+    }
+
+    $patch = &pkgvar_name();
+    if ($patch =~ /^\d+$/) {
+        # Here is where we redo the spec file to comment out
+        # the patch we're about to regenerate.
+
     }
 
     $old_wd = $WORK_DIR;
@@ -242,7 +251,7 @@ gen_patch($$)
         if (-d $old_wd) {
             &nuke_tree($old_wd);
         }
-    } elsif (! &mv($old_wd, $new_wd)) {
+    } elsif (! &move_files($old_wd, $new_wd)) {
         eprint "Unable to move $old_wd to $new_wd -- $!\n";
         return MEZZANINE_SYSTEM_ERROR;
     }
@@ -267,8 +276,8 @@ gen_patch($$)
         if (! &mkdirhier("P")) {
             return MEZZANINE_SYSTEM_ERROR;
         }
-        if ($test_only) {
-            print "You specified the \"test\" (-T) option.  You will need to add the patch directory by hand (mzadd P).\n";
+        if ($local_mode) {
+            print "You requested local mode.  You will need to add the patch directory by hand (mzadd P).\n";
         } else {
             $err = &add_new_files("P");
             if ($err != MEZZANINE_SUCCESS && $err != MEZZANINE_DUPLICATE) {
@@ -300,8 +309,8 @@ gen_patch($$)
     print "Created P/$patch ($line_cnt lines).\n";
 
     # Add the new patch file
-    if ($test_only) {
-        print "You specified the \"test\" (-T) option.  You will need to add the new patch by hand (mzadd P/$patch).\n";
+    if ($local_mode) {
+        print "You requested local mode.  You will need to add the new patch by hand (mzadd P/$patch).\n";
     } else {
         $err = &add_new_files("P/$patch");
         if ($err != MEZZANINE_SUCCESS && $err != MEZZANINE_DUPLICATE) {
@@ -313,7 +322,7 @@ gen_patch($$)
 
     # Cleanup
     &nuke_tree($old_wd);
-    mv($new_wd, $old_wd);
+    &move_files($new_wd, $old_wd);
     chdir($pwd) if ($pwd);
 
     return MEZZANINE_SUCCESS;
@@ -388,9 +397,9 @@ merge_file($$)
             return MEZZANINE_SYSTEM_ERROR;
         }
 
-        # Add the file to be committed later via "srctool -m" or "mzmod"
-        if ($test_only) {
-            print "You specified the \"test\" (-T) option.  You will need to add the new file(s) by hand (mzadd $dest).\n";
+        # Add the file to be committed later.
+        if ($local_mode) {
+            print "You requested local mode.  You will need to add the new file(s) by hand (mzadd $dest).\n";
         } else {
             $err = &add_new_files($dest);
             if ($err != MEZZANINE_SUCCESS) {
@@ -422,8 +431,8 @@ clean_package
         $pkg = &basename(&getcwd());
     }
 
-    if ($test_only) {
-        eprint "You specified the \"test\" (-T) option.  I will not be able to clean this module.\n";
+    if ($local_mode) {
+        eprint "You requested local mode.  I will not be able to clean this module.\n";
         return MEZZANINE_SYNTAX_ERROR;
     }
 
@@ -466,8 +475,8 @@ sync_package
         $pkg = &basename(&getcwd());
     }
 
-    if ($test_only) {
-        eprint "You specified the \"test\" (-T) option.  I will not be able to sync this module.\n";
+    if ($local_mode) {
+        eprint "You requested local mode.  I will not be able to sync this module.\n";
         return MEZZANINE_SYNTAX_ERROR;
     }
 
@@ -528,7 +537,7 @@ move_package_files
     $target = pop(@flist);
     if ((scalar(@flist) > 1) && (! -d $target)) {
         mkdir $target, 0775;
-        if (! $test_only) {
+        if (! $local_mode) {
             @output = &run_mz_cmd("revtool", &revctl_repository() . " -a $target", 0);
         }
     }
@@ -538,7 +547,7 @@ move_package_files
         return MEZZANINE_SYSTEM_ERROR;
     }
 
-    if ($test_only) {
+    if ($local_mode) {
         wprint "Files have been moved, but no contact was made with the respository.  Run \"mzsync\" when ready.\n";
         return MEZZANINE_SYNTAX_ERROR;
     }
@@ -572,9 +581,9 @@ main
     umask 022;
 
     # See the Getopt::Long man page for details on the syntax of this line
-    @valid_opts = ("h|help", "v|version", "d|debug", "i|import", "p|prepare", "m|mod|modify",
-                   "M|merge", "r|resync", "a|apply|patch", "move", "n|name=s", "c|clean",
-                   "D|dir|repository=s", "T|test");
+    @valid_opts = ("h|help", "v|version", "d|debug", "i|import", "p|prepare",
+                   "m|merge", "r|resync", "a|apply|patch", "move", "n|name=s",
+                   "c|clean", "D|dir|repository=s", "L|local");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -582,7 +591,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.33 $ created on $Date: 2003/08/02 15:29:35 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.34 $ created on $Date: 2003/11/30 16:40:28 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -603,7 +612,10 @@ main
 	@flist = @ARGV;
     }
     &revctl_repository($opt_D);
-    &revctl_command("/bin/true") if ($opt_T);
+    if ($opt_L) {
+        &revctl_command("/bin/true");
+        $local_mode = 1;
+    }
 
     # Signal handling
     $SIG{HUP} = 'IGNORE';
