@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: compstool,v 1.1 2000/11/11 00:12:56 mej Exp $
+# $Id: compstool,v 1.2 2000/11/11 01:14:33 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -58,6 +58,7 @@ print_usage_info
     print "    -d --debug                       Turn on debugging\n";
     print "    -v --version                     Show version and copyright\n";
     print "    -D --dir <directory>             Specify \"directory\" as the full path to the CD image\n";
+    print "    -a --arch <architecture>         Specify the architecture to check\n";
     print "\n";
     exit(COMPSTOOL_SUCCESS);
 }
@@ -142,35 +143,64 @@ handle_warning
     dprint @_;
 }
 
+# Exclusive push.  Only push if the item(s) aren't already in the list
+sub
+xpush(\@; @)
+{
+    my $parray = shift;
+    my @items = @_;
+
+    foreach $item (@items) {
+        push @{$parray}, $item if (!grep($_ eq $item, @{$parray}));
+    }
+}
+
 sub
 parse_comps_file
 {
-    my ($comps, $pkgdir) = @_;
+    my ($comps, $pkgdir, $arch) = @_;
     local (*COMPS, *DIR);
-    my $line;
-    my (@pkgs, @missing);
+    my ($line, $pkg);
+    my (@pkgs, @rpms, @missing);
 
+    dprint "Parsing comps file at $comps using package directory $pkgdir\n";
     opendir(DIR, $pkgdir) || &fatal_error("Unable to open package directory ($pkgdir) -- $!\n");
-    @pkgs = grep($_ =~ /\.rpm$/, readdir(DIR));
+    @rpms = grep($_ =~ /\.rpm$/, readdir(DIR));
     closedir(DIR);
-    dprint "Package files found:  \"", join("\", \"", @pkgs), "\"\n";
 
     open(COMPS, $comps) || &fatal_error("Unable to open comps file ($comps) -- $!\n");
     while (<COMPS>) {
+        my $testarch;
+
         chomp($line = $_);
+        next if ($line =~ /^\s*\d\s$/ || $line =~ /[\{\}]/);
         next if ($line !~ m/^\s*(\S+:)?\s*(\S+)\s*$/);
-        $line = $1;
-        dprint "Looking at $line\n";
-        if (!grep($_ eq $line, @pkgs)) {
-            push @missing, $line;
+        if ($1) {
+            ($testarch, $pkg) = ($1, $2);
+            $testarch =~ s/:$//;
+        } else {
+            $pkg = $2;
+            $testarch = $arch;
+        }
+        if (($testarch =~ /^\!/ && $arch eq substr($testarch, 1, 999)) || ($arch eq $testarch)) {
+            xpush(@pkgs, $pkg);
         }
     }
     close(COMPS);
+
+    foreach $pkg (@pkgs) {
+        dprint "Looking at $pkg\n";
+        if (!grep($_ =~ /\Q$pkg\E-[^-]+-[^-]+\.[^\.]+\.rpm/, @rpms)) {
+            dprint "$pkg is missing\n";
+            xpush @missing, $pkg;
+        }
+    }
 
     if (scalar(@missing)) {
         eprint "The following packages are missing:  ", join(" ", @missing), "\n";
         return COMPSTOOL_MISSING_PKGS;
     } else {
+        print "All packages verified.\n";
         return COMPSTOOL_SUCCESS;
     }
 }
@@ -186,7 +216,7 @@ main
     $version = "1.0";
 
     # See the Getopt::Long man page for details on the syntax of this line
-    @valid_opts = ("h|help", "v|version", "d|debug", "D|dir=s");
+    @valid_opts = ("h|help", "v|version", "d|debug", "D|dir=s", "a|arch=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -194,7 +224,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.1 $ created on $Date: 2000/11/11 00:12:56 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.2 $ created on $Date: 2000/11/11 01:14:33 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -208,10 +238,12 @@ main
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
         # This is a really silly way to shut up the "used only once" warnings.
-        $opt_h = $opt_v = $opt_D = 0;
+        $opt_h = $opt_v = 0;
     }
 
+    $debug = ($opt_d ? $opt_d : 0);
     $imagedir = ($opt_D ? $opt_D : "");
+    $arch = ($opt_a ? $opt_a : "i386");
 
     # Signal handling
     $SIG{HUP} = 'IGNORE';
@@ -228,7 +260,7 @@ main
     $SIG{TTOU} = \&handle_fatal_signal;
     $SIG{__WARN__} = \&handle_warning;
 
-    $ret = &parse_comps_file("$imagedir/RedHat/base/comps", "$imagedir/RedHat/RPMS");
+    $ret = &parse_comps_file("$imagedir/RedHat/base/comps", "$imagedir/RedHat/RPMS", $arch);
 
     return $ret;
 }

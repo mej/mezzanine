@@ -933,3 +933,7 @@ Fri Nov 10 16:12:20 2000                        Michael Jennings (mej)
 New tool for parsing comps files and making sure all needed packages
 are present.
 ----------------------------------------------------------------------
+Fri Nov 10 17:14:15 2000                        Michael Jennings (mej)
+
+Works now.
+----------------------------------------------------------------------
