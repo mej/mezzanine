@@ -733,3 +733,9 @@ Adding cdtool, a quick sh script that does the prep work for CD
 images.  I created this while doing today's CD, so it's not tested
 yet.
 ----------------------------------------------------------------------
+Fri Jul 21 17:17:48 2000                        Michael Jennings (mej)
+
+Make command-line --target take precedence over ARCH variables in the
+prod files.  This fixes bug #220.
+http://engr.valinux.com/bugs/?func=detailbug&group_id=16&bug_id=220
+----------------------------------------------------------------------
