@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.12 2001/09/22 13:22:34 mej Exp $
+# $Id: Prod.pm,v 1.13 2001/11/04 13:46:30 mej Exp $
 #
 
 package Mezzanine::Prod;
@@ -506,7 +506,11 @@ parse_prod_file($$$)
                 last;
             }
         } elsif ($line =~ /^ver(sion)?\s*:\s*(\S+)/i) {
-            if ((! $prodver) || ($2 eq $prodver)) {
+            if (! $prodver) {
+                $prodver = $2;
+                $prod = "$prodname-$prodver";
+                next;
+            } elsif ($2 eq $prodver) {
                 next;
             } else {
                 last;

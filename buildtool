@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.157 2001/09/22 13:22:33 mej Exp $
+# $Id: buildtool,v 1.158 2001/11/04 13:46:30 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -118,6 +118,80 @@ update_package_list
     return (@{$parray});
 }
 
+# Check to see if we actually need to rebuild this package.
+sub
+is_build_needed
+{
+    my ($pkg, $pkgfile, $srpm_dir);
+    my @stat1;
+
+    $pkg = &pkgvar_name();
+    if (!$pkg) {
+        dprint "Doh!  is_build_needed() called with no package name set.  I suck!\n";
+        return -1;
+    }
+
+    $pkgfile = &pkgvar_filename();
+    if (!$pkgfile) {
+        dprint "Doh!  is_build_needed() called for $pkg with no filename set.  I suck!\n";
+        return -1;
+    }
+
+    # If the file/module does not exist, we definitely need to build it.
+    return 1 if (! -e $pkgfile);
+    @stat1 = stat($pkgfile);
+
+    # If there is no SRPMS directory, then there are surely no SRPMS to be checked.
+    $srpm_dir = &pkgvar_topdir() . "/SRPMS";
+    return 1 if (! -d $srpm_dir);
+
+    # For each SRPM that matches the package name, see if it's newer than the directory.
+    # If so, we do not need to rebuild that package.
+    foreach my $srpm (&grepdir(sub {&basename($_) =~ /^\Q$pkg\E-[^-]+-[^-]+\.(no)?src\.rpm$/}, $srpm_dir)) {
+        my @stat2;
+
+        dprint "Checking $srpm...\n";
+        @stat2 = stat($srpm);
+        if ($stat2[9] >= $stat1[9]) {
+            # SRPM is newer than (or the same age as) the file/module.  Skip it.
+            dprint "$srpm is newer than $pkgfile; no need to rebuild.\n";
+            &pkgvar_filename($srpm);
+            return 0;
+        }
+    }
+    # Doh, gotta rebuild this one.
+    return 1;
+}
+
+# Scan the binary RPM directories to see which binaries belong to which SRPM's.
+sub
+scan_rpm_dirs
+{
+    my $topdir;
+    my @contents;
+
+    $topdir = &pkgvar_topdir();
+
+    # Pre-scan all the binary RPM's for future use We need to know what SRPM
+    # each binary came from, because some (lame) packages change the base name.
+    nprint "Updating state information....\n";
+    dprint "Scanning binary RPM's in $topdir/RPMS for their corresponding SRPM's.\n";
+    @contents = glob("$topdir/RPMS/*/*.rpm");
+    foreach my $rpm (@contents) {
+        my $srpm;
+
+        $srpm = `rpm -qp $rpm --queryformat \"%{SOURCERPM}\"`;
+        dprint "$rpm -> $srpm\n";
+        $srpm_of_rpm{$rpm} = $srpm;
+        if (!defined($rpms_of_srpm{$srpm})) {
+            @{$rpms_of_srpm{$srpm}} = ($rpm);
+        } else {
+            push @{$rpms_of_srpm{$srpm}}, $rpm;
+        }
+        dprint "RPM's for $srpm:  ", join(' ', @{$rpms_of_srpm{$srpm}}), "\n";
+    }
+}
+
 # Build a single package from source (if needed) and place the resulting files where they go.
 sub
 build_single_package
@@ -135,7 +209,7 @@ build_single_package
     # If there are binaries, no point in trying to build source.
     if ($pkgs->{$pkg}{BINS}) {
         $outfiles = join(' ', &pkgvar_filename(), @{$pkgs->{$pkg}{BINS}});
-    } else {
+    } elsif (&is_build_needed()) {
         # Build the source
         &pkgvar_target($target);
         ($err, $msg, $outfiles) = &build_package();
@@ -143,6 +217,13 @@ build_single_package
             &fail_package($pkg, $msg);
             return $err;
         }
+    } else {
+        my $srpm;
+
+        # No build needed.  Just get the list of output files.
+        $srpm = &basename(&pkgvar_filename());
+        $outfiles = join(' ', &pkgvar_filename(), @{$rpms_of_srpm{$srpm}});
+        dprint "Got cached output files:  $outfiles\n";
     }
     $err = &place_package_files($pkg, $outfiles, $pkgs->{$pkg}{LOCATIONS});
     return $err if ($err != MEZZANINE_SUCCESS);
@@ -307,7 +388,7 @@ place_package_files
                 dprint "ln -f $file $dest\n";
                 if (!link($file, $dest)) {
                     &fail_package($pkg, "Unable to create $dest as a link to $file -- $!");
-                    last;
+                    return MEZZANINE_SYSTEM_ERROR;
                 }
             }
 
@@ -334,6 +415,10 @@ parallel_build
     $logdir = &make_log_dir($builddir);
     # Need to do this here for parallel builds because it's not parallel-safe.  Race condition. :(
     &prepare_build_tree();
+
+    if (! $opt_nocache) {
+        &scan_rpm_dirs();
+    }
 
     # Download all the packages.
     &download_packages(@packages);
@@ -424,6 +509,10 @@ build_product
         &fatal_error("Unable to chdir to build directory -- $!\n");
     }
 
+    if (! $opt_nocache) {
+        &scan_rpm_dirs();
+    }
+
     # Download all the packages.
     &download_packages(@packages);
     &update_package_list(\@packages);
@@ -501,7 +590,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.157 $ created on $Date: 2001/09/22 13:22:33 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.158 $ created on $Date: 2001/11/04 13:46:30 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -603,6 +692,7 @@ main
     return MEZZANINE_BAD_PRODUCT if (!scalar(@packages));
 
     dprint "Products to be built (", scalar(@packages), " packages):  ", join(" ", @products), "\n";
+
     if ($num_cpus > 1) {
         $ret = &parallel_build(@packages);
     } else {

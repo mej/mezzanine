@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: mediatool,v 1.9 2001/09/22 13:22:33 mej Exp $
+# $Id: mediatool,v 1.10 2001/11/04 13:46:30 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -108,10 +108,14 @@ create_iso
     my ($cmd, $ignore, $bootimg, $line, $err);
     local *MKISOFS;
 
-    $bootimg = ($boot_image ? "-b $boot_image -c boot.cat" : "");
     $ignore = "-m CVS -m RCS -m BitKeeper -m SCCS -m .cvsignore -m '.mezz.*'";
-    $cmd = "mkisofs -o $iso $ignore $bootimg -T -r -R -J -v $imagedir";
-    dprint "About to run \"$cmd\"\n";
+    if ($isolinux_dir) {
+        $bootimg = "-b $isolinux_dir/isolinux.bin -c $isolinux_dir/boot.cat";
+        $cmd = "mkisofs -o $iso $ignore $bootimg -no-emul-boot -boot-load-size 4 -boot-info-table -l -T -r -R -J -v $imagedir";
+    } else {
+        $bootimg = ($boot_image ? "-b $boot_image -c boot.cat" : "");
+        $cmd = "mkisofs -o $iso $ignore $bootimg -T -r -R -J -v $imagedir";
+    }
     print "Creating ISO image $iso from $imagedir....\n";
     if (!open(MKISOFS, "$cmd </dev/null 2>&1 |")) {
         &fatal_error("Execution of \"$cmd\" failed -- $!\n");
@@ -130,8 +134,8 @@ create_iso
         }
     }
     close(MKISOFS);
-    dprint "\"$cmd\" returned $?\n";
     if ($? != 0 && $err == 0) {
+        dprint "\"$cmd\" returned $?\n";
         &fatal_error("mkisofs failed [$line]\n");
     }
 }
@@ -147,7 +151,7 @@ main
     umask 022;
 
     # See the Getopt::Long man page for details on the syntax of this line
-    @valid_opts = ("h|help", "v|version", "d|debug", "i|iso=s", "t|tar|tarball=s",
+    @valid_opts = ("h|help", "v|version", "d|debug", "i|iso=s", "I|isolinux:s", "t|tar|tarball=s",
                    "x|exclude|ignore=s@", "boot=s", "c|cmd|command=s", "D|dir|directory=s@");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
@@ -156,7 +160,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.9 $ created on $Date: 2001/09/22 13:22:33 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.10 $ created on $Date: 2001/11/04 13:46:30 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -182,6 +186,13 @@ main
     @excludes = (scalar(@opt_x) ? @opt_x : (".mezz.*", "*.mezz", "CVS", "RCS", "SCCS", "BitKeeper", ".cvsignore"));
     $boot_image = ($opt_boot ? $opt_boot : 0);
     $command = ($opt_c ? $opt_c : 0);
+    if (defined($opt_I)) {
+        if ($opt_I) {
+            $isolinux_dir = $opt_I;
+        } else {
+            $isolinux_dir = "boot";
+        }
+    }
 
     # Signal handling
     $SIG{HUP} = 'IGNORE';

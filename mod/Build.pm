@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.20 2001/09/25 16:41:10 mej Exp $
+# $Id: Build.pm,v 1.21 2001/11/04 13:46:30 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -157,18 +157,6 @@ prepare_build_tree
     dprint "I created:  ", join(" ", @my_dirs), "\n";
 
     return ($name, $topdir, $buildroot);
-
-    # Pre-scan all the binary RPM's for future use in possibly parallel processes.  We need
-    # to know what SRPM each binary came from, because some (lame) packages change the base name.
-    #if (! $opt_nocache) {
-    #    nprint "Updating state information....\n";
-    #    dprint "Scanning binary RPM's in $topdir/RPMS for their corresponding SRPM's.\n";
-    #    @contents = glob("$topdir/RPMS/*/*.rpm");
-    #    foreach my $rpm (@contents) {
-    #        dprint "Checking $rpm\n";
-    #        $srpm_of_rpm{$rpm} = `rpm -qp $rpm --queryformat \"%{SOURCERPM}\"`;
-    #    }
-    #}
 }
 
 sub

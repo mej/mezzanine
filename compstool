@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: compstool,v 1.8 2001/09/22 13:22:33 mej Exp $
+# $Id: compstool,v 1.9 2001/11/04 13:46:30 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -74,18 +74,21 @@ parse_comps_file
         if ($1 && $1 !~ /^\(\S+\):$/) {
             ($testarch, $pkg) = ($1, $2);
             $testarch =~ s/:$//;
+            dprint "Detected arch test for $pkg:  $testarch\n";
         } else {
             $pkg = $2;
             $testarch = $arch;
+            dprint "Package $pkg included regardless.\n";
         }
-        if (($testarch =~ /^\!/ && $arch eq substr($testarch, 1, 999)) || ($arch eq $testarch)) {
+        if (($testarch =~ /^\!/ && $arch ne substr($testarch, 1, 999)) || ($arch eq $testarch)) {
+            dprint "Adding $pkg to package list.\n";
             xpush(@pkgs, $pkg);
         }
     }
     close(COMPS);
 
     foreach $pkg (@pkgs) {
-        dprint "Looking at $pkg\n";
+        dprint "Looking at comps file package $pkg\n";
         if (!grep($_ =~ /\Q$pkg\E-[^-]+-[^-]+\.[^\.]+\.rpm/, @rpms)) {
             dprint "$pkg is missing\n";
             xpush @missing, $pkg;
@@ -93,10 +96,12 @@ parse_comps_file
     }
 
     foreach $rpm (@rpms) {
-        dprint "Looking at $rpm\n";
-        ($pkg = $rpm) =~ s/-[^-]+-[^-]+\.[^\.]+\.rpm//;
+        my $rpmfile = &basename($rpm);
+
+        dprint "Looking at package file $rpmfile\n";
+        ($pkg = $rpmfile) =~ s/-[^-]+-[^-]+\.[^\.]+\.rpm//;
         if (!grep($_ eq $pkg, @pkgs)) {
-            dprint "$rpm is ignored\n";
+            dprint "$rpmfile ($pkg) is ignored.\n";
             push @ignored, $pkg;
         }
     }
@@ -134,7 +139,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.8 $ created on $Date: 2001/09/22 13:22:33 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.9 $ created on $Date: 2001/11/04 13:46:30 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

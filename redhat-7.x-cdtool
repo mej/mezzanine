@@ -5,7 +5,7 @@
 # Michael Jennings <mej@eterm.org>
 # 21 July 2000
 #
-# $Id: redhat-7.x-cdtool,v 1.19 2001/10/05 17:38:21 mej Exp $
+# $Id: redhat-7.x-cdtool,v 1.20 2001/11/04 13:46:30 mej Exp $
 #
 
 umask 022
@@ -21,12 +21,8 @@ else
     IMAGE=0
 fi
 
-if [ "x$1" = "x" ]; then
-    VA_VER=7.1.1
-else
-    VA_VER=$1
-fi
-RH_VER=`echo $VA_VER | awk -F. '{print $1"."$2}'`
+V_VER=`cut -d' ' -f2 /etc/vermillion`
+RH_VER=`cut -d' ' -f5 /etc/redhat-release`
 
 trap 'exit -1' 1 2 15
 
@@ -35,11 +31,11 @@ if [ "x$MEZZANINE_BUILDDIR" != "x" ]; then
 else
     BUILDDIR=$PWD/build.mezz
 fi
-CD1=va-redhat-${RH_VER}-cd1
-CD2=va-redhat-${RH_VER}-cd2
-CD=va-redhat-${RH_VER}-cd
-EXTRAS=va-redhat-${RH_VER}-extras
-NET=va-redhat-${RH_VER}-net
+CD1=vermillion-${V_VER}-cd1
+CD2=vermillion-${V_VER}-cd2
+CD=vermillion-${V_VER}-cd
+EXTRAS=vermillion-${V_VER}-extras
+NET=vermillion-${V_VER}-net
 RH_GOOP_DIR=/usr/lib/anaconda-runtime
 RH_KERNEL_GOOP=$RH_GOOP_DIR/buildinstall
 RH_PKGLIST_GOOP=$RH_GOOP_DIR/genhdlist
@@ -93,11 +89,11 @@ cd $BUILDDIR/$NET
 $RH_PKGLIST_GOOP `pwd`
 
 cd $BUILDDIR
-$RH_SPLIT_GOOP $NET i386 > $NET/RH-VALE-${VA_VER}-packages.list
+$RH_SPLIT_GOOP $NET i386 > $NET/RH-VALE-${V_VER}-packages.list
 
 NUM=1
 rm -f ${CD}*/RedHat/RPMS/*.rpm
-for i in `cat $NET/RH-VALE-${VA_VER}-packages.list` ; do
+for i in `cat $NET/RH-VALE-${V_VER}-packages.list` ; do
     ln -f $NET/RedHat/RPMS/$i $CD$NUM/RedHat/RPMS/$i
     SIZE=`du -ks $CD$NUM | cut -f1`
     if [ $SIZE -gt 665000 ]; then
@@ -108,7 +104,7 @@ for i in `cat $NET/RH-VALE-${VA_VER}-packages.list` ; do
 done
 
 # Regenerate the package list ($CD1/RedHat/base/hdlist) from $CD1/RedHat/base/comps
-$RH_PKGLIST_GOOP --fileorder $NET/RH-VALE-${VA_VER}-packages.list --withnumbers $BUILDDIR/$CD*
+$RH_PKGLIST_GOOP --fileorder $NET/RH-VALE-${V_VER}-packages.list --withnumbers $BUILDDIR/$CD*
 
 # Create ISO files
 cd $BUILDDIR
@@ -121,6 +117,6 @@ for i in 1 2 3 4 5 6 7 ; do
     else
         CDIMG=""
     fi
-    mediatool -i va-redhat-os-${VA_VER}-cd$i.iso -D va-redhat-${RH_VER}-cd$i $CDIMG
+    mediatool -i vermillion-os-${V_VER}-cd$i.iso -D vermillion-${V_VER}-cd$i $CDIMG
 done
-test -d va-redhat-${RH_VER}-extras && mediatool -i va-redhat-extras-${VA_VER}.iso -D va-redhat-${RH_VER}-extras
+test -d vermillion-${V_VER}-extras && mediatool -i vermillion-extras-${V_VER}.iso -D vermillion-${V_VER}-extras

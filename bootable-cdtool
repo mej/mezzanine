@@ -1,0 +1,22 @@
+#!/bin/sh -x
+#
+# cdtool - The behind-the-scenes magic glue that happens before a CD is made
+#
+# Michael Jennings <mej@eterm.org>
+# 21 July 2000
+#
+# $Id: bootable-cdtool,v 1.1 2001/11/04 13:46:30 mej Exp $
+#
+
+umask 022
+
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
+trap 'exit -1' 1 2 15
+
+if [ "x$MEZZANINE_BUILDDIR" != "x" ]; then
+    BUILDDIR=$MEZZANINE_BUILDDIR
+else
+    BUILDDIR=$PWD/build.mezz
+fi
+

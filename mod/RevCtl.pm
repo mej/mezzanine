@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.8 2001/10/05 16:14:52 mej Exp $
+# $Id: RevCtl.pm,v 1.9 2001/11/04 13:46:30 mej Exp $
 #
 
 package Mezzanine::RevCtl;
@@ -732,7 +732,8 @@ talk_to_cvs_server
                     $err = MEZZANINE_NO_SERVER;
                     last;
                 }
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/
+                     || $line =~ /^cvs \[\w+ aborted\]: end of file from server/) {
                 if ($tries < 10) {
                     $err = -1;
                     print "The CVS server crashed.  I'll wait a bit and try again.\n";
