@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.47 2004/07/25 03:48:40 mej Exp $
+# $Id: srctool,v 1.48 2004/07/26 00:22:21 mej Exp $
 #
 
 use strict;
@@ -82,12 +82,14 @@ print_usage_info
 
 # Import a package
 sub
-import_package
+import_package()
 {
     my ($pkgfile, $name, $err, $msg, $cmd, $pwd, $tmpdir, $rpmcmd, $pkg, $ver, $rel, $arch, $spec, $tag, $specdata);
     my (@contents, @srcs, @patches, @tmp);
 
+    dprint &print_args(@_);
     $pwd = &getcwd();
+    dprint "Working directory is $pwd.\n";
     $pkgfile = &pkgvar_filename();
     $name = &pkgvar_name();
 
@@ -184,81 +186,83 @@ import_package
         if ($tmpdir) {
             &clean_temp_space($tmpdir);
         }
-    } elsif (! $pkgfile || -d $pkgfile) {
-	if (! $name || $name !~ /-/) {
-	    if (-t STDIN) {
-		my ($pname, $pver);
+    } elsif ((! $pkgfile) || (-d $pkgfile)) {
+        dprint "Importing FST.\n";
+        if (! $name || $name !~ /-/) {
+            if (-t STDIN) {
+                my ($pname, $pver);
 
-		print "Missing -n option.  Please supply the following information:\n";
-		print "Package name:  ";
-		chomp($pname = <STDIN>);
-		while (! $pver) {
-		    print "Package version:  ";
-		    chomp($pver = <STDIN>);
-		    if ($pver =~ /-/) {
-			eprint "Package versions cannot contain hyphens.  Please try again.\n";
-			undef $pver;
-		    }
-		}
-		$name = "$pname-$pver";
-		print "For future reference, you can specify this information on the command line like this:  -n $name\n";
-	    } else {
-		eprint "No package name/version supplied for FST import\n";
-		return MEZZANINE_SYNTAX_ERROR;
-	    }
-	}
-    }
-
-    if ($local_mode) {
-        printf("You requested local mode.  To add this tree to SCM, you will need to import it by hand%s.\n",
-               (($name) ? (" (mzimport -n $name)") : ("")));
-    } else {
-        my $module;
-        my $tmp;
-
-        if ($pkgfile) {
-            # Must be a directory.
-            chdir($pkgfile);
+                print "Missing -n option.  Please supply the following information:\n";
+                print "Package name:  ";
+                chomp($pname = <STDIN>);
+                while (! $pver) {
+                    print "Package version:  ";
+                    chomp($pver = <STDIN>);
+                    if ($pver =~ /-/) {
+                        eprint "Package versions cannot contain hyphens.  Please try again.\n";
+                        undef $pver;
+                    }
+                }
+                $name = "$pname-$pver";
+                print "For future reference, you can specify this information on the command line like this:  -n $name\n";
+            } else {
+                eprint "No package name/version supplied for FST import\n";
+                return MEZZANINE_SYNTAX_ERROR;
+            }
         }
 
-        ($tag = $name) =~ tr/a-z/A-Z/;
-        $tag =~ s/\./_/g;
-        $scm->propset("target_tag", $tag);
-        $tag =~ s/-[^-]*$//;
-        $scm->propset("source_tag", $tag);
-        $scm->propset("use_standard_ignore", 0);
-
-        if ($OPTION{"path"} && -d "$pwd/$OPTION{path}") {
-            # Relative path exists, so parse in terms of
-            # the current directory and SCM context.
-            chdir("$pwd/$OPTION{path}");
-            $tmp = $scm->relative_path();
-        } elsif (! $OPTION{"path"}) {
-            # No path.  Check for relative path in current repo.
-            $tmp = $scm->relative_path();
+        if ($local_mode) {
+            printf("You requested local mode.  To add this tree to SCM, you will need to import it by hand%s.\n",
+                   (($name) ? (" (mzimport -n $name)") : ("")));
         } else {
-            # Supplied path doesn't exist, so take it as gospel.
-            $tmp = $OPTION{"path"};
-        }
-        if (defined($tmp) && length($tmp) > 1) {
-            $module = "$tmp/$pkg";
-        }
+            my $module;
+            my $tmp;
 
-        chdir($pwd);
-        if (! $scm->propget("repository")) {
-            $scm->detect_repository();
+            if ($pkgfile) {
+                # Must be a directory.
+                chdir($pkgfile);
+            }
+
+            ($tag = $name) =~ tr/a-z/A-Z/;
+            $tag =~ s/\./_/g;
+            $scm->propset("target_tag", $tag);
+            $tag =~ s/-[^-]*$//;
+            $scm->propset("source_tag", $tag);
+            $scm->propset("use_standard_ignore", 0);
+
+            if ($OPTION{"path"} && -d "$pwd/$OPTION{path}") {
+                # Relative path exists, so parse in terms of
+                # the current directory and SCM context.
+                chdir("$pwd/$OPTION{path}");
+                $tmp = $scm->relative_path();
+            } elsif (! $OPTION{"path"}) {
+                # No path.  Check for relative path in current repo.
+                $tmp = $scm->relative_path();
+            } else {
+                # Supplied path doesn't exist, so take it as gospel.
+                $tmp = $OPTION{"path"};
+            }
+            if (defined($tmp) && length($tmp) > 1) {
+                $module = "$tmp/$pkg";
+            }
+
+            if (! $scm->propget("repository")) {
+                $scm->detect_repository();
+            }
+
+            $err = $scm->imprt($module);
+
+            # FIXME:  Needed?
+            $scm->propset("source_tag", "");
+            $scm->propset("target_tag", "");
+
+            if ($err != MEZZANINE_SUCCESS) {
+                eprintf("Import of %s failed.\n", (($pkgfile) ? ($pkgfile) : (".")));
+                return $err;
+            }
         }
-
-        $err = $scm->imprt($module);
-
-        # FIXME:  Needed?
-        $scm->propset("source_tag", "");
-        $scm->propset("target_tag", "");
-
-        if ($err != MEZZANINE_SUCCESS) {
-            eprintf("Import of %s failed.\n", (($pkgfile) ? ($pkgfile) : (".")));
-            return $err;
-        }
+    } else {
+        eprint "$pkgfile seems to be neither a file nor a directory.  What should I do?\n";
     }
     return MEZZANINE_SUCCESS;
 }
@@ -808,7 +812,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.47 $ created on $Date: 2004/07/25 03:48:40 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.48 $ created on $Date: 2004/07/26 00:22:21 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();
@@ -822,9 +826,8 @@ main
     &debug_set($config->set("DEBUG", $OPTION{"debug"} || $config->get("DEBUG") || 0));
     &pkgvar_name($OPTION{"name"});
     if (scalar(@ARGV)) {
-	@flist = @ARGV;
+        @flist = @ARGV;
     }
-
     $config->set("DEFAULT_SCM", $OPTION{"protocol"} || $config->get("DEFAULT_SCM") || "cvs");
 
     if ($OPTION{"protocol"}) {
@@ -865,30 +868,30 @@ main
         if ($OPTION{"flat"}) {
             $import_as_pdr = 1;
         }
-	if (scalar(@flist)) {
-	    foreach my $f (@flist) {
-		my $err;
+        if (scalar(@flist)) {
+            foreach my $f (@flist) {
+                my $err;
 
                 &pkgvar_filename($f);
-		$err = &import_package();
-		return $err if ($err);
-	    }
-	} else {
-	    return &import_package();
-	}
+                $err = &import_package();
+                return $err if ($err);
+            }
+        } else {
+            return &import_package();
+        }
     } elsif ($0 =~ /mzprep$/ || $OPTION{"prepare"}) {
         $command = "prep";
-	if (scalar(@flist)) {
-	    foreach my $f (@flist) {
-		my $err;
+        if (scalar(@flist)) {
+            foreach my $f (@flist) {
+                my $err;
 
                 &pkgvar_filename($f);
-		$err = &prepare_tree();
-		return $err if ($err);
-	    }
-	} else {
-	    return &prepare_tree();
-	}
+                $err = &prepare_tree();
+                return $err if ($err);
+            }
+        } else {
+            return &prepare_tree();
+        }
     } elsif ($0 =~ /mzmerge$/ || $OPTION{"merge"}) {
         my $pkg;
 
@@ -952,39 +955,39 @@ main
         return &gen_patch();
     } elsif ($0 =~ /mzclean$/ || $OPTION{"clean"}) {
         $command = "clean";
-	if (scalar(@flist)) {
-	    foreach my $f (@flist) {
-		my $err;
+        if (scalar(@flist)) {
+            foreach my $f (@flist) {
+                my $err;
 
                 &pkgvar_filename($f);
-		$err = &clean_package();
-		return $err if ($err);
-	    }
-	} else {
-	    return &clean_package();
-	}
+                $err = &clean_package();
+                return $err if ($err);
+            }
+        } else {
+            return &clean_package();
+        }
     } elsif ($0 =~ /mz(re)?sync$/ || $OPTION{"resync"}) {
         $command = "sync";
-	if (scalar(@flist)) {
-	    foreach my $f (@flist) {
-		my $err;
+        if (scalar(@flist)) {
+            foreach my $f (@flist) {
+                my $err;
 
                 &pkgvar_filename($f);
-		$err = &sync_package();
-		return $err if ($err);
-	    }
-	} else {
-	    return &sync_package();
-	}
+                $err = &sync_package();
+                return $err if ($err);
+            }
+        } else {
+            return &sync_package();
+        }
     } elsif ($0 =~ /mzmv$/ || $OPTION{"move"}) {
         $command = "move";
-	if (scalar(@flist) > 1) {
+        if (scalar(@flist) > 1) {
             $err = &move_package_files(@flist);
             return $err if ($err);
-	} else {
+        } else {
             eprint "Two or more parameters required for move.\n";
             return MEZZANINE_SYNTAX_ERROR;
-	}
+        }
     } else {
     }
     return MEZZANINE_SUCCESS;

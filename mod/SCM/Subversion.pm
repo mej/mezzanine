@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Subversion.pm,v 1.3 2004/06/24 23:31:43 mej Exp $
+# $Id: Subversion.pm,v 1.4 2004/07/26 00:22:21 mej Exp $
 #
 
 package Mezzanine::SCM::Subversion;
@@ -71,7 +71,7 @@ can_handle($)
     my $path = shift;
 
     dprint "Subversion::can_handle():  $proto $class $path\n";
-    return MEZZANINE_CANNOT_HANDLE;
+    return MZSCM_CANNOT_HANDLE;
 }
 
 

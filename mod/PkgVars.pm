@@ -292,7 +292,8 @@ identify_package_type
         my @specs;
 
         if (($filename ne &basename(&getcwd)) && (-d $filename)) {
-            chdir($filename);
+            # FIXME:  This breaks mzimport on directories.  Needed?
+            #chdir($filename);
         }
         if (-s "Makefile.mezz") {
             $pkg_vars{"type"}{$filename} = "CFST";
