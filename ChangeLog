@@ -613,3 +613,7 @@ Fri Jul  7 20:13:05 2000                        Michael Jennings (mej)
 
 The finishing touches for Avalon 1.1....
 ----------------------------------------------------------------------
+Mon Jul 10 12:14:34 2000                        Michael Jennings (mej)
+
+Cleaned up a minor uninitialized variable warning.
+----------------------------------------------------------------------

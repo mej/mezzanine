@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.81 2000/07/08 03:04:54 mej Exp $
+# $Id: buildtool,v 1.82 2000/07/10 19:06:36 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1040,8 +1040,8 @@ gen_sources
         ($rtag = "$pkg-$pkgs->{$pkg}{VERSION}") =~ tr/[a-z]/[A-Z]/;
         $rtag =~ s/[^-A-Z0-9]/-/g;
     }
-    $rtag = "-r $rtag" if ($rtag);
-    $htag = "-t $htag" if ($htag);
+    $rtag = ($rtag ? "-r $rtag" : "");
+    $htag = ($htag ? "-t $htag" : "");
     $cmd = ("$pkgtool $prog -g -R \"/usr/lib/rpm/rpmrc:$rpmrc\" --root \"$buildroot/$pkg-root\""
             . " -s $specfile -D $builddir/SOURCES $srcs $htag $rtag");
     dprint "About to run \"$cmd\"\n";
@@ -1792,7 +1792,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.81 $ created on $Date: 2000/07/08 03:04:54 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.82 $ created on $Date: 2000/07/10 19:06:36 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
