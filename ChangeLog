@@ -498,3 +498,7 @@ Wed Jun 23 22:58:22 2004                        Michael Jennings (mej)
 
 Additional fixes to finally eliminate RevCtl.pm altogether.
 ----------------------------------------------------------------------
+Thu Jun 24 18:25:35 2004                        Michael Jennings (mej)
+
+Fixed logic error with "mzput -x"
+----------------------------------------------------------------------
