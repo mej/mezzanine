@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #
-# srctool -- Tool for generating disk images, CD's, etc.
+# srctool -- Tool for managing source packages and modules
 # 
 # Copyright (C) 2001, Michael Jennings
 #
@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.18 2001/04/21 06:17:59 mej Exp $
+# $Id: srctool,v 1.19 2001/04/26 00:44:28 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -135,10 +135,10 @@ import_package
 
 		print "Missing -n option.  Please supply the following information:\n";
 		print "Package name:  ";
-		$pname = <STDIN>;
+		chomp($pname = <STDIN>);
 		while (! $pver) {
 		    print "Package version:  ";
-		    $pver = <STDIN>;
+		    chomp($pver = <STDIN>);
 		    if ($pver =~ /-/) {
 			eprint "Package versions cannot contain hyphens.  Please try again.\n";
 			undef $pver;
@@ -321,6 +321,8 @@ merge_file($$)
 
     if ($new_file =~ /^([SPRF]):(.*)$/) {
         ($type, $new_file) = ($1, $2);
+    } elsif ($new_file =~ /^(.*):([SPRF])$/) {
+        ($type, $new_file) = ($2, $1);
     } elsif ($new_file =~ /\.(patch|diff)(\.gz|\.bz2|\.Z)?$/) {
         $type = 'P';
     } elsif ($new_file =~ /\.(cpio|tar|cgz|tgz)(\.gz|\.bz2|\.Z)?$/) {
@@ -336,7 +338,8 @@ merge_file($$)
             print "Please specify whether $new_file is a Source file, Patch, spec File, or an Extra file ";
             for (; $type !~ /^[SPFE]$/; ) {
                 print "[S/P/F/E]:  ";
-                ($type = <STDIN>) =~ tr/a-z/A-Z/;
+                chomp($type = <STDIN>);
+                $type =~ tr/a-z/A-Z/;
             }
         } else {
             eprint "Unable to guess the type of merge file $new_file.  You must specify it.\n";
@@ -344,12 +347,17 @@ merge_file($$)
         }
     }
 
-    dprint "Merging $new_file ($type) into $pkg\n";
-    $pwd = &getcwd();
-    if (!chdir($pkg)) {
-        eprint "Unable to chdir into $pkg -- $!\n";
-        return AVALON_BAD_PACKAGE;
+    if ($pkg) {
+        $pwd = &getcwd();
+        if (!chdir($pkg)) {
+            eprint "Unable to chdir into $pkg -- $!\n";
+            return AVALON_SYSTEM_ERROR;
+        }
+    } else {
+        $pkg = &basename(&getcwd);
     }
+
+    dprint "Merging $new_file ($type) into $pkg\n";
     if ($type eq 'R') {
         # Merge in new files from an SRPM.  TODO
     } else {
@@ -381,7 +389,7 @@ merge_file($$)
             print "$new_file merged successfully.\n";
         }
     }
-    chdir($pwd);
+    chdir($pwd) if ($pwd);
     return AVALON_SUCCESS;
 }
 
@@ -431,7 +439,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.18 $ created on $Date: 2001/04/21 06:17:59 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.19 $ created on $Date: 2001/04/26 00:44:28 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -497,15 +505,15 @@ main
                 last;
             }
         }
-        if (! $pkg) {
-            if (-d "F") {
-                $pkg = &basename(&getcwd());
-            } else {
-                eprint "No valid module specified.\n";
-                return AVALON_BAD_MODULE;
-            }
+        if ($pkg) {
+            @flist = grep($_ ne $pkg, @flist);
+        } elsif (! -d "F") {
+            eprint "No valid module specified.\n";
+            return AVALON_BAD_MODULE;
+        } else {
+            $pkg = "";
         }
-        foreach my $f (grep($_ ne $pkg, @flist)) {
+        foreach my $f (@flist) {
             my $err;
 
             $err = &merge_file($pkg, $f);

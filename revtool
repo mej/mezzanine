@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.65 2001/04/20 04:20:53 mej Exp $
+# $Id: revtool,v 1.66 2001/04/26 00:44:28 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -493,7 +493,7 @@ add_new_files
         if (-t STDIN) {
             print "You've asked me to add files, but you didn't tell me what files to add.\n";
             print "Please enter a whitespace-separated list of files or wildcards:\n";
-            $file_list = <STDIN>;
+            chomp($file_list = <STDIN>);
             @files = glob($file_list);
         } else {
             return AVALON_BAD_ADDITION;
@@ -516,7 +516,7 @@ delete_old_files
         if (-t STDIN) {
             print "You've asked me to remove files, but you didn't tell me what files to remove.\n";
             print "Please enter a whitespace-separated list of files or wildcards:\n";
-            $file_list = <STDIN>;
+            chomp($file_list = <STDIN>);
             @files = glob($file_list);
         } else {
             return AVALON_BAD_REMOVAL;
@@ -706,7 +706,7 @@ import_vendor_sources
         $release_tag = $rtag;
     } elsif (-t STDIN) {
         print "Enter the release tag (in the form $vendor_tag-<version>):\n";
-        $release_tag = <STDIN>;
+        chomp($release_tag = <STDIN>);
     } else {
         eprint "No valid release tag was given.  I can't import without it.\n";
         return AVALON_INVALID_TAG;
@@ -890,7 +890,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.65 $ created on $Date: 2001/04/20 04:20:53 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.66 $ created on $Date: 2001/04/26 00:44:28 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
