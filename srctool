@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.30 2002/02/18 18:48:53 mej Exp $
+# $Id: srctool,v 1.31 2002/09/17 20:36:16 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -517,6 +517,51 @@ sync_package
     return MEZZANINE_SUCCESS;
 }
 
+# Move repository files around
+sub
+move_package_files
+{
+    my @flist = @_;
+    my ($target, $err, $done);
+    my (@output, @add, @rm);
+
+    $target = pop(@flist);
+    if ((scalar(@flist) > 1) && (! -d $target)) {
+        mkdir $target, 0775;
+        if (! $test_only) {
+            @output = &run_mz_cmd("revtool", &revctl_repository() . " -a $target", 0);
+        }
+    }
+
+    if (&move_files(@flist, $target) != scalar(@flist)) {
+        eprint "Error moving files.\n";
+        return MEZZANINE_SYSTEM_ERROR;
+    }
+
+    if ($test_only) {
+        wprint "Files have been moved, but no contact was made with the respository.  Run \"mzsync\" when ready.\n";
+        return MEZZANINE_SYNTAX_ERROR;
+    }
+
+    @rm = @flist;
+    if (-d $target) {
+        $target .= '/' if ($target !~ /\/$/);
+        foreach my $f (@flist) {
+            push @add, $target . &basename($f);
+        }
+    } else {
+        push @add, $target;
+    }
+
+    @output = &run_mz_cmd("revtool", &revctl_repository() . " -r " . join(" ", @rm), 0);
+    @output = &run_mz_cmd("revtool", &revctl_repository() . " -a " . join(" ", @add), 0);
+
+    print "Removed files:  " . join(" ", @rm) . "\n";
+    print "Added files:  " . join(" ", @add) . "\n";
+    print "Move complete.  Your changes will not be finalized until you commit them.\n";
+    return MEZZANINE_SUCCESS;
+}
+
 # main() here is basically the same as main() in C
 sub
 main
@@ -528,8 +573,8 @@ main
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "i|import", "p|prepare", "m|mod|modify",
-                   "M|merge", "r|resync", "a|apply|patch", "n|name=s", "c|clean", "D|dir|repository=s",
-                   "T|test");
+                   "M|merge", "r|resync", "a|apply|patch", "move", "n|name=s", "c|clean",
+                   "D|dir|repository=s", "T|test");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -537,7 +582,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.30 $ created on $Date: 2002/02/18 18:48:53 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.31 $ created on $Date: 2002/09/17 20:36:16 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -677,6 +722,14 @@ main
 	    }
 	} else {
 	    return &sync_package();
+	}
+    } elsif ($0 =~ /mzmv$/ || $opt_move) {
+	if (scalar(@flist) > 1) {
+            $err = &move_package_files(@flist);
+            return $err if ($err);
+	} else {
+            eprint "Two or more parameters required for move.\n";
+            return MEZZANINE_SYNTAX_ERROR;
 	}
     } else {
     }

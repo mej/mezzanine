@@ -1,6 +1,6 @@
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
-Version: 1.4
+Version: 1.5
 Release: 0.5
 Copyright: BSD
 Group: Development/Tools
@@ -61,7 +61,7 @@ done
     ln -s revtool mz$i
     echo ".so revtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/mz$i.1
   done
-  for i in import prep mod merge patch clean sync ; do
+  for i in import prep mod merge patch clean sync mv ; do
     ln -s srctool mz$i
     echo ".so srctool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/mz$i.1
   done

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.16 2002/02/27 19:18:06 mej Exp $
+# $Id: RevCtl.pm,v 1.17 2002/09/17 20:36:16 mej Exp $
 #
 
 package Mezzanine::RevCtl;
@@ -717,7 +717,7 @@ talk_to_cvs_server
             } elsif ($line =~ /^cvs server: warning: (.+) is not \(any longer\) pertinent/
                      || $line =~ /^cvs server: warning: newborn (\S+) has disappeared/) {
                 push @removed, $1;
-                if ($cmd =~ /$1/) {
+                if ($cmd =~ /\Q$1\E/) {
                     # It's only an error if the removed file was specifically requested in the get
                     $err = MEZZANINE_FILE_REMOVED;
                 }
