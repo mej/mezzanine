@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 28 Sept 2000
 #
-# $Id: web-sync,v 1.10 2001/04/11 02:10:34 mej Exp $
+# $Id: web-sync,v 1.11 2001/05/09 18:06:49 mej Exp $
 #
 
 if [ ! -z "$SUDO_USER" ]; then
@@ -59,28 +59,29 @@ for i in $* ; do
       echo "*** Sync of $i done ***"
       ;;
 
-    7.0.1)
+    7.*)
       REMOTE_UHOST=mej@grendel
       REMOTE_DIR=/grendel/scratch/mej/avalon/build
       LOCAL_DIR=/home/ftp/pub/VALinux
+      RH_VER=`echo $i | awk -F. '{print $1"."$2}'`
       mkdir -p $LOCAL_DIR/$i
       cd $LOCAL_DIR/$i
       echo "*** Synchronizing network install image ***"
       mkdir -p $LOCAL_DIR/$i/os/image
-      $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-7.0-net/ $LOCAL_DIR/$i/os/image/
+      $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-${RH_VER}-net/ $LOCAL_DIR/$i/os/image/
       echo "*** Copying ISO images ***"
       mkdir -p $LOCAL_DIR/$i/os/iso
-      $SCP_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-os-'*'.iso $LOCAL_DIR/$i/os/iso/
+      $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-os-'*'.iso $LOCAL_DIR/$i/os/iso/
       echo "*** Synchronizing extras ***"
       mkdir -p $LOCAL_DIR/$i/extras/image
-      $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-7.0-extras/ $LOCAL_DIR/$i/extras/image/
+      $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-${RH_VER}-extras/ $LOCAL_DIR/$i/extras/image/
       echo "*** Copying ISO images ***"
       mkdir -p $LOCAL_DIR/$i/extras/iso
-      $SCP_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-extras-'*'.iso $LOCAL_DIR/$i/extras/iso/
+      $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-extras-'*'.iso $LOCAL_DIR/$i/extras/iso/
       for j in RPMS SRPMS ; do
         echo "*** Synchronizing $j ***"
         mkdir -p $LOCAL_DIR/$i/$j
-        $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-7.0-www/$j/ $LOCAL_DIR/$i/$j/
+        $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-${RH_VER}-www/$j/ $LOCAL_DIR/$i/$j/
       done
       echo "*** Fixing ownerships and permissions ***"
       $CHOWN_CMD RPMS SRPMS os/iso extras/iso

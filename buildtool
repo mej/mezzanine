@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.137 2001/05/03 18:26:15 mej Exp $
+# $Id: buildtool,v 1.138 2001/05/09 18:06:49 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -376,8 +376,8 @@ fail_package
     } else {
         eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage.\n";
     }
-    exit(AVALON_PACKAGE_FAILED) if (! $opt_f);
     @packages = grep($_ ne $pkg, @packages);
+    exit(AVALON_PACKAGE_FAILED) if (! $opt_f);
     return 0;
 }
 
@@ -967,9 +967,9 @@ gen_sources
         }
     }
     close(PKGTOOL);
-    dprint "pkgtool returned $?\n";
+    dprint "pkgtool returned ", $? >> 8, "\n";
     if ($? != 0 && $err == 0) {
-        $err = $?;
+        $err = $? >> 8;
         $msg = "Unhandled RPM build error" if (! $msg);
     }
     dprint "gen_sources():  Returning $err, $msg\n";
@@ -1790,7 +1790,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.137 $ created on $Date: 2001/05/03 18:26:15 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.138 $ created on $Date: 2001/05/09 18:06:49 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

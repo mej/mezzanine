@@ -1,6 +1,6 @@
 %define name     avalon
 %define ver      2.0
-%define rel      1
+%define rel      2
 %define prefix   /usr
 
 Summary: Avalon -- The VA Software Engineering Build System
@@ -28,18 +28,18 @@ building, and releasing software products.
 
 %install
 rm -rf $RPM_BUILD_ROOT
-mkdir -p $RPM_BUILD_ROOT%{prefix}/bin
-mkdir -p $RPM_BUILD_ROOT%{prefix}/lib/perl5/site_perl/5.6.0/Avalon
-mkdir -p $RPM_BUILD_ROOT%{prefix}/lib/perl5/site_perl/5.005/Avalon
+mkdir -p $RPM_BUILD_ROOT%{_bindir}
+mkdir -p $RPM_BUILD_ROOT%{_libdir}/perl5/site_perl/5.6.0/Avalon
+mkdir -p $RPM_BUILD_ROOT%{_libdir}/perl5/site_perl/5.005/Avalon
 mkdir -p $RPM_BUILD_ROOT%{_mandir}/man1
 
 for i in *tool pkgsort ; do
-  install -m 755 $i $RPM_BUILD_ROOT%{prefix}/bin/
+  install -m 755 $i $RPM_BUILD_ROOT%{_bindir}/
 done
 
 for i in mod/*.pm ; do
-  install -m 644 $i $RPM_BUILD_ROOT%{prefix}/lib/perl5/site_perl/5.6.0/Avalon/
-  install -m 644 $i $RPM_BUILD_ROOT%{prefix}/lib/perl5/site_perl/5.005/Avalon/
+  install -m 644 $i $RPM_BUILD_ROOT%{_libdir}/perl5/site_perl/5.6.0/Avalon/
+  install -m 644 $i $RPM_BUILD_ROOT%{_libdir}/perl5/site_perl/5.005/Avalon/
 done
 
 for i in doc/man/*.1 ; do
@@ -47,11 +47,11 @@ for i in doc/man/*.1 ; do
 done
 
 (
-  cd $RPM_BUILD_ROOT%{prefix}/bin
+  cd $RPM_BUILD_ROOT%{_bindir}
   for i in get co put ci info add new rm purge rtag tag reset login ; do
     ln revtool av$i
   done
-  for i in import prep mod merge patch ; do
+  for i in import prep mod merge patch clean ; do
     ln srctool av$i
   done
   for i in rpm pkg ; do
@@ -66,6 +66,6 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-, root, root)
 %doc README ChangeLog doc/*.txt
-%{prefix}/bin/*
-%{prefix}/lib/*
+%{_bindir}/*
+%{_libdir}/*
 %{_mandir}/*

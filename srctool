@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.21 2001/05/02 21:56:10 mej Exp $
+# $Id: srctool,v 1.22 2001/05/09 18:06:49 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -55,8 +55,9 @@ print_usage_info
     print "    -i --import                      Import a new package/source tree\n";
     print "    -p --prepare                     Prepare a working tree\n";
     print "    -M --merge                       Merge one or more raw files into an SPM\n";
-    print "    -a --apply                       Apply changes in the working tree as a patch to the SPM\n";
+    print "    -a --apply --patch               Apply changes in the working tree as a patch to the SPM\n";
     print "    -m --mod --modify                Upload modifications to the master repository\n";
+    print "    -c --clean                       Clean up a package tree\n";
     print "    -n --name <name>                 Specify the name of a package (-i) or patch (-a)\n";
     print "\n";
     exit(AVALON_SUCCESS);
@@ -210,7 +211,7 @@ prepare_tree($$)
         dprint join("\n  ", @tmp), "\n";
         eprint "Creation of working directory failed -- $tmp[$#tmp]\n";
     } elsif ($external) {
-        print "You may now chdir to ", ($pkg ? "$pkg/$WORK_DIR" : $WORK_DIR), " to make changes.\n";
+        print "You may now chdir to ", ($pkgdir eq $pwd ? $WORK_DIR : "$pkg/$WORK_DIR"), " to make changes.\n";
         print "Use \"avpatch -n <patch_name>\" to generate a patch when done.\n";
     }
 
@@ -423,6 +424,45 @@ apply_changes($)
     return AVALON_SUCCESS;
 }
 
+# Clean up a package tree
+sub
+clean_package
+{
+    my $pkg = $_[0];
+    my ($pwd, $err);
+    my @output;
+
+    if ($pkg) {
+        $pwd = &getcwd();
+        if (!chdir($pkg)) {
+            eprint "Unable to chdir to $pkg -- $!\n";
+            return AVALON_SYSTEM_ERROR;
+        }
+    } else {
+        $pkg = &basename(&getcwd());
+    }
+
+    print "Cleaning and resyncing $pkg...\n";
+    @output = &run_av_cmd("revtool", "-g", 0);
+    if (($err = shift @output) != AVALON_SUCCESS) {
+        print @output;
+        eprint "Unable to resync with repository.\n";
+        return $err;
+    }
+    @output = grep(/^\?/, @output);
+    if (scalar(@output)) {
+        foreach my $item (@output) {
+            $item =~ s/^\?\s+//;
+            print "Removing $item...\n";
+            &nuke_tree($item);
+        }
+    }
+
+    print "Cleanup of $pkg complete.\n";
+    chdir($pwd) if ($pwd);
+    return AVALON_SUCCESS;
+}
+
 # main() here is basically the same as main() in C
 sub
 main
@@ -433,7 +473,7 @@ main
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "i|import", "p|prepare", "m|mod|modify",
-                   "M|merge", "r|resync", "a|apply:s", "n|name=s");
+                   "M|merge", "r|resync", "a|apply|patch:s", "n|name=s", "c|clean");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -441,7 +481,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.21 $ created on $Date: 2001/05/02 21:56:10 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.22 $ created on $Date: 2001/05/09 18:06:49 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -557,7 +597,9 @@ main
             }
         }
         if (! $patch) {
-            if ($pkgname) {
+            if ($opt_a && $opt_a =~ /patch$/) {
+                $patch = $opt_a;
+            } elsif ($pkgname) {
                 $patch = $pkgname;
             } else {
                 eprint "No patch name was specified.\n";
@@ -565,6 +607,17 @@ main
             }
         }
         return &gen_patch($pkg, $patch);
+    } elsif ($0 =~ /avclean$/ || $opt_c) {
+	if (scalar(@flist)) {
+	    foreach $f (@flist) {
+		my $err;
+
+		$err = &clean_package($f);
+		return $err if ($err);
+	    }
+	} else {
+	    return &clean_package("");
+	}
     } elsif ($opt_r) {
     } else {
     }
