@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.2 2001/03/27 05:44:39 mej Exp $
+# $Id: Pkg.pm,v 1.3 2001/04/02 07:53:39 mej Exp $
 #
 
 package Avalon::Pkgtool;
@@ -29,7 +29,7 @@ package Avalon::Pkgtool;
 BEGIN {
     use Exporter   ();
     use Avalon::Util;
-    our ($VERSION, @ISA, @EXPORT, @EXPORT_OK, %EXPORT_TAGS);
+    use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
     $VERSION     = 2.0;
@@ -42,7 +42,7 @@ BEGIN {
     # Exported variables go here
     @EXPORT_OK   = ('$VERSION');
 }
-our @EXPORT_OK;
+use vars ('@EXPORT_OK');
 
 ### Private global variables
 

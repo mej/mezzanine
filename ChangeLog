@@ -1109,3 +1109,7 @@ buildtool should now be able to build SPM's.  It should also support
 in-module product files named ".prod" which can be used for in-place
 building of modules with non-default semantics.
 ----------------------------------------------------------------------
+Mon Apr  2 00:52:23 2001                        Michael Jennings (mej)
+
+Today's work, trying to get 6.2.4 building with the new Avalon stuff.
+----------------------------------------------------------------------

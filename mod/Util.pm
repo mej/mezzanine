@@ -21,14 +21,14 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.2 2001/03/27 05:44:39 mej Exp $
+# $Id: Util.pm,v 1.3 2001/04/02 07:53:39 mej Exp $
 #
 
 package Avalon::Util;
 
 BEGIN {
     use Exporter   ();
-    our ($VERSION, @ISA, @EXPORT, @EXPORT_OK, %EXPORT_TAGS);
+    use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
     $VERSION     = 2.0;
@@ -37,6 +37,7 @@ BEGIN {
     # Exported functions go here
     @EXPORT      = ('$debug', '$progname',
 
+                    '&debug_get', '&debug_set',
 		    '&get_timestamp', '&fatal_error', '&dprintf', '&dprint', '&eprintf', '&eprint',
 		    '&handle_signal', '&handle_fatal_signal', '&handle_warning',
 		    '&mkdirhier', '&nuke_tree', '&move_file', '&getcwd', '&basename', '&dirname', '&grepdir',
@@ -57,7 +58,7 @@ BEGIN {
     # Exported variables go here
     @EXPORT_OK   = ('$VERSION');
 }
-our @EXPORT_OK;
+use vars ('@EXPORT_OK');
 
 ### Private global variables
 
@@ -68,6 +69,8 @@ $progname = "Avalon";
 ### Initialize private global variables
 
 ### Function prototypes
+sub debug_get();
+sub debug_set($);
 sub get_timestamp();
 sub fatal_error(@);
 sub dprintf(@);
@@ -139,6 +142,19 @@ sub AVALON_CRASHED()           {121;}
 sub AVALON_UNSPECIFIED_ERROR() {127;}
 
 ### Function definitions
+
+# Get debugging state
+sub
+debug_get()
+{
+    return $debug;
+}
+
+sub
+debug_set($)
+{
+    $debug = $_[0];
+}
 
 # Generate timestamp for debugging/log file
 sub
@@ -220,7 +236,13 @@ handle_fatal_signal(@)
 sub
 handle_warning(@)
 {
-    dprint @_;
+    if ($_[0] !~ /^Name \"\S+::opt_\w+\" used only once/) {
+        dprint @_;
+    }
+}
+BEGIN {
+    # Take care of this ASAP at load time....
+    $SIG{__WARN__} = \&handle_warning;
 }
 
 # Make a directory hierarchy

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.34 2001/03/27 05:44:39 mej Exp $
+# $Id: pkgtool,v 1.35 2001/04/02 07:53:39 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -129,9 +129,7 @@ fetch_package
     }
     while (<REVTOOL>) {
         chomp($line = $_);
-        if ($debug) {
-            dprint "From revtool -> $line\n";
-        }
+        dprint "From revtool -> $line\n";
         next if ($line =~ /^\[debug:/);
         # Check the output for errors
         if ($line =~ /^revtool:\s*Error/) {
@@ -162,9 +160,7 @@ update_to_tag
     }
     while (<REVTOOL>) {
         chomp($line = $_);
-        if ($debug) {
-            dprint "From revtool -> $line\n";
-        }
+        dprint "From revtool -> $line\n";
         next if ($line =~ /^\[debug:/);
         # Check the output for errors
         if ($line =~ /^U (\S+)$/) {
@@ -762,7 +758,7 @@ rpm_generate_source_files
     dprint "Sources:  ", join(", ", @{$specdata->{SOURCES}}), "\n";
     dprint "Patches:  ", join(", ", @{$specdata->{PATCHES}}), "\n";
 
-    if ($#patches >= 0) {
+    if (scalar(@{$specdata->{PATCHES}})) {
         @tags = grep($tag_type{$_} eq "revision", &get_tag_list($tagfile));
         if ($release_tag || $head_tag) {
             my @real_tags;
@@ -968,7 +964,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.34 $ created on $Date: 2001/03/27 05:44:39 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.35 $ created on $Date: 2001/04/02 07:53:39 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -981,8 +977,6 @@ main
 	return AVALON_SUCCESS;
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
-        # This is a really silly way to shut up the "used only once" warnings.
-        $opt_h = $opt_v = $opt_b = $opt_c = $opt_i = $opt_g = $opt_u = 0;
     }
 
     if ($opt_b) {
@@ -1002,18 +996,18 @@ main
         &fatal_error("Nothing to do!\n");
     }
 
-    $debug = ($opt_d ? $opt_d : 0);
-    $srcs = ($opt_o ? $opt_o : 0);
-    $pkg_file = ($opt_p ? $opt_p : 0);
-    $pkg_prog = ($opt_P ? $opt_P : 0);
-    $specfile = $script_dir = ($opt_s ? $opt_s : 0);
-    $module = ($opt_m ? $opt_m : 0);
-    $release_tag = ($opt_r ? $opt_r : 0);
-    $head_tag = ($opt_t ? $opt_t : 0);
-    $rcfile = ($opt_R ? $opt_R : 0);
-    $tar = ($opt_tar ? $opt_tar : 0);
-    $zip = ($opt_zip ? $opt_zip : 0);
-    $tagfile = ($opt_tagfile ? $opt_tagfile : ($specfile ? $specfile : 0));
+    &debug_set($opt_d);
+    $srcs = $opt_o;
+    $pkg_file = $opt_p;
+    $pkg_prog = $opt_P;
+    $specfile = $script_dir = $opt_s;
+    $module = $opt_m;
+    $release_tag = $opt_r;
+    $head_tag = $opt_t;
+    $rcfile = $opt_R;
+    $tar = $opt_tar;
+    $zip = $opt_zip;
+    $tagfile = ($opt_tagfile ? $opt_tagfile : $specfile);
     $destdir = ($opt_D ? $opt_D : "");
     $rootdir = ($opt_root ? $opt_root : "");
 
@@ -1030,7 +1024,6 @@ main
     $SIG{TSTP} = \&handle_fatal_signal;
     $SIG{TTIN} = \&handle_fatal_signal;
     $SIG{TTOU} = \&handle_fatal_signal;
-    $SIG{__WARN__} = \&handle_warning;
 
     if ($specfile) {
         if ((-f $specfile || -f "$module/$specfile") && -s _) {

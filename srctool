@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.9 2001/03/29 09:13:08 mej Exp $
+# $Id: srctool,v 1.10 2001/04/02 07:53:39 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -328,7 +328,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.9 $ created on $Date: 2001/03/29 09:13:08 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.10 $ created on $Date: 2001/04/02 07:53:39 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -341,11 +341,9 @@ main
 	return AVALON_SUCCESS;
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
-        # This is a really silly way to shut up the "used only once" warnings.
-        $opt_h = $opt_v = $opt_a = $opt_i = $opt_m = $opt_p = $opt_r = $opt_M = 0;
     }
 
-    $debug = ($opt_d ? $opt_d : 0);
+    &debug_set($opt_d);
     $pkgname = ($opt_n ? $opt_n : "");
     if (scalar(@ARGV)) {
 	@flist = @ARGV;
@@ -364,7 +362,6 @@ main
     $SIG{TSTP} = \&handle_fatal_signal;
     $SIG{TTIN} = \&handle_fatal_signal;
     $SIG{TTOU} = \&handle_fatal_signal;
-    $SIG{__WARN__} = \&handle_warning;
 
     if ($0 =~ /avimport$/ || $opt_i) {
 	if (scalar(@flist)) {

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.127 2001/03/29 09:13:08 mej Exp $
+# $Id: buildtool,v 1.128 2001/04/02 07:53:39 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -819,11 +819,7 @@ fetch_package
     }
     while (<REVTOOL>) {
         chomp($line = $_);
-        if ($debug) {
-            nprint "From revtool -> $line\n";
-        } else {
-            nprint "$line\n";
-        }
+        nprint "$line\n";
         next if ($line =~ /^\[debug:/);
         # Check the output for errors
         if ($line =~ /^revtool:\s*Error/) {
@@ -1549,8 +1545,8 @@ summarize_failures
 
     # $ns is the number of successful packages.  $nf is the number of failures.
     # $nt is the total number of packages we tried to build.
-    $ns = $#packages + 1;
-    $nf = $#failed_pkgs + 1;
+    $ns = scalar(@packages);
+    $nf = scalar(@failed_pkgs);
     $nt = $ns + $nf;
     qprint "Package Summary:  Out of $nt total packages,";
     if ($ns) {
@@ -1747,7 +1743,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.127 $ created on $Date: 2001/03/29 09:13:08 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.128 $ created on $Date: 2001/04/02 07:53:39 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1761,12 +1757,10 @@ main
     }
     if ($opt_h) {
 	&print_usage_info();   # Never returns
-        # This is a really silly way to shut up the "used only once" warnings.
-        $opt_h = $opt_P = $opt_Q = $opt_p = $opt_q = $opt_v = $opt_nocache = 0;
     }
-    $debug = $opt_d;
-    $revtool = "revtool" . ($opt_d ? " --debug" : "");
-    $pkgtool = "pkgtool" . ($opt_d ? " --debug" : "");
+    &debug_set($opt_d);
+    $revtool = "revtool" . (&debug_get() ? " --debug" : "");
+    $pkgtool = "pkgtool" . (&debug_get() ? " --debug" : "");
     $GLOBAL_LOG = 0;
     if ($opt_l) {
         if (!open(LOGFILE, ">$opt_l")) {
@@ -1780,9 +1774,9 @@ main
     }
     select STDOUT; $| = 1;
     $verbosity = ($opt_Q ? 0 : ($opt_q ? 1 : 2));
-    $target = ($opt_t ? $opt_t : undef);
-    $global_tree = ($opt_tree ? $opt_tree : undef);
-    $global_tag = ($opt_tag ? $opt_tag : undef);
+    $target = $opt_t;
+    $global_tree = $opt_tree;
+    $global_tag = $opt_tag;
 
     # Set up the start/end stage identifiers
     $start_stage = ($opt_B ? $opt_B : "s");
@@ -1888,7 +1882,6 @@ main
     $SIG{TSTP} = 'IGNORE';
     $SIG{TTIN} = 'IGNORE';
     $SIG{TTOU} = 'IGNORE';
-    $SIG{__WARN__} = \&handle_warning;
 
     # Environment modifications
     $ENV{MAKE} = "make";  # Make sure we don't parallel build, because it doesn't work.

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: imgtool,v 1.5 2001/03/26 09:48:54 mej Exp $
+# $Id: imgtool,v 1.6 2001/04/02 07:53:39 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -257,7 +257,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.5 $ created on $Date: 2001/03/26 09:48:54 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.6 $ created on $Date: 2001/04/02 07:53:39 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -270,11 +270,9 @@ main
 	return AVALON_SUCCESS;
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
-        # This is a really silly way to shut up the "used only once" warnings.
-        $opt_h = $opt_v = $opt_k = $opt_t = 0;
     }
 
-    $debug = ($opt_d ? $opt_d : 0);
+    &debug_set($opt_d);
     $imagedir = ($opt_i ? $opt_i : ($ENV{"IMAGE_DIR"} ? $ENV{"IMAGE_DIR"} : ""));
     if ($imagedir eq "") {
         chomp($imagedir = `/bin/pwd`);
@@ -312,7 +310,6 @@ main
     $SIG{TSTP} = \&handle_fatal_signal;
     $SIG{TTIN} = \&handle_fatal_signal;
     $SIG{TTOU} = \&handle_fatal_signal;
-    $SIG{__WARN__} = \&handle_warning;
 
     &find_packages(@pkgs);
     &install_packages(@pkgs);
