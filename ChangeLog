@@ -515,3 +515,7 @@ Mon Jun 19 22:17:01 2000                        Michael Jennings (mej)
 Fixed the spec file so that it will build, and fixed a typo in
 buildtool.
 ----------------------------------------------------------------------
+Mon Jun 19 22:27:02 2000                        Michael Jennings (mej)
+
+Crap!  Forgot to remove the options debugging stuff.
+----------------------------------------------------------------------
