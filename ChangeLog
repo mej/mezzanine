@@ -597,3 +597,7 @@ Wed Jul  5 17:04:48 2000                        Michael Jennings (mej)
 Converted buildtool to use pkgtool instead of rpm directly.  Still
 need to switch over the source generation, but I'll do that next.
 ----------------------------------------------------------------------
+Wed Jul  5 19:52:25 2000                        Michael Jennings (mej)
+
+Doh.  The -R option was broken for builds.
+----------------------------------------------------------------------
