@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.12 2000/05/17 00:14:18 mej Exp $
+# $Id: buildtool,v 1.13 2000/05/17 00:25:48 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -298,60 +298,30 @@ sub
 fetch_package
 {
     my $cmd = $_[0];
-    my $err = 0;
-    my $tries = 0;
-    my $msg = undef;
+    my ($msg, $line) = undef;
 
-    for (; (($err == -1) || ($tries == 0)); $tries++) {
-        dprint "About to run $cmd\n";
-        if (!open(REVTOOL, "$cmd 2>&1 |")) {
-            $err = 1;
-            $msg = "Execution of \"$cmd\" failed -- $!";
-            last;
-        }
-        while (<REVTOOL>) {
-            chomp($line = $_);
-            if ($debug) {
-                nprint "From revtool -> $line\n";
-            } else {
-                nprint "$line\n";
-            }
-            next if ($line =~ /^\[debug:/);
-            # Check the output for errors
-            if ($line =~ /^cvs server: cannot find module/) {
-                $err = 1;
-                $msg = "$filename does not seem to exist in the repository";
-            } elsif ($line =~ /^revtool:\s*Error/) {
-                $err = 1;
-                $msg = "$line";
-            } elsif ($line =~ /^cvs server: warning: $filename is not \(any longer\) pertinent/) {
-                $err = 1;
-                $msg = "$filename was removed from the repository.  Please update the product file.";
-            } elsif ($line =~ /^cvs \[checkout aborted\]: connect to \S+ failed: Connection refused/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    qprint "The CVS server seems to be down.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    $err = 1;
-                    $msg = "The CVS server was unreachable.";
-                }
-            } elsif ($line =~ /^cvs \[checkout aborted\]: received .* signal/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    qprint "The CVS server crashed.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    $err = 1;
-                    $msg = "The CVS server kept crashing.";
-                }
-            }
-            last if ($err == 1);
-        }
-        close(REVTOOL);
-        dprint "\"$cmd\" returned $?\n";
+    dprint "About to run $cmd\n";
+    if (!open(REVTOOL, "$cmd 2>&1 |")) {
+        $err = 1;
+        $msg = "Execution of \"$cmd\" failed -- $!";
+        last;
     }
-    return ($err, $msg);
+    while (<REVTOOL>) {
+        chomp($line = $_);
+        if ($debug) {
+            nprint "From revtool -> $line\n";
+        } else {
+            nprint "$line\n";
+        }
+        next if ($line =~ /^\[debug:/);
+        # Check the output for errors
+        if ($line =~ /^revtool:\s*Error/) {
+            $msg = "$line";
+        }
+    }
+    close(REVTOOL);
+    dprint "\"$cmd\" returned $?\n";
+    return ($?, $msg);
 }
 
 # Build RPMS from the spec file
