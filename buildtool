@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.181 2004/04/07 18:24:39 mej Exp $
+# $Id: buildtool,v 1.182 2004/04/12 00:09:26 mej Exp $
 #
 
 use strict;
@@ -52,6 +52,7 @@ my $failure;
 my @failed_pkgs;
 my @completed_pkgs;
 my $num_cpus;
+my $num_built = 0;
 
 # RPM/SRPM cache data.
 my $rpm_cache;
@@ -99,6 +100,7 @@ print_usage_info
     print "       --ir --instroot-reset <cmd>   Command used to reset chroot jail\n";
     print "       --ic --instroot-copy <cmd>    Command used to copy chroot jail\n";
     print "       --nocache                     Do not scan the cache (use with care)\n";
+    print "       --retry                       Retry packages which have previously failed to build\n";
     print "       --clean                       Clean up RPM and buildroot directories when done\n";
     print "\n";
     exit(MEZZANINE_SUCCESS);
@@ -154,7 +156,7 @@ update_package_list
     return (@{$parray});
 }
 
-# Check to see if we actually need to rebuild this package.
+# Check to see if we actually need to build this package.
 sub
 is_build_needed
 {
@@ -185,7 +187,7 @@ is_build_needed
     return 1 if (! -d $srpm_dir);
 
     # For each SRPM that matches the package name, see if it's newer than the directory.
-    # If so, we do not need to rebuild that package.
+    # If so, we do not need to build that package.
     if ($pkgs->{$pkg}{"TYPE"} =~ /^s?rpm$/) {
         @srpm_matches = &grepdir(sub {&basename($_) =~ /^\Q$pkg\E\.(no)?src\.rpm$/}, $srpm_dir);
     } else {
@@ -197,14 +199,16 @@ is_build_needed
 
         dprint "Checking $srpm...\n";
         @stat2 = stat($srpm);
-        if ($stat2[9] >= $stat1[9]) {
+        if ($OPTION{"rebuild"}) {
+            ### Allow rebuild of older successful packages as sanity check.
+        } elsif ($stat2[9] >= $stat1[9]) {
             # SRPM is newer than (or the same age as) the file/module.  Skip it.
-            dprint "$srpm is newer than $pkgfile; no need to rebuild.\n";
+            dprint "$srpm is newer than $pkgfile; no need to build.\n";
             &pkgvar_filename($srpm);
             return 0;
         }
     }
-    # Doh, gotta rebuild this one.
+    # Doh, gotta build this one.
     return 1;
 }
 
@@ -365,6 +369,8 @@ build_single_package
         if ($err != MEZZANINE_SUCCESS) {
             &fail_package($pkg, $msg);
             return $err;
+        } else {
+            $num_built++;
         }
     } else {
         my $aref;
@@ -416,15 +422,23 @@ build_package_forked
 
             # Child -- reset state as needed and jump to build process
             if (-e $logfile) {
-                dprint "Log file $logfile exists.\n";
+                #dprint "Log file $logfile exists.\n";
                 if (! -e "$logfile.save") {
-                    dprint "Renaming to $logfile.save.\n";
+                    #dprint "Renaming to $logfile.save.\n";
                     &move_files($logfile, "$logfile.save");
                 } else {
-                    dprint "Removing $logfile.\n";
+                    #dprint "Removing $logfile.\n";
                     &nuke_tree($logfile);
                 }
+            } elsif (-e "$logfile.broken") {
+                if (! $OPTION{"retry"}) {
+                    dprint "Package $pkg failed previously.  Aborting.\n";
+                    exit MEZZANINE_PACKAGE_FAILED;
+                } else {
+                    dprint "Retrying build for failed package $pkg.\n";
+                }
             }
+
             close $GLOBAL_LOG if ($GLOBAL_LOG);
             open(STDOUT, ">/dev/null");
             open(STDIN, "</dev/null");
@@ -438,6 +452,7 @@ build_package_forked
                 chown($mz_uid, $mz_gid, $logfile);
             }
             qprintf("Package build of $pkg started.  (%s)\n", &get_timestamp());
+            $num_built = 0;
             $buildroot = &pkgvar_buildroot();
             if ($buildroot) {
                 &pkgvar_buildroot("$buildroot/$pkg.$$");
@@ -466,6 +481,9 @@ build_package_forked
                 &nuke_tree(&pkgvar_buildroot());
             }
             if ($err == MEZZANINE_SUCCESS) {
+                if (! $num_built) {
+                    $err = MEZZANINE_BUILD_UNNEEDED;
+                }
                 if (-e "$logfile.broken") {
                     wprint "Breakage log file $logfile.broken exists -- Package fixed itself!?\n";
                     &nuke_tree("$logfile.broken");
@@ -729,9 +747,13 @@ parallel_build
         # Remove the child from our PID list
         @children = grep($_ != $pid, @children);
 
-        # Check to see how it existed
-        if ($err == MEZZANINE_SUCCESS) {
+        # Check to see how it exited
+        if ($err == MEZZANINE_BUILD_UNNEEDED) {
+            $err = MEZZANINE_SUCCESS;
+            &complete_package($pkg);
+        } elsif ($err == MEZZANINE_SUCCESS) {
             # Yay! :-)
+            $num_built++;
             &complete_package($pkg);
         } else {
             my $logfile;
@@ -776,7 +798,11 @@ parallel_build
         # End of loop.  Time to spawn the next child.
     }
     &cleanup_build_tree();
-    return (scalar(@failed_pkgs) ? MEZZANINE_PACKAGE_FAILED : MEZZANINE_SUCCESS);
+    if ($num_built > 0) {
+        return $num_built;
+    } else {
+        return (0 - scalar(@failed_pkgs));
+    }
 }
 
 sub
@@ -830,7 +856,11 @@ build_product
 
     # Now we clean up.
     &cleanup_build_tree();
-    return (scalar(@failed_pkgs) ? MEZZANINE_PACKAGE_FAILED : MEZZANINE_SUCCESS);
+    if ($num_built > 0) {
+        return $num_built;
+    } else {
+        return (0 - scalar(@failed_pkgs));
+    }
 }
 
 # Once we're all done, summarize any failures at the very end
@@ -886,10 +916,10 @@ main
                "instroot|i|jail=s", "hints|H=s",
                "hintinstaller|hint-installer|hi=s", "instroot-init|ii=s",
                "instroot-reset|ir=s", "instroot-copy|ic=s",
-               "user|u=s", "buildtree|b=s");
+               "user|u=s", "buildtree|b=s", "retry", "rebuild");
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.181 $ created on $Date: 2004/04/07 18:24:39 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.182 $ created on $Date: 2004/04/12 00:09:26 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
@@ -909,6 +939,9 @@ main
     $global_tag = $OPTION{"tag"};
     $buildtree_layout = (($OPTION{"buildtree"}) ? ($OPTION{"buildtree"}) : ("mej"));
     &pkgvar_cleanup((($OPTION{"clean"}) ? ($OPTION{"clean"}) : ("temp")));
+    if ($buildtree_layout ne "mej") {
+        &pkgvar_cleanup($buildtree_layout);
+    }
     &pkgvar_target($OPTION{"target"});
 
     # Open log file, if any.

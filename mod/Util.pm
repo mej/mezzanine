@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.33 2004/03/31 02:22:23 mej Exp $
+# $Id: Util.pm,v 1.34 2004/04/12 00:09:27 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -69,6 +69,7 @@ BEGIN {
                '&MEZZANINE_NO_SOURCES', '&MEZZANINE_SERVER_CRASH',
                '&MEZZANINE_BAD_PRODUCT', '&MEZZANINE_SPAWN_FAILED',
                '&MEZZANINE_PACKAGE_FAILED',
+               '&MEZZANINE_BUILD_UNNEEDED',
                '&MEZZANINE_ARCH_MISMATCH', '&MEZZANINE_BAD_MODULE',
                '&MEZZANINE_BUILD_FAILURE', '&MEZZANINE_DEPENDENCIES',
                '&MEZZANINE_MISSING_FILES', '&MEZZANINE_SPEC_ERRORS',
@@ -174,6 +175,7 @@ sub MEZZANINE_DUPLICATE()          {33;}
 sub MEZZANINE_BAD_PRODUCT()        {51;}
 sub MEZZANINE_SPAWN_FAILED()       {52;}
 sub MEZZANINE_PACKAGE_FAILED()     {53;}
+sub MEZZANINE_BUILD_UNNEEDED()     {54;}
 
 # pkgtool-related errors
 sub MEZZANINE_ARCH_MISMATCH()      {61;}
@@ -553,7 +555,7 @@ move_files
     } elsif (! -l $dest) {
         unlink($dest);
     }
-    dprint "Moving ", join(' ', @flist), " to $dest.\n";
+    #dprint "Moving ", join(' ', @flist), " to $dest.\n";
     foreach my $f (@flist) {
         my ($target, $mode);
 
@@ -604,7 +606,7 @@ copy_files
     } elsif (! -l $dest) {
         unlink($dest);
     }
-    dprint "Copying ", join(' ', @flist), " to $dest.\n";
+    #dprint "Copying ", join(' ', @flist), " to $dest.\n";
     foreach my $f (grep(-f $_, @flist)) {
         my ($target, $mode);
 

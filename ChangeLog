@@ -420,3 +420,15 @@ Thu Apr  8 17:40:49 2004                        Michael Jennings (mej)
 
 Correct hint filename for new package name scheme.
 ----------------------------------------------------------------------
+Sun Apr 11 20:05:16 2004                        Michael Jennings (mej)
+
+Allow orc-style cleaning to preserve SPECS directories.
+
+Exit code now corresponds with how many packages were actually built
+during this run.  If none were built, the number of failures is
+returned as a negative number.
+
+Added 2 new options, one of which should already work, for determining
+whether or not to retry broken builds or rebuild old successful
+builds.
+----------------------------------------------------------------------
