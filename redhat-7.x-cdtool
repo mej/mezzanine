@@ -5,7 +5,7 @@
 # Michael Jennings <mej@eterm.org>
 # 21 July 2000
 #
-# $Id: redhat-7.x-cdtool,v 1.25 2002/07/10 18:51:53 mej Exp $
+# $Id: redhat-7.x-cdtool,v 1.26 2002/07/16 15:25:35 mej Exp $
 #
 
 umask 022
@@ -133,4 +133,5 @@ else
     ln -s hdlist base/hdlist.all
     ln -s ../vermillion-7.3.1-www/SRPMS ../SRPMS.all
     genbasedir --topdir=$BUILDDIR/$NET --progress --bz2only --bloat RedHat all
+    gpg -s -u vermillion base/hashfile
 fi
