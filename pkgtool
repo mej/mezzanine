@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.40 2001/07/18 22:47:49 mej Exp $
+# $Id: pkgtool,v 1.41 2001/07/24 02:21:11 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -32,6 +32,7 @@ require Getopt::Long;
 use Cwd;
 use Avalon::Util;
 use Avalon::Pkg;
+use Avalon::Build;
 
 # Print usage information
 sub
@@ -85,237 +86,6 @@ should_ignore
     return 1 if ($fname =~ /^debian$/ && -d $fname);
 
     return 0;
-}
-
-sub
-get_tag_list
-{
-    my $tagfile = $_[0];
-    my ($cmd, $line);
-    my @tags;
-    local *CMD;
-
-    $cmd = "revtool -qt $tagfile";
-    if (!open(CMD, "$cmd 2>&1 |")) {
-        eprint "Execution of \"$cmd\" failed -- $!\n";
-    }
-    while (<CMD>) {
-        chomp($line = $_);
-        if ($line =~ /^([-A-Z0-9]+) at (revision|branch) [.\d]+$/) {
-            push @tags, $1;
-            $tag_type{$1} = $2;
-        } elsif ($line =~ /^No tags found/) {
-            eprint "The sample tag file ($tagfile) contains no tags.\n";
-            last;
-        } else {
-            eprint "Unexpected output from revtool:  $line\n";
-        }
-    }
-    close(CMD);
-    return (reverse @tags);
-}
-
-sub
-fetch_package
-{
-    my $cmd = $_[0];
-    my ($err, $msg, $line) = undef;
-    local *REVTOOL;
-
-    dprint "About to run $cmd\n";
-    if (!open(REVTOOL, "$cmd 2>&1 |")) {
-        $err = AVALON_COMMAND_FAILED;
-        $msg = "Execution of \"$cmd\" failed -- $!";
-        last;
-    }
-    while (<REVTOOL>) {
-        chomp($line = $_);
-        dprint "From revtool -> $line\n";
-        next if ($line =~ /^\[debug:/);
-        # Check the output for errors
-        if ($line =~ /^revtool:\s*Error/) {
-            ($msg = $line) =~ s/^revtool:\s*Error:\s*//;
-        }
-    }
-    close(REVTOOL);
-    $err = $?;
-    dprintf "\"$cmd\" returned $err (%d)\n", $err >> 8;
-    return ($err >> 8, $msg);
-}
-
-sub
-update_to_tag
-{
-    my ($tag, $src_files) = @_;
-    my ($err, $msg, $cmd, $line) = undef;
-    my (@new_files);
-    local *REVTOOL;
-
-    $tag = ($tag ? "-t $tag" : "--reset");
-    $cmd = "revtool -g $tag" . ($src_files ? " $src_files" : "");
-    dprint "About to run $cmd\n";
-    if (!open(REVTOOL, "$cmd 2>&1 |")) {
-        $err = AVALON_COMMAND_FAILED;
-        $msg = "Execution of \"$cmd\" failed -- $!";
-        last;
-    }
-    while (<REVTOOL>) {
-        chomp($line = $_);
-        dprint "From revtool -> $line\n";
-        next if ($line =~ /^\[debug:/);
-        # Check the output for errors
-        if ($line =~ /^U (\S+)$/) {
-            push @new_files, $1;
-        } elsif ($line =~ /is not a valid tag/) {
-            eprint "$tag does not seem to be valid for this package.\n";
-            last;
-        } elsif ($line =~ /^revtool:\s*Error/) {
-            ($msg = $line) =~ s/^revtool:\s*Error:\s*//;
-            eprint "$msg\n";
-        }
-    }
-    close(REVTOOL);
-    $err = $?;
-    dprintf "Command returned $err (%d)\n", $err >> 8;
-    return @new_files;
-}
-
-sub
-check_for_source_files
-{
-    my ($src_files, $tarball, $destdir) = @_;
-
-    if ($tarball) {
-        # Check to see if the tarball exists
-        if (-f "$destdir/$tarball" && -s _) {
-            return 1;
-        } else {
-            return 0;
-        }
-    } else {
-        foreach $src (split(" ", $src_files)) {
-            if ((! -f "$destdir/$src") || (! -s _)) {
-                return 0;
-            }
-        }
-        return 1;
-    }
-}
-
-sub
-create_source_file
-{
-    my ($src_files, $tarball, $destdir, $tar, $zip) = @_;
-    my $cmd;
-    local *CMD;
-
-    dprint "Source files:  \"$src_files\"\n";
-    if ($tarball) {
-        print "Generating $tarball...\n";
-        if ($tar) {
-            $cmd = $tar;
-            $cmd =~ s/\%f/$src_files/;
-            $cmd =~ s/\%t/$destdir$tarball/;
-        } else {
-            if (! $zip) {
-                if ($tarball =~ /(gz|Z)$/) {
-                    $zip = "gzip";
-                } elsif ($tarball =~ /\.bz2$/) {
-                    $zip = "bzip2";
-                }
-            }
-            if ($zip) {
-                $zip = " --use-compress-program=$zip";
-            } else {
-                $zip = " ";
-            }
-            $cmd = "tar --exclude CVS --exclude RCS --exclude BitKeeper --exclude SCCS"
-                   . "$zip -cf ${destdir}$tarball $src_files";
-        }
-        dprint "Creating $tarball:  $cmd\n";
-        unlink($tarball);
-        if (!open(CMD, "$cmd 2>&1 |")) {
-            eprint "Execution of \"$cmd\" failed -- $!\n";
-            return AVALON_COMMAND_FAILED;
-        }
-        while (<CMD>) {
-            chomp($line = $_);
-            print "tar output -> $line\n";
-        }
-        close(CMD);
-        dprint "Command returned $?\n";
-        if ($?) {
-            eprint "Creation of vendor source tarball $tarball failed\n";
-            return AVALON_BUILD_FAILURE;
-        }
-    } else {
-        my $rc;
-
-        print "Copying $src_files to $destdir.\n";
-        $rc = system("cp -f $src_files $destdir") >> 8;
-        if ($rc) {
-            eprint "Unable to copy $src_files to $destdir -- $!\n";
-            return AVALON_BUILD_FAILURE;
-        }
-    }
-    return AVALON_SUCCESS;
-}
-
-sub
-gen_diff
-{
-    my ($module, $src_files, $prev_tag, $tag, $patch) = @_;
-    my ($cmd, $line_cnt, $ignore, $fname);
-    my @src_files;
-    local (*CMD, *PATCH);
-
-    @src_files = split(" ", $src_files);
-    if (!open(PATCH, ">$patch")) {
-        eprint "Unable to write to patch file $patch -- $!\n";
-        return AVALON_BUILD_FAILURE;
-    }
-    $cmd = "revtool -qD -t '$prev_tag $tag' $module";
-    dprint "About to run \"$cmd\"\n";
-    if (!open(CMD, "$cmd 2>/dev/null |")) {
-        eprint "Execution of \"$cmd\" failed -- $!\n";
-        return AVALON_COMMAND_FAILED;
-    }
-    $line_cnt = $ignore = 0;
-    while (<CMD>) {
-        chomp($line = $_);
-        next if ($line =~ /^revtool/);
-        if ($line =~ /^Index: (\S+)$/) {
-            my @tmp;
-
-            ($fname = $1) =~ s/^\Q$module\E\///;
-            @tmp = grep(($fname eq $_) || ($fname =~ /^\Q$_\E\//), @src_files);
-            if ($#tmp < 0) {
-                # Not a source file.  Ignore it.
-                dprint "Ignoring patch to $fname\n";
-                $ignore = 1;
-            } else {
-                # A source file.  Include it.
-                dprint "Now diffing $fname\n";
-                $ignore = 0;
-            }
-            next;
-        } elsif ($line =~ /^(diff|---|\+\+\+|\*\*\*)/) {
-            $line =~ s/\Q$module\/$fname\E\b/$fname/g;
-        }
-        next if ($ignore);
-
-        if ($line =~ /^[-I=Rrd+\s@\*\\]/) {
-            print PATCH "$line\n";
-            $line_cnt++;
-        } else {
-            dprint "Extra line in diff:  $line\n";
-        }
-    }
-    close(CMD);
-    close(PATCH);
-    print "Generated $patch ($line_cnt lines).\n";
-    dprint "\"$cmd\" returned $?\n";
-    return AVALON_SUCCESS;
 }
 
 sub
@@ -610,9 +380,20 @@ tar_query
 }
 
 sub
+rpm_generate_source_files
+{
+    my ($specfile, $module, $srcs, $destdir, $tar, $zip) = @_;
+    my @srcs;
+
+    @srcs = &get_source_list($specfile, $module, $srcs, $destdir);
+    return &create_source_files($destdir, $tar, $zip, @srcs);
+}
+
+sub
 rpm_build
 {
-    my ($cmd, $rpm, $line);
+    my $target = $_[0];
+    my ($cmd, $rpm, $line, $pwd);
     my ($err, $msg) = (0, 0);
     my (@failed_deps, @not_found, @spec_errors, @out_files);
     local *RPM;
@@ -621,12 +402,18 @@ rpm_build
     if ($rootdir) {
         $rpm .= " --buildroot=\"$rootdir\"";
     }
-    if ($_[0] =~ /src\.rpm$/) {
-        $cmd = "$rpm" . ($rcfile ? " --rcfile \"$rcfile\"" : "") . " --rebuild $_[0]";
-    } elsif ($_[0] =~ /\.(t?gz|Z|bz2)$/) {
-        $cmd = "$rpm" . ($rcfile ? " --rcfile \"$rcfile\"" : "") . " -ta $_[0]";
+    if (-d $target) {
+        $pwd = &getcwd();
+        if (!chdir($target)) {
+            eprint "Unable to chdir to \"$target\" -- $!\n";
+            return AVALON_SYSTEM_ERROR;
+        }
+    } elsif ($target =~ /src\.rpm$/) {
+        $cmd = "$rpm" . ($rcfile ? " --rcfile \"$rcfile\"" : "") . " --rebuild $target";
+    } elsif ($target =~ /\.(t?gz|Z|bz2)$/) {
+        $cmd = "$rpm" . ($rcfile ? " --rcfile \"$rcfile\"" : "") . " -ta $target";
     } else {
-        $cmd = "$rpm" . ($rcfile ? " --rcfile \"$rcfile\"" : "") . " -ba $_[0]";
+        $cmd = "$rpm" . ($rcfile ? " --rcfile \"$rcfile\"" : "") . " -ba $target";
     }
     dprint "About to run \"$cmd\"\n";
     if (!open(RPM, "$cmd </dev/null 2>&1 |")) {
@@ -700,253 +487,6 @@ deb_build
 
 }
 
-sub
-rpm_generate_source_files
-{
-    my ($specfile, $module, $srcs, $head_tag, $release_tag) = @_;
-    my ($err, $msg, $src_files, $tarball, $modname, $tag_prefix, $prev_tag);
-    my (@contents, @tags, @srcs, @all_srcs);
-    local (*DIR, *CMD);
-
-    if ($module && (!chdir($module))) {
-        return AVALON_BAD_MODULE;
-    }
-    if (-f "CVS/Repository") {
-        chomp($modname = &cat_file("CVS/Repository"));
-    } elsif ($module) {
-        ($modname = $module) =~ s/^.*\/([^\/]+)$/$1/;
-    } else {
-        $modname = &basename(&getcwd());
-    }
-    if ($destdir && $destdir !~ /\/$/) {
-        $destdir .= "/";
-    }
-    opendir(DIR, ".");
-    @contents = readdir(DIR);
-    closedir(DIR);
-
-    &parse_spec_file($specfile) if ($specfile);
-
-    if (! $release_tag) {
-        ($release_tag = "$specdata->{DEFINES}{PACKAGE_NAME}-$specdata->{DEFINES}{PACKAGE_VERSION}") =~ tr/[a-z]/[A-Z]/;
-        $release_tag =~ s/[^-A-Z0-9]/-/g;
-    }
-    $tag_prefix = $release_tag;
-
-    if ($srcs) {
-        @srcs = split(/[\s,]/, $srcs);
-    } elsif (-s "avalon.srcs") {
-        @srcs = &parse_srcs_file("avalon.srcs");
-    } else {
-        my $fname;
-
-        wprint "No SRCS variable found.  Proceeding with default assumptions.  If the assumptions don't work,\n";
-        wprint "you will need to create an avalon.srcs file for this package.\n";
-
-        foreach $fname (@contents) {
-            next if (&should_ignore($fname));
-            if (-d $fname) {
-                my @tmp;
-
-                @tmp = grep($_ =~ /^\Q$fname\E\.(tgz|tar\.gz|tar\.Z|tar\.bz2|tbz)$/, values %{$specdata->{SOURCE}});
-                if (scalar(@tmp)) {
-                    push @srcs, "$fname:$tmp[0]";
-                } else {
-                    push @srcs, "$fname:$fname.tar.gz";
-                }
-            } else {
-                push @srcs, $fname;
-            }
-        }
-    }
-
-    dprint "Preparing to generate sources \"", join(" ", @srcs), "\".\n";
-    dprint "Sources:  ", join(", ", @{$specdata->{SOURCES}}), "\n";
-    dprint "Patches:  ", join(", ", @{$specdata->{PATCHES}}), "\n";
-
-    if (scalar(@{$specdata->{PATCHES}})) {
-        @tags = grep($tag_type{$_} eq "revision", &get_tag_list($tagfile));
-        if ($release_tag || $head_tag) {
-            my @real_tags;
-            my $keep = ($release_tag ? 0 : 1);
-
-            foreach $tag (@tags) {
-                if ($tag eq $release_tag) {
-                    $keep = 1;
-                } elsif ($tag eq $head_tag) {
-                    $keep = 0;
-                }
-                push @real_tags, $tag if ($keep);
-            }
-            @tags = @real_tags;
-        }
-        dprint "Real Tags:  ", join(" ", @tags), "\n";
-        for ($i = 1; $i <= $#tags; $i++) {
-            if ($tags[$i] =~ /^$tag_prefix-PATCH-(\d+)$/) {
-                my $num = $1;
-
-                if (!defined($specdata->{PATCH}{$num})) {
-                    print "$progname:  Warning:  Patch $num exists as a tag but is not referenced in the spec file.\n";
-                    next;
-                }
-                $last_tag{$specdata->{PATCH}{$num}} = $tags[$i - 1];
-                dprint "Previous tag for patch $num ($specdata->{PATCH}{$num}) is $last_tag{$specdata->{PATCH}{$num}}\n";
-            } elsif ($tags[$i] =~ /^$tag_prefix-SOURCE-(\d+)$/) {
-                my $num = $1;
-
-                if (!defined($specdata->{SOURCE}{$num})) {
-                    print "$progname:  Warning:  Source $num exists as a tag but is not referenced in the spec file.\n";
-                    next;
-                }
-                $last_tag{$specdata->{SOURCE}{$num}} = $tags[$i - 1];
-                dprint "Previous tag for source $num ($specdata->{SOURCE}{$num}) is $last_tag{$specdata->{SOURCE}{$num}}\n";
-            } elsif ($tags[$i] =~ /^(.*)-(SOURCE|PATCH)-\d+$/) {
-                my $tmp = $1;
-                my @tmp;
-
-                # It's trying to be a valid tag.  Maybe we can help it along.
-                @tmp = grep($_ =~ /^$tmp/, @tags);
-                if ($#tmp > ($#tags / 2)) {
-                    # More than half of the tags start with this.  Somebody screwed up.  Let's help.
-                    $tag_prefix = $tmp;
-                    print "$progname:  Warning:  Incorrect tag prefix detected.  Using $tag_prefix instead of $release_tag.\n";
-                    $i = 0;
-                }
-            }                
-        }
-        #($err, $msg) = &fetch_package("revtool -gt $release_tag $modname");
-        #if ($err) {
-        #    eprint "Unable to obtain $modname using release tag $release_tag -- $msg\n";
-        #    return AVALON_BAD_MODULE;
-        #}
-        #chdir($modname);
-
-        #opendir(DIR, ".");
-        #@contents = readdir(DIR);
-        #closedir(DIR);
-
-        # Generate all the source files that already exist
-        dprint "Beginning initial source file generation....\n";
-        &update_to_tag($release_tag) if ($release_tag);
-        foreach $src (@srcs) {
-            my @tmp;
-            my $i;
-
-            ($src_files, $tarball) = split(":", $src);
-            @tmp = split(/[\&\s]+/, $src_files);
-            if ($tarball) {
-                dprint "\"$src_files\", \"$tarball\", (", join('|', @tmp), ")\n";
-            } else {
-                dprint "\"$src_files\", (", join('|', @tmp), ")\n";
-            }
-            for ($i = 0; $i < scalar(@tmp); ) {
-                my @matches = grep(-e $_, glob($tmp[$i]));
-
-                splice(@tmp, $i, 1, @matches);
-                $i += scalar(@matches);
-            }
-            @all_srcs = (@all_srcs, @tmp);
-            #@tmp = grep(-e $_, @tmp);
-            next if ($#tmp < 0);
-            dprint "\@tmp contains ", scalar(@tmp), " elements:  ", join(" ", @tmp), "\n";
-            $src_files = join(" ", @tmp);
-            if (&check_for_source_files($src_files, $tarball, $destdir)) {
-                dprint "Not creating ", ($tarball ? $tarball : "\"$src_files\""), " -- Already exists.\n";
-            } else {
-                $err = &create_source_file($src_files, $tarball, $destdir, $tar, $zip);
-                if ($err) {
-                    return $err;
-                }
-            }
-            foreach $num (@{$specdata->{SOURCES}}) {
-                if (($tarball && $specdata->{SOURCE}{$num} =~ /$tarball$/)
-                    || (! $tarball && $src_files =~ /^(.*\s+)?$specdata->{SOURCE}{$num}(\s+.*)?$/)) {
-                    dprint "Undefining source $num\n";
-                    delete $specdata->{SOURCE}{$num};
-                }
-            }
-            @{$specdata->{SOURCES}} = sort {$a <=> $b} keys %{$specdata->{SOURCE}};
-        }
-
-        # Clean the checkout we did.
-        #chdir("..");
-        #&nuke_tree($modname) if (-d $modname);
-
-        # At this point, we've generated all the source files which are initially available
-        # in the original import of the module.  Now update to generate other sources.
-
-        $src_files = join(" ", @all_srcs);  # For generating diffs
-
-        $prev_tag = "";
-        dprint "Beginning final source file generation....\n";
-        foreach $num (@{$specdata->{SOURCES}}) {
-            my $source = $specdata->{SOURCE}{$num};
-            my ($tag, $files);
-            my @new_files;
-
-            dprint "Generating source $num ($source)\n";
-            $tag = "$tag_prefix-SOURCE-$num";
-            if (!defined $last_tag{$specdata->{SOURCE}{$num}}) {
-                eprint "No tag exists for $source ($tag).  I'll create an empty file for it, but this may cause problems.\n";
-                &touch_file("$destdir$source");
-                next;
-            }
-            if (&check_for_source_files($source, 0, $destdir)) {
-                dprint "Not creating $source -- Already exists.\n";
-                next;
-            }
-            &update_to_tag($last_tag{$specdata->{SOURCE}{$num}}) if ($prev_tag ne $last_tag{$specdata->{SOURCE}{$num}});
-            @new_files = &update_to_tag($tag);
-            @new_files = grep(! &should_ignore($_), @new_files);
-            $prev_tag = $tag;
-            next if ($#new_files < 0);
-            $files = join(" ", @new_files);
-            $err = &create_source_file($files, ($source =~ /\.tar(\.[A-Za-z0-9]+)?$/ ? $source : 0), $destdir, $tar, $zip);
-            if ($err) {
-                return $err;
-            }
-        }
-
-        # For patches, diff between the two tags to generate the patch files.
-        foreach $num (@{$specdata->{PATCHES}}) {
-            my $patch = $specdata->{PATCH}{$num};
-            my $tag;
-
-            dprint "Generating diff for patch $num ($patch)\n";
-            $tag = "$tag_prefix-PATCH-$num";
-            if (!defined $last_tag{$specdata->{PATCH}{$num}}) {
-                eprint "No tag exists for $specdata->{PATCH}{$num} ($tag).  I'll create an empty file for it, but this may cause problems.\n";
-                &touch_file("$destdir$specdata->{PATCH}{$num}");
-                next;
-            }
-            if (&check_for_source_files($patch, 0, $destdir)) {
-                dprint "Not creating $patch -- Already exists.\n";
-                next;
-            }
-            $err = &gen_diff($modname, $src_files, $last_tag{$specdata->{PATCH}{$num}}, $tag, "$destdir$specdata->{PATCH}{$num}");
-            if ($err) {
-                return $err;
-            }
-        }
-        &update_to_tag($head_tag ? $head_tag : "");
-    } else {
-        # Just sources.  Do it like we always have.
-        foreach $src (@srcs) {
-            ($src_files, $tarball) = split(":", $src);
-            $src_files =~ s/\&/ /g;
-            if (&check_for_source_files($src_files, $tarball, $destdir)) {
-                dprint "Not creating ", ($tarball ? $tarball : "\"$src_files\""), " -- Already exists.\n";
-            } else {
-                $err = &create_source_file($src_files, $tarball, $destdir, $tar, $zip);
-                if ($err) {
-                    return $err;
-                }
-            }
-        }
-    }
-    return AVALON_SUCCESS;
-}
-
 # main() here is basically the same as main() in C
 sub
 main
@@ -962,8 +502,8 @@ main
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "b|build", "i|install", "c|contents", "q|query=s",
                    "g|generate", "u|unarch|unarchive", "o|sources:s", "p|package=s", "s|specfile|scripts=s",
-                   "m|module=s", "r|release-tag=s", "t|head-tag=s", "P|program=s", "R|rcfile=s", "tar=s",
-                   "zip=s", "tagfile=s", "D|destdir=s", "root=s");
+                   "m|module=s", "t|type=s", "P|program=s", "R|rcfile=s", "tar=s", "zip=s", "D|destdir=s",
+                   "root=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -971,7 +511,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.40 $ created on $Date: 2001/07/18 22:47:49 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.41 $ created on $Date: 2001/07/24 02:21:11 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -986,7 +526,11 @@ main
 	&print_usage_info();   # Never returns
     }
 
-    if ($opt_b) {
+    if ($0 =~ /build$/) {
+        $mode = "build";
+    } elsif ($0 =~ /inst(all)?$/) {
+        $mode = "install";
+    } elsif ($opt_b) {
         $mode = "build";
     } elsif ($opt_i) {
         $mode = "install";
@@ -1009,12 +553,10 @@ main
     $pkg_prog = $opt_P;
     $specfile = $script_dir = $opt_s;
     $module = $opt_m;
-    $release_tag = $opt_r;
-    $head_tag = $opt_t;
+    $type = $opt_t;
     $rcfile = $opt_R;
     $tar = $opt_tar;
     $zip = $opt_zip;
-    $tagfile = ($opt_tagfile ? $opt_tagfile : $specfile);
     $destdir = ($opt_D ? $opt_D : "");
     $rootdir = ($opt_root ? $opt_root : "");
 
@@ -1034,31 +576,15 @@ main
 
     if ($specfile) {
         if ((-f $specfile || -f "$module/$specfile") && -s _) {
-            $type = "rpm";
+            $type = "rpm" if (! $type);
         } elsif (-d $script_dir) {
-            $type = "deb";
+            $type = "deb" if (! $type);
         } else {
             eprint "You must specify a valid spec file or script directory with -s\n";
             return AVALON_SYNTAX_ERROR;
         }
     }
-    if ($#ARGV >= 0) {
-        if (! $specfile) {
-            # If they didn't give us a spec file, find one on the command line
-            ($specfile) = grep(/\.spec(\.in)?$/, @ARGV);
-            if ($specfile) {
-                @ARGV = grep($_ !~ /\.spec(\.in)?$/, @ARGV);
-            }
-        }
-        if (! $pkg_file) {
-            # If it looks like a package, assume it is one
-            $pkg_file = join(" ", grep(/\.(rpm|deb|t?gz|Z)$/, @ARGV));
-            if ($pkg_file) {
-                @ARGV = grep($_ !~ /\.(rpm|deb|t?gz|Z)$/, @ARGV);
-            }
-        }
-    }
-    if ($pkg_file) {
+    if ($pkg_file && ! $type) {
         if ($pkg_file =~ /\.(deb|diff\.gz)$/) {
             $type = "deb";
         } elsif ($pkg_file =~ /\.rpm$/) {
@@ -1066,8 +592,8 @@ main
         } elsif ($pkg_file =~ /\.(t?gz|Z|bz2)$/) {
             $type = "tar";
         }
-        dprint "Package type is $type\n";
     }
+    dprint "Package type is $type\n";
 
     if ($mode eq "build") {
         if ($type eq "rpm") {
@@ -1076,6 +602,10 @@ main
                 $ret = &rpm_build($specfile);
             } elsif ($pkg_file && $pkg_file =~ /src\.rpm$/) {
                 $ret = &rpm_build($pkg_file);
+            } elsif (-d "F") {
+                $ret = &rpm_build(".");
+            } elsif (-d "$module/F") {
+                $ret = &rpm_build($module);
             }
         } elsif ($type eq "deb") {
             $ret = &deb_build();
@@ -1108,7 +638,7 @@ main
             return AVALON_SYNTAX_ERROR;
         }
         if ($type eq "rpm") {
-            $ret = &rpm_generate_source_files($specfile, $module, $srcs, $head_tag, $release_tag);
+            $ret = &rpm_generate_source_files($specfile, $module, $srcs, $destdir, $tar, $zip);
         } elsif ($type eq "deb") {
         } elsif ($type eq "tar") {
         }

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.2 2001/07/20 20:29:35 mej Exp $
+# $Id: Build.pm,v 1.3 2001/07/24 02:21:11 mej Exp $
 #
 
 package Avalon::Build;
@@ -83,7 +83,7 @@ count_cpus
 sub
 initial_setup
 {
-    my @contents;
+    my ($builddir, $buildroot) = @_;
 
     # Create the build directory if it doesn't exist.  If we can't, die.
     if (! -d "$builddir") {
@@ -93,7 +93,7 @@ initial_setup
     }
 
     # Create the RPM directories also.  Same deal as above.
-    foreach $dir ("BUILD", "SRPMS", "RPMS", "SPECS", "SOURCES") {
+    foreach my $dir ("BUILD", "SRPMS", "RPMS", "SPECS", "SOURCES") {
         if (! -d "$builddir/$dir") {
             mkdir("$builddir/$dir", 0755) || &fatal_error("Cannot create $builddir/$dir -- $!\n");
         }
@@ -106,19 +106,140 @@ initial_setup
     }
     mkdir($buildroot, 0775);
 
-    chdir("$builddir");
-
     # Pre-scan all the binary RPM's for future use in possibly parallel processes.  We need
     # to know what SRPM each binary came from, because some (lame) packages change the base name.
-    if (! $opt_nocache) {
-        nprint "Updating state information....\n";
-        dprint "Scanning binary RPM's in $builddir/RPMS for their corresponding SRPM's.\n";
-        @contents = glob("$builddir/RPMS/*/*.rpm");
-        foreach $rpm (@contents) {
-            dprint "Checking $rpm\n";
-            $srpm_of_rpm{$rpm} = `rpm -qp $rpm --queryformat \"%{SOURCERPM}\"`;
+    #if (! $opt_nocache) {
+    #    nprint "Updating state information....\n";
+    #    dprint "Scanning binary RPM's in $builddir/RPMS for their corresponding SRPM's.\n";
+    #    @contents = glob("$builddir/RPMS/*/*.rpm");
+    #    foreach $rpm (@contents) {
+    #        dprint "Checking $rpm\n";
+    #        $srpm_of_rpm{$rpm} = `rpm -qp $rpm --queryformat \"%{SOURCERPM}\"`;
+    #    }
+    #}
+}
+
+sub
+get_source_list
+{
+    my ($specfile, $module, $srcs, $destdir) = @_;
+    my @srcs;
+
+    if ($module && (!chdir($module))) {
+        return AVALON_BAD_MODULE;
+    }
+    if ($destdir && $destdir !~ /\/$/) {
+        $destdir .= "/";
+    }
+    &parse_spec_file($specfile) if ($specfile);
+
+    if ($srcs) {
+        @srcs = split(/[\s,]/, $srcs);
+    } elsif (-s "avalon.srcs") {
+        @srcs = &parse_srcs_file("avalon.srcs");
+    } else {
+        my $fname;
+
+        wprint "No SRCS variable found.  Proceeding with default assumptions.  If the assumptions don't work,\n";
+        wprint "you will need to create an avalon.srcs file for this package.\n";
+
+        foreach $fname (&grepdir(sub {! &should_ignore($_);}, ".")) {
+            next if (&should_ignore($fname));
+            if (-d $fname) {
+                my @tmp;
+
+                @tmp = grep($_ =~ /^\Q$fname\E\.(tgz|tar\.gz|tar\.Z|tar\.bz2|tbz)$/, values %{$specdata->{SOURCE}});
+                if (scalar(@tmp)) {
+                    push @srcs, "$fname:$tmp[0]";
+                } else {
+                    push @srcs, "$fname:$fname.tar.gz";
+                }
+            } else {
+                push @srcs, $fname;
+            }
         }
     }
+
+    dprint "Preparing to generate sources \"", join(" ", @srcs), "\".\n";
+    dprint "Sources:  ", join(", ", @{$specdata->{SOURCES}}), "\n";
+    return @srcs;
+}
+
+sub
+create_source_file
+{
+    my ($src_files, $tarball, $destdir, $tar, $zip) = @_;
+    my $cmd;
+    local *CMD;
+
+    dprint "Source files:  \"$src_files\"\n";
+    if ($tarball) {
+        print "Generating $tarball...\n";
+        if ($tar) {
+            $cmd = $tar;
+            $cmd =~ s/\%f/$src_files/;
+            $cmd =~ s/\%t/$destdir$tarball/;
+        } else {
+            if (! $zip) {
+                if ($tarball =~ /(gz|Z)$/) {
+                    $zip = "gzip";
+                } elsif ($tarball =~ /\.bz2$/) {
+                    $zip = "bzip2";
+                }
+            }
+            if ($zip) {
+                $zip = " --use-compress-program=$zip";
+            } else {
+                $zip = " ";
+            }
+            $cmd = "tar --exclude CVS --exclude RCS --exclude BitKeeper --exclude SCCS"
+                   . "$zip -cf ${destdir}$tarball $src_files";
+        }
+        dprint "Creating $tarball:  $cmd\n";
+        unlink($tarball);
+        if (!open(CMD, "$cmd 2>&1 |")) {
+            eprint "Execution of \"$cmd\" failed -- $!\n";
+            return AVALON_COMMAND_FAILED;
+        }
+        while (<CMD>) {
+            chomp($line = $_);
+            print "tar output -> $line\n";
+        }
+        close(CMD);
+        dprint "Command returned $?\n";
+        if ($?) {
+            eprint "Creation of vendor source tarball $tarball failed\n";
+            return AVALON_BUILD_FAILURE;
+        }
+    } else {
+        my $rc;
+
+        print "Copying $src_files to $destdir.\n";
+        $rc = system("cp -f $src_files $destdir") >> 8;
+        if ($rc) {
+            eprint "Unable to copy $src_files to $destdir -- $!\n";
+            return AVALON_BUILD_FAILURE;
+        }
+    }
+    return AVALON_SUCCESS;
+}
+
+sub
+create_source_files($ $ $ \@)
+{
+    my ($destdir, $tar, $zip, $srcs) = @_;
+    my ($err, $src_files, $tarball);
+
+    # Create all the source files we need.
+    foreach $src (@{$srcs}) {
+        ($src_files, $tarball) = split(":", $src);
+        $src_files =~ s/\&/ /g;
+        $err = &create_source_file($src_files, $tarball, $destdir, $tar, $zip);
+        if ($err) {
+            return $err;
+        }
+    }
+    return AVALON_SUCCESS;
 }
 
 # Build package files

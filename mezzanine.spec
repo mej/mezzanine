@@ -1,7 +1,7 @@
 Summary: Avalon -- The VA Software Engineering Build System
 Name: avalon
 Version: 2.0
-Release: 9.1
+Release: 9.2
 Copyright: BSD with Advertising Clause
 Group: Development/Tools
 Source: %{name}.tar.gz
@@ -51,12 +51,14 @@ done
     ln -s srctool av$i
     echo ".so srctool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/av$i.1
   done
-  for i in rpm pkg ; do
+  for i in rpm pkg build inst ; do
     ln -s pkgtool av$i
     echo ".so pkgtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/av$i.1
   done
-  ln -s buildtool avbuild
-  echo ".so buildtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/av$i.1
+  for i in prod pbuild prodbuild ; do
+    ln -s buildtool av$i
+    echo ".so buildtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/av$i.1
+  done
 )
 
 %clean
