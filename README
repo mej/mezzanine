@@ -4,7 +4,7 @@
 #  Written by:  Michael Jennings
 #               Ted T'so
 #
-#  $Id: README,v 1.4 2000/06/14 00:28:17 mej Exp $
+#  $Id: README,v 1.5 2000/06/14 05:28:27 mej Exp $
 #
 ########################################################################
 
@@ -120,8 +120,72 @@ functionality, stability, and manageability of the build system, and
 revtool allows us to enforce the policies that provide those things
 before anything enters the tree that could disrupt it.
 
+2.1.  Retrieving and Updating Package Sources
+---------------------------------------------
 
+The most common activity for which revtool is used is obtaining
+sources from the master server.  In revtool lingo, this is referred to
+as a "get" operation and is performed via the "-g" or "--get"
+options.  If any names are present on the command line, they will be
+used.  If you wish to specify a particular tag for the get operation,
+use the -t option.
 
+Examples:
+
+  To update a module in the current directory:
+     revtool -g
+
+  To download the "Eterm" module from the master server:
+     revtool -g Eterm
+
+  To retrieve the "imlib" package using a tag:
+     revtool -gt IMLIB-1-9-8 imlib
+
+  To obtain the "varmon" and "vacm" trees simultaneously:
+     revtool -g varmon vacm
+
+2.2.  Adding and Removing Files from the Master Server
+------------------------------------------------------
+
+As part of maintaining a package, it is sometimes necessary to add or
+remove files from the source tree.  Special steps must be taken within
+a revision control environment to add/remove files while still
+maintaining the ability to check out the tree exactly as it existed in
+a particular version or at a particular date/time.  Thus, you must use
+revtool when adding or deleting files within a module.
+
+Addition is done using the "-a" or "--add" options.  Removal uses the
+"-r" or "--remove" options.  These options require that the files to
+be added or removed be listed on the command line, and they cannot be
+used simultaneously.  (If no files are listed on the command line, but
+revtool is being run from a tty, you will be prompted to enter the
+filename globs.)
+
+The option syntax of revtool is designed to allow several things to
+happen at once.  For example, you can add files and commit them with a
+single revtool command.  The same applies for removing files.  An
+unfortunate side effect of this ability is that you cannot use -a and
+-r at the same time.  However, it is still possible to add some files,
+remove some other files, and commit the module, all at once.  You must
+use the --add-list and --rem-list options to do this.
+
+Examples:
+
+  To add a new README file to the current module:
+     revtool -a README
+
+  To add all the C files in the current directory:
+     revtool -a *.c
+
+  To add a FAQ file and commit all changes to the module:
+     revtool -ap FAQ
+
+  To add a FAQ and commit only the new FAQ file:
+     revtool -axp FAQ
+
+  (Note:  The -r option works in the exact same way.)
+
+2.3.  
 3.  BUILDING PRODUCTS
 ---------------------
 

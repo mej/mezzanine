@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.27 2000/06/13 04:59:02 mej Exp $
+# $Id: revtool,v 1.28 2000/06/14 05:28:27 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -65,7 +65,7 @@ print_usage_info
     $underbar =~ s/./-/g;
     print "$leader\n$underbar\n";
     print "\n";
-    print "  Syntax:   $progname [ options ]\n";
+    print "  Syntax:   $progname [ options ] [ files ]\n";
     print "\n";
     print "    -h --help                Show this usage information\n";
     print "    -d --debug               Turn on debugging\n";
@@ -74,14 +74,16 @@ print_usage_info
     print "    -p --put                 Upload new changes to the master tree\n";
     print "    -a --add                 Mark new files for addition into the master tree\n";
     print "    -r --remove              Delete files and mark them for deletion in the master tree\n";
-    print "    -R --recurse             Operate recursively (this is the default for some commands)\n";
-    print "    -t --tag                 Specify a symbolic tag\n";
+    print "    -q --query <type>        Query for a particular type of information\n";
     print "    -i --import              Import a new set of sources, or update the vendor branch for a package\n";
+    print "    -T --rtag <tag>          Tag one or more complete modules directly\n";
+    print "    -t --tag <tag>           Specify a symbolic tag for an operation, or tag local sources\n";
+    print "    -R --recurse             Operate recursively (this is the default for some commands)\n";
     print "    -k [code]                Specify keyword handling when adding files (use -kb to add binary files)\n";
     print "    -D --dir                 Specify an alternative repository (\$CVSROOT)\n";
     print "    -x --exclusive           Only commit the specified files\n";
-    print "       --addlist \"files\"   Specify which files to add so that adds and removes can coincide\n";
-    print "       --remlist \"files\"   Specify which files to remove so that adds and removes can coincide\n";
+    print "       --addlist \"files\"     Specify which files to add so that adds and removes can coincide\n";
+    print "       --remlist \"files\"     Specify which files to remove so that adds and removes can coincide\n";
     print "\n";
     exit(0);
 }
@@ -679,7 +681,7 @@ BEGIN {
     $cvsroot = "-d $opt_D" if ($opt_D);
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.27 $ created on $Date: 2000/06/13 04:59:02 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.28 $ created on $Date: 2000/06/14 05:28:27 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
