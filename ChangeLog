@@ -971,3 +971,8 @@ Thu Jan 18 17:23:05 2001                        Michael Jennings (mej)
 
 From the "Keeping the Director Happy" department....
 ----------------------------------------------------------------------
+Thu Jan 18 17:28:27 2001                        Michael Jennings (mej)
+
+Actually, let's do it this way.  The executable name overrides the
+command line options since they can have mixed purposes.
+----------------------------------------------------------------------

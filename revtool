@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.56 2001/01/19 01:23:25 mej Exp $
+# $Id: revtool,v 1.57 2001/01/19 01:29:07 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -864,7 +864,7 @@ BEGIN {
         $protocol = $defproto;
     }
 
-    # Set the mode, first based on executable name, then on command line options
+    # Set the mode, first based on executable name...
     if ($0 =~ /(get|co|checkout)$/) {
         $mode = "get";
     } elsif ($0 =~ /(put|ci|commit|checkin)$/) {
@@ -885,8 +885,8 @@ BEGIN {
         $mode = "reset";
     } elsif ($0 =~ /login$/) {
         $mode = "login";
-    }
-    if ($opt_i) {
+    # ...then on command line options
+    } elsif ($opt_i) {
         $mode = "import";
     } elsif ($opt_q) {
         $mode = "query";
@@ -924,7 +924,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.56 $ created on $Date: 2001/01/19 01:23:25 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.57 $ created on $Date: 2001/01/19 01:29:07 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
