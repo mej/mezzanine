@@ -55,7 +55,7 @@ $pkg_target = "rpms";
 $pkg_srcs = "";
 $pkg_inst = "";
 $pkg_topdir = "";
-$pkg_instroot = "/var/tmp/mezzanine-instroot.$$";
+$pkg_instroot = "";
 $pkg_buildroot = "/var/tmp/mezzanine-buildroot.$$";
 $pkg_arch = "i386";
 $pkg_params = "";
@@ -210,7 +210,7 @@ pkgvar_instroot
     my $param = $_[0];
 
     if (defined($param)) {
-        $pkg_instroot = ($param ? $param : "/var/tmp/mezzanine-instroot.$$");
+        $pkg_instroot = ($param ? $param : "");
     }
     dprint "$pkg_instroot\n";
     return $pkg_instroot;

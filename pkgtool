@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.50 2001/09/22 13:39:14 mej Exp $
+# $Id: pkgtool,v 1.51 2001/09/25 16:41:09 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -96,7 +96,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.50 $ created on $Date: 2001/09/22 13:39:14 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.51 $ created on $Date: 2001/09/25 16:41:09 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -158,9 +158,6 @@ main
             &pkgvar_filename(".");
         }
     }
-    if (! &pkgvar_topdir()) {
-        &pkgvar_cleanup("build");
-    }
 
     # Signal handling
     $SIG{HUP} = 'IGNORE';
@@ -179,6 +176,7 @@ main
     if ($mode eq "build") {
         my ($pkg, $topdir, $buildroot);
 
+        &pkgvar_cleanup("all");
         &pkgvar_instroot(&getcwd()) if (! &pkgvar_instroot());
         if ((-e &pkgvar_instructions()) && (! &pkgvar_filename())) {
             &prepare_build_tree();

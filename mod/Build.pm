@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.19 2001/09/22 13:22:34 mej Exp $
+# $Id: Build.pm,v 1.20 2001/09/25 16:41:10 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -289,12 +289,11 @@ create_source_files($)
 sub
 cleanup_build_tree
 {
-    my ($topdir, $buildroot, $instroot, $type);
+    my ($topdir, $buildroot, $type);
     my @dirs;
 
     $topdir = &pkgvar_topdir();
     $buildroot = &pkgvar_buildroot();
-    $instroot = &pkgvar_instroot();
     $type = &pkgvar_cleanup();
 
     dprint "$topdir | $buildroot | $type\n";

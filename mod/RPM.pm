@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.8 2001/09/22 13:22:34 mej Exp $
+# $Id: RPM.pm,v 1.9 2001/09/25 16:41:10 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -327,7 +327,7 @@ rpm_build
             $msg = "The RPM $line stage exited abnormally";
         } elsif ($line =~ /^error: failed build dependencies:/) {
             $err = MEZZANINE_DEPENDENCIES;
-            while (<RPM>) {
+            while (<CMD>) {
                 chomp($line = $_);
                 last if ($line !~ /is needed by/);
                 $line =~ s/^\s+(\S+)\s+is needed by .*$/$1/;
