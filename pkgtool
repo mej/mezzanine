@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.54 2003/12/31 11:53:50 mej Exp $
+# $Id: pkgtool,v 1.55 2004/01/05 19:48:57 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -67,6 +67,8 @@ print_usage_info
     print "    -R --rcfile <rcfile>             Specify an alternate rpmrc file\n";
     print "    -D --dir <directory>             Specify \"directory\" as the full path to the module\n";
     print "    -r --root <dir>                  Specify the build/install root (depending on mode)\n";
+    print "    -H --hints <file_or_dir>         Specify location of pre-build hints or hint files\n";
+    print "       --hi --hint-installer <prog>  Specify the mechanism used to install the hints\n";
     print "       --tar <tarcmd>                Use <tarcmd> as the \"tar\" command\n";
     print "       --zip <zipcmd>                Use <zipcmd> as the compression program\n";
     print "\n";
@@ -100,7 +102,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.54 $ created on $Date: 2003/12/31 11:53:50 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.55 $ created on $Date: 2004/01/05 19:48:57 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
