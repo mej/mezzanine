@@ -372,3 +372,10 @@ Mon Jun 12 22:09:35 2000                        Michael Jennings (mej)
 
 A couple small bug fixes.
 ----------------------------------------------------------------------
+Tue Jun 13 11:41:56 2000                        Michael Jennings (mej)
+
+Fixed the compose stage so it should leave SRPM's in the right place.
+(Forgot to change that when I removed modules from the explode/build
+stages.)  Also redirected /dev/null to stdin and added ignore options
+for the revision-control stuff to the mkhybrid command line.
+----------------------------------------------------------------------
