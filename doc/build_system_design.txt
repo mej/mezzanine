@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: build_system_design.txt,v 1.6 2001/01/24 07:21:38 mej Exp $
+#  $Id: build_system_design.txt,v 1.7 2001/01/24 18:10:15 mej Exp $
 #
 ########################################################################
 
@@ -55,6 +55,7 @@ product.  Anything else is simply a benefit, not a necessity.
    without requiring an update of the master repository.  In other
    words, changes must be able to be tested prior to being pushed to
    the master server.
+
 
 2.  BUILD SYSTEM TOOLS AND COMPONENTS
 -------------------------------------
@@ -368,18 +369,92 @@ SRPM's can also be imported directly.
 4.2.  Retrieving Products and Packages
 --------------------------------------
 
-(** revtool -g foo, or avget foo...what more can I say? **)
+There are several different reasons one might want to retrieve one or
+more packages from the master server.  Depending on what you want to
+end up with, there are different ways to go about downloading these
+packages.
+
+4.2.1.  For a Build
+-------------------
+
+As part of the build process, Avalon will automatically download all
+packages needed for a particular product and place them in the correct
+locations.  No manual intervention is needed.
+
+However, some modules which are checked out by a build must also be
+used to commit changes (e.g., CD images).  For this, you must specify
+an alternative CVSROOT for buildtool to use, because the default is to
+check things out anonymously.  Use the --tree option for this.
+
+4.2.2.  For Read-Only Access
+----------------------------
+
+Generally avget (or revtool -g) is used to download individual
+packages.  However, when dealing with entire products, use buildtool
+instead and pass the "-bs" option to halt processing after the
+bootstrap stage completes.
+
+4.2.3.  For Modification
+------------------------
+
+For individual packages, use avget.  For entire products, use
+buildtool as suggested in section 4.2.2, but don't forget the --tree
+option mentioned in section 4.2.1 in order to have write access from
+the checkout.
 
 4.3.  Making Alterations
 ------------------------
 
+The distribution process is a repetitive loop of making changes,
+building those packages which changed, and testing the results.  Thus,
+the build system must make each of these tasks as simple and
+straight-forward as possible.
 
+The following sections cover changes to SRPM-based modules only.
+Source tree modules and SRPM collections (like contrib-rh) are altered
+through a simple add/remove/commit process as normal.
 
 4.3.1.  Applying Existing Patch Files
+-------------------------------------
+
+Often, updates to modules maintained internally come from outside
+sources and must be merged in with the internal changes.  The build
+system makes it easy to add new patches to an existing SRPM module.
+
+(** Do we make them copy the patch in, add it, edit spec file, and
+commit?  or do we make srctool handle everything, maybe even open up
+the spec file in an editor? **)
+
 4.3.2.  Making Your Own Changes
+-------------------------------
+
+avget to get the module, avprep to generate the patched tree, make
+changes, avmod to generate patch from changes, avput to commit.
+
 4.4.  Building
+--------------
+
 4.4.1.  Individual Packages
+---------------------------
+
+avbuild -p <dir>, no commit needed.  Should always precede a commit.
+
 4.4.2.  Entire Products
+-----------------------
+
+avbuild -p <product>
+
 4.5.  Publishing and Media Management
+-------------------------------------
+
+(** This section, and 4.5.2, are mainly for helpful hints, I
+think. **)
+
 4.5.1.  Creating Package CD's
+-----------------------------
+
+(** Not sure here.  mediatool anyone? **)
+
 4.5.2.  Generating/Syncing Web Sites
+------------------------------------
+
