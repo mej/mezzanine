@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgsort,v 1.4 2000/09/12 03:14:19 mej Exp $
+# $Id: pkgsort,v 1.5 2000/09/13 23:55:09 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -78,10 +78,17 @@ print_usage_info
     print "    -h --help                        Show this usage information\n";
     print "    -d --debug                       Turn on debugging\n";
     print "    -v --version                     Show version and copyright\n";
-    print "    -n --names                       Output package names rather than package files\n";
+    print "    -s --sort <flag(s)>              Specify which criterion to sort on\n";
+    print "    -f --format <type>               Specify the output format (names, files, prod)\n";
     print "    -D --dir <directory>             Specify one or more directories from which to take packages\n";
     print "    -l --list <file>                 Take the input package list from \"file\" instead of the command line\n";
     print "    -o --outfile <file>              Output the resulting package list to \"file\" instead of stdout\n";
+    print "\n";
+    print "Valid sort flags are:  a for alphabetical by binary package\n";
+    print "                       d for dependency\n";
+    print "                       p for provisions\n";
+    print "                       s for alphabetical by source package\n";
+    print "                       r to reverse the sort order (in addition to one of the above flags)\n";
     print "\n";
     exit(PKGSORT_SUCCESS);
 }
@@ -166,6 +173,18 @@ handle_warning
     dprint @_;
 }
 
+# Exclusive push.  Only push if the item(s) aren't already in the list
+sub
+xpush(\@; @)
+{
+    my $parray = shift;
+    my @items = @_;
+
+    foreach $item (@items) {
+        push @{$parray}, $item if (!grep($_ eq $item, @{$parray}));
+    }
+}
+
 sub
 get_package_list
 {
@@ -186,7 +205,6 @@ get_package_list
         $line =~ s/^\s+//;
         $line =~ s/\s+$//;
         $line =~ s/^.*\///g;
-        dprint "Looking at $line\n";
 #        if ($line =~ /^\S+\s+(-\S+.*)$/) {
 #            $flags = $1;
 #        }
@@ -196,7 +214,6 @@ get_package_list
         next if ($line =~ /:/);
 
         # If we get here, what remains is a package
-        dprint "Got package:  $line\n";
         push @pkgs, $line;
 #        if ($flags) {
 #            $flags{$line} = $flags;
@@ -204,7 +221,33 @@ get_package_list
 #        }
     }
     close(LISTFILE);
+    dprint "Got package list:  ", join(" ", @pkgs), "\n";
     return @pkgs;
+}
+
+sub
+get_srpm_for_rpm
+{
+    my $rpm = shift;
+    my ($line, $cmd, $srpm);
+    local *CMD;
+
+    $cmd = "pkgtool -qs -p $path{$rpm}/$rpm";
+    open(CMD, "$cmd 2>&1 |") || &fatal_error("Unable to execute pkgtool -- $!\n");
+    while (<CMD>) {
+        chomp($line = $_);
+        if ($line =~ /^Source:  (.*)$/) {
+            $srpm = $1;
+            last;
+        } else {
+            eprint "$line\n";
+        }
+    }
+    close(CMD);
+    if ($? != PKGTOOL_SUCCESS) {
+        &fatal_error("Query of $rpm failed (error $?).\n");
+    }
+    return $srpm;
 }
 
 sub
@@ -228,21 +271,23 @@ find_packages
     }
 
     foreach $rpm (@contents) {
-        my ($pkg, $ver, $rel);
+        my ($srpm, $spkg, $pkg, $ver, $rel);
 
         $rpm =~ m/^([^\/]+)-([^-\/]+)-([^-\/]+)\.\w+\.rpm$/;
-        ($pkg, $ver, $rel) = ($1, $2, $3);
-        if (!defined($rpm_list{$pkg})) {
-            push @{$rpm_list{$pkg}}, $rpm;
-        } elsif (!grep($_ eq $rpm, @{$rpm_list{$pkg}})) {
-            my ($old_pkg, $old_ver, $old_rel);
-
-            $rpm_list{$pkg}[0] =~ m/^([^\/]+)-([^-\/]+)-([^-\/]+)\.\w+\.rpm$$/;
-            ($old_pkg, $old_ver, $old_rel) = ($1, $2, $3);
-            if ($old_ver eq $ver && $old_rel eq $rel) {
-                push @{$rpm_list{$pkg}}, $rpm;
-            } else {
-                eprint "Multiple versions of $pkg found:  $pkg-$ver-$rel (new) vs. $old_pkg-$old_ver-$old_rel (old)\n";
+        $pkg = $1;
+        $srpm = &get_srpm_for_rpm($rpm);
+        $srpm =~ m/^([^\/]+)-([^-\/]+)-([^-\/]+)\.\w+\.rpm$/;
+        ($spkg, $ver, $rel) = ($1, $2, $3);
+        dprint "Package $pkg from $spkg $ver-$rel ($srpm)\n";
+        if (scalar(@_)) {
+            next if (!grep($_ eq $pkg || $_ eq $spkg, @pkgs));
+        } else {
+            push @pkgs, $pkg;
+        }
+        xpush @{$bin_packages{$spkg}}, $pkg;
+        if (defined($src_version{$spkg})) {
+            if ($src_version{$spkg} ne $ver || $src_release{$spkg} ne $rel) {
+                eprint "Multiple versions of $spkg found:  $spkg-$ver-$rel (new) vs. $spkg-$src_version{$spkg}-$src_release{$spkg} (old)\n";
                 if (-t) {
                     my $ans;
 
@@ -254,13 +299,21 @@ find_packages
                         push @{$rpm_list{$pkg}}, $rpm;
                     } else {
                         print "Ignoring $rpm\n";
+                        next;
                     }
                 } else {
                     print "I will ignore $rpm\n";
+                    next;
                 }
             }
         }
+        $src_version{$pkg} = $ver;
+        $src_release{$pkg} = $rel;
+        $src_package{$pkg} = $spkg;
+        $src_rpm{$spkg} = $srpm;
+        xpush @{$rpm_list{$pkg}}, $rpm;
     }
+    return @pkgs;
 }
 
 # Simplify package dependency queries and operations
@@ -275,7 +328,7 @@ pkg_depends_on
             return 1;
         }
         # If they passed a non-zero 3rd parameter, only check exact matches
-        if ($_[2] || !defined(@{$provides{$_[1]}})) {
+        if ($_[2] || !defined($provides{$_[1]})) {
             return 0;
         }
         # Next, check all of what $_[1] provides to see if $_[0] requires any of it
@@ -294,7 +347,7 @@ sub
 pkg_add_dep
 {
     push @{$requires{$_[0]}}, $_[1] if (! &pkg_depends_on($_[0], $_[1], 1));
-    push @{$what_requires{$_[1]}}, $_[0] if (!grep($_ eq $_[0], @{$what_requires{$_[1]}}));
+    xpush @{$what_requires{$_[1]}}, $_[0];
 }
 sub
 pkg_provides
@@ -311,7 +364,7 @@ sub
 pkg_add_cap
 {
     push @{$provides{$_[0]}}, $_[1] if (! &pkg_provides($_[0], $_[1]));
-    push @{$what_provides{$_[1]}}, $_[0] if (!grep($_ eq $_[0], @{$what_provides{$_[1]}}));
+    xpush @{$what_provides{$_[1]}}, $_[0];
 }
 
 sub
@@ -361,11 +414,13 @@ query_packages
                 if ($line =~ /^Provides/ || $line =~ /^Contains/) {
                     $line =~ s/^\w+:  \s*(\S.+)\s*$/$1/;
                     $line =~ s/^\s+//;  $line =~ s/\s+$//;
+                    next if ($pkg eq $line);
                     &pkg_add_cap($pkg, $line);
                 } elsif ($line =~ /^Requires/) {
                     $line =~ s/^\w+:  \s*//;
                     $line =~ s/\s+[-=<>lteqng]+\s+\S+$//;
                     $line =~ s/^\s+//;  $line =~ s/\s+$//;
+                    next if ($pkg eq $line);
                     &pkg_add_dep($pkg, $line);
                 } else {
                     eprint "$line\n";
@@ -381,6 +436,7 @@ query_packages
 
     # Go through the provides info and throw out any files/capabilities not required by other packages
     foreach $pkg (keys %provides) {
+        dprint "Checking provides for $pkg\n";
         for ($i = 0; $i < scalar(@{$provides{$pkg}}); ) {
             my $file = $provides{$pkg}[$i];
             my $found = 0;
@@ -408,16 +464,10 @@ query_packages
 
     if ($debug) {
         foreach $pkg (sort keys %provides) {
-            dprint "Package $pkg provides:\n";
-            foreach $file (@{$provides{$pkg}}) {
-                dprint "     $file\n";
-            }
+            dprint "Package $pkg provides:  ", join(", ", @{$provides{$pkg}}), "\n";
         }
         foreach $pkg (sort keys %requires) {
-            dprint "Package $pkg requires:\n";
-            foreach $file (@{$requires{$pkg}}) {
-                dprint "     $file\n";
-            }
+            dprint "Package $pkg requires:  ", join(", ", @{$requires{$pkg}}), "\n";
         }
 
         foreach $cap (sort keys %what_provides) {
@@ -492,9 +542,7 @@ cmp_packages_by_relation
             } else {
                 $s = "$pkg2/$pkg1";
             }
-            if (!grep($_ eq $s, @circular_deps)) {
-                push @circular_deps, $s;
-            }
+            xpush @circular_deps, $s;
 
             # Now here's the hard part.  What to do about circular dependencies.  First,
             # let's see if one supplies libs and the other doesn't or supplies less.
@@ -523,43 +571,38 @@ sort_packages
     $func_start = (times)[0];
     $n = 0;
     return if ($cnt == 1);
+
+    # Work around RedHat's incomplete dependency info by
+    # making kernel-headers and procps depend on fileutils
     &add_implicit_dependency("/bin/sh", "fileutils", "kernel-headers", "procps");
 
     # First sort packages by the number of dependencies they have/fulfill
-    @pkgs = sort cmp_packages_by_dep_count @pkgs;
+    if ($sort_method eq "p" || $sort_method eq "d") {
+        @pkgs = sort cmp_packages_by_dep_count @pkgs;
 
-    # Then brute-force check and fix the list until no changes are made
-    do {
-        $loop_start = (times)[0];
-        ($changes, @pkgs) = &verify_list(@pkgs);
-        $loop_end = (times)[0];
-        $n++;
-        dprint "Verify pass #$n took ", $loop_end - $loop_start, " seconds.\n";
-    } while ($changes);
+        # Then brute-force check and fix the list until no changes are made
+        if ($sort_method eq "d") {
+            do {
+                $loop_start = (times)[0];
+                ($changes, @pkgs) = &verify_list(@pkgs);
+                $loop_end = (times)[0];
+                $n++;
+                dprint "Verify pass #$n took ", $loop_end - $loop_start, " seconds.\n";
+                } while ($changes);
+        }
+    } elsif ($sort_method eq "a") {
+        @pkgs = sort {$src_package{$a} cmp $src_package{$b}} @pkgs;
+    } else {
+        @pkgs = sort {$a cmp $b} @pkgs;
+    }
+    if ($reverse_sort) {
+        @pkgs = reverse @pkgs;
+    }
 
     $func_end = (times)[0];
     dprint "Complete sort operation took ", $func_end - $func_start, " seconds and $n passes.\n";
 
-    if (($outfile eq "-") || !open(OUTFILE, ">$outfile")) {
-        open(OUTFILE, ">&STDOUT");
-    }
-
-    foreach $pkg (@pkgs) {
-        my $flag = "";
-
-        if (grep($_ =~ /^\Q$pkg\E\// || $_ =~ /\/\Q$pkg\E$/, @circular_deps)) {
-            $flag .= " --nodeps";
-        }
-        if ($output_names) {
-            print OUTFILE "$pkg$flag\n";
-        } else {
-            foreach $rpm (sort @{$rpm_list{$pkg}}) {
-                print OUTFILE "$rpm$flag\n";
-            }
-        }
-    }
-    close(OUTFILE);
-    return PKGSORT_SUCCESS;
+    return @pkgs;
 }
 
 sub
@@ -584,19 +627,72 @@ verify_list
     return ($changes, @pkgs);
 }
 
+sub
+sort_source_packages
+{
+    my @pkgs = @_;
+    my @src_pkgs;
+
+    foreach $pkg (@pkgs) {
+        xpush @src_pkgs, $src_package{$pkg};
+    }
+    return @src_pkgs;
+}
+
+sub
+show_packages
+{
+    my @pkgs = @_;
+    my @src_pkgs;
+
+    if (($outfile eq "-") || !open(OUTFILE, ">$outfile")) {
+        open(OUTFILE, ">&STDOUT");
+    }
+
+    if (substr($output_format, 0, 4) eq "prod") {
+        @src_pkgs = &sort_source_packages(@pkgs);
+        if ($output_format eq "prodfile") {
+            foreach $spkg (@src_pkgs) {
+                print OUTFILE "# $spkg\n";
+                print OUTFILE "contrib-rh/$src_rpm{$spkg}\n";
+                foreach $pkg (@{$bin_packages{$spkg}}) {
+                    foreach $rpm (sort @{$rpm_list{$pkg}}) {
+                        print OUTFILE "bin-rh/$rpm\n";
+                    }
+                }
+                print OUTFILE "\n";
+            }
+        }
+    } else {
+        foreach $pkg (@pkgs) {
+            my $flag = "";
+
+            if (grep($_ =~ /^\Q$pkg\E\// || $_ =~ /\/\Q$pkg\E$/, @circular_deps)) {
+                $flag .= " --nodeps";
+            }
+            if ($output_format eq "names") {
+                print OUTFILE "$pkg$flag\n";
+            } elsif ($output_format eq "files") {
+                foreach $rpm (sort @{$rpm_list{$pkg}}) {
+                    print OUTFILE "$rpm$flag\n";
+                }
+            }
+        }
+    }
+    close(OUTFILE);
+}
+
 # main() here is basically the same as main() in C
 sub
 main
 {
-    my $ret;
-
     # Set up the basic variables
     $progname = "pkgsort";
     $version = "1.0";
 
     # See the Getopt::Long man page for details on the syntax of this line
-    @valid_opts = ("h|help", "v|version", "d|debug", "n|names", "D|dir=s", "l|list=s",
-                   "o|outfile=s");
+    @valid_opts = ("h|help", "v|version", "d|debug", "D|dir=s", "l|list=s",
+                   "o|outfile=s", "f|format=s", "s|sort=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -604,7 +700,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.4 $ created on $Date: 2000/09/12 03:14:19 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.5 $ created on $Date: 2000/09/13 23:55:09 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -618,21 +714,53 @@ main
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
         # This is a really silly way to shut up the "used only once" warnings.
-        $opt_h = $opt_v = $opt_d = $opt_n = 0;
+        $opt_h = $opt_v = $opt_d;
     }
 
     $debug = $opt_d;
     $outfile = ($opt_o ? $opt_o : "-");
-    $output_names = $opt_n;
+    if ($opt_f) {
+        if ($opt_f eq substr("names", 0, length($opt_f))) {
+            $output_format = "names";
+        } elsif ($opt_f eq substr("files", 0, length($opt_f))) {
+            $output_format = "files";
+        } elsif ($opt_f eq substr("prodfile", 0, length($opt_f))) {
+            $output_format = "prodfile";
+        } elsif ($opt_f eq substr("products", 0, length($opt_f))) {
+            $output_format = "products";
+        } else {
+            eprint "Unrecognized output format:  $opt_f\n";
+            eprint "Valid formats:  names, files, prodfile\n";
+            $output_format = "files";
+        }
+    } else {
+        $opt_f = "files";
+    }
+    $sort_method = ($opt_s ? $opt_s : "d");
+    if ($sort_method =~ /r/) {
+        $reverse_sort = 1;
+        $sort_method =~ s/r//;
+    } else {
+        $reverse_sort = 0;
+    }
+    if ($sort_method !~ /^[adps]$/i) {
+        eprint "Invalid sort flags:  $sort_method\n";
+        eprint "Must be exactly one of a, d, p, or s, with an optional r\n";
+        $sort_method = "d";
+    }
     if ($opt_D) {
         @pkgdirs = split(/[:\s]/, $opt_D);
     } else {
-        @pkgdirs = glob('$ENV{BUILD_DIR}/RPMS/*');
+        @pkgdirs = glob('$ENV{BUILD_DIR}/RPMS/???*');
     }
     if ($opt_l) {
         @pkgs = &get_package_list($opt_l);
     } else {
-        @pkgs = @ARGV;
+        if (scalar(@ARGV)) {
+            @pkgs = @ARGV;
+        } else {
+            @pkgs = ();
+        }
     }
 
     # Signal handling
@@ -650,11 +778,13 @@ main
     $SIG{TTOU} = \&handle_fatal_signal;
     $SIG{__WARN__} = \&handle_warning;
 
-    &find_packages(@pkgs);
-    &query_packages(@pkgs);
-    $ret = &sort_packages(@pkgs);
-
-    return $ret;
+    @pkgs = &find_packages(@pkgs);
+    if ($sort_method eq "p" || $sort_method eq "d") {
+        &query_packages(@pkgs);
+    }
+    @pkgs = &sort_packages(@pkgs);
+    &show_packages(@pkgs);
+    return PKGSORT_SUCCESS;
 }
 
 exit &main();

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.23 2000/09/06 06:15:05 mej Exp $
+# $Id: pkgtool,v 1.24 2000/09/13 23:55:09 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -764,6 +764,8 @@ rpm_query
 
     if ($query_type eq "d") {
         $rpm_opt = "-q --qf '[Contains:  %{FILENAMES}\n][Provides:  %{PROVIDES}\n][Requires:  %{REQUIRENAME} %{REQUIREFLAGS:depflags} %{REQUIREVERSION}\n]'";
+    } elsif ($query_type eq "s") {
+        $rpm_opt = "-q --qf 'Source:  %{SOURCERPM}\n'";
     } else {
         eprint "Unrecognized query type \"$query_type\"\n";
         return PKGTOOL_SYNTAX_ERROR;
@@ -1163,7 +1165,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.23 $ created on $Date: 2000/09/06 06:15:05 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.24 $ created on $Date: 2000/09/13 23:55:09 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

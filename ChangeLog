@@ -809,3 +809,7 @@ on Debian.
 Also here is the step-by-step documentation for building a build
 server from the ground up.
 ----------------------------------------------------------------------
+Wed Sep 13 16:53:11 2000                        Michael Jennings (mej)
+
+pkgsort is now fully working.  Just in time too.
+----------------------------------------------------------------------

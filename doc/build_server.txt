@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: build_server.txt,v 1.1 2000/09/12 03:14:19 mej Exp $
+#  $Id: build_server.txt,v 1.2 2000/09/13 23:55:09 mej Exp $
 #
 ########################################################################
 
@@ -34,7 +34,7 @@ system.  Then cd into Powertools/i386 and run the following command:
 
 rpm -Uvh alien-* sip-* libax25-* lesstif-* R-base-* SDL-* aalib-* \
          ocaml-* libcdaudio-* pccts-* xmake-* OffiX-devel-* lha-* \
-         icqlib-* sane-* fpc-* hfsutils-* mkhybrid-*
+         icqlib-* sane-* fpc-* hfsutils-* mkhybrid-* nasm-*
 
 2.  Install the FFTW library and header files
 ---------------------------------------------
