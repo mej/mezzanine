@@ -1,0 +1,54 @@
+########################################################################
+#            Software Engineering Build Server Information
+#
+#  Written by:  Michael Jennings
+#               Ted T'so
+#
+#  $Id: README,v 1.1 2000/05/09 02:55:55 mej Exp $
+#
+########################################################################
+
+0.  Introduction and Quick Start
+--------------------------------
+
+This document is intended as a brief overview of the new Software
+Engineering build system:  how it works, how to use it, and some of the
+design philosophies behind it.  It also details the various standards
+policies which govern its contents, so those planning on adding and/or
+maintaining its contents should read those sections carefully.
+
+For those wishing to simply build a particular VA product, you will
+find a directory called products under this one.  It contains a series
+of files with .prod extensions.  Find the file with the name of the
+product you wish to build, then invoke the following command at your
+shell prompt:
+
+$ ./buildtool -bp -p <product>
+
+...where <product> is the name of the product file, but without the
+.prod on the end.  This command should be run by your regular user
+account (not root) and should be run from the directory which contains
+buildtool and this README file.  Executing this command will build all
+packages associated with that product, both binary and source packages.
+If you wish to build ISO images as well, use -bi instead of -bp.
+
+The following sections will have more detailed information on how to
+use the system, so if you are going to be involved in the actual day-
+to-day maintenance of the system or any packages within the system,
+keep reading!
+
+1.  Overall Philosophy
+----------------------
+
+2.  Revision Control
+--------------------
+
+3.  Packages
+------------
+
+4.  Standards and Conventions
+-----------------------------
+
+5.  Tool Usage Guidelines
+-------------------------
+

@@ -42,3 +42,12 @@ wildcards, glob them, and pass them on to the add command.  I also am
 committing buildtool as it stands thus far (which isn't too far, but
 hey...).
 ----------------------------------------------------------------------
+Mon May  8 19:54:03 2000                        Michael Jennings (mej)
+
+Added a README file.  Right now it's basically bupkis, but it will get
+better.  I put in a skeleton of the sections I think we need to flesh
+out along with a quick-start intro (that doesn't actually apply yet,
+but gives a bit of an idea how it should work long-term).
+
+Feel free to use it as a place to get your ideas down "on paper."
+----------------------------------------------------------------------
