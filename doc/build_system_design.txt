@@ -1,0 +1,48 @@
+########################################################################
+#           Design of the VA Software Engineering Build System
+#
+#  Written by:  Michael Jennings
+#
+#  $Id: build_system_design.txt,v 1.1 2000/12/21 02:54:45 mej Exp $
+#
+########################################################################
+
+This document describes the philosophies and strategies behind the
+design of the VA Software Engineering Build System.  Hopefully, by
+establishing and documenting policies, procedures, and priorities up
+front, the resultant product will better suit the needs of all
+concerned:  users, administrators, and customers.
+
+The Build System is the collection of all the various tools, including
+servers, scripts, etc., which are used in concert to create software
+products.  Avalon refers to the set of custom tools which simplify and
+streamline the process of using the Build System and are generally
+considered a part, though not the whole, of the Build System itself.
+
+1.  PROJECT GOALS AND REQUIREMENTS
+----------------------------------
+
+Before we design the system, we need to establish a clear set of
+guidelines for what it must be able to do.  These are not only
+priorities of design, but absolute requirements for the finished
+product.  Anything else is simply a benefit, not a necessity.
+
+ - The Build System must create software products.  It must be able to
+   create these products in a commonly-acceptable complete form, such
+   as a CD image, which can be marketed to customers.
+ - The Build System must also be capable of creating package
+   collections suitable for use with Build-to-Order Software, either
+   as an intermediate step of the above, or in its own right.
+ - The Build System must preserve each state of each product
+   permanently.  In other words, it should be possible at any point in
+   time to retrieve a particular product which was released at any
+   previous point in time.
+ - The Build System should enforce good structure and policy for
+   maintaining products and packages.  That is, it should do its best
+   to assert proper, logical organization amongst all products and
+   within each product.
+ - The Build System should be robust enough to be as tolerant of
+   mistakes as possible.  Specifically, violations of policy should be
+   handled as sanely as they can be, but should not be allowed to
+   happen directly.
+ - 

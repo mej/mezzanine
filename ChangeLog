@@ -950,3 +950,7 @@ Tue Dec 12 14:53:22 2000                        Michael Jennings (mej)
 
 Make sure to remove $LD_RUN_PATH.
 ----------------------------------------------------------------------
+Wed Dec 20 18:54:33 2000                        Michael Jennings (mej)
+
+Started working on a design doc for the new build system.
+----------------------------------------------------------------------
