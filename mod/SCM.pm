@@ -21,14 +21,16 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: SCM.pm,v 1.2 2004/06/04 17:16:40 mej Exp $
+# $Id: SCM.pm,v 1.3 2004/06/22 23:10:07 mej Exp $
 #
 
 package Mezzanine::SCM;
+use Exporter;
+use Mezzanine::Util;
+use Mezzanine::SCM::Global;
+use strict;
 
 BEGIN {
-    use Exporter ();
-    use Mezzanine::Util;
     use vars ('$VERSION', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
@@ -56,6 +58,7 @@ BEGIN {
             my $modname = &basename($module);
 
             $modname =~ s/\.pm$//;
+            next if ($modname eq "Global");
             if (!scalar(grep { $_ eq $modname } @SCM_MODULE_LIST)) {
                 dprint "$modname not loaded.  Loading.\n";
                 eval "use Mezzanine::SCM::$modname";
@@ -72,8 +75,6 @@ BEGIN {
 
 ### Initialize exported package variables
 
-# Constants
-
 sub
 new($)
 {
@@ -81,8 +82,9 @@ new($)
     my $class = ref($proto) || $proto;
     my $type = shift;
 
+    dprint &print_args($proto, $class, $type, @_);
     if (! $type) {
-        return auto_detect();
+        return Mezzanine::SCM::auto_detect(undef, ".");
     } elsif (lc($type) eq "cvs" && grep { $_ eq "CVS" } @SCM_MODULE_LIST) {
         return Mezzanine::SCM::CVS->new();
     } elsif ((lc($type) eq "svn" || lc($type) eq "subversion")
@@ -97,7 +99,9 @@ sub
 auto_detect($)
 {
     my ($self, $path) = @_;
+    my $will;
 
+    dprint &print_args(@_);
     if (!ref($self)) {
         $path = $self;
     }
@@ -108,12 +112,23 @@ auto_detect($)
         $ret = eval "Mezzanine::SCM::$mod->can_handle(\"$path\")";
         if ($@) {
             eprint "can_handle() member function call failed -- $@\n";
-        } elsif ($ret) {
-            dprint "$mod can handle $path.\n";
-            return new($mod);
-        } else {
+        } elsif (!defined($ret)) {
+            dprint "$mod returned undef.\n";
+        } elsif ($ret == MZSCM_CANNOT_HANDLE) {
             dprint "$mod cannot handle $path.\n";
+        } elsif ($ret == MZSCM_CAN_HANDLE) {
+            dprint "$mod can handle $path.\n";
+            return Mezzanine::SCM->new($mod);
+        } elsif ($ret == MZSCM_WILL_HANDLE) {
+            dprint "$mod is willing to handle $path.\n";
+            $will = $mod;
+            # Keep looking
+        } else {
+            dprint $mod . "->can_handle($path) returned $ret?!\n";
         }
+    }
+    if ($will) {
+        return Mezzanine::SCM->new($will);
     }
     return undef;
 }

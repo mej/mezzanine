@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.25 2004/06/22 23:03:42 mej Exp $
+# $Id: RevCtl.pm,v 1.26 2004/06/22 23:10:07 mej Exp $
 #
 
 package Mezzanine::RevCtl;
@@ -470,71 +470,6 @@ find_module_changelog($)
 sub
 do_changelog_entry($$)
 {
-    my ($log, $message) = @_;
-    my ($pwd, $username, $fullname, $line, $module, $rel_dir, $datestamp, $author);
-    my @pw_info;
-    my @stat_info;
-    my @contents;
-    my $logfile = "/var/tmp/.cvs.commit.$$";
-    local *LOGFILE;
-
-    dprint &print_args(@_);
-
-    $pwd = &basename(&getcwd());
-
-    open(LOGFILE, ">$logfile") || die("Cannot write to $logfile -- $!\n");
-    dprint("Opened log file $logfile for commit log\n");
-    $username = $ENV{"LOGNAME"};
-    @pw_info = getpwnam($username);
-    if ($pw_info[6] =~ /,/) {
-        my @gecos = split(",", $pw_info[6], -1);
-
-        $fullname = $gecos[0];
-    } else {
-        $fullname = $pw_info[6];
-    }
-    $datestamp = scalar(localtime());
-    $author = (($fullname) ? ("$fullname ($username)") : ("$username"));
-    printf LOGFILE "%-25s%45s\n\n", $datestamp, $author;
-    if ($message) {
-        print LOGFILE "$message\n";
-    }
-    close(LOGFILE);
-
-    if (! $message) {
-        dprint "Current directory is \"$pwd\", module name is \"$module\"\n";
-        print "Please edit your commit message now...\n";
-        system("/bin/sh -c \"" . ($ENV{"EDITOR"} ? $ENV{"EDITOR"} : "vi") . " $logfile\"");
-
-        # Abort if the logfile was not modified or is too small.
-        @stat_info = stat($logfile);
-        if ($stat_info[7] <= 72) {
-            print "Commit message was unmodified or is too short.  Aborting commit.\n";
-            return "";
-        }
-    }
-
-    if (! $log) {
-        return $logfile;
-    }
-
-    if (! -f "ChangeLog") {
-        $rel_dir = &find_module_changelog();
-        dprint "Got relative directory \"$rel_dir\"\n";
-        if ($rel_dir && ($rel_dir ne ".")) {
-            if (scalar(@ARGV)) {
-                my @tmp = @ARGV;
-
-                @ARGV = ();
-                foreach my $tmp (@tmp) {
-                    dprint "Updating argument path:  $tmp -> $rel_dir/$tmp\n";
-                    push @ARGV, "$rel_dir/$tmp";
-                }
-            } else {
-                push @ARGV, $rel_dir;
-            }
-        }
-    }
     if (! -f "ChangeLog") {
         if (!open(CL, ">ChangeLog")) {
             print "WARNING:  Unable to create ChangeLog:  $!\n";
@@ -852,6 +787,8 @@ talk_to_cvs_server($$)
         while (<CMD>) {
             chomp($line = $_);
             if ($line =~ /^cvs \w+: Diffing/) {
+                dprint "$line\n";
+            } elsif ($line =~ /^cvs \w+: Updating/) {
                 dprint "$line\n";
             } else {
                 print "$line\n";

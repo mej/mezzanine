@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.43 2004/06/18 18:13:38 mej Exp $
+# $Id: srctool,v 1.44 2004/06/22 23:10:07 mej Exp $
 #
 
 use strict;
@@ -32,7 +32,8 @@ use File::Copy ('&cp', '&mv');
 
 # Mezzanine modules
 use Mezzanine::Util;
-use Mezzanine::RevCtl;
+#use Mezzanine::RevCtl;
+use Mezzanine::SCM;
 use Mezzanine::PkgVars;
 use Mezzanine::RPM;
 use Mezzanine::Src;
@@ -40,6 +41,7 @@ use Mezzanine::Pkg;
 use Mezzanine::Config;
 
 my $config;
+my $scm;
 my $import_as_pdr = 0;
 my $local_mode = 0;
 my $command = "";
@@ -71,7 +73,10 @@ print_usage_info
     print "    -D --dir <repository>            Specify the repository to use\n";
     print "    -L --local                       Local mode; do not talk to the master server\n";
     print "    -f --flat --pdr                  Import as a PDR (all files in top dir) rather than an SPM\n";
-    print "    -P --path <repo path>            Import into repository at specified path\n";
+    print "    -R --path --relpath <repo path>  Import into repository at specified path\n";
+    print "    -P --protocol <proto>            SCM protocol to use (e.g., \"cvs\", \"svn\")\n";
+    print "       --move                        Move/rename file(s)\n";
+    print "       --savecfg                     Preserve current settings for future use\n";
     print "\n";
     exit(MEZZANINE_SUCCESS);
 }
@@ -114,7 +119,6 @@ import_package
 
         $tag = "$pkg-$ver-$rel";
         if ($local_mode) {
-            chdir($pwd);
             if (! &copy_tree($tmpdir, "$pwd/$pkg")) {
                 eprint "Unable to move $tmpdir to $pwd/$pkg -- $!\n";
                 &nuke_tree("$pwd/$pkg");
@@ -122,45 +126,54 @@ import_package
             } else {
                 &nuke_tree($tmpdir);
             }
-            print "You requested local mode.  You will need to import the new tree by hand (mzimport $pkg).\n";
+            print "You requested local mode.  To add this tree to SCM, you will need to import it by hand (mzimport $pkg).\n";
         } else {
             my $module;
+            my $tmp;
 
-            chdir($tmpdir);
             $tag =~ tr/a-z/A-Z/;
             $tag =~ s/\./_/g;
-            &revctl_rtag($tag);
-            &revctl_exclusive(1);
-            if ($OPTION{"path"}) {
-                $module = "$OPTION{path}/$pkg";
-            } elsif (-r "$pwd/CVS/Repository") {
-                my $tmp = &cat_file("$pwd/CVS/Repository");
+            $scm->propset("target_tag", $tag);
+            ($tag = $pkg) =~ tr/a-z/A-Z/;
+            $scm->propset("source_tag", $tag);
+            $scm->propset("use_standard_ignore", 0);
 
-                chomp($tmp);
+            chdir($pwd);
+            if ($OPTION{"path"} && -d $OPTION{"path"}) {
+                # Relative path exists, so parse in terms of
+                # the current directory and SCM context.
+                chdir($OPTION{"path"});
+                $tmp = $scm->relative_path();
+            } elsif (! $OPTION{"path"}) {
+                # No path.  Check for relative path in current repo.
+                $tmp = $scm->relative_path();
+            } else {
+                # Supplied path doesn't exist, so take it as gospel.
+                $tmp = $OPTION{"path"};
+            }
+            if ($tmp && (length($tmp) > 1)) {
                 $module = "$tmp/$pkg";
-            }
-            dprintf("Currently set to import into $module at %s\n", &revctl_repository());
-            if ((-r "$pwd/CVS/Root")
-                && ((! $ENV{"CVSROOT"} && ! &revctl_repository())
-                    || (&revctl_repository() eq $ENV{"CVSROOT"}))) {
-                my $tmp = &cat_file("$pwd/CVS/Root");
-
-                chomp($tmp);
-                &revctl_repository($tmp);
+            } else {
+                $module = $pkg;
             }
 
-            dprintf("Now set to import into $module at %s\n", &revctl_repository());
+            if (! $scm->propget("repository")) {
+                $scm->detect_repository();
+            }
+
+            chdir($tmpdir);
             if (! -f "ChangeLog") {
                 my ($tmpfile, $msg);
 
                 $msg = sprintf("Mezzanine auto-imported %s from %s.",
                                $pkg, &basename($pkgfile));
-                $tmpfile = &do_changelog_entry(1, $msg);
+                #$tmpfile = &do_changelog_entry(1, $msg);
                 if ($tmpfile) {
                     unlink($tmpfile);
                 }
             }
-            $err = &import_vendor_sources($module);
+            $err = $scm->imprt($module);
+
             if ($err != MEZZANINE_SUCCESS) {
                 eprint "Import of $pkgfile failed.\n";
                 return $err;
@@ -197,36 +210,58 @@ import_package
 	}
 
         if ($local_mode) {
-            print "You requested local mode.  You will need to import the new tree by hand (mzimport -n $name).\n";
+            printf("You requested local mode.  To add this tree to SCM, you will need to import it by hand%s.\n",
+                   (($name) ? (" (mzimport -n $name)") : ("")));
         } else {
-            chdir($pkgfile) if ($pkgfile);
-            if (($err = &generate_symlink_file("")) != MEZZANINE_SUCCESS) {
-                return $err;
+            my $module;
+            my $tmp;
+
+            if ($pkgfile) {
+                # Must be a directory.
+                chdir($pkgfile);
             }
+
             ($tag = $name) =~ tr/a-z/A-Z/;
             $tag =~ s/\./_/g;
-            &revctl_rtag($tag);
-            &revctl_exclusive(1);
-            if ($OPTION{"path"}) {
-                my $module = $OPTION{"path"};
+            $scm->propset("target_tag", $tag);
+            $tag =~ s/-[^-]*$//;
+            $scm->propset("source_tag", $tag);
+            $scm->propset("use_standard_ignore", 0);
 
-                if ($pkgfile) {
-                    $module .= "/$pkgfile";
-                } else {
-                    $module .= '/' . &basename($pwd);
-                }
-                $err = &import_vendor_sources($module);
+            if ($OPTION{"path"} && -d "$pwd/$OPTION{path}") {
+                # Relative path exists, so parse in terms of
+                # the current directory and SCM context.
+                chdir("$pwd/$OPTION{path}");
+                $tmp = $scm->relative_path();
+            } elsif (! $OPTION{"path"}) {
+                # No path.  Check for relative path in current repo.
+                $tmp = $scm->relative_path();
             } else {
-                $err = &import_vendor_sources();
+                # Supplied path doesn't exist, so take it as gospel.
+                $tmp = $OPTION{"path"};
             }
-            &revctl_tag("");
-            &revctl_rtag("");
+            if (length($tmp) > 1) {
+                $module = "$tmp/$pkg";
+            }
+
+            chdir($pwd);
+            if (! $scm->propget("repository")) {
+                $scm->detect_repository();
+            }
+
+            chdir($tmpdir);
+            $err = $scm->imprt($module);
+            chdir($pwd);
+
+            # FIXME:  Needed?
+            $scm->propset("source_tag", "");
+            $scm->propset("target_tag", "");
+
             if ($err != MEZZANINE_SUCCESS) {
                 eprintf("Import of %s failed.\n", (($pkgfile) ? ($pkgfile) : (".")));
                 return $err;
             }
         }
-        chdir($pwd);
     }
     return MEZZANINE_SUCCESS;
 }
@@ -285,7 +320,8 @@ prepare_tree($$)
     print "Creating working directory $pkgdir/$WORK_DIR....\n";
     @tmp = &run_cmd("rpmbuild", $params, 0);
     if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
-        eprint "Creation of working directory failed -- $tmp[$#tmp]\n";
+        eprint "Creation of working directory failed.  Error context:\n     ";
+        print join("\n     ", splice(@tmp, -5, 5)), "\n";
     } elsif ($command eq "prep") {
         print "You may now chdir to ", ($pkgdir eq $pwd ? $WORK_DIR : "$pkg/$WORK_DIR"), " to make changes.\n";
         print "Use \"mzpatch -n <patch_name>\" to generate a patch when done.\n";
@@ -391,10 +427,11 @@ gen_patch($$)
         if (! &mkdirhier("P")) {
             return MEZZANINE_SYSTEM_ERROR;
         }
-        if ($local_mode) {
+        if ($local_mode && $scm) {
             print "You requested local mode.  You will need to add the patch directory by hand (mzadd P).\n";
-        } else {
-            $err = &add_new_files("P");
+        } elsif ($scm) {
+            # FIXME:  This should be ->mkdir()
+            $err = $scm->add("P");
             if ($err != MEZZANINE_SUCCESS && $err != MEZZANINE_DUPLICATE) {
                 eprint "Addition of directory P failed.\n";
                 return $err;
@@ -428,15 +465,15 @@ gen_patch($$)
     print "Created $patchdir$patch ($line_cnt lines).\n";
 
     # Add the new patch file
-    if ($local_mode) {
+    if ($local_mode && $scm) {
         print "You requested local mode.  You will need to add the new patch by hand (mzadd $patchdir$patch).\n";
-    } else {
-        $err = &add_new_files("$patchdir$patch");
+    } elsif ($scm) {
+        $err = $scm->add("$patchdir$patch");
         if ($err != MEZZANINE_SUCCESS && $err != MEZZANINE_DUPLICATE) {
-            eprint "Addition of directory $patchdir$patch failed.\n";
+            eprint "Addition of $patchdir$patch failed.\n";
             return $err;
         }
-        print "Patch added and ready for commit.\n";
+        print "Patch added to SCM.  Use 'mzput' to upload to repository.\n";
     }
 
     # Cleanup
@@ -469,14 +506,16 @@ merge_file($$)
         $type = 'E';
     } else {
         if (-t STDIN) {
-            print "Please specify whether $new_file is a Source file, Patch, spec File, or an Extra file ";
+            print "Please specify whether $new_file is a (S)ource file, (P)atch, spec (F)ile, or an (E)xtra file ";
             for (; $type !~ /^[SPFE]$/; ) {
                 print "[S/P/F/E]:  ";
                 chomp($type = <STDIN>);
                 $type =~ tr/a-z/A-Z/;
             }
         } else {
-            eprint "Unable to guess the type of merge file $new_file.  You must specify it.\n";
+            eprint "Unable to guess the type of merge file $new_file.  You must specify\n";
+            print "whether it is a (S)ource file, (P)atch, spec (F)ile, or an (E)xtra file\n";
+            print "(e.g., \"S:foo-1.0-1.src.rpm\" or \"P:foo-1.0-fix_stuff.patch\").\n";
             return MEZZANINE_BAD_ADDITION;
         }
     }
@@ -500,7 +539,12 @@ merge_file($$)
         } else {
             &convert_srpm_to_spm($new_file, ".");
         }
-        print "You will need to run 'mzsync' next.\n";
+        if ($local_mode) {
+            print "$new_file merged successfully.\n";
+        } else {
+            print "$new_file merged successfully.  Make sure you remove any files and/or\n";
+            print "directories which should not be under SCM.  Then run 'mzsync'.\n";
+        }
     } else {
         my @output;
 
@@ -521,10 +565,10 @@ merge_file($$)
         }
 
         # Add the file to be committed later.
-        if ($local_mode) {
+        if ($local_mode && $scm) {
             print "You requested local mode.  You will need to add the new file(s) by hand (mzadd $dest).\n";
-        } else {
-            $err = &add_new_files($dest);
+        } elsif ($scm) {
+            $err = $scm->add($dest);
             if ($err != MEZZANINE_SUCCESS) {
                 eprint "Addition of $new_file ($dest) failed.\n";
             } else {
@@ -555,20 +599,25 @@ clean_package
     }
 
     if ($local_mode) {
-        eprint "You requested local mode.  I will not be able to clean this module.\n";
+        eprint "I'm sorry, but cleaning does not function in local mode.\n";
         return MEZZANINE_SYNTAX_ERROR;
     }
 
-    print "Cleaning and resyncing $pkg...\n";
-    @output = &run_mz_cmd("revtool", &revctl_repository() . " -g", 0);
-    if (($err = shift @output) != MEZZANINE_SUCCESS) {
-        print @output;
-        eprint "Unable to resync with repository.\n";
+    print "Cleaning and resyncing $pkg, please wait....\n";
+    $scm->propset("handle_output", 0);
+    $err = $scm->get();
+    if ($err != MEZZANINE_SUCCESS) {
+        print @{$scm->propget("saved_output")};
+        eprint "Unable to clean $pkg.  (See above error(s).)\n";
         return $err;
     }
+    push @output, @{$scm->propget("saved_output")};
+    $scm->propset("handle_output", 1);
+    $scm->propset("saved_output", "");
     @output = grep(/^\?/, @output);
     if (scalar(@output)) {
         foreach my $item (@output) {
+            chomp($item);
             $item =~ s/^\?\s+//;
             print "Removing $item...\n";
             &nuke_tree($item);
@@ -580,7 +629,7 @@ clean_package
     return MEZZANINE_SUCCESS;
 }
 
-# Get a tree back in sync with your checkout
+# Get a tree back in sync with your current working copy.
 sub
 sync_package
 {
@@ -604,14 +653,16 @@ sync_package
     }
 
     print "Syncing $pkg...\n";
-
-    @output = &run_mz_cmd("revtool", &revctl_repository() . " -g", 0);
-    if (($err = shift @output) != MEZZANINE_SUCCESS) {
+    $scm->propset("handle_output", 0);
+    $scm->propset("saved_output", \@output);
+    $err = $scm->get();
+    if ($err != MEZZANINE_SUCCESS) {
         print @output;
-        eprint "Unable to contact repository.\n";
+        eprint "Unable to sync repository to working copy of $pkg.  (See above error(s).)\n";
         return $err;
     }
     foreach my $a (grep(/^\?\s/, @output)) {
+        chomp($a);
         $a =~ s/^\?\s+//;
         if (($a ne "build.mezz") && ($a ne "work") && ($a ne "work+patched")
             && ($a !~ /\.rpm$/) && ($a !~ /\.deb$/)) {
@@ -620,15 +671,23 @@ sync_package
     }
     push @new, @add;
     foreach my $r (grep(/^U\s/, @output)) {
+        chomp($r);
         $r =~ s/^U\s+//;
         push @rm, $r;
     }
     push @old, @rm;
     if (! $local_mode) {
-        for (; scalar(@add); ) {
-            @output = &run_mz_cmd("revtool", &revctl_repository() . " -a " . join(" ", @add), 0);
+        for (@output = (); scalar(@add); ) {
+            dprint "Adding...  ", join(" ", @add), "\n";
+            if ($scm->add(@add) != MEZZANINE_SUCCESS) {
+                print @output;
+                wprintf("Add for %s failed.  (See above error(s).)\n",
+                        join(" ", @add));
+                next;
+            }
             @add = ();
             foreach my $a (grep(/^\?\s/, @output)) {
+                chomp($a);
                 $a =~ s/^\?\s+//;
                 push @add, $a;
             }
@@ -636,12 +695,18 @@ sync_package
         }
     }
     if (scalar(@rm)) {
+        dprint "Removing...  ", join(" ", @rm), "\n";
         if ($local_mode) {
             foreach my $path (@rm) {
                 &nuke_tree($path);
             }
         } else {
-            @output = &run_mz_cmd("revtool", &revctl_repository() . " -r " . join(" ", @rm), 0);
+            if ($scm->remove(@rm) != MEZZANINE_SUCCESS) {
+                print @output;
+                wprintf("Remove for %s failed.  (See above error(s).)\n",
+                        join(" ", @rm));
+                @old = ();
+            }
         }
     }
 
@@ -669,10 +734,20 @@ move_package_files
     my (@output, @add, @rm);
 
     $target = pop(@flist);
+    $scm->propset("handle_output", 0);
+    $scm->propset("saved_output", \@output);
+
     if ((scalar(@flist) > 1) && (! -d $target)) {
+        # When moving multiple files, the target must be a directory.
+        # It's not there, so create it for the user and add it.
         mkdir $target, 0775;
         if (! $local_mode) {
-            @output = &run_mz_cmd("revtool", &revctl_repository() . " -a $target", 0);
+            $err = $scm->add($target);
+            if ($err != MEZZANINE_SUCCESS && $err != MEZZANINE_DUPLICATE) {
+                print @output;
+                eprint "Unable to add target directory $target to repository.  (See above error(s).)\n";
+                return $err;
+            }
         }
     }
 
@@ -681,9 +756,12 @@ move_package_files
         return MEZZANINE_SYSTEM_ERROR;
     }
 
-    if ($local_mode) {
-        wprint "Files have been moved, but no contact was made with the respository.  Run \"mzsync\" when ready.\n";
-        return MEZZANINE_SYNTAX_ERROR;
+    if ($local_mode && $scm) {
+        print "Files have been moved, but no contact was made with the respository.  Run \"mzsync\" when ready.\n";
+        return MEZZANINE_SUCCESS;
+    } elsif ($local_mode) {
+        print "Move complete.\n";
+        return MEZZANINE_SUCCESS;
     }
 
     @rm = @flist;
@@ -696,12 +774,25 @@ move_package_files
         push @add, $target;
     }
 
-    @output = &run_mz_cmd("revtool", &revctl_repository() . " -r " . join(" ", @rm), 0);
-    @output = &run_mz_cmd("revtool", &revctl_repository() . " -a " . join(" ", @add), 0);
+    @output = ();
+    $err = $scm->remove(@rm);
+    if ($err != MEZZANINE_SUCCESS) {
+        print @output;
+        eprint "Unable to remove files from repository.  (See above error(s).)\n";
+        return $err;
+    }
+
+    @output = ();
+    $err = $scm->add(@add);
+    if ($err != MEZZANINE_SUCCESS && $err != MEZZANINE_DUPLICATE) {
+        print @output;
+        eprint "Unable to add files/directories to repository.  (See above error(s).)\n";
+        return $err;
+    }
 
     print "Removed files:  " . join(" ", @rm) . "\n";
     print "Added files:  " . join(" ", @add) . "\n";
-    print "Move complete.  Your changes will not be finalized until you commit them.\n";
+    print "Move complete.  Your changes will not be finalized until you 'mzput' them.\n";
     return MEZZANINE_SUCCESS;
 }
 
@@ -714,28 +805,62 @@ main
 
     &mezz_init("srctool", "3.0", "help|h", "version|v", "debug|d",
                "import|i", "prepare|p", "merge|m", "resync|r",
-               "patch|apply|a", "move", "name|n=s", "clean|c",
+               "patch|apply|a", "move|mv", "name|n=s", "clean|c",
                "repository|dir|D=s", "local|L", "flat|pdr|f",
-               "path|P=s");
+               "path|relpath|R=s", "protocol|P=s", "savecfg!");
+
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.43 $ created on $Date: 2004/06/18 18:13:38 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.44 $ created on $Date: 2004/06/22 23:10:07 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();
     }
     select STDOUT; $| = 1;
     $config = Mezzanine::Config->new("srctool/config");
+    if (!scalar($config->keys()) && ((!defined($OPTION{"savecfg"})) || ($OPTION{"savecfg"}))) {
+        $OPTION{"savecfg"} = 1;
+    }
 
     &debug_set($config->set("DEBUG", $OPTION{"debug"} || $config->get("DEBUG") || 0));
     &pkgvar_name($OPTION{"name"});
     if (scalar(@ARGV)) {
 	@flist = @ARGV;
     }
-    &revctl_repository($OPTION{"repository"});
+
+    $config->set("DEFAULT_SCM", $OPTION{"protocol"} || $config->get("DEFAULT_SCM") || "cvs");
+
+    if ($OPTION{"protocol"}) {
+        $scm = Mezzanine::SCM->new($OPTION{"protocol"});
+    } elsif (scalar(@ARGV)) {
+        $scm = Mezzanine::SCM->auto_detect($ARGV[0]);
+    } else {
+        $scm = Mezzanine::SCM->auto_detect('.');
+    }
+    if (! $scm) {
+        if (! ($scm = Mezzanine::SCM->new($config->get("DEFAULT_SCM")))) {
+            wprint "Unable to initialize SCM.  Using local mode.\n";
+            $local_mode = 1;
+        }
+    }
+
     if ($OPTION{"local"}) {
-        &revctl_command("/bin/true");
+        if ($scm) {
+            $scm->propset("command", "/bin/true");
+        }
         $local_mode = 1;
+    }
+
+    $local_mode = $config->set("LOCAL_MODE", $local_mode || 0);
+    $config->set("REPOSITORY", $OPTION{"repository"} || $config->get("REPOSITORY"));
+
+    # Save configuration if needed.
+    if ($OPTION{"savecfg"}) {
+        $config->save();
+    }
+
+    if ($scm) {
+        $scm->propset("repository", $config->get("REPOSITORY"));
     }
 
     if ($0 =~ /mzimport$/ || $OPTION{"import"}) {

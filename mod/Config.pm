@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Config.pm,v 1.3 2004/04/20 02:57:37 mej Exp $
+# $Id: Config.pm,v 1.4 2004/06/22 23:10:07 mej Exp $
 #
 
 package Mezzanine::Config;
@@ -266,7 +266,7 @@ save_config_vars()
     }
 
     foreach my $key (sort(grep { substr($_, 0, 2) ne "__" } keys(%{$self}))) {
-        print CFG "$key = $self->{$key}\n";
+        printf CFG "%s = %s\n", $key, (($self->{$key}) ? ($self->{$key}) : (""));
     }
     close(CFG);
 }

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.38 2004/06/04 17:16:40 mej Exp $
+# $Id: Util.pm,v 1.39 2004/06/22 23:10:07 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -49,15 +49,16 @@ BEGIN {
                '&handle_fatal_signal', '&install_signal_handlers',
                '&handle_warning', '&show_backtrace', '&print_args',
                '&mkdirhier', '&nuke_tree', '&move_files',
-               '&copy_files', '&copy_tree', '&create_temp_space',
-               '&clean_temp_space', '&basename', '&dirname',
-               '&grepdir', '&limit_files', '&xpush', '&cat_file',
-               '&parse_rpm_name', '&should_ignore', '&touch_file',
-               '&run_cmd', '&run_mz_cmd', '&MEZZANINE_SUCCESS',
-               '&MEZZANINE_FATAL_ERROR', '&MEZZANINE_SYNTAX_ERROR',
-               '&MEZZANINE_SYSTEM_ERROR', '&MEZZANINE_COMMAND_FAILED',
-               '&MEZZANINE_DUPLICATE', '&MEZZANINE_FILE_NOT_FOUND',
-               '&MEZZANINE_FILE_OP_FAILED',
+               '&copy_files', '&copy_tree', '&get_temp_dir',
+               '&create_temp_space', '&clean_temp_space', '&basename',
+               '&dirname', '&grepdir', '&limit_files', '&xpush',
+               '&cat_file', '&parse_rpm_name', '&should_ignore',
+               '&touch_file', '&run_cmd', '&run_mz_cmd',
+               '&MEZZANINE_SUCCESS', '&MEZZANINE_FATAL_ERROR',
+               '&MEZZANINE_SYNTAX_ERROR', '&MEZZANINE_SYSTEM_ERROR',
+               '&MEZZANINE_COMMAND_FAILED', '&MEZZANINE_DUPLICATE',
+               '&MEZZANINE_FILE_NOT_FOUND',
+               '&MEZZANINE_FILE_OP_FAILED', '&MEZZANINE_UNSUPPORTED',
                '&MEZZANINE_ACCESS_DENIED', '&MEZZANINE_BAD_ADDITION',
                '&MEZZANINE_BAD_LOG_ENTRY', '&MEZZANINE_BAD_LOGIN',
                '&MEZZANINE_BAD_REMOVAL', '&MEZZANINE_CONFLICT_FOUND',
@@ -120,6 +121,7 @@ sub nuke_tree($);
 sub move_files(@);
 sub copy_files(@);
 sub copy_tree($$);
+sub get_temp_dir();
 sub create_temp_space($$$);
 sub clean_temp_space($);
 sub basename($);
@@ -147,6 +149,7 @@ sub MEZZANINE_SYSTEM_ERROR()        {3;}
 sub MEZZANINE_COMMAND_FAILED()      {4;}
 sub MEZZANINE_FILE_NOT_FOUND()      {5;}
 sub MEZZANINE_FILE_OP_FAILED()      {6;}
+sub MEZZANINE_UNSUPPORTED()         {7;}
 
 # revtool-related errors
 sub MEZZANINE_ACCESS_DENIED()      {21;}
@@ -187,6 +190,7 @@ sub MEZZANINE_INVALID_PACKAGE()    {100;}
 sub MEZZANINE_TERMINATED()        {120;}
 sub MEZZANINE_CRASHED()           {121;}
 sub MEZZANINE_UNSPECIFIED_ERROR() {127;}
+
 
 ### Function definitions
 
@@ -694,6 +698,18 @@ copy_tree($$)
     }
 }
 
+# Use proper TEMP directory.
+sub
+get_temp_dir()
+{
+    foreach my $var ("MEZZANINE_TMP", "MEZZANINE_TEMP", "MEZZANINE_TEMPDIR", "MEZZANINE_TMPDIR", "TEMP", "TMP", "TMPPATH") {
+        if ($ENV{$var} && -d $ENV{$var} && -w _) {
+            return $ENV{$var};
+        }
+    }
+    return "/var/tmp";
+}
+
 # Create temporary working space in /var/tmp
 sub
 create_temp_space($$$)
@@ -703,15 +719,9 @@ create_temp_space($$$)
     my @dirlist;
 
     if (! $tmpdir) {
-        foreach my $var ("MEZZANINE_TMP", "MEZZANINE_TEMP", "MEZZANINE_TEMPDIR", "MEZZANINE_TMPDIR", "TEMP", "TMP", "TMPPATH") {
-            if ($ENV{$var} && -d $ENV{$var} && -w _) {
-                $tmpdir = "$ENV{$var}/mezzanine.$$";
-                last;
-            }
-        }
-        if (! $tmpdir) {
-            $tmpdir = sprintf("/var/tmp/mezzanine.%d.%04x", $$, rand(32767));
-        }
+        $tmpdir = &get_temp_dir() . sprintf("/mezzanine.temp.%s.%d.%04x",
+                                            (($type) ? ($type) : ("misc")),
+                                            $$, rand(32767));
     }
     if ($pkg) {
         $dir = "$tmpdir/$pkg";
