@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.31 2004/01/23 22:54:48 mej Exp $
+# $Id: Build.pm,v 1.32 2004/01/26 20:46:10 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -192,7 +192,7 @@ prepare_build_tree
 
     # If the topdir doesn't exist, create it.
     if (! -d $topdir) {
-        if (!mkdir($topdir, 0755)) {
+        if (!&mkdirhier($topdir, 0755)) {
             &fatal_error("Cannot create $topdir -- $!\n");
         }
         dprint "Created $topdir.\n";
@@ -220,7 +220,7 @@ prepare_build_tree
                 # It's a bogus file.  Nuke it.
                 &nuke_tree("$topdir/$dir");
             }
-            mkdir("$topdir/$dir", 0755) || &fatal_error("Cannot create $topdir/$dir -- $!\n");
+            &mkdirhier("$topdir/$dir", 0755) || &fatal_error("Cannot create $topdir/$dir -- $!\n");
             xpush @my_dirs, "$topdir/$dir";
         }
         if ($instroot && ! -d "$instroot$topdir/$dir") {
@@ -228,7 +228,7 @@ prepare_build_tree
                 # It's a bogus file.  Nuke it.
                 &nuke_tree("$instroot$topdir/$dir");
             }
-            mkdir("$instroot$topdir/$dir", 0755) || &fatal_error("Cannot create $instroot$topdir/$dir -- $!\n");
+            &mkdirhier("$instroot$topdir/$dir", 0755) || &fatal_error("Cannot create $instroot$topdir/$dir -- $!\n");
             xpush @my_dirs, "$instroot$topdir/$dir";
         }
     }
@@ -238,7 +238,7 @@ prepare_build_tree
     if (-d $buildroot && !grep(/$buildroot/, @my_dirs)) {
         &nuke_tree($buildroot);
     }
-    mkdir($buildroot, 0775);
+    &mkdirhier($buildroot, 0775);
     xpush @my_dirs, $buildroot;
     dprint "I created:  ", join(" ", @my_dirs), "\n";
 
@@ -379,7 +379,8 @@ create_source_file
             } else {
                 $zip = " ";
             }
-            $cmd = "tar --exclude CVS --exclude RCS --exclude BitKeeper --exclude SCCS"
+            $cmd = "tar --owner=root --group=root "
+                   . "--exclude CVS --exclude RCS --exclude BitKeeper --exclude SCCS"
                    . "$zip -cf ${destdir}$tarball $src_files";
         }
         unlink($tarball);

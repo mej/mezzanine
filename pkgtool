@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.56 2004/01/06 20:53:05 mej Exp $
+# $Id: pkgtool,v 1.57 2004/01/26 20:46:10 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -68,6 +68,7 @@ print_usage_info
     print "    -D --dir <directory>             Specify \"directory\" as the full path to the module\n";
     print "    -r --root <dir>                  Specify the build/install root (depending on mode)\n";
     print "    -H --hints <file_or_dir>         Specify location of pre-build hints or hint files\n";
+    print "    -u --user <userid>               Build as <userid> rather than the current user\n";
     print "       --hi --hint-installer <prog>  Specify the mechanism used to install the hints\n";
     print "       --tar <tarcmd>                Use <tarcmd> as the \"tar\" command\n";
     print "       --zip <zipcmd>                Use <zipcmd> as the compression program\n";
@@ -93,7 +94,7 @@ main
                    "s|specfile|scripts=s", "m|module=s", "t|target=s",
                    "a|arch=s", "P|program=s", "R|rcfile=s", "tar=s",
                    "zip=s", "D|destdir=s", "r|root=s", "H|hints=s",
-                   "hi|hint-installer=s");
+                   "hi|hint-installer=s", "u|user=s");
 
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
@@ -102,7 +103,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.56 $ created on $Date: 2004/01/06 20:53:05 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.57 $ created on $Date: 2004/01/26 20:46:10 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -156,6 +157,10 @@ main
     &pkgvar_zip($opt_zip);
     &pkgvar_topdir($opt_D);
     &pkgvar_instroot($opt_r);
+    if ($opt_u) {
+        &pkgvar_set("builduser", $opt_u);
+        &file_owner(&pkgvar_get("builduser"), "", &pkgvar_instroot());
+    }
 
     if (!&pkgvar_filename()) {
         if (scalar(@ARGV)) {

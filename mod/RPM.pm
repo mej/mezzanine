@@ -21,10 +21,11 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.20 2004/01/24 23:54:15 mej Exp $
+# $Id: RPM.pm,v 1.21 2004/01/26 20:46:10 mej Exp $
 #
 
 package Mezzanine::RPM;
+use English;
 
 BEGIN {
     use strict;
@@ -93,9 +94,10 @@ rpm_form_command
         if (! &pkgvar_command()) {
             if (&pkgvar_instroot()) {
                 &pkgvar_command("chroot " . &pkgvar_instroot()
-                                . " /usr/bin/rpmbuild --define '_debug_package %{nil}' --define '_enable_debug_packages 0' --define '__debug_package 0'");
+                                . ((&file_user() == $UID) ? ("") : (sprintf(" /bin/su -s /bin/sh %s -c", &pkgvar_get("builduser"))))
+                                . " /bin/sh -c \"/usr/bin/rpmbuild");
             } else {
-                &pkgvar_command("/usr/bin/rpmbuild --define '_debug_package %{nil}' --define '_enable_debug_packages 0' --define '__debug_package 0'");
+                &pkgvar_command("/bin/sh -c \"/usr/bin/rpmbuild");
             }
         } elsif (&pkgvar_instroot()) {
             &pkgvar_command("chroot " . &pkgvar_instroot() . " " . &pkgvar_command());
@@ -115,14 +117,14 @@ rpm_form_command
     if ($type eq "build") {
         $cmd .= " --define 'optflags $ENV{CFLAGS}'";
         if (&pkgvar_buildroot()) {
-            $cmd .= " --buildroot=\"" . &pkgvar_buildroot() . "\"";
+            $cmd .= " --buildroot='" . &pkgvar_buildroot() . "'";
         }
         if (&pkgvar_architecture()) {
-            $cmd .= " --target=\"" . &pkgvar_architecture() . "\"";
+            $cmd .= " --target='" . &pkgvar_architecture() . "'";
         }
     } elsif ($type eq "install") {
         if (&pkgvar_instroot()) {
-            $cmd .= " --root=\"" . &pkgvar_instroot() . "\"";
+            $cmd .= " --root='" . &pkgvar_instroot() . "'";
         }
     }
     if (&pkgvar_parameters()) {
@@ -146,6 +148,7 @@ rpm_form_command
             &show_backtrace();
             &fatal_error("Bad call to rpm_form_command(\"build\")!\n");
         }
+        $cmd .= "\"";
     } elsif ($type eq "contents") {
         $cmd .= " -qlv -p " . &pkgvar_filename();
     } elsif ($type eq "install") {

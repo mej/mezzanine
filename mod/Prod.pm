@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.19 2004/01/10 13:40:58 mej Exp $
+# $Id: Prod.pm,v 1.20 2004/01/26 20:46:10 mej Exp $
 #
 
 package Mezzanine::Prod;
@@ -156,6 +156,8 @@ get_var_name
     } elsif ($var =~ /^((CH|INST)ROOT|JAIL)([_A-Z]*)$/) {
         # This one case covers CHROOT, CHROOT_INIT, CHROOT_RESET, et al.
         $var = "INSTROOT$3";
+    } elsif ($var =~ /^BUILD_?(USER|AS)$/) {
+        $var = "BUILDUSER";
     }
     return $var;
 }

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.23 2004/01/24 23:54:15 mej Exp $
+# $Id: Util.pm,v 1.24 2004/01/26 20:46:10 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -39,27 +39,37 @@ BEGIN {
     $VERSION     = 2.1;
 
     @ISA         = ('Exporter');
-    # Exported functions go here
-    @EXPORT      = ('$debug', '$progname',
 
-                    '&debug_get', '&debug_set',
-		    '&get_timestamp', '&fatal_error', '&dprintf', '&dprint', '&eprintf', '&eprint', '&wprintf', '&wprint',
-		    '&handle_signal', '&handle_fatal_signal', '&handle_warning', '&show_backtrace', '&print_args',
-		    '&mkdirhier', '&nuke_tree', '&move_files', '&copy_files', '&copy_tree',
-                    '&basename', '&dirname', '&grepdir', '&limit_files',
-		    '&xpush',
-		    '&cat_file',
-                    '&parse_rpm_name', '&should_ignore', '&touch_file',
+    @EXPORT = ('$debug', '$progname', '$mz_uid', '$mz_gid',
+               '&debug_get', '&debug_set', '&file_user',
+               '&file_group', '&file_owner', '&get_timestamp',
+               '&fatal_error', '&dprintf', '&dprint', '&eprintf',
+               '&eprint', '&wprintf', '&wprint', '&handle_signal',
+               '&handle_fatal_signal', '&handle_warning',
+               '&show_backtrace', '&print_args', '&mkdirhier',
+               '&nuke_tree', '&move_files', '&copy_files',
+               '&copy_tree', '&basename', '&dirname', '&grepdir',
+               '&limit_files', '&xpush', '&cat_file',
+               '&parse_rpm_name', '&should_ignore', '&touch_file',
+               '&MEZZANINE_SUCCESS', '&MEZZANINE_FATAL_ERROR',
+               '&MEZZANINE_SYNTAX_ERROR', '&MEZZANINE_SYSTEM_ERROR',
+               '&MEZZANINE_COMMAND_FAILED', '&MEZZANINE_DUPLICATE',
+               '&MEZZANINE_FILE_NOT_FOUND',
+               '&MEZZANINE_FILE_OP_FAILED',
+               '&MEZZANINE_ACCESS_DENIED', '&MEZZANINE_BAD_ADDITION',
+               '&MEZZANINE_BAD_LOG_ENTRY', '&MEZZANINE_BAD_LOGIN',
+               '&MEZZANINE_BAD_REMOVAL', '&MEZZANINE_CONFLICT_FOUND',
+               '&MEZZANINE_FILE_REMOVED', '&MEZZANINE_INVALID_TAG',
+               '&MEZZANINE_NEED_UPDATE', '&MEZZANINE_NO_SERVER',
+               '&MEZZANINE_NO_SOURCES', '&MEZZANINE_SERVER_CRASH',
+               '&MEZZANINE_BAD_PRODUCT', '&MEZZANINE_SPAWN_FAILED',
+               '&MEZZANINE_PACKAGE_FAILED',
+               '&MEZZANINE_ARCH_MISMATCH', '&MEZZANINE_BAD_MODULE',
+               '&MEZZANINE_BUILD_FAILURE', '&MEZZANINE_DEPENDENCIES',
+               '&MEZZANINE_MISSING_FILES', '&MEZZANINE_SPEC_ERRORS',
+               '&MEZZANINE_MISSING_PKGS', '&MEZZANINE_TERMINATED',
+               '&MEZZANINE_CRASHED', '&MEZZANINE_UNSPECIFIED_ERROR');
 
-		    '&MEZZANINE_SUCCESS', '&MEZZANINE_FATAL_ERROR', '&MEZZANINE_SYNTAX_ERROR', '&MEZZANINE_SYSTEM_ERROR',
-		    '&MEZZANINE_COMMAND_FAILED', '&MEZZANINE_DUPLICATE', '&MEZZANINE_FILE_NOT_FOUND', '&MEZZANINE_FILE_OP_FAILED',
-		    '&MEZZANINE_ACCESS_DENIED', '&MEZZANINE_BAD_ADDITION', '&MEZZANINE_BAD_LOG_ENTRY', '&MEZZANINE_BAD_LOGIN', 
-		    '&MEZZANINE_BAD_REMOVAL', '&MEZZANINE_CONFLICT_FOUND', '&MEZZANINE_FILE_REMOVED', '&MEZZANINE_INVALID_TAG', 
-		    '&MEZZANINE_NEED_UPDATE', '&MEZZANINE_NO_SERVER', '&MEZZANINE_NO_SOURCES', '&MEZZANINE_SERVER_CRASH', 
-		    '&MEZZANINE_BAD_PRODUCT', '&MEZZANINE_SPAWN_FAILED', '&MEZZANINE_PACKAGE_FAILED', '&MEZZANINE_ARCH_MISMATCH', 
-		    '&MEZZANINE_BAD_MODULE', '&MEZZANINE_BUILD_FAILURE', '&MEZZANINE_DEPENDENCIES', '&MEZZANINE_MISSING_FILES', 
-		    '&MEZZANINE_SPEC_ERRORS', '&MEZZANINE_MISSING_PKGS', '&MEZZANINE_TERMINATED', '&MEZZANINE_CRASHED', 
-		    '&MEZZANINE_UNSPECIFIED_ERROR');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -72,12 +82,17 @@ use vars ('@EXPORT_OK');
 ### Initialize exported package variables
 my $debug = 0;
 my $progname = "Mezzanine";
+my $mz_uid = $UID;
+my $mz_gid = $GID;
 
 ### Initialize private global variables
 
 ### Function prototypes
 sub debug_get();
 sub debug_set($);
+sub file_user($);
+sub file_group($);
+sub file_owner($$$);
 sub get_timestamp();
 sub fatal_error(@);
 sub dprintf(@);
@@ -169,6 +184,68 @@ sub
 debug_set($)
 {
     $debug = $_[0];
+}
+
+sub
+file_user($)
+{
+    if (defined($_[0])) {
+        $mz_uid = $_[0];
+    }
+    return $mz_uid;
+}
+
+sub
+file_group($)
+{
+    if (defined($_[0])) {
+        $mz_gid = $_[0];
+    }
+    return $mz_gid;
+}
+
+sub
+file_owner($$$)
+{
+    my ($user, $group, $root) = @_;
+    local *PASSWD;
+    local *GROUP;
+
+    if ($user) {
+        if (! $group) {
+            $group = $user;
+        }
+        if (! $root) {
+            $root = "";
+        }
+
+        open(PASSWD, "$root/etc/passwd") || return undef;
+        while (<PASSWD>) {
+            my $line;
+            my @inp;
+
+            chomp($line = $_);
+            next if (substr($line, 0, length($user)) ne $user);
+            @inp = split(':', $line);
+            ($mz_uid, $mz_gid) = ($inp[2], $inp[3]);
+            last;
+        }
+        close(PASSWD);
+
+        open(GROUP, "$root/etc/group") || return ($mz_uid, $mz_gid);
+        while (<GROUP>) {
+            my $line;
+            my @inp;
+
+            chomp($line = $_);
+            next if (substr($line, 0, length($group)) ne $group);
+            @inp = split(':', $line);
+            $mz_gid = $inp[2];
+            last;
+        }
+        close(GROUP);
+    }
+    return ($mz_uid, $mz_gid);
 }
 
 # Generate timestamp for debugging/log file
@@ -330,7 +407,8 @@ mkdirhier($$)
         $path .= "$dir/";
         if (! -d $path) {
             dprint "mkdirhier() creating \"$path\"\n";
-            mkdir($path, 0755) || eprint("Unable to create $path -- $!\n");
+            mkdir($path, $mask) || eprint("Unable to create $path -- $!\n");
+            chown($mz_uid, $mz_gid, $path);
         }
     }
     if (! -d $_[0]) {
@@ -358,10 +436,10 @@ nuke_tree($)
                 &nuke_tree("$path/$f");
             }
         }
-        dprint "Removing directory $path\n";
+        #dprint "Removing directory $path\n";
         rmdir $path || return 0;
     } else {
-        dprint "Unlinking $path\n";
+        #dprint "Unlinking $path\n";
         unlink($path) || return 0;
     }
     return 1;
@@ -388,7 +466,7 @@ move_files
     }
     dprint "Moving ", join(' ', @flist), " to $dest.\n";
     foreach my $f (@flist) {
-        my ($target, $perms, $uid, $gid, $mode);
+        my ($target, $mode);
 
         if ($addname) {
             ($target = $f) =~ s/^(.*\/)?([^\/]+)$/$dest$2/;
@@ -397,16 +475,7 @@ move_files
         }
 
         # Save permissions of the source file.
-        $perms = stat($f);
-        if (! $perms) {
-            eprint "Unable to stat $f -- $!\n";
-        } else {
-            ($uid, $gid, $mode) = ($perms->uid(), $perms->gid(), $perms->mode());
-            if (($UID == 0) || ($EUID == 0)) {
-                $uid = $gid = 0;
-            }
-            $mode &= 07775;
-        }
+        $mode = ((stat($f))->mode() & 0775) || 0600;
 
         if (!&File::Copy::move($f, $target)) {
             eprint "Unable to move $f to $target -- $!\n";
@@ -414,12 +483,8 @@ move_files
         }
 
         # Set permissions on the target file appropriately.
-        if (! chown($uid, $gid, $target)) {
-            wprint "chown($uid, $gid, $target) failed -- $!\n";
-        }
-        if (! chmod($mode, $target)) {
-            wprintf("chmod(%05o, $target) failed -- $!\n", $mode);
-        }
+        chown($mz_uid, $mz_gid, $target) || dprint "chown($mz_uid, $mz_gid, $target) failed -- $!\n";
+        chmod($mode, $target) || dprintf("chmod(%05o, $target) failed -- $!\n", $mode);
         $fcnt++;
     }
     return $fcnt;
@@ -446,7 +511,7 @@ copy_files
     }
     dprint "Copying ", join(' ', @flist), " to $dest.\n";
     foreach my $f (grep(-f $_, @flist)) {
-        my ($target, $perms, $uid, $gid, $mode);
+        my ($target, $mode);
 
         if ($addname) {
             $target = $dest . &basename($f);
@@ -455,16 +520,7 @@ copy_files
         }
 
         # Save permissions of the source file.
-        $perms = stat($f);
-        if (! $perms) {
-            eprint "Unable to stat $f -- $!\n";
-        } else {
-            ($uid, $gid, $mode) = ($perms->uid(), $perms->gid(), $perms->mode());
-            if (($UID == 0) || ($EUID == 0)) {
-                $uid = $gid = 0;
-            }
-            $mode &= 07775;
-        }
+        $mode = ((stat($f))->mode() & 0775) || 0600;
 
         if (!&File::Copy::copy($f, $target)) {
             eprint "Unable to copy $f to $target -- $!.  Copied $fcnt files.\n";
@@ -472,12 +528,8 @@ copy_files
         }
 
         # Set permissions on the target file appropriately.
-        if (! chown($uid, $gid, $target)) {
-            wprint "chown($uid, $gid, $target) failed -- $!\n";
-        }
-        if (! chmod($mode, $target)) {
-            wprintf("chmod(%05o, $target) failed -- $!\n", $mode);
-        }
+        chown($mz_uid, $mz_gid, $target) || dprint "chown($mz_uid, $mz_gid, $target) failed -- $!\n";
+        chmod($mode, $target) || dprintf("chmod(%05o, $target) failed -- $!\n", $mode);
         $fcnt++;
     }
     return $fcnt;
@@ -512,6 +564,7 @@ copy_tree($$)
             eprint "Unable to create directory $new_path -- $!\n";
             return 0;
         }
+        chown($mz_uid, $mz_gid, $new_path);
 
         $fcnt += &copy_files(&grepdir(sub {! -d $_}, $old_path), $new_path);
         @files = &grepdir(sub {-d $_}, $old_path);
@@ -651,6 +704,7 @@ touch_file
     local *TMP;
 
     open(TMP, ">$file") && close(TMP);
+    chown($mz_uid, $mz_gid, $file);
 }
 
 1;

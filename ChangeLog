@@ -277,3 +277,13 @@ Sat Jan 24 20:19:01 2004                        Michael Jennings (mej)
 
 Permissions/ownership fixes for installed files.
 ----------------------------------------------------------------------
+Mon Jan 26 15:44:26 2004                        Michael Jennings (mej)
+
+Added build-as-user option.
+
+Removed unnecessary debugging statements in nuke_tree().
+
+Force ownership in created tarballs to root/root.
+
+Fixed -L option to work.
+----------------------------------------------------------------------

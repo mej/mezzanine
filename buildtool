@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.169 2004/01/23 22:54:48 mej Exp $
+# $Id: buildtool,v 1.170 2004/01/26 20:46:10 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -65,6 +65,7 @@ print_usage_info
     print "    -L --location <location_spec>    Specify where packages should be placed (as in product file)\n";
     print "    -i --instroot --jail <dir>       Specify chroot jail to build in\n";
     print "    -H --hints <file_or_dir>         Specify location of pre-build hints or hint files\n";
+    print "    -u --user <userid>               Build packages as <userid> instead of current user\n";
     print "       --hi --hint-installer <prog>  Specify the mechanism used to install the hints\n";
     print "       --ii --instroot-init <cmd>    Command used to initialize chroot jail\n";
     print "       --ir --instroot-reset <cmd>   Command used to reset chroot jail\n";
@@ -239,8 +240,16 @@ build_single_package
                     wprint "Reset of install root failed.\n";
                 }
             }
+            if ($pkgs->{$pkg}{"BUILDUSER"}) {
+                &pkgvar_set("builduser", $pkgs->{$pkg}{"BUILDUSER"});
+                &file_owner($pkgs->{$pkg}{"BUILDUSER"}, $pkgs->{$pkg}{"BUILDGROUP"}, $pkgs->{$pkg}{"INSTROOT"});
+            }
         } else {
             &pkgvar_instroot("");
+            if ($pkgs->{$pkg}{"BUILDUSER"}) {
+                &pkgvar_set("builduser", $pkgs->{$pkg}{"BUILDUSER"});
+                &file_owner($pkgs->{$pkg}{"BUILDUSER"}, $pkgs->{$pkg}{"BUILDGROUP"});
+            }
         }
         ($err, $msg, $outfiles) = &build_package();
         if ($err != MEZZANINE_SUCCESS) {
@@ -647,7 +656,7 @@ main
                    "U|user=s", "L|location=s", "i|instroot|jail=s",
                    "H|hints=s", "hi|hint-installer=s",
                    "ii|instroot-init=s", "ir|instroot-reset=s",
-                   "ic|instroot-copy=s");
+                   "ic|instroot-copy=s", "u|user=s");
 
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
@@ -657,7 +666,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.169 $ created on $Date: 2004/01/23 22:54:48 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.170 $ created on $Date: 2004/01/26 20:46:10 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -729,6 +738,30 @@ main
         $prod = "autoprod-1.0";
     }
 
+    # This must happen after $prod is set but before $opt_s is handled.
+    if ($opt_L) {
+        my $locations = $opt_L;
+
+        if (-d $locations) {
+            $locations = '/.*/=' . $locations;
+            dprint "Got global location \"$locations\".\n";
+        } elsif ($locations !~ m,/[^/]+/[\@=],) {
+            if (&mkdir($locations, 0775)) {
+                dprint "Created location $locations.\n";
+                $locations = "/.*/=$locations";
+            } else {
+                eprint "Bad location $locations, can't mkdir -- $!\n";
+                $locations = "/.*/=.";
+            }
+        }
+        &assign_product_variable($prod, "LOCATIONS", $locations);
+    }
+
+    # This must happen after $prod is set but before $opt_s is handled.
+    if ($opt_u) {
+        &assign_product_variable($prod, "BUILDUSER", $opt_u);
+    }
+
     if ($opt_i) {
         my ($instroot, $instroot_init, $instroot_reset, $instroot_copy) = ($opt_i, $opt_ii, $opt_ir, $opt_ic);
 
@@ -737,13 +770,13 @@ main
         # info and other flags can be added to $MEZZANINE_INSTROOT_SOURCE_RSYNC.
         if ($ENV{"MEZZANINE_INSTROOT_SOURCE_RSYNC"}) {
             if (! $instroot_init) {
-                $instroot_init = "rsync -PHavz --delete --delete-after --exclude=/proc $ENV{MEZZANINE_INSTROOT_SOURCE_RSYNC}";
+                $instroot_init = "rsync -PHaz --delete --delete-after --exclude=/proc $ENV{MEZZANINE_INSTROOT_SOURCE_RSYNC}";
             }
             if (! $instroot_reset) {
-                $instroot_reset = "rsync -PHavz --delete --delete-after --exclude=/proc $ENV{MEZZANINE_INSTROOT_SOURCE_RSYNC}";
+                $instroot_reset = "rsync -PHaz --delete --delete-after --exclude=/proc $ENV{MEZZANINE_INSTROOT_SOURCE_RSYNC}";
             }
             if (! $instroot_copy) {
-                $instroot_copy = "rsync -PHav --delete --delete-after";
+                $instroot_copy = "rsync -PHa --delete --delete-after";
             }
         }
 
@@ -770,24 +803,6 @@ main
                 &parse_product_entry($pkg, $prod);
             }
         }
-    }
-
-    if ($opt_L) {
-        my $locations = $opt_L;
-
-        if (-d $locations) {
-            $locations = '/.*/=' . $locations;
-            dprint "Got global location \"$locations\".\n";
-        } elsif ($locations !~ m,/[^/]+/[\@=],) {
-            if (&mkdir($locations, 0775)) {
-                dprint "Created location $locations.\n";
-                $locations = "/.*/=$locations";
-            } else {
-                eprint "Bad location $locations, can't mkdir -- $!\n";
-                $locations = "/.*/=.";
-            }
-        }
-        &assign_product_variable($prod, "LOCATIONS", $locations);
     }
 
     &pkgvar_buildroot($ENV{"MEZZANINE_BUILDROOT"});

@@ -81,6 +81,7 @@ $orig_pkg_vars{"rcfile"} = "";
 $orig_pkg_vars{"tar"} = "";
 $orig_pkg_vars{"zip"} = "";
 $orig_pkg_vars{"cleanup"} = "none";
+$orig_pkg_vars{"builduser"} = $ENV{"USER"};
 %{$orig_pkg_vars{"type"}} = ();
 %{$orig_pkg_vars{"subtype"}} = ();
 
