@@ -1,7 +1,7 @@
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
 Version: 1.7
-Release: 0.2
+Release: 0.3
 Copyright: BSD
 Group: Development/Tools
 Source: %{name}.tar.gz
@@ -44,7 +44,7 @@ mkdir -p $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine
 mkdir -p $RPM_BUILD_ROOT%{_mandir}/man1
 mkdir -p $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine/templates
 
-for i in *tool pkgsort perlpkg ; do
+for i in *tool pkgsort perlpkg specgen ; do
   install -m 755 $i $RPM_BUILD_ROOT%{_bindir}/
 done
 

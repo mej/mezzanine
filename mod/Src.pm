@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.17 2004/01/30 23:18:11 mej Exp $
+# $Id: Src.pm,v 1.18 2004/03/26 21:31:20 mej Exp $
 #
 
 package Mezzanine::Src;
@@ -43,11 +43,11 @@ BEGIN {
 
     @ISA         = ('Exporter');
 
-    @EXPORT = ('$WORK_DIR', '$TMP_DIR', '&find_files',
-               '&find_subdirs', '&generate_symlink_file',
-               '&install_spm_files', '&create_temp_space',
-               '&clean_temp_space', '&convert_srpm_to_spm',
-               '&convert_srpm_to_pdr', '&run_cmd', '&run_mz_cmd');
+    @EXPORT = ('$WORK_DIR', '&find_files', '&find_subdirs',
+               '&generate_symlink_file', '&install_spm_files',
+               '&create_temp_space', '&clean_temp_space',
+               '&convert_srpm_to_spm', '&convert_srpm_to_pdr',
+               '&run_cmd', '&run_mz_cmd');
 
     %EXPORT_TAGS = ( );
 
@@ -62,7 +62,6 @@ use vars ('@EXPORT_OK');
 
 # Constants
 $WORK_DIR = "work";
-$TMP_DIR = "/var/tmp/srctool.$$";
 
 ### Initialize private global variables
 
@@ -71,8 +70,6 @@ sub find_files($);
 sub find_subdirs($);
 sub generate_symlink_file($);
 sub install_spm_files($);
-sub create_temp_space($$);
-sub clean_temp_space();
 sub convert_srpm_to_spm($$);
 sub convert_srpm_to_pdr($$);
 sub run_cmd($$$);
@@ -185,42 +182,6 @@ install_spm_files($)
 	return 0;
     }
     return $spec;
-}
-
-# Create temporary working space in /var/tmp
-sub
-create_temp_space($$)
-{
-    my ($pkg, $type) = @_;
-    my ($dir, $d);
-    my @dirlist;
-
-    $dir = "$TMP_DIR/$pkg";
-    dprint "Creating $type temp space in $dir.\n";
-    &nuke_tree($dir);
-    &mkdirhier($dir) || return "";
-    if ($type eq "SPM") {
-	@dirlist = ("S", "P", "F");
-    } elsif ($type eq "PDR") {
-	@dirlist = ();
-    } elsif ($type eq "build") {
-	@dirlist = ("BUILD", "SOURCES", "SRPMS", "RPMS", "SPECS");
-    }
-    foreach $d (@dirlist) {
-	if (!&mkdirhier("$dir/$d")) {
-	    eprint "Creation of $dir/$d failed -- $!\n";
-	    return "";
-	}
-    }
-    return $dir;
-}
-
-# Clean up temp space
-sub
-clean_temp_space()
-{
-    dprint "Cleaning temp space in $TMP_DIR.\n";
-    return &nuke_tree($TMP_DIR);
 }
 
 sub

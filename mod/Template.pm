@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Template.pm,v 1.1 2004/03/25 02:58:40 mej Exp $
+# $Id: Template.pm,v 1.2 2004/03/26 21:31:20 mej Exp $
 #
 
 package Mezzanine::Template;
@@ -37,8 +37,7 @@ BEGIN {
     $VERSION     = 0.1;
 
     # Stuff that's always exported.
-    @EXPORT      = ('&build', '&add_var', '&del_var', '&find',
-                    '&verify', '&subst', '&generate');
+    @EXPORT      = ();
 
     # Stuff that's exported upon request.
     @EXPORT_OK   = ('$VERSION');
@@ -139,11 +138,12 @@ find(@)
 {
     my $self = shift;
     my @dirs = @_;
-    my $template = $self->file;
+    my $template = $self->file();
 
     push @dirs, @INC;
     push @dirs, &getcwd();
     foreach my $dir (@dirs) {
+        next if (! $dir);
         if (-f "$dir/Mezzanine/templates/$template") {
             $self->directory("$dir/Mezzanine/templates");
             return $self->directory();

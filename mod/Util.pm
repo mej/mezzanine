@@ -1,6 +1,6 @@
 # Mezzanine Utilities Perl Module
 # 
-# Copyright (C) 2001, Michael Jennings
+# Copyright (C) 2001-2004, Michael Jennings
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -21,13 +21,14 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.31 2004/03/25 16:10:56 mej Exp $
+# $Id: Util.pm,v 1.32 2004/03/26 21:31:20 mej Exp $
 #
 
 package Mezzanine::Util;
 use strict;
-use vars '$debug', '$progname', '$mz_uid', '$mz_gid';
+use vars '$debug', '$PROGNAME', '$VERSION', '$mz_uid', '$mz_gid', '$TMP_DIR', '%OPTION';
 use English;
+use Getopt::Long;
 
 BEGIN {
     use strict;
@@ -41,15 +42,18 @@ BEGIN {
 
     @ISA         = ('Exporter');
 
-    @EXPORT = ('$debug', '$progname', '$mz_uid', '$mz_gid',
+    @EXPORT = ('$debug', '$PROGNAME', '$VERSION', '$mz_uid',
+               '$mz_gid', '$TMP_DIR', '%OPTION', '&mezz_init',
                '&debug_get', '&debug_set', '&print_version',
                '&file_user', '&file_group', '&file_owner',
                '&get_timestamp', '&fatal_error', '&dprintf',
                '&dprint', '&eprintf', '&eprint', '&wprintf',
                '&wprint', '&handle_signal', '&handle_fatal_signal',
-               '&handle_warning', '&show_backtrace', '&print_args',
-               '&mkdirhier', '&nuke_tree', '&move_files',
-               '&copy_files', '&copy_tree', '&basename', '&dirname',
+               '&install_signal_handlers', '&handle_warning',
+               '&show_backtrace', '&print_args', '&mkdirhier',
+               '&nuke_tree', '&move_files', '&copy_files',
+               '&copy_tree', '&create_temp_space',
+               '&clean_temp_space', '&basename', '&dirname',
                '&grepdir', '&limit_files', '&xpush', '&cat_file',
                '&parse_rpm_name', '&should_ignore', '&touch_file',
                '&MEZZANINE_SUCCESS', '&MEZZANINE_FATAL_ERROR',
@@ -82,14 +86,24 @@ use vars ('@EXPORT_OK');
 
 ### Initialize exported package variables
 $debug = 0;
-$progname = "Mezzanine";
+$PROGNAME = "Mezzanine";
+$VERSION = "0.0";
 $mz_uid = $UID;
-$mz_gid = $GID;
-$mz_gid =~ s/\s+.*$//;
+($mz_gid = $GID) =~ s/\s+.*$//;
+%OPTION = ();
+
+$TMP_DIR = "/var/tmp/mezzanine.$$";
+foreach my $var ("MEZZANINE_TMP", "MEZZANINE_TEMP", "MEZZANINE_TEMPDIR", "MEZZANINE_TMPDIR", "TEMP", "TMP", "TMPPATH") {
+    if ($ENV{$var} && -d $ENV{$var} && -w _) {
+        $TMP_DIR = "$ENV{$var}/mezzanine.$$";
+        last;
+    }
+}
 
 ### Initialize private global variables
 
 ### Function prototypes
+sub mezz_init($$@);
 sub debug_get();
 sub debug_set($);
 sub print_version($$$$);
@@ -104,6 +118,7 @@ sub eprintf(@);
 sub eprint(@);
 sub handle_signal(@);
 sub handle_fatal_signal(@);
+sub install_signal_handlers();
 sub handle_warning(@);
 sub show_backtrace();
 sub print_args(@);
@@ -112,6 +127,8 @@ sub nuke_tree($);
 sub move_files(@);
 sub copy_files(@);
 sub copy_tree($$);
+sub create_temp_space($$$);
+sub clean_temp_space($);
 sub basename($);
 sub dirname($);
 sub grepdir(& $);
@@ -175,6 +192,26 @@ sub MEZZANINE_CRASHED()           {121;}
 sub MEZZANINE_UNSPECIFIED_ERROR() {127;}
 
 ### Function definitions
+
+# Perform common startup tasks, including option parsing.
+sub
+mezz_init($$@)
+{
+    my @valid_opts;
+
+    $PROGNAME = shift;
+    $VERSION = shift;
+    @valid_opts = @_;
+
+    umask 022;
+    &install_signal_handlers();
+    select STDERR; $| = 1;
+    select STDOUT; $| = 1;
+
+    Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
+    Getopt::Long::GetOptions(\%OPTION, @valid_opts);
+    return %OPTION;
+}
 
 # Get debugging state
 sub
@@ -281,7 +318,7 @@ get_timestamp()
 sub
 fatal_error(@)
 {
-    print STDERR "$progname:  FATAL:  ", @_;
+    print STDERR "$PROGNAME:  FATAL:  ", @_;
     exit(MEZZANINE_FATAL_ERROR);
 }
 
@@ -325,26 +362,26 @@ dprint(@)
 sub
 eprintf(@)
 {
-    print "$progname:  Error:  ";
+    print "$PROGNAME:  Error:  ";
     printf @_;
 }
 sub
 eprint(@)
 {
-    print "$progname:  Error:  ", @_;
+    print "$PROGNAME:  Error:  ", @_;
 }
 
 # Print a warning
 sub
 wprintf(@)
 {
-    print "$progname:  Warning:  ";
+    print "$PROGNAME:  Warning:  ";
     printf @_;
 }
 sub
 wprint(@)
 {
-    print "$progname:  Warning:  ", @_;
+    print "$PROGNAME:  Warning:  ", @_;
 }
 
 # Handle a terminate signal
@@ -368,6 +405,26 @@ handle_fatal_signal(@)
 
     eprint "Caught fatal signal SIG$sig.  Cleaning up and aborting...\n";
     exit MEZZANINE_CRASHED;
+}
+
+# Install standard signal handlers.
+sub
+install_signal_handlers()
+{
+    # Signal handling
+    $SIG{"__WARN__"} = \&handle_warning;
+    $SIG{"HUP"} = "IGNORE";
+    $SIG{"INT"} = \&handle_signal;
+    $SIG{"TERM"} = \&handle_signal;
+    $SIG{"QUIT"} = \&handle_fatal_signal;
+    $SIG{"ILL"} = \&handle_fatal_signal;
+    $SIG{"ABRT"} = \&handle_fatal_signal;
+    $SIG{"FPE"} = \&handle_fatal_signal;
+    $SIG{"SEGV"} = \&handle_fatal_signal;
+    $SIG{"BUS"} = \&handle_fatal_signal;
+    $SIG{"TSTP"} = \&handle_fatal_signal;
+    $SIG{"TTIN"} = \&handle_fatal_signal;
+    $SIG{"TTOU"} = \&handle_fatal_signal;
 }
 
 # Handle a perl warning
@@ -622,6 +679,47 @@ copy_tree($$)
         dprint "Direct copying $old_path to $new_path.\n";
         return &copy_files($old_path, $new_path);
     }
+}
+
+# Create temporary working space in /var/tmp
+sub
+create_temp_space($$)
+{
+    my ($pkg, $type, $tmpdir) = @_;
+    my ($dir, $d);
+    my @dirlist;
+
+    if (! $tmpdir) {
+        $tmpdir = $TMP_DIR;
+    }
+    $dir = "$tmpdir/$pkg";
+    dprint "Creating $type temp space in $dir.\n";
+    &nuke_tree($dir);
+    &mkdirhier($dir) || return "";
+    if ($type eq "SPM") {
+	@dirlist = ("S", "P", "F");
+    } elsif ($type eq "dironly" || $type eq "PDR") {
+	@dirlist = ();
+    } elsif ($type eq "build") {
+	@dirlist = ("BUILD", "SOURCES", "SRPMS", "RPMS", "SPECS");
+    }
+    foreach $d (@dirlist) {
+	if (!&mkdirhier("$dir/$d")) {
+	    eprint "Creation of $dir/$d failed -- $!\n";
+	    return "";
+	}
+    }
+    return $dir;
+}
+
+# Clean up temp space
+sub
+clean_temp_space($)
+{
+    my $tmpdir = $_[0] || $TMP_DIR;
+
+    dprint "Cleaning temp space in $tmpdir.\n";
+    return &nuke_tree($tmpdir);
 }
 
 # Strip the leading path off a directory/file name

@@ -361,3 +361,19 @@ Thu Mar 25 11:10:42 2004                        Michael Jennings (mej)
 
 Minor touchups for 1.7-0.2.
 ----------------------------------------------------------------------
+Fri Mar 26 16:26:04 2004                        Michael Jennings (mej)
+
+Made temp space creation more generic.  This needs to be used for all
+temp space creation ASAP.
+
+Centralized some common initialization code.
+
+Added 2 new spec templates, make and imake.
+
+Added specgen to installed scripts.
+
+specgen now has automatic detection of:
+ - %setup macro parameters
+ - documentation files
+ - package license
+----------------------------------------------------------------------
