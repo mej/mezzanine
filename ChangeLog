@@ -112,3 +112,9 @@ Sat May 13 01:03:53 2000                        Michael Jennings (mej)
 
 Miscellaneous bug fixes to buildtool.  Getting closer....
 ----------------------------------------------------------------------
+Mon May 15 17:50:54 2000                        Michael Jennings (mej)
+
+This should fix that build bug where some packages got excluded from
+one stage or another.  The beginnings of the compose stage are here
+too.
+----------------------------------------------------------------------

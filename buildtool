@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.9 2000/05/13 07:56:15 mej Exp $
+# $Id: buildtool,v 1.10 2000/05/16 00:43:41 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -183,13 +183,15 @@ parse_product_def
             foreach $varval (@inp) {
                 ($var, $val) = split("=", $varval);
                 $var =~ tr/[a-z]/[A-Z]/;
-                # Common variables are REVISION/TAG, VERSION, DATE, CVSROOT
+                # Common variables are REVISION/TAG, VERSION, DATE, CVSROOT, SPECFILE
                 if ($var =~ /^REV/ || $var =~ /^TAG/) {
                     $var = "REVISION";
                 } elsif ($var =~ /^REL/) {
                     $var = "RELEASE";
                 } elsif ($var =~ /^VER/) {
                     $var = "VERSION";
+                } elsif ($var =~ /^SPEC/) {
+                    $var = "SPECFILE";
                 }
                 $pkgvars{$var} = $val;
             }
@@ -332,6 +334,7 @@ do_bootstrap_stage
     my $line;
     my $err;
     my $msg;
+    my @p = @packages;
 
     qprint "$progname:  Entering the bootstrap stage.  (${\(&get_timestamp())})\n";
     if (! -d "$builddir") {
@@ -364,7 +367,7 @@ do_bootstrap_stage
             close(RPMRC);
         }
     }
-    foreach $pkg (@packages) {
+    foreach $pkg (@p) {
         nprint "$progname:  Starting bootstrap stage for the \"$pkg\" package....\n";
         $filename = $pkgs->{$pkg}{FILENAME};
         if ($pkgs->{$pkg}{CVSROOT}) {
@@ -405,16 +408,47 @@ do_bootstrap_stage
 sub
 do_compose_stage
 {
+    my ($specfile, $target, $pn);
+    my @contents;
+    my @tmp;
+    my @p = @packages;
+
     qprint "$progname:  Entering the compose stage.  (${\(&get_timestamp())})\n";
     # No compose stage for SRPM's since they're *already* SRPM's....
-    foreach $pkg (grep $pkgs->{$_}{TYPE} ne "srpm", @packages) {
+    foreach $pkg (grep $pkgs->{$_}{TYPE} eq "module", @p) {
         nprint "$progname:  Starting compose stage for the \"$pkg\" package....\n";
-        if ($pkgs->{$pkg}{TYPE} eq "module") {
-            #
-            # Somewhere in here, be sure to reset the {FILENAME} member
-            # to the path and filename of the SRPM rather than the module.
-            #
+        #
+        # Somewhere in here, be sure to reset the {FILENAME} member
+        # to the path and filename of the SRPM rather than the module.
+        #
+        if (! chdir($pkgs->{$pkg}{MODULE})) {
+            &fail_package($pkg, "compose", "Could not chdir into $pkgs->{$pkg}{MODULE} -- $!");
+            next;
         }
+        ($pn = $prodname) =~ s/^va-//;
+        opendir(DIR, ".");
+        @contents = readdir(DIR);
+        closedir(DIR);
+        if ($pkgs->{$pkg}{SPECFILE}) {
+            $specfile = $pkgs->{$pkg}{SPECFILE};
+        } else {
+            @tmp = grep($_ =~ /^($pkg-)?(va-)?$prodname\.spec/, @contents);
+            if ($#tmp != 0) {
+                @tmp = grep($_ =~ /^($pkg-)?$prodname\.spec/, @contents);
+                if ($#tmp != 0) {
+                    @tmp = grep($_ =~ /^$pkg\.spec/, @contents);
+                    if ($#tmp != 0) {
+                        @tmp = grep($_ =~ /\.spec/, @contents);
+                    }
+                }
+            }
+            $specfile = $tmp[0];
+            if (!defined $specfile || $specfile =~ /^$/) {
+                &fail_package($pkg, "compose", "No spec file could be located in $pkgs->{$pkg}{MODULE}");
+                next;
+            }
+        }
+
         nprint "$progname:  Compose stage for \"$pkg\" is complete.\n";
     }
     qprint "$progname:  Compose stage is now complete.  (${\(&get_timestamp())})\n";
@@ -425,9 +459,12 @@ do_explode_stage
 {
     my ($cmd, $err, $msg, $line, $specfile, $rpm) = undef;
     my @manifest;
+    my @p = @packages;
 
     qprint "$progname:  Entering the explode stage.  (${\(&get_timestamp())})\n";
-    foreach $pkg (@packages) {
+    dprint "Packages left:  ", join(" ", @packages), "\n";
+
+    foreach $pkg (@p) {
         undef @manifest;
         nprint "$progname:  Starting explode stage for the \"$pkg\" package....\n";
         $rpm = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
@@ -439,13 +476,26 @@ do_explode_stage
             &fail_package($pkg, "explode", "Execution of \"$cmd\" failed -- $!");
             next;
         }
+        if (defined $pkgs->{$pkg}{SPECFILE}) {
+            $specfile = $pkgs->{$pkg}{SPECFILE};
+        } else {
+            undef $specfile;
+        }
         while (<RPM>) {
             chomp($line = $_);
             dprint "RPM contents -> $line\n";
             push @manifest, $line;  # Add the file to the manifest
             if ($line =~ /\.spec(\.in)?$/) {
-                $specfile = $line;
-                dprint "Found spec file as $specfile\n";
+                if (!defined $specfile) {
+                    $specfile = $line;
+                    dprint "Found spec file as $specfile\n";
+                } elsif ($specfile eq $line) {
+                    dprint "Found spec file $specfile as predicted.\n";
+                } else {
+                    qprint "$progname:  Warning:  $pkgs->{$pkg}{FILENAME} contains the spec file $line\n";
+                    qprint "$progname:  which is different from the one I was told to expect ($specfile).\n";
+                    qprint "$progname:  I will ignore the auto-detected one as requested, but this may be a problem.\n";
+                }
             }
         }
         close(RPM);
@@ -455,6 +505,7 @@ do_explode_stage
         }
         if (! $specfile) {
             &fail_package($pkg, "explode", "Unable to locate spec file in SRPM");
+            next;
         }
         # We'll use these later, so they MUST be defined for
         # any package we plan on actually building later.
@@ -504,6 +555,7 @@ do_explode_stage
         }
         if ($err) {
             &fail_package($pkg, "explode", $msg);
+            next;
         }
         nprint "$progname:  Explode stage for \"$pkg\" is complete.\n";
     }
@@ -514,10 +566,13 @@ sub
 do_build_stage
 {
     my ($cmd, $err, $msg, $line, $specfile, $rpm, $tmp, $target) = undef;
+    my ($target_age, $orig_age, $spec_age);
+    my @p = @packages;
 
     qprint "$progname:  Entering the build stage.  (${\(&get_timestamp())})\n";
-    foreach $pkg (@packages) {
-        undef @outfiles;
+    dprint "Packages left:  ", join(" ", @packages), "\n";
+
+    foreach $pkg (@p) {
         nprint "$progname:  Starting build stage for the \"$pkg\" package....\n";
 
         # Check for a target SRPM that is newer than the original SRPM and the
@@ -593,6 +648,7 @@ do_package_stage
     my @outfiles;
     my @tmp;
     my @contents;
+    my @p = @packages;
 
     qprint "$progname:  Entering the package accumulation stage.  (${\(&get_timestamp())})\n";
 
@@ -605,7 +661,9 @@ do_package_stage
         }
     }
     
-    foreach $pkg (@packages) {
+    dprint "Packages left:  ", join(" ", @packages), "\n";
+
+    foreach $pkg (@p) {
         nprint "$progname:  Starting package accumulation stage for the \"$pkg\" package....\n";
         $version = $pkgs->{$pkg}{VERSION};
         $release = $pkgs->{$pkg}{RELEASE};
@@ -658,8 +716,10 @@ do_package_stage
 sub
 do_iso_stage
 {
+    my @p = @packages;
+
     qprint "$progname:  Entering the ISO image stage.  (${\(&get_timestamp())})\n";
-    foreach $pkg (@packages) {
+    foreach $pkg (@p) {
         nprint "$progname:  Starting ISO image stage for the \"$pkg\" package....\n";
 
         nprint "$progname:  ISO image stage for \"$pkg\" is complete.\n";
@@ -670,8 +730,10 @@ do_iso_stage
 sub
 do_cleanup_stage
 {
+    my @p = @packages;
+
     qprint "$progname:  Entering the cleanup stage.  (${\(&get_timestamp())})\n";
-    foreach $pkg (@packages) {
+    foreach $pkg (@p) {
         nprint "$progname:  Starting cleanup stage for the \"$pkg\" package....\n";
 
         nprint "$progname:  Cleanup stage for \"$pkg\" is complete.\n";
@@ -684,6 +746,13 @@ do_cleanup_stage
 sub
 summarize_failures
 {
+    my $ns, $nf, $nt;
+
+    $ns = $#packages + 1;
+    $nf = $#failed_pkgs + 1;
+    $nt = $ns + $nf;
+    qprintf "Package Summary:  Out of %d total packages, %d succeeded and %d failed.\n", $nt, $ns, $nf;
+
     foreach $pkg (@failed_pkgs) {
         if ($failure->{$pkg}{MESSAGE}) {
             eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage:  $failure->{$pkg}{MESSAGE}.\n";
@@ -697,7 +766,7 @@ summarize_failures
 sub
 build_process
 {
-    undef $ENV{MAKE};  # Make sure we don't parallel build, because it doesn't work.
+    $ENV{MAKE} = "make";  # Make sure we don't parallel build, because it doesn't work.
     $ENV{CFLAGS} = "-O2 -march=pentium";  # A bit of optimization, but not much.
     undef $ENV{LD_LIBRARY_PATH};  # Make glibc happy
 
@@ -727,6 +796,9 @@ build_process
 sub
 main
 {
+    $prod = $opt_p;
+    ($prodname, $prodver) = split("-", $prod);
+
     if (! $prod) {
         eprint "You didn't tell me what to build, so I'm not quite sure what to do.\n";
         eprint "If you aren't familiar with how to use $progname, try $progname --help.\n";
@@ -768,7 +840,6 @@ BEGIN {
     } else {
         $proddir = ".";
     }
-    $prod = $opt_p;
     $opt_b = "p" if (! $opt_b);
     $basedir = ($ENV{BASE_DIR} ? $ENV{BASE_DIR} : ".");
     $builddir = ($ENV{BUILD_DIR} ? $ENV{BUILD_DIR} : "$basedir/build");
