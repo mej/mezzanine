@@ -130,3 +130,8 @@ Tue May 16 17:33:16 2000                        Michael Jennings (mej)
 
 Doh!  Forgot a bit there.
 ----------------------------------------------------------------------
+Wed May 17 20:43:39 2000                        Michael Jennings (mej)
+
+Some additions in error handling for robustness in the face of
+stupidity.
+----------------------------------------------------------------------
