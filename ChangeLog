@@ -536,3 +536,9 @@ Wed Jul 21 20:30:58 2004                        Michael Jennings (mej)
 
 gmkurtzer is helping me track down a cache bug....
 ----------------------------------------------------------------------
+Wed Jul 21 22:09:06 2004                        Michael Jennings (mej)
+
+This should fix the caching problems.  Also added an option for
+setting the root of the build tree (formerly only
+$MEZZANINE_BUILDDIR).
+----------------------------------------------------------------------
