@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.1 2001/07/20 15:13:55 mej Exp $
+# $Id: Build.pm,v 1.2 2001/07/20 20:29:35 mej Exp $
 #
 
 package Avalon::Build;
@@ -51,6 +51,7 @@ use vars ('@EXPORT_OK');
 ### Initialize private global variables
 
 ### Function prototypes
+sub cleanup($);
 
 # Private functions
 
@@ -337,6 +338,30 @@ special_build
     }
     chdir($builddir);
     return ($err, $msg, $srpm);
+}
+
+# Clean up the RPM build directories and the build root
+sub
+cleanup
+{
+    my $type = $_[0];
+    my @dirs;
+
+    if ($type =~ /no(ne)?/i) {
+        return;
+    } elsif ($type =~ /temp/i) {
+        @dirs = ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SPECS", $buildroot);
+    } elsif ($type =~ /rpm/i) {
+        @dirs = ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SRPMS", "$builddir/RPMS", "$builddir/SPECS");
+    } elsif ($type =~ /(build)?root/) {
+        @dirs = ($buildroot);
+    } else {
+        @dirs = ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SRPMS", "$builddir/RPMS", "$builddir/SPECS", $buildroot);
+    }
+    foreach $f (@dirs) {
+        nprint "$progname:  Cleaning up $f\n";
+        &nuke_tree($f) || qprint "Warning:  Removal of $f failed -- $!\n";
+    }
 }
 
 

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.7 2001/07/20 15:13:55 mej Exp $
+# $Id: Pkg.pm,v 1.8 2001/07/20 20:29:35 mej Exp $
 #
 
 package Avalon::Pkg;
@@ -36,7 +36,7 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('$specdata', '&parse_spec_file', '&parse_srcs_file');
+    @EXPORT      = ('$specdata', '&parse_spec_file', '&parse_srcs_file', '&fetch_package');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -54,6 +54,7 @@ $specdata = 0;
 ### Function prototypes
 sub parse_spec_file($$);
 sub parse_srcs_file($);
+sub fetch_package($$$$$);
 
 # Private functions
 sub add_define($$);
@@ -201,6 +202,61 @@ parse_srcs_file($)
     dprint "Post-parse SRCS variable:  $srcs\n";
 
     return split(',', $srcs);
+}
+
+# Use revtool to download a package from the master repository
+sub
+fetch_package
+{
+    my ($module, $filename, $tag, $cvsroot, $opts) = @_;
+    my ($err, $msg, $line) = undef;
+    local *REVTOOL;
+
+    $filename = "" if (!defined($filename));
+    $tag = "" if (!defined($tag));
+    $cvsroot = "" if (!defined($cvsroot));
+    $opts = "" if (!defined($opts));
+    dprint "$module, $filename, $tag, $cvsroot, $opts\n";
+    if ($module && $filename) {
+        $filename = "$module/$filename";
+    } elsif ($module) {
+        $filename = $module;
+    }
+    if ($cvsroot) {
+        $cvsroot = "-D $cvsroot";
+    }
+    if ($tag) {
+        if ($tag =~ /^head$/i) {
+            $tag = "";
+        } else {
+            $tag = "-t $tag";
+        }
+    }
+
+    dprint "Checking for $filename\n";
+    # If it already exists, go on.
+    if (($module && -d $module) || (-f $filename && -s _)) {
+        return 2;
+    }
+
+    $cmd = "revtool -l $cvsroot $tag $opts -g $filename";
+    dprint "About to run $cmd\n";
+    if (!open(REVTOOL, "$cmd 2>&1 |")) {
+        return (AVALON_COMMAND_FAILED, "Execution of \"$cmd\" failed -- $!");
+    }
+    while (<REVTOOL>) {
+        chomp($line = $_);
+        dprint "$line\n";
+        next if ($line =~ /^\[debug:/);
+        # Check the output for errors
+        if ($line =~ /^revtool:\s*Error/) {
+            ($msg = $line) =~ s/^revtool:\s*Error:\s*//;
+        }
+    }
+    close(REVTOOL);
+    $err = $? >> 8;
+    dprint "\"$cmd\" returned $err\n";
+    return ($err, ($msg ? $msg : "Unknown error"));
 }
 
 ### Private functions

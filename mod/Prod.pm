@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.1 2001/07/20 15:13:55 mej Exp $
+# $Id: Prod.pm,v 1.2 2001/07/20 20:29:35 mej Exp $
 #
 
 package Avalon::Prod;
@@ -36,8 +36,8 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ();
-    %EXPORT_TAGS = ('@products', '@packages', '$prods', '$pkgs');
+    @EXPORT      = ('@products', '@packages', '@failed_pkgs', '$prods', '$pkgs', '$failure', '&get_var_name', '&get_package_stages', '&branch_tag_prefix', '&pkg_to_release_tag', '&pkg_to_branch_tag', '&place_file', '&fail_package', '&find_product_file', '&parse_product_entry', '&parse_prod_file');
+    %EXPORT_TAGS = ();
 
     # Exported variables go here
     @EXPORT_OK   = ('$VERSION');
@@ -49,10 +49,25 @@ use vars ('@EXPORT_OK');
 ### Initialize exported package variables
 $prods = undef;
 $pkgs = undef;
+$failure = undef;
 
 ### Initialize private global variables
+$proddir = ".";
 
 ### Function prototypes
+sub get_var_name($);
+sub get_package_stages($);
+sub branch_tag_prefix();
+sub pkg_to_release_tag($$);
+sub pkg_to_branch_tag($$);
+sub place_file($$$);
+sub fail_package($$);
+sub find_product_file($$);
+sub parse_product_entry($$$);
+sub parse_prod_file($$$);
+sub summarize_failures();
+sub parallel_build();
+sub build_process();
 
 # Private functions
 
@@ -68,52 +83,17 @@ get_var_name
 {
     my $var = $_[0];
 
+    # Variable names are all uppercase because they are struct members.
     $var =~ tr/[a-z]/[A-Z]/;
 
-    # Commonly shortened variables
-    if ($var =~ /^REV/ || $var eq "TAG") {
-        $var = "REVISION";
-    } elsif ($var =~ /^REL/) {
+    if ($var =~ /^REL/) {
         $var = "RELEASE";
     } elsif ($var =~ /^VER/) {
         $var = "VERSION";
-    } elsif ($var =~ /^SPEC/) {
-        $var = "SPECFILE";
-    } elsif ($var =~ /^DIR/) {
-        $var = "DIRS";
-    } elsif ($var =~ /^PATCH/) {
-        $var = "PATCHES";
     } elsif ($var =~ /^LOC/) {
         $var = "LOCATIONS";
-    } elsif ($var =~ /^DESC/) {
-        $var = "DESCRIPTION";
-    } elsif ($var =~ /^SOURCE/) {
-        $var = "SRCS";
-    } elsif ($var =~ /^MACRO/) {
-        $var = "MACROS";
     }
     return $var;
-}
-
-# Translate a package type into its default STAGES variable
-sub
-get_package_stages
-{
-    my $type = $_[0];
-
-    if ($type eq "srpm") {
-        return "scbp";
-    } elsif ($type eq "tar") {
-        return "sbp";
-    } elsif ($type eq "rpm") {
-        return "sbp";
-    } elsif ($type eq "module") {
-        return "scbp";
-    } elsif ($type eq "image") {
-        return "s";
-    } else {
-        return "scbp";
-    }
 }
 
 # Supply the branch tag prefix
@@ -141,25 +121,20 @@ sub
 pkg_to_branch_tag
 {
     my ($pkg_name, $pkg_version) = @_;
-    my $tag;
 
-    $tag = &branch_tag_prefix() . &pkg_to_release_tag($pkg_name, $pkg_version);
-    return $tag;
+    return (&branch_tag_prefix() . &pkg_to_release_tag($pkg_name, $pkg_version));
 }
 
 # Find the proper location within the image for an output file
 sub
 place_file
 {
-    my ($pkg, $file) = @_;
+    my ($pkg, $loc, $file) = @_;
     my $found = 0;
 
-    dprint "place_file(\"$pkg\", \"$file\") called.\n";
-    if (!defined($pkgs->{$pkg}{LOCATIONS})) {
-        $pkgs->{$pkg}{LOCATIONS} = "/./:$basedir";
-    }
+    dprint "place_file(\"$pkg\", \"$loc\", \"$file\") called.\n";
 
-    foreach $location (split(",", $pkgs->{$pkg}{LOCATIONS})) {
+    foreach $location (split(",", $loc)) {
         my ($regex, $stop, $dest, $image, $subdir);
 
         # Format is:  /regexp/.path  where . is some delimiter character that
@@ -181,12 +156,6 @@ place_file
         dprint "Match found.\n";
 
         if ($dest) {
-            # Grab the first part of the destination path, make sure it's an image module
-            ($image = $dest) =~ s/^([^\/]+)\/.*$/$1/;
-            if (($dest ne $basedir) && (!defined($pkgs->{$image}{TYPE}) || ($pkgs->{$image}{TYPE} ne "image"))) {
-                qprint "Warning:  Destination \"$dest\" is not a package of type \"image\".\n";
-            }
-
             # If the destination does not contain a filename, add the filename portion of
             # $file to the directory path in $dest.  The destination could be used to rename
             # a file, however; that's why this check is in place.
@@ -221,19 +190,15 @@ place_file
 sub
 fail_package
 {
-    my ($pkg, $stage, $msg) = @_;
+    my ($pkg, $msg) = @_;
 
     push @failed_pkgs, $pkg;
-    $failure->{$pkg}{STAGE} = $stage;
     if ($msg) {
-        ($failure->{$pkg}{MESSAGE} = $msg) =~ s/\.+$//;
-        eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage:  $failure->{$pkg}{MESSAGE}.\n";
+        $msg =~ s/\.+$//;
+        eprint "Package \"$pkg\" failed:  $msg.\n";
     } else {
-        eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage.\n";
+        eprint "Package \"$pkg\" failed with an unknown error.\n";
     }
-    @packages = grep($_ ne $pkg, @packages);
-    exit(AVALON_PACKAGE_FAILED) if (! $opt_f);
-    return 0;
 }
 
 # Locate the product file for a particular product
@@ -241,74 +206,22 @@ sub
 find_product_file
 {
     my ($prodname, $prodver) = @_;
-    my $prod = ($prodver ? "$prodname-$prodver" : $prodname);
     my $prodfile;
-    my @contents;
-    local *PRODFILE;
 
     dprint "find_product_file($prodname, ", ($prodver ? $prodver : ""), ")\n";
+
     if ($prodver) {
-        # If it already has the .prod extension, and it exists, return that
-        if ($prod =~ /\.prod$/) {
-            if (-f $prod) {
-                return $prod;
-            } elsif (-f "$proddir/$prod") {
-                # Just needed a path
-                return "$proddir/$prod";
-            } else {
-                $prod =~ s/\.prod$//;
-            }
-        } else {
-            # It has no .prod extension.  Let's try just giving it one.
-            if (-f "$prod.prod") {
-                return "$prod.prod";
-            } elsif (-f "$proddir/$prod.prod") {
-                # Extension and path needed...
-                return "$proddir/$prod.prod";
-            }
+        # Try the whole product ID.
+        ($prodfile = "$proddir/$prodname-$prodver") =~ s/(\.prod)?$/.prod/;
+        if (-f $prodfile) {
+            return $prodfile;
         }
     }
 
     # Try just the product name
-    if ($prodname =~ /\.prod$/) {
-        if (-f $prodname) {
-            return $prodname;
-        } elsif (-f "$proddir/$prodname") {
-            # Just needed a path
-            return "$proddir/$prodname";
-        } else {
-            $prodname =~ s/\.prod$//;
-        }
-    } else {
-        # It has no .prod extension.  Let's try just giving it one.
-        if (-f "$prodname.prod") {
-            return "$prodname.prod";
-        } elsif (-f "$proddir/$prodname.prod") {
-            # Extension and path needed...
-            return "$proddir/$prodname.prod";
-        }
-    }
-
-    # Well, rats.  We've eliminated the simple cases.  Time to get creative.
-    # Find all the product files and search each one for a match.
-    foreach $prodfile (sort(&grepdir(sub {/\.prod$/}, $proddir))) {
-        my (@lines, @names, @versions);
-
-        dprint "find_product_file():  Searching product file $prodfile for a match...\n";
-        open(PRODFILE, "$proddir/$prodfile") || next;
-        @lines = <PRODFILE>;
-        @names = grep($_ =~ /^\s*name\s*:/i, @lines);
-        @versions = grep($_ =~ /^\s*ver(sion)?\s*:/i, @lines);
-        if (grep($_ =~ /$prodname/, @names) && grep($_ =~ /$prodver/, @versions)) {
-            # Found it.
-            dprint "find_product_file():  Match found!\n";
-            return "$proddir/$prodfile";
-        }
-    }
-
-    # One last chance.  Product directory with a .prod file.
-    if (-s "$builddir/$prodname/.prod") {
-	return "$builddir/$prodname/.prod";
+    ($prodfile = "$proddir/$prodname") =~ s/(\.prod)?$/.prod/;
+    if (-f $prodfile) {
+        return $prodfile;
     }
 
     # Give up.  It doesn't exist.
@@ -347,7 +260,7 @@ parse_product_entry
         ($type, $name) = split(":", $inp[0]);
         $type =~ tr/[A-Z]/[a-z]/;
         if (! $name && $inp[1]) {
-            # If there's no name, but there's something after the type, they probably
+            # If there's no name, but there's a colon after the type, they probably
             # just put in some extra whitespace.  Grab it and shift everything left.
             $name = $inp[1];
             shift @inp;
@@ -546,7 +459,7 @@ parse_product_entry
     # FIXME:  Perhaps these shouldn't be hard-coded.  Perhaps we should keep a list of
     #         all package/product variables we've encountered thus far and iterate
     #         through those only, since we're guaranteed no others will have a fallback.
-    foreach $pkgvar ("REVISION", "LOCATIONS", "RPMCMD", "TAR", "ZIP", "STAGES", "CVSROOT", "ARCH", "MACROS") {
+    foreach $pkgvar ("TAG", "LOCATIONS", "CVSROOT") {
         if (! $pkgs->{$name}{$pkgvar}) {
             my ($pkg, $val) = undef;
 
@@ -564,17 +477,6 @@ parse_product_entry
             }
         }
     }
-    # This goes here to avoid the fallback mechanism above.
-    if (defined($pkgs->{$name}{REVISION}) && $pkgs->{$name}{REVISION} =~ /^head$/i) {
-        undef $pkgs->{$name}{REVISION};
-    }
-    # If we haven't been told which stages we want, use the defaults.
-    if (!defined $pkgs->{$name}{STAGES}) {
-        $pkgs->{$name}{STAGES} = &get_package_stages($type);
-        if (defined($pkgs->{$name}{BINS})) {
-            $pkgs->{$name}{STAGES} =~ s/c//;
-        }
-    }
     # Add the package name to the list of packages
     push @packages, $name;
     # Set the parent product name
@@ -587,7 +489,7 @@ parse_product_entry
 # all the products we need to work with and what packages or
 # other products compose them.
 sub
-parse_prod_file
+parse_prod_file($$$)
 {
     my ($prodname, $prodver, $parent_prod) = @_;
     my ($prodfile, $skip_to_name, $skip_to_next_ver, $found, $line);
@@ -613,18 +515,11 @@ parse_prod_file
         next if ($skip_to_name && $line !~ /^name\s*:/i);
         next if ($skip_to_next_ver && $line !~ /^ver(sion)?\s*:/i);
         if ($line =~ /^name\s*:/) {
-            if ($skip_to_name) {
-                $line =~ s/^[^:]+:\s*//;
-                if ($line eq $prodname) {
-                    dprint "parse_prod_file():  Found product name match\n";
-                    $skip_to_name = 0;
-                    $skip_to_next_ver = 1;
-                    next;
-                }
-            } else {
-                # New product.  Time to quit.
-                last;
-            }
+            $line =~ s/^[^:]+:\s*//;
+            $prodname = $line;
+            $skip_to_name = 0;
+            $skip_to_next_ver = 1;
+            next;
         } elsif ($line =~ /^ver(sion)?\s*:/) {
             if ($skip_to_next_ver) {
                 $line =~ s/^[^:]+:\s*//;
@@ -673,199 +568,6 @@ parse_prod_file
     dprint "parse_prod_file():  Closing file $prodfile and returning $found\n";
     close(PROD);
     return ($found);
-}
-
-# Use revtool to download a package from the master repository
-sub
-fetch_package
-{
-    my $cmd = $_[0];
-    my ($err, $msg, $line) = undef;
-    local *REVTOOL;
-
-    dprint "About to run $cmd\n";
-    if (!open(REVTOOL, "$cmd 2>&1 |")) {
-        $err = AVALON_COMMAND_FAILED;
-        $msg = "Execution of \"$cmd\" failed -- $!";
-        last;
-    }
-    while (<REVTOOL>) {
-        chomp($line = $_);
-        nprint "$line\n";
-        next if ($line =~ /^\[debug:/);
-        # Check the output for errors
-        if ($line =~ /^revtool:\s*Error/) {
-            ($msg = $line) =~ s/^revtool:\s*Error:\s*//;
-        }
-    }
-    close(REVTOOL);
-    $err = $?;
-    dprintf "\"$cmd\" returned $err (%d)\n", $err >> 8;
-    return ($err >> 8, $msg);
-}
-
-# Clean up the RPM build directories and the build root
-sub
-cleanup
-{
-    my $type = $_[0];
-    my @dirs;
-
-    if ($type =~ /no(ne)?/i) {
-        return;
-    } elsif ($type =~ /temp/i) {
-        @dirs = ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SPECS", $buildroot);
-    } elsif ($type =~ /rpm/i) {
-        @dirs = ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SRPMS", "$builddir/RPMS", "$builddir/SPECS");
-    } elsif ($type =~ /(build)?root/) {
-        @dirs = ($buildroot);
-    } else {
-        @dirs = ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SRPMS", "$builddir/RPMS", "$builddir/SPECS", $buildroot);
-    }
-    foreach $f (@dirs) {
-        nprint "$progname:  Cleaning up $f\n";
-        &nuke_tree($f) || qprint "Warning:  Removal of $f failed -- $!\n";
-    }
-}
-
-# Once we're all done, summarize any failures at the very end
-# so that they're easy to find if the user is generating a log.
-sub
-summarize_failures
-{
-    my ($ns, $nf, $nt);
-
-    # $ns is the number of successful packages.  $nf is the number of failures.
-    # $nt is the total number of packages we tried to build.
-    $ns = scalar(@packages);
-    $nf = scalar(@failed_pkgs);
-    $nt = $ns + $nf;
-    dprint "Successful:  $ns    Failed:  $nf    Total:  $nt\n";
-
-    qprint "Package Summary:  Out of $nt total packages,";
-    if ($ns) {
-        qprint(" ", ($ns == $nt ? "all" : "$ns"), " succeeded");
-        if ($nf) {
-            qprint " and";
-        }
-    }
-    if ($nf) {
-        qprint(" ", ($nf == $nt ? "all" : "$nf"), " failed");
-    }
-    qprint ".\n";
-
-    if ($nf) {
-        foreach $pkg (@failed_pkgs) {
-            if ($failure->{$pkg}{MESSAGE}) {
-                eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage:  $failure->{$pkg}{MESSAGE}.\n";
-            } else {
-                eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage.\n";
-            }
-        }
-    }
-}
-
-# This routine handles the role of "master buildtool"
-sub
-parallel_build
-{
-    my ($pid, $err, $idx, $pkg, $logfile, $line, $nprocs, $done, $left, $failed, $bldg);
-    my (@children, @vars, @p);
-    my %child_pkg;
-    local *ERRLOG;
-
-    @p = ($#_ >= 0 ? @_ : @packages);
-    if (! -d "$basedir/logs") {
-        mkdir("$basedir/logs", 0755) || &fatal_error("Unable to mkdir $basedir/logs -- $!\n");
-    }
-    $idx = 0;
-    # Set $nprocs equal to the index within @children that should not be exceeded.
-    $nprocs = $num_cpus - 1;
-    # The "!$idx || " part of the test below is required because perl's do...while construct
-    # sucks.  You can't use next/last from within it.  Someone shoot whoever decided that.
-    qprintf "$progname:  Beginning $num_cpus-way build of %d packages.  (${\(&get_timestamp())})\n", $#p + 1;
-    while (!$idx || $#children >= 0) {
-        for (; $idx <= $#p && $#children < $nprocs; $idx++) {
-            # Spawn a buildtool child process to handle the next package
-            $pkg = $p[$idx];
-            $logfile = "$basedir/logs/$pkg.log";
-            $pid = &spawn_cmd($pkg, $logfile);
-            push @children, $pid;
-            $child_pkg{$pid} = $pkg;
-        }
-
-        # Out of space for children for now.
-        $line = "";
-        foreach $pid (@children) {
-            $line .= "$child_pkg{$pid} ($pid)    ";
-        }
-        nprint "$progname:  Currently building:  $line\n";
-        $bldg = $#children + 1;
-        $done = $idx - $#children - 1;
-        $left = $#p + 1 - $done - $bldg;
-        $failed = $#failed_pkgs + 1;
-        nprint "$progname:  $done packages completed ($failed failed), $bldg building, $left in queue.\n";
-
-        # Wait for a child to die
-        $pid = waitpid(-1, 0);
-        next if (! $child_pkg{$pid});
-        $pkg = $child_pkg{$pid};
-        $err = $? >> 8;
-        if ($pid == -1) {
-            # This should never happen.
-            eprint "Ummm, waitpid() returned -1.  That wasn't very nice.  I'm offended.\n";
-            next;
-        }
-        @children = grep($_ != $pid, @children);
-        if ($err == AVALON_SUCCESS) {
-            nprint "Child process $pid for package $pkg completed successfully.  (${\(&get_timestamp())})\n";
-        } else {
-            dprint "Child process $pid for package $pkg failed, returning $err.\n";
-            if ($err == AVALON_SPAWN_FAILED) {
-                &fail_package($pkg, "pre-build", "exec() of child failed");
-            } else {
-                my @tmp;
-
-                # The last line of the logfile should give the error message
-                if (!open(ERRLOG, "$basedir/logs/$pkg.log")) {
-                    &fail_package($pkg, "???", "Child process returned $err but the log file is missing");
-                    next;
-                }
-                @tmp = <ERRLOG>;
-                close(ERRLOG);
-                chomp($line = $tmp[$#tmp]);
-                if ($line =~ /^$progname:  Error:  Package \S+ failed at the ([a-z ]+) stage:  (.*)$/) {
-                    &fail_package($pkg, $1, $2);
-                } else {
-                    $line =~ s/^\w+:  (Error:  )?\s*//;
-                    &fail_package($pkg, "???", "Child process exited with code $err -- $line");
-                }
-            }
-        }
-        # End of loop.  Time to spawn the next child.
-    }
-    qprint "$progname:  Parallel build complete.  (${\(&get_timestamp())})\n";
-}
-
-# This routine does the actual build process
-sub
-build_process
-{
-    # Perform the build in stages, checking after each one to see if we should stop
-    &do_bootstrap_stage() if ($start_stage eq "s");
-    return if ($end_stage eq "s" || $#packages == -1);
-
-    if ($master) {
-        &parallel_build();
-    } else {
-        &do_component_stage() if ("sc" =~ /$start_stage/);
-        return if ($end_stage eq "c");
-
-        &do_build_stage() if ("scb" =~ /$start_stage/);
-        return if ($end_stage eq "b");
-
-        &do_package_stage();
-    }
 }
 
 

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.145 2001/07/20 15:13:55 mej Exp $
+# $Id: buildtool,v 1.146 2001/07/20 20:29:35 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -32,7 +32,8 @@ require Getopt::Long;
 use Cwd;
 use Avalon::Util;
 use Avalon::Src;
-use Avalon::Build;
+use Avalon::Pkg;
+#use Avalon::Build;
 use Avalon::Prod;
 
 # Print usage information
@@ -50,59 +51,27 @@ print_usage_info
     print "    -h --help                        Show this usage information\n";
     print "    -d --debug                       Turn on debugging\n";
     print "    -v --version                     Show version and copyright\n";
-    print "    -b --build <stage>               Stop building after a particular stage (see below)\n";
-    print "    -p --product --package <name>    Specify the product or package to build\n";
     print "    -q --quiet                       Be somewhat quiet.  Simply gives basic progress info\n";
     print "    -Q --really-quiet --silent       Be very quiet.  Only errors are reported\n";
-    print "    -D --dir <directory>             Specify \"directory\" as the base directory for the build\n";
-    print "    -f --force                       Ignore errors, build as much as possible\n";
+    print "    -D --dir <directory>             Specify the repository to use (overrides all product files)\n";
     print "    -l --log <logfile>               Specify a log file to send informational output to\n";
     print "    -P --parallel [expr]             Parallelize the build process based on the number of CPU's\n";
     print "    -t --target <arch>               Tell rpm to build for a particular target architecture\n";
     print "    -C --cflags <flags>              Specify the \$CFLAGS variable to use for building\n";
     print "    -U --user <userid>               Specify a userid for the repository (overrides product files)\n";
-    print "       --tree <repository>           Specify the repository to use (overrides all product files)\n";
-    print "       --tag <tag>                   Specify a tag to use (overrides all product files)\n";
+    print "    -T --tag <tag>                   Specify a tag to use (overrides all product files)\n";
     print "       --nocache                     Do not scan the cache (use with care)\n";
     print "       --clean                       Clean up RPM and buildroot directories when done\n";
     print "\n";
-    print "The stages and their abbreviations (for use with the -b option) are:\n";
-    print "  bootstrap (s), component (c), build (b), package accumulation (p)\n\n";
-    print "The default is \"-bp\" if you do not specify otherwise.\n\n";
     exit(AVALON_SUCCESS);
 }
 
 # Normal print (i.e., don't print this in -q or -Q mode)
-sub
-nprintf
-{
-    if ($GLOBAL_LOG || $verbosity >= 2) {
-        printf @_;
-    }
-}
-sub
-nprint
-{
-    if ($GLOBAL_LOG || $verbosity >= 2) {
-        print @_;
-    }
-}
-
+sub nprintf    {printf @_ if ($GLOBAL_LOG || $verbosity >= 2);}
+sub nprint     {print  @_ if ($GLOBAL_LOG || $verbosity >= 2);}
 # Quiet print (i.e., print in -q mode but not in -Q mode)
-sub
-qprintf
-{
-    if ($GLOBAL_LOG || $verbosity >= 1) {
-        printf @_;
-    }
-}
-sub
-qprint
-{
-    if ($GLOBAL_LOG || $verbosity >= 1) {
-        print @_;
-    }
-}
+sub qprintf    {printf @_ if ($GLOBAL_LOG || $verbosity >= 1);}
+sub qprint     {print  @_ if ($GLOBAL_LOG || $verbosity >= 1);}
 
 # Spawn a child buildtool
 sub
@@ -122,7 +91,6 @@ spawn_cmd
             $verbosity = 0;
             $slave = 1;
             $master = 0;
-            $opt_master = 0;
             close $GLOBAL_LOG if ($GLOBAL_LOG);
             open(STDOUT, ">/dev/null");
             open(STDIN, "</dev/null");
@@ -150,51 +118,36 @@ spawn_cmd
     } while (1);
 }
 
-#
-# The build process stages
-#
+# Download packages from the repository
 sub
-do_bootstrap_stage
+download_packages
 {
+    my @packages = @_;
     my ($line, $err, $msg);
-    my @p;
 
-    if ($#_ >= 0) {
-        @p = @_;
-    } else {
-        @p = @packages;
-    }
-
-    ### The bootstrap stage is where everything gets downloaded.  The list of packages is cycled
-    ### through, and each file/module is retrieved from the master repository.  Unfortunately,
-    ### this process cannot be properly parallelized because CVS isn't parallel-safe for checkouts.
-    qprint "$progname:  Entering the bootstrap stage.  (${\(&get_timestamp())})\n";
-    foreach $pkg (@p) {
-        my @flist;
+    nprint "Downloading packages, please wait..." if (! &debug_get());
+    foreach $pkg (@packages) {
+        my ($module, $filename) = ($pkgs->{$pkg}{MODULE}, $pkgs->{$pkg}{FILENAME});
+        my ($files, $tag, $cvsroot);
 
         $err = 0;
-        &create_rpm_files($pkg);
-        if ($pkgs->{$pkg}{STAGES} !~ /s/) {
-            nprint "$progname:  Skipping bootstrap stage for the \"$pkg\" package.\n";
-            next;
-        }
-        nprint "$progname:  Starting bootstrap stage for the \"$pkg\" package....\n";
-
-	# Create @flist, the list of files we need to download for this package.
-	# Unless it's an SRPM plus binary RPM's, there will only be one file.
-        if ($pkgs->{$pkg}{FILENAME} eq $pkgs->{$pkg}{MODULE}) {
-            push(@flist, $pkgs->{$pkg}{MODULE});
+        if ($filename eq $module) {
+            dprint "\"$filename\" vs. \"$module\" == 1\n";
+            $files = $module;
         } else {
-            push(@flist, "$pkgs->{$pkg}{MODULE}/$pkgs->{$pkg}{FILENAME}");
+            dprint "\"$filename\" vs. \"$module\" == 0\n";
+            $files = "$module/$filename";
         }
         if (defined($pkgs->{$pkg}{BINS})) {
-            push(@flist, @{$pkgs->{$pkg}{BINS}});
+            foreach my $bin (@{$pkgs->{$pkg}{BINS}}) {
+                $files .= " $bin";
+            }
         }
 	# Set the proper CVSROOT and tag for the checkout.
         if ($global_tree) {
-            $cvsroot = "-D $global_tree";
+            $cvsroot = $global_tree;
         } elsif ($pkgs->{$pkg}{CVSROOT}) {
-            $cvsroot = "-D $pkgs->{$pkg}{CVSROOT}";
+            $cvsroot = $pkgs->{$pkg}{CVSROOT};
         } else {
             $cvsroot = "";
         }
@@ -202,385 +155,21 @@ do_bootstrap_stage
             $cvsroot =~ s/\w+\@/$global_user\@/;
         }
         if ($global_tag) {
-            $tag = "-t $global_tag";
-        } elsif ($pkgs->{$pkg}{REVISION}) {
-            ($tag = $pkgs->{$pkg}{REVISION}) =~ s/^([^:]+):([^:]+)$/$2/;
-            $tag = "-t $tag";
+            $tag = $global_tag;
+        } elsif ($pkgs->{$pkg}{TAG}) {
+            ($tag = $pkgs->{$pkg}{TAG}) =~ s/^([^:]+):([^:]+)$/$2/;
         } else {
             $tag = "";
         }
 
-	# Check out each file using revtool
-        foreach $filename (@flist) {
-            last if ($err);
-            dprint "Checking for $filename\n";
-            # If it already exists, go on.
-            if ((($pkgs->{$pkg}{TYPE} eq "module" || $pkgs->{$pkg}{TYPE} eq "image") && -d $filename)
-                || (($pkgs->{$pkg}{TYPE} eq "srpm" || $pkgs->{$pkg}{TYPE} eq "rpm" || $pkgs->{$pkg}{TYPE} eq "tar") && -f $filename && -s _)) {
-                nprint "$progname:  $filename already exists.  I'll assume it's the right one.\n";
-                next;
-            }
-            $cmd = "$revtool -l $cvsroot $tag -g $filename";
-            ($err, $msg) = &fetch_package($cmd);
-            if ($err) {
-                &fail_package($pkg, "bootstrap", $msg);
-                next;
-            }
-            if (!((($pkgs->{$pkg}{TYPE} eq "module" || $pkgs->{$pkg}{TYPE} eq "image") && -d $filename)
-                  || (($pkgs->{$pkg}{TYPE} eq "srpm" || $pkgs->{$pkg}{TYPE} eq "rpm" || $pkgs->{$pkg}{TYPE} eq "tar") && -f $filename && -s _))) {
-                # If it's not there, we must've missed the error.
-                $err = AVALON_PACKAGE_FAILED;
-                &fail_package($pkg, "bootstrap", "Unhandled error condition");
-                next;
-            }
-        }
-
-        nprint "$progname:  Bootstrap stage for \"$pkg\" is complete.\n";
-    }
-    qprint "$progname:  Bootstrap stage is now complete.  (${\(&get_timestamp())})\n";
-}
-
-sub
-do_component_stage
-{
-    my ($specfile, $target, $pn, $dir, $line, $src, $tarball, $rpm);
-    my ($err, $msg, $srpm) = (0, 0, 0);
-    my (@contents, @tmp, @dirs, @sfiles, @srcs, @manifest);
-    my @p;
-    local *DIR;
-    local *PKGTOOL;
-
-    if ($#_ >= 0) {
-        @p = @_;
-    } else {
-        @p = @packages;
-    }
-
-    ### The component stage is where all the individual package components are obtained and put
-    ### into place.  For modules, this means creating source and patch files and copying them into.
-    ### For source packages, it means exploding the source package.  No other packages use this stage.
-    qprint "$progname:  Entering the component stage.  (${\(&get_timestamp())})\n";
-
-    foreach $pkg (@p) {
-        if ($pkgs->{$pkg}{STAGES} !~ /c/) {
-            nprint "$progname:  Skipping component stage for the \"$pkg\" package.\n";
+        nprint "$pkg..." if (! &debug_get());
+        ($err, $msg) = &fetch_package("", $files, $tag, $cvsroot);
+        if ($err) {
+            &fail_package($pkg, $msg);
             next;
         }
-        nprint "$progname:  Starting component stage for the \"$pkg\" package....  (${\(&get_timestamp())})\n";
-
-        if (! chdir("$builddir/$pkgs->{$pkg}{MODULE}")) {
-            &fail_package($pkg, "component", "Could not chdir into $builddir/$pkgs->{$pkg}{MODULE} -- $!");
-            next;
-        }
-
-        if ($pkgs->{$pkg}{TYPE} eq "module") {
-            ### If there's a makefile, skip this stage.
-            if (-s "$builddir/$pkgs->{$pkg}{MODULE}/Makefile.avalon") {
-                nprint "$progname:  Avalon makefile exists, skipping component stage.\n";
-                next;
-            }
-
-            ### Check to see if we really need to do this stage or not.
-            # Find matches to pkg-*-*.src.rpm in the SRPMS directory
-            @tmp = &grepdir(sub {/^$pkg-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/}, "$builddir/SRPMS");
-            if (scalar(@tmp) > 0) {
-                # Keep the first one
-                $srpm = $tmp[0];
-                # If there are more, ignore them, but warn the user
-                if ($#tmp > 0) {
-                    nprint "$progname:  Warning:  Multiple target SRPM's found in $pkgs->{$pkg}{MODULE}.\n";
-                    nprint "$progname:  Assuming that $srpm is the correct one.\n";
-                }
-                # The target SRPM already exists.  Skip this stage.
-                nprint "$progname:  The target SRPM for \"$pkg\" already exists ($builddir/SRPMS/$srpm).\n";
-                nprint "$progname:  I'll assume it's the right one.  Component stage for \"$pkg\" is complete.\n";
-                # (?:) means "don't include this as a $<num> variable"
-                $srpm =~ m/^(\S+)-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/;
-                ($pkgs->{$pkg}{VERSION}, $pkgs->{$pkg}{RELEASE}) = ($2, $3);
-                $pkgs->{$pkg}{FILENAME} = "$builddir/SRPMS/$srpm";
-                $pkgs->{$pkg}{STAGES} =~ s/b//;  # Don't do build stage either.
-                next;
-            }
-
-	    if (-d "F") {
-		### It's an SPM.  Just copy all the files into the right places.
-		$specfile = &install_spm_files($builddir);
-		if (! $specfile) {
-		    &fail_package($pkg, "component", "Could not copy component files into $builddir");
-		    next;
-		}
-		$pkgs->{$pkg}{SPECFILE} = $specfile;
-	    } else {
-		### The next step is to find the spec file.  If it's an oddball
-		### case, they better have told us what it's actually called....
-		opendir(DIR, ".");
-		@contents = readdir(DIR);
-		closedir(DIR);
-		if ($pkgs->{$pkg}{SPECFILE} && -f $pkgs->{$pkg}{SPECFILE}) {
-		    # If they gave us the spec file and it exists, use that.
-		    $specfile = $pkgs->{$pkg}{SPECFILE};
-		    dprint "User specified a spec file:  $specfile\n";
-		} else {
-		    # First choice:  Exactly one file named <pkg>-<distro>.spec
-		    ($pn = $prodname) =~ s/^va-//;
-		    @tmp = grep($_ =~ /^($pkg-)?(va-)?$pn\.spec/, @contents);
-		    if ($#tmp != 0) {
-			# Second choice:  Exactly one file named <pkg>.spec
-			@tmp = grep($_ =~ /^$pkg\.spec/, @contents);
-			if ($#tmp != 0) {
-			    # Third choice:  The first match to *.spec*
-			    @tmp = grep($_ =~ /\.spec/, @contents);
-			}
-		    }
-		    $pkgs->{$pkg}{SPECFILE} = $specfile = $tmp[0];
-		    if (!defined $specfile || $specfile =~ /^$/) {
-			# Our attempt to guess failed.  They need to specify the spec file in the .prod file.
-			&fail_package($pkg, "component", "No spec file could be located in $pkgs->{$pkg}{MODULE}");
-			next;
-		    }
-		}
-
-		### Next, generate the source files
-		($err, $msg) = &gen_sources($pkg, $specfile);
-		if ($err) {
-		    &fail_package($pkg, "component", "Creation of vendor sources failed -- $msg");
-		    next;
-		}
-	    }
-        } elsif ($pkgs->{$pkg}{TYPE} eq "srpm") {
-            my $rpmrc = "$buildroot/$pkg-rpmrc";
-
-            if (defined($pkgs->{$pkg}{BINS})) {
-                dprint "This package shouldn't even be using the component stage!  Skipping it.\n";
-                next;
-            }
-
-            undef @manifest;
-            $rpm = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
-
-            ### Examine the SRPM and figure out everything it contains.
-            $cmd = "$pkgtool -P \"$rpm\" -R $rpmrc -cp $pkgs->{$pkg}{FILENAME}";
-            dprint "About to run \"$cmd\"\n";
-            if (!open(PKGTOOL, "$cmd 2>&1 |")) {
-                &fail_package($pkg, "component", "Execution of \"$cmd\" failed -- $!");
-                next;
-            }
-	    # We've got to record the spec file name for later use
-            if (defined $pkgs->{$pkg}{SPECFILE}) {
-                $specfile = $pkgs->{$pkg}{SPECFILE};
-            } else {
-                undef $specfile;
-            }
-            while (<PKGTOOL>) {
-                chomp($line = $_);
-                next if ($line =~ /^\[pkgtool\//);
-                dprint "RPM contents -> $line\n";
-                # Add the file to the manifest
-                push @manifest, $line;
-                if ($line =~ /\.spec(\.in)?$/) {
-                    if (!defined $specfile) {
-                        $specfile = $line;
-                        dprint "Found spec file as $specfile\n";
-                    } elsif ($specfile eq $line) {
-                        dprint "Found spec file $specfile as predicted.\n";
-                    } else {
-                        qprint "$progname:  Warning:  $pkgs->{$pkg}{FILENAME} contains the spec file $line\n";
-                        qprint "$progname:  which is different from the one I was told to expect ($specfile).\n";
-                        qprint "$progname:  I will ignore the auto-detected one as requested, but this may be a problem.\n";
-                    }
-                }
-            }
-            close(PKGTOOL);
-            dprint "\"$cmd\" returned $?\n";
-            if ($? != 0) {
-                # FIXME:  What to do here?
-            }
-            if (! $specfile) {
-                &fail_package($pkg, "component", "Unable to locate spec file in SRPM");
-                next;
-            }
-            # We'll use this later, so it MUST be defined for any
-            # package we plan on actually building at some point.
-            $pkgs->{$pkg}{SPECFILE} = "$builddir/SPECS/$specfile";
-
-            ### Explode the SRPM into its components
-            $cmd = "$pkgtool -P \"$rpm\" -R $rpmrc -ip $pkgs->{$pkg}{FILENAME}";
-            dprint "About to run \"$cmd\"\n";
-            if (!open(PKGTOOL, "$cmd 2>&1 |")) {
-                &fail_package($pkg, "component", "Execution of \"$cmd\" failed -- $!");
-                next;
-            }
-            $err = 0;
-            while (<PKGTOOL>) {
-                chomp($line = $_);
-                next if ($line =~ /^\[pkgtool\//);
-                nprint "$line\n";
-                if ($line !~ /successfully installed\.?$/) {
-                    # Any otheroutput from this command is an error.
-                    $err = 1;
-                    ($msg = $line) =~ s/^pkgtool:\s+Error:\s+//;;
-                    last;
-                }
-            }
-            close(PKGTOOL);
-            dprint "pkgtool returned $?\n";
-            if ($? != 0) {
-                # FIXME:  What to do here?
-            }
-            if ($err) {
-                &fail_package($pkg, "component", $msg);
-                next;
-            }
-        }
-
-        nprint "$progname:  Component stage for \"$pkg\" is complete.  (${\(&get_timestamp())})\n";
     }
-    chdir($builddir);
-    qprint "$progname:  Component stage is now complete.  (${\(&get_timestamp())})\n";
-}
-
-sub
-do_build_stage
-{
-    my ($cmd, $line, $specfile, $rpm, $tmp, $target) = undef;
-    my ($target_age, $orig_age, $spec_age);
-    my ($err, $msg, $srpm) = (0, 0, 0);
-    my @p;
-
-    if ($#_ >= 0) {
-        @p = @_;
-    } else {
-        @p = @packages;
-    }
-
-    ### The build stage is where module, SRPM, and tar packages are built from sources.  Also,
-    ### binary packages (and source packages with binaries) are copied into the RPM directories.
-    qprint "$progname:  Entering the build stage.  (${\(&get_timestamp())})\n";
-
-    foreach $pkg (@p) {
-        if ($pkgs->{$pkg}{STAGES} !~ /b/) {
-            nprint "$progname:  Skipping build stage for the \"$pkg\" package.\n";
-            next;
-        }
-        nprint "$progname:  Starting build stage for the \"$pkg\" package....  (${\(&get_timestamp())})\n";
-
-        if (! chdir("$builddir/$pkgs->{$pkg}{MODULE}")) {
-            return (AVALON_PACKAGE_FAILED, "Could not chdir into $builddir/$pkgs->{$pkg}{MODULE} -- $!", 0);
-        }
-        if (defined($pkgs->{$pkg}{BINS})) {
-            my ($arch, $rpm, $file, $dest);
-
-            # Source and binaries.
-            $file = $pkgs->{$pkg}{FILENAME};
-            $rpm = &basename($file);
-            $dest = "$builddir/SRPMS/" . $rpm;
-            if (-s $dest) {
-                dprint "$dest already exists.\n";
-            } else {
-                dprint "ln -f $file $dest\n";
-                &mkdirhier("$builddir/SRPMS") if (! -d "$builddir/SRPMS");
-                if (!link($file, $dest)) {
-                    return (AVALON_PACKAGE_FAILED, "Could not link $dest to $file -- $!", 0);
-                }
-            }
-            $pkgs->{$pkg}{OUTFILES} = $dest;
-            chdir($builddir);
-            foreach $rpm (@{$pkgs->{$pkg}{BINS}}) {
-                my $bin;
-
-                $rpm =~ m/^.*\/([^\/]+)\.(\w+)\.rpm$/;
-                $arch = $2;
-                $bin = "$builddir/RPMS/$arch/$1.$arch.rpm";
-                $pkgs->{$pkg}{OUTFILES} .= " $bin";
-                if (-s $bin) {
-                    dprint "$bin already exists\n";
-                } else {
-                    dprint "ln -f $rpm $bin\n";
-                    &mkdirhier("$builddir/RPMS/$arch") if (! -d "$builddir/RPMS/$arch");
-                    if (!link($rpm, $bin)) {
-                        return (AVALON_PACKAGE_FAILED, "Could not link $bin to $rpm -- $!", 0);
-                    }
-                }
-            }
-        } elsif ($pkgs->{$pkg}{TYPE} eq "rpm") {
-            my ($rpm, $arch, $dest);
-
-            # Binary package.  Just move it into place.
-            ($rpm = $pkgs->{$pkg}{FILENAME}) =~ m/\.(\w+)\.rpm/;
-            $arch = $1;
-            $dest = "$builddir/RPMS/$arch/" . &basename($rpm);
-            if (-s $dest) {
-                dprint "$dest already exists.\n";
-            } else {
-                dprint "ln -f $rpm $dest\n";
-                &mkdirhier("$builddir/RPMS/$arch") if (! -d "$builddir/RPMS/$arch");
-                if (!link($rpm, $dest)) {
-                    return (AVALON_PACKAGE_FAILED, "Could not link $dest to $rpm -- $!", 0);
-                }
-            }
-        } elsif ($pkgs->{$pkg}{TYPE} eq "tar") {
-            # Rebuild from the tarball
-            ($err, $msg, $srpm) = &build_pkgs($pkg, $pkgs->{$pkg}{FILENAME});
-            dprint "do_build_stage():  build_pkgs($pkg, $specfile) returned $err, $msg, $srpm\n";
-            if ($err) {
-                &fail_package($pkg, "build", $msg);
-            } else {
-                $srpm =~ m/^(\S+)-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/;
-                ($pkgs->{$pkg}{VERSION}, $pkgs->{$pkg}{RELEASE}) = ($2, $3);
-                dprint "Filename is $pkgs->{$pkg}{FILENAME}, version is $pkgs->{$pkg}{VERSION}, release is $pkgs->{$pkg}{RELEASE}\n";
-            }
-        } elsif ($pkgs->{$pkg}{TYPE} eq "module") {
-            ### If there's a makefile, use special_build() to build it.
-            if (-s "$builddir/$pkgs->{$pkg}{MODULE}/Makefile.avalon") {
-                ($err, $msg, $srpm) = &special_build($pkg);
-                dprint "do_build_stage():  special_build($pkg) returned $err, $msg, $srpm\n";
-            } else {
-                # Build the module into an SRPM
-                $specfile = $pkgs->{$pkg}{SPECFILE};
-                ($err, $msg, $srpm) = &build_pkgs($pkg, $specfile);
-                dprint "do_build_stage():  build_pkgs($pkg, $specfile) returned $err, $msg, $srpm\n";
-            }
-            if ($err) {
-                &fail_package($pkg, "build", $msg);
-            }
-
-            # Update the values for FILENAME, VERSION, and RELEASE
-            $pkgs->{$pkg}{FILENAME} = $srpm;
-            $srpm =~ s/^(\S+)\/([^\/]+src\.rpm)$/$2/;
-            $srpm =~ m/^(\S+)-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/;
-            ($pkgs->{$pkg}{VERSION}, $pkgs->{$pkg}{RELEASE}) = ($2, $3);
-            dprint "Filename is $pkgs->{$pkg}{FILENAME}, version is $pkgs->{$pkg}{VERSION}, release is $pkgs->{$pkg}{RELEASE}\n";
-        } else {  # SRPM
-            # Check for a target SRPM that is newer than the original SRPM and the
-            # spec file.  If such an SRPM exists, skip the build stage for this package.
-            $target = "$builddir/SRPMS/$pkg" . "-"
-                       . "$pkgs->{$pkg}{VERSION}" . "-" . "$pkgs->{$pkg}{RELEASE}.src.rpm";
-            $specfile = $pkgs->{$pkg}{SPECFILE};
-            dprint "Target SRPM is $target\n";
-            if (-f $target) {
-                $target_age = -M _;
-                $orig_age = -M $pkgs->{$pkg}{FILENAME};
-                $spec_age = -M $specfile;
-                dprint "File ages:  $orig_age for $pkgs->{$pkg}{FILENAME}, $target_age for $target,"
-                        . " and $spec_age for $specfile\n";
-                if ($target_age < $spec_age && $target_age < $orig_age) {
-                    nprint "$progname:  The target SRPM already exists.\n";
-                    nprint "$progname:  Build stage for \"$pkg\" is complete.\n";
-                    next;
-                }
-            }
-
-            # Rebuild from the spec file
-            ($err, $msg, $srpm) = &build_pkgs($pkg, $specfile);
-            dprint "do_build_stage():  build_pkgs($pkg, $specfile) returned $err, $msg, $srpm\n";
-            if ($err) {
-                &fail_package($pkg, "build", $msg);
-            }
-        }
-        nprint "$progname:  Build stage for \"$pkg\" is complete.  (${\(&get_timestamp())})\n";
-    }
-    chdir($builddir);
-    qprint "$progname:  Build stage is now complete.  (${\(&get_timestamp())})\n";
+    nprint "done.\n\n" if (! &debug_get());
 }
 
 sub
@@ -680,30 +269,171 @@ do_package_stage
     qprint "$progname:  Package accumulation stage is now complete.  (${\(&get_timestamp())})\n";
 }
 
+# Once we're all done, summarize any failures at the very end
+# so that they're easy to find if the user is generating a log.
+sub
+summarize_failures
+{
+    my ($ns, $nf, $nt);
+
+    # $ns is the number of successful packages.  $nf is the number of failures.
+    # $nt is the total number of packages we tried to build.
+    $ns = scalar(@packages);
+    $nf = scalar(@failed_pkgs);
+    $nt = $ns + $nf;
+    dprint "Successful:  $ns    Failed:  $nf    Total:  $nt\n";
+
+    qprint "Package Summary:  Out of $nt total packages,";
+    if ($ns) {
+        qprint(" ", ($ns == $nt ? "all" : "$ns"), " succeeded");
+        if ($nf) {
+            qprint " and";
+        }
+    }
+    if ($nf) {
+        qprint(" ", ($nf == $nt ? "all" : "$nf"), " failed");
+    }
+    qprint ".\n";
+
+    if ($nf) {
+        foreach $pkg (@failed_pkgs) {
+            if ($failure->{$pkg}{MESSAGE}) {
+                eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage:  $failure->{$pkg}{MESSAGE}.\n";
+            } else {
+                eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage.\n";
+            }
+        }
+    }
+}
+
+# This routine handles the role of "master buildtool"
+sub
+parallel_build
+{
+    my ($pid, $err, $idx, $pkg, $logfile, $line, $nprocs, $done, $left, $failed, $bldg);
+    my (@children, @vars, @p);
+    my %child_pkg;
+    local *ERRLOG;
+
+    @p = ($#_ >= 0 ? @_ : @packages);
+    if (! -d "$basedir/logs") {
+        mkdir("$basedir/logs", 0755) || &fatal_error("Unable to mkdir $basedir/logs -- $!\n");
+    }
+    $idx = 0;
+    # Set $nprocs equal to the index within @children that should not be exceeded.
+    $nprocs = $num_cpus - 1;
+    # The "!$idx || " part of the test below is required because perl's do...while construct
+    # sucks.  You can't use next/last from within it.  Someone shoot whoever decided that.
+    qprintf "$progname:  Beginning $num_cpus-way build of %d packages.  (${\(&get_timestamp())})\n", $#p + 1;
+    while (!$idx || $#children >= 0) {
+        for (; $idx <= $#p && $#children < $nprocs; $idx++) {
+            # Spawn a buildtool child process to handle the next package
+            $pkg = $p[$idx];
+            $logfile = "$basedir/logs/$pkg.log";
+            $pid = &spawn_cmd($pkg, $logfile);
+            push @children, $pid;
+            $child_pkg{$pid} = $pkg;
+        }
+
+        # Out of space for children for now.
+        $line = "";
+        foreach $pid (@children) {
+            $line .= "$child_pkg{$pid} ($pid)    ";
+        }
+        nprint "$progname:  Currently building:  $line\n";
+        $bldg = $#children + 1;
+        $done = $idx - $#children - 1;
+        $left = $#p + 1 - $done - $bldg;
+        $failed = $#failed_pkgs + 1;
+        nprint "$progname:  $done packages completed ($failed failed), $bldg building, $left in queue.\n";
+
+        # Wait for a child to die
+        $pid = waitpid(-1, 0);
+        next if (! $child_pkg{$pid});
+        $pkg = $child_pkg{$pid};
+        $err = $? >> 8;
+        if ($pid == -1) {
+            # This should never happen.
+            eprint "Ummm, waitpid() returned -1.  That wasn't very nice.  I'm offended.\n";
+            next;
+        }
+        @children = grep($_ != $pid, @children);
+        if ($err == AVALON_SUCCESS) {
+            nprint "Child process $pid for package $pkg completed successfully.  (${\(&get_timestamp())})\n";
+        } else {
+            dprint "Child process $pid for package $pkg failed, returning $err.\n";
+            if ($err == AVALON_SPAWN_FAILED) {
+                &fail_package($pkg, "pre-build", "exec() of child failed");
+            } else {
+                my @tmp;
+
+                # The last line of the logfile should give the error message
+                if (!open(ERRLOG, "$basedir/logs/$pkg.log")) {
+                    &fail_package($pkg, "???", "Child process returned $err but the log file is missing");
+                    next;
+                }
+                @tmp = <ERRLOG>;
+                close(ERRLOG);
+                chomp($line = $tmp[$#tmp]);
+                if ($line =~ /^$progname:  Error:  Package \S+ failed at the ([a-z ]+) stage:  (.*)$/) {
+                    &fail_package($pkg, $1, $2);
+                } else {
+                    $line =~ s/^\w+:  (Error:  )?\s*//;
+                    &fail_package($pkg, "???", "Child process exited with code $err -- $line");
+                }
+            }
+        }
+        # End of loop.  Time to spawn the next child.
+    }
+    qprint "$progname:  Parallel build complete.  (${\(&get_timestamp())})\n";
+}
+
+# This routine does the actual build process
+sub
+build_process
+{
+    # Perform the build in stages, checking after each one to see if we should stop
+    &do_bootstrap_stage() if ($start_stage eq "s");
+    return if ($end_stage eq "s" || $#packages == -1);
+
+    if ($master) {
+        &parallel_build();
+    } else {
+        &do_component_stage() if ("sc" =~ /$start_stage/);
+        return if ($end_stage eq "c");
+
+        &do_build_stage() if ("scb" =~ /$start_stage/);
+        return if ($end_stage eq "b");
+
+        &do_package_stage();
+    }
+}
+
 # main() here is basically the same as main() in C
 sub
 main
 {
     # Set up the basic variables
     $progname = "buildtool";
-    $version = "2.0";
+    $version = "2.1";
     umask 022;
 
     # No input.
     open(STDIN, "</dev/null");
 
     # See the Getopt::Long man page for details on the syntax of this line
-    @valid_opts = ("h|help", "v|version", "d|debug", "b|build=s", "p|product|package=s",
-                   "q|quiet", "Q|really-quiet|silent", "D|dir=s", "f|force", "l|log=s",
-                   "P|parallel:s", "t|target=s", "C|cflags=s", "B|startbuild=s", "tree=s",
-                   "tag=s", "nocache", "clean:s", "U|user=s");
+    @valid_opts = ("h|help", "v|version", "d|debug", "q|quiet", "Q|really-quiet|silent", "D|dir|tree=s",
+                   "l|log=s", "P|parallel:s", "t|target=s", "p|prod|product|prodfile=s", "C|cflags=s",
+                   "T|tag=s", "nocache", "clean:s", "U|user=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
-    # Post-parse the options stuff
+    #
+    # Options Handling
+    #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.145 $ created on $Date: 2001/07/20 15:13:55 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.146 $ created on $Date: 2001/07/20 20:29:35 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -719,8 +449,6 @@ main
 	&print_usage_info();   # Never returns
     }
     &debug_set($opt_d);
-    $revtool = "revtool" . (&debug_get() ? " --debug" : "");
-    $pkgtool = "pkgtool" . (&debug_get() ? " --debug" : "");
     $GLOBAL_LOG = 0;
     open(STDERR, ">&STDOUT");
     if ($opt_l) {
@@ -737,35 +465,11 @@ main
     $verbosity = ($opt_Q ? 0 : ($opt_q ? 1 : 2));
     $target = $opt_t;
     $global_user = $opt_U;
-    $global_tree = $opt_tree;
-    $global_tag = $opt_tag;
-
-    # Set up the start/end stage identifiers
-    $start_stage = ($opt_B ? $opt_B : "s");
-    if (index("Zscbp", $start_stage) == -1) {
-        eprint "Bad start stage \"$start_stage\".  Assuming \"s\".\n";
-        $start_stage = "s";
-    }
-    $end_stage = ($opt_b ? $opt_b : "p");
-    if ($end_stage ne "Z") {
-        if (index("scbp", $end_stage) == -1) {
-            eprint "Bad end stage \"$end_stage\".  Assuming \"p\".\n";
-            $end_stage = "p";
-        } elsif (index("scbp", $start_stage) > index("scbp", $end_stage)) {
-            eprint "End stage \"$end_stage\" comes before start stage \"$start_stage\".\n";
-            $start_stage = "s";
-            $end_stage = "p";
-        }
-        dprint "Building stages \"$start_stage\" through \"$end_stage\"\n";
-    }
+    $global_tree = $opt_D;
+    $global_tag = $opt_T;
 
     # Figure out parallelization stuff
-    if ($opt_master) {
-        $slave = 1;
-        $master = 0;
-    } elsif (defined($opt_P)) {
-        $master = 1;
-        $slave = 0;
+    if (defined($opt_P)) {
         $num_cpus = &count_cpus();
         if ($opt_P) {
             my ($mult, $add);
@@ -776,54 +480,30 @@ main
             $num_cpus = $num_cpus * ($mult ? $mult : 1) + ($add ? $add : 0);
         }
     } else {
-        $master = 0;
-        $slave = 0;
         $num_cpus = 1;
     }
-    dprint "Using $num_cpus parallel processes.\n";
+    dprint "Using $num_cpus parallel process(es).\n";
 
     # Try to parse the product name we were given into a name or a name-version combo
     if ($opt_p) {
         $prod = $opt_p;
-        if ($prod =~ /^(\S+)-((?:\d|us|a|alpha|b|beta)[^-]+)$/) {
-            ($prodname, $prodver) = ($1, $2);
-        } else {
-            ($prodname, $prodver) = ($prod, 0);
-        }
-        if ($opt_D && -d $opt_D) {
-            $basedir = $opt_D;
-        } elsif ($ENV{BASE_DIR} && $ENV{BASE_DIR} =~ /^\// && -d $ENV{BASE_DIR}) {
-            $basedir = $ENV{BASE_DIR};
-        } else {
-            chomp($basedir = `pwd`);
-        }
-	if (-d "$basedir/$prod") {
-	    $builddir = $basedir;
-	} elsif ($ENV{BUILD_DIR}) {
-	    $builddir = $ENV{BUILD_DIR};
-	} else {
-	    $builddir = "$basedir/build";
-	}
     } else {
-        my $cwd = &getcwd();
-
-        $prod = $prodname = &basename($cwd);
-        $basedir = $cwd;
-        $builddir = &dirname($cwd);
-	dprint "No product specified.  Assuming product \"$prod\" with base dir $basedir and build dir $builddir\n";
+        $prod = $prodname = &basename(&getcwd());
     }
     $buildroot = ($ENV{BUILDROOT} ? $ENV{BUILDROOT} : "/var/tmp/buildtool.$$");
-    qprint "$progname:  Building product:  $prodname", ($prodver ? " $prodver" : ""), "\n";
 
-    # Try to find the products directory
-    foreach $dir (($ENV{PROD_DIR} ? $ENV{PROD_DIR} : 0), "$basedir/products", "$basedir/../products") {
-	if ($dir && -d $dir) {
-	    $proddir = $dir;
-	    last;
-	}
+    if (! $opt_clean) {
+        if (scalar(@packages) > 1) {
+            $opt_clean = "root";
+        } else {
+            $opt_clean = "all";
+        }
     }
+    dprint "Cleaning:  $opt_clean\n";
 
+    #
     # Signal handling
+    #
     $SIG{HUP} = 'IGNORE';
     $SIG{INT} = \&handle_signal;
     $SIG{TERM} = \&handle_signal;
@@ -837,7 +517,9 @@ main
     $SIG{TTIN} = 'IGNORE';
     $SIG{TTOU} = 'IGNORE';
 
+    #
     # Environment modifications
+    #
     $ENV{MAKE} = "make";  # Make sure we don't parallel build, because it doesn't work.
     $ENV{CFLAGS} = ($opt_C ? $opt_C : "-O2 -march=pentiumpro");
     delete $ENV{LD_RUN_PATH};  # Don't hard code any RPATH's into binaries
@@ -847,34 +529,19 @@ main
                   . ":/usr/kerberos/bin:.";
 
     # Parse the product definition files to figure out what the heck we need to build. :)
-    # If we're a slave process, we know it's going to be a straight product entry.
-    if ($slave || ! &parse_prod_file($prodname, $prodver, 0)) {
+    if (! &parse_prod_file($prod, 0, 0)) {
         if (! &parse_product_entry($prod)) {
             eprint "$prod does not seem to be a valid product or product entry.\n";
             eprint "Perhaps you made a typo?\n";
             return AVALON_BAD_PRODUCT;
         }
     }
-    dprint "Products to be built:  ", join(" ", @products), "\n";
+    return AVALON_BAD_PRODUCT if (!scalar(@packages));
 
-    if (! $opt_clean) {
-        if (scalar(@packages) > 1) {
-            $opt_clean = "root";
-        } else {
-            $opt_clean = "all";
-        }
-    }
-    dprint "Cleaning:  $opt_clean\n";
-
-    if ($end_stage ne "Z") {  # -dbZ, a.k.a. How To Debug the Parser :-)
-        &initial_setup();
-        &build_process();
-        &cleanup($opt_clean);
-    } else {
-        # This way we can just do cleanup. :-)
-        &cleanup($opt_clean);
-    }
-    return (defined(@failed_pkgs) && $#failed_pkgs != -1) ? AVALON_PACKAGE_FAILED : AVALON_SUCCESS;
+    dprint "Products to be built (", scalar(@packages), " packages):  ", join(" ", @products), "\n";
+    &download_packages(@packages);
+#    &cleanup($opt_clean);
+    return (scalar(@failed_pkgs)) ? AVALON_PACKAGE_FAILED : AVALON_SUCCESS;
 }
 
 exit &main();
