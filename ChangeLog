@@ -351,3 +351,7 @@ Sun Jun 11 00:53:14 2000                        Michael Jennings (mej)
 Somehow the damn thing managed to crash on a SIGTTOU.  I'm going to
 try ignoring the tty signals.  We'll see what happens.
 ----------------------------------------------------------------------
+Mon Jun 12 11:51:28 2000                        Michael Jennings (mej)
+
+Fixing urw-fonts.
+----------------------------------------------------------------------
