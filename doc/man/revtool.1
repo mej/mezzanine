@@ -1,4 +1,4 @@
-.TH REVTOOL "1" "April 2001" "revtool" VA
+.TH REVTOOL "1" "April 2001" "revtool" MEZZANINE
 .SH NAME
 revtool \- Source Code Revision Control Tool
 .SH SYNOPSIS
@@ -31,26 +31,26 @@ Show version and copyright
 \fB\-g\fR \fB\-\-get\fR
 Download and/or merge the current sources from the master tree
 .br
-Shortcuts: \fBavget\fR, \fBavco\fR
+Shortcuts: \fBmzget\fR, \fBmzco\fR
 .TP
 \fB\-p\fR \fB\-\-put\fR
 Upload new changes to the master tree
 .br
-Shortcuts: \fBavput\fR, \fBavci\fR
+Shortcuts: \fBmzput\fR, \fBmzci\fR
 .TP
 \fB\-a\fR \fB\-\-add\fR
 Mark new files for addition into the master tree
 .br
-Shortcut: \fBavadd\fR and \fBavnew\fR
+Shortcut: \fBmzadd\fR and \fBmznew\fR
 .TP
 \fB\-r\fR \fB\-\-remove\fR
 Delete files and mark them for deletion in the master tree
 .br
-Shortcut: \fBavremove\fR, \fBavrm\fR, \fBavkill\fR, \fBavnuke\fR, \fBavpurge\fR
+Shortcut: \fBmzremove\fR, \fBmzrm\fR, \fBmzkill\fR, \fBmznuke\fR, \fBmzpurge\fR
 .TP
 \fB\-q\fR \fB\-\-query\fR <type>
 Query for a particular type of information.
-Shortcut: \fBavquery\fR, \fBavask\fR, \fBavinfo\fR, \fBavdiff\fR. \fBavlog\fB, \fBavstatus\fR
+Shortcut: \fBmzquery\fR, \fBmzask\fR, \fBmzinfo\fR, \fBmzdiff\fR. \fBmzlog\fB, \fBmzstatus\fR
 Query types are:
 .br
 .TP 
@@ -68,17 +68,17 @@ Query types are:
 \fB\-i\fR \fB\-\-import\fR
 Import a new set of sources, or update the vendor branch for a package
 .br
-Shortcut: \fBavimport\fR
+Shortcut: \fBmzimport\fR
 .TP
 \fB\-T\fR \fB\-\-rtag\fR <tag>
 Tag one or more complete modules directly
 .br
-Shortcut: \fBavrtag\fR
+Shortcut: \fBmzrtag\fR
 .TP
 \fB\-t\fR \fB\-\-tag\fR <tag>
 Specify a symbolic tag for an operation, or tag local sources
 .br
-Shortcut: \fBavtag\fR, \fBavlabel\fR, \fBavmark\fR
+Shortcut: \fBmztag\fR, \fBmzlabel\fR, \fBmzmark\fR
 .TP
 \fB\-\-ptag\fR
 Specified tag is a product tag (overrides tag checking; use with care)
@@ -89,7 +89,7 @@ When performing a tag, make it a branch tag
 \fB\-l\fR \fB\-\-login\fR
 Perform a login to the repository
 .br
-Shortcut: \fBavlogin\fR
+Shortcut: \fBmzlogin\fR
 .TP
 \fB\-R\fR \fB\-\-recurse\fR
 Operate recursively (this is the default for some commands)
@@ -112,7 +112,7 @@ Specify which files to remove so that adds and removes can coincide
 \fB\-\-reset\fR
 Reset sticky tags, dates, etc. in the current module
 .br
-Shortcut: \fBavreset\fR
+Shortcut: \fBmzreset\fR
 .TP
 \fB\-\-blind\fR
 Do not update before committing (may result in conflicts, use carefully)
@@ -120,6 +120,4 @@ Do not update before committing (may result in conflicts, use carefully)
 \fB\-P\fR \fB\-\-protocol\fR <proto>
 Specify which protocol to use (cvs or bk)
 .SH AUTHORS
-Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.
-.br
-Man page initially written by Sean 'Shaleh' Perry <shaleh@valinux.com>
+Copyright (c) 2001, Michael Jennings

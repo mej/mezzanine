@@ -1,9 +1,9 @@
 ########################################################################
-#           Creating and Maintaining Avalon Product Files
+#           Creating and Maintaining Mezzanine Product Files
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: product_files.txt,v 1.3 2001/03/06 03:51:54 mej Exp $
+#  $Id: product_files.txt,v 1.4 2001/09/22 13:22:33 mej Exp $
 #
 ########################################################################
 
@@ -32,8 +32,8 @@ type is a reference to a component package.
 Generally speaking, product-level variables are found at the top of
 each product file.  In fact, at least two such variables must appear
 before anything else will matter.  While parsing a product file,
-Avalon searches first for a product name, then a product version.  It
-ignores everything until it finds the product name and version for
+Mezzanine searches first for a product name, then a product version.
+It ignores everything until it finds the product name and version for
 which is it looking.  Therefore, excluding comments, the first lines
 in any product file should appear as follows:
 
@@ -42,20 +42,20 @@ version:  1.0.1
 
 Of course you should change "myproduct" and "1.0.1" to match the
 actual name and version for your product, but those two lines tell
-Avalon it's looking at the right information.  Note that whitespace
+Mezzanine it's looking at the right information.  Note that whitespace
 before or after the ':' is acceptable, but the keywords "name" and
 "version" must appear at the beginning of the line with no leading
 whitespace.  In fact, leading whitespace is universally bad in product
 files.
 
-Once Avalon encounters a name/version pair that match what it's
+Once Mezzanine encounters a name/version pair that match what it's
 looking for, it will parse every non-comment line up until the next
 name or version it encounters, or until the end of the file.  This
 permits a single product file to define multiple versions of a
 product.  It also allows a single product file to contain multiple
 products; however, this means that the filename won't match the
-product name, thus requiring Avalon to go digging, and is discouraged
-for that very reason.
+product name, thus requiring Mezzanine to go digging, and is
+discouraged for that very reason.
 
 All other product-level variables are of a similar form to the name
 and version lines; i.e.:
@@ -91,8 +91,7 @@ srpm) are given their own product files for simplicity and
 maintainability.
 
 A "module" is a directory tree which is stored in unarchived form in
-the master repository.  In Avalon 1.x, all packages maintained within
-the build system are kept as modules.
+the master repository.
 
 Both "srpm" and "rpm" packages are stored in package set directories,
 one directory for each type (source and binary) containing all
@@ -113,11 +112,11 @@ The basic syntax for a component package is:
 <type>:<modulename>/<name> <var>=<value> <var>=<value> ...
 
 In theory, the only part of this line which is required is <name>.  If
-you omit the component type (one of the 5 keywords above), Avalon will
-try to guess the correct value from the other information you
+you omit the component type (one of the 5 keywords above), Mezzanine
+will try to guess the correct value from the other information you
 supplied.  For example, if <name> is "somepackage-1.0-1.src.rpm," this
-is obviously an srpm package, and Avalon will recognize this.  Also,
-in the case of a "module" component, the name of the module will
+is obviously an srpm package, and Mezzanine will recognize this.
+Also, in the case of a "module" component, the name of the module will
 almost always match the name of the package (<name>), and therefore
 can be omitted along with the corresponding '/'.  And of course there
 can be as many or as few package variables as required.
@@ -130,10 +129,10 @@ package variables; those will be covered in the next section.
 product:elvis-3.0
 # A source RPM for valen 2.1 from the contrib-rh module
 srpm:contrib-rh/valen-2.1-3.src.rpm
-# A source RPM for zathras 0.7.1, this time letting Avalon assume
+# A source RPM for zathras 0.7.1, this time letting Mezzanine assume
 # the package type to be "srpm"
 contrib-rh/zathras-0.7.1-1.src.rpm
-# A binary RPM.  Again, Avalon knows it's a binary RPM from the
+# A binary RPM.  Again, Mezzanine knows it's a binary RPM from the
 # filename.
 bin-rh/messup-0.0.1-7.i586.rpm
 # A simple module for the package morestuff
@@ -174,10 +173,10 @@ currently-recognized product variables will follow.
 product:elvis version=3.0
 # A source RPM for valen 2.1 from the contrib-rh module
 srpm:contrib-rh/valen ver=2.1 rel=3 tag=head
-# A source RPM for zathras 0.7.1, this time letting Avalon assume
+# A source RPM for zathras 0.7.1, this time letting Mezzanine assume
 # the package type to be "srpm"
-contrib-rh/zathras-0.7.1-1.src.rpm tag=VA-REDHAT-7-0-1
-# A binary RPM.  Again, Avalon knows it's a binary RPM from the
+contrib-rh/zathras-0.7.1-1.src.rpm tag=REDHAT-7-0
+# A binary RPM.  Again, Mezzanine knows it's a binary RPM from the
 # filename.
 bin-rh/messup-0.0.1-7.i586.rpm tag=head
 # A simple module for the package morestuff
@@ -190,8 +189,8 @@ module:morestuff    tag=MORESTUFF-1-3
 Earlier sections have discussed the general syntax of product files,
 and specifically of the variables that allow for very flexible
 customization of packages and their attributes.  This section will
-outline each of the variables which are presently supported by Avalon
-along with their syntax, shortcuts, and proper usage.
+outline each of the variables which are presently supported by
+Mezzanine along with their syntax, shortcuts, and proper usage.
 
 2.1.  Specifying Build Targets:  ARCH
 -------------------------------------
@@ -217,7 +216,7 @@ Example:  bins=bin-rh/foo-1.0-1.i386.rpm,bin-rh/foo-server-1.0-1.i386.rpm
 
 The BOOTIMG variable specifies a relative path within an image module
 to a bootable floppy disk image.  If this variable is defined for a
-particular image, Avalon will create a bootable CD using the floppy
+particular image, Mezzanine will create a bootable CD using the floppy
 disk image specified.
 
 Example:  bootimg=images/bootcd.img
@@ -252,7 +251,7 @@ spaces.
 
 Aliases:  DESC
 
-Example:  description:  RedHat Linux with VA Linux Enhancements
+Example:  description:  RedHat Linux
 
 2.7.  Making CD's from Images:  ISO
 -----------------------------------
@@ -260,7 +259,7 @@ Example:  description:  RedHat Linux with VA Linux Enhancements
 Image modules for which you want CD's created must specify the
 filename for the ISO image to create using the ISO variable.
 
-Example:  iso=vana-2.0.iso
+Example:  iso=foo-2.0.iso
 
 2.8.  Labelling CD's:  LABEL
 ----------------------------
@@ -268,7 +267,7 @@ Example:  iso=vana-2.0.iso
 The default label for CD images is the product name and version.  If
 you wish to specify your own, use the LABEL variable.
 
-Example:  label=RH/VALE
+Example:  label=RH7
 
 2.9.  Placing Packages into Image Trees:  LOCATIONS
 ---------------------------------------------------
@@ -285,7 +284,7 @@ There are two types of specifiers, differentiated by the character
 which separates the regular expression from the directory path.  If an
 equals sign ('=') is used, a package file matching the regexp will be
 placed in that location, and no subsequent patterns will be tested for
-that package file.  If a colon (':') is used instead, Avalon will keep
+that package file.  If a colon (':') is used instead, Mezzanine will keep
 testing the regexp's, even after finding a match, until it reaches a
 match with an equals sign or the end of the list.
 
@@ -303,10 +302,10 @@ breaks or intervening whitespace.
 
 Aliases:  LOC
 
-Example:  locations:/src\.rpm$/:va-os-srpms/VALinux/SRPMS,
-                    /src\.rpm$/=va-os-srpms/SRPMS,
-                    /\.rpm$/:va-os-rpms/VALinux/RPMS,
-                    /\.rpm$/:va-os-rpms/RedHat/RPMS
+Example:  locations:/src\.rpm$/:os-srpms/Custom/SRPMS,
+                    /src\.rpm$/=os-srpms/SRPMS,
+                    /\.rpm$/:os-rpms/Custom/RPMS,
+                    /\.rpm$/:os-rpms/RedHat/RPMS
 
 2.10.  Forcing RPM into Submission:  MACROS
 ------------------------------------------
@@ -326,7 +325,7 @@ Example:  macros=release_version:6.2,release_name:Piglet
 --------------------------------------
 
 For packages which simply cannot conform to any standard build
-mechanism, maintainers may supply a ".avalon.makefile" which contains
+mechanism, maintainers may supply a "Makefile.mezz" which contains
 make instructions for creating source and binary package files.  The
 MAKE variable allows for customization of which make is used and how
 it is called.  As with CFLAGS, use ampersands for separators.
@@ -382,18 +381,18 @@ Example:  rpmcmd=rpm4
 2.16.  Defining Source Files:  SRCS
 -----------------------------------
 
-Avalon has certain default rules when building a package from a full
-source tree.  Assume that directories named "CVS", "BitKeeper", "RCS",
-or "SCCS", and any directories or files whose names begin with a dot
-will be ignored.  After those exclusions, any directories inside the
-module are treated as vendor source directories which should be tarred
-up into a .tar.gz (or tar.bz2, depending on the spec file) file with
-the same name as the directory.  Likewise, any files whose names do
-not end in .spec (or .spec.in) are assumed to be additional vendor
+Mezzanine has certain default rules when building a package from a
+full source tree.  Assume that directories named "CVS", "BitKeeper",
+"RCS", or "SCCS", and any directories or files whose names begin with
+a dot will be ignored.  After those exclusions, any directories inside
+the module are treated as vendor source directories which should be
+tarred up into a .tar.gz (or tar.bz2, depending on the spec file) file
+with the same name as the directory.  Likewise, any files whose names
+do not end in .spec (or .spec.in) are assumed to be additional vendor
 source files.
  
 If your package does not fit the above default assumptions, you will
-need to tell Avalon how to override the defaults using package
+need to tell Mezzanine how to override the defaults using package
 variables.  The SRCS variable consists of a comma-separated list of
 source file definitions.  Each definition contains one or more source
 files/directories separated by ampersands, and at most one tarball,
@@ -405,7 +404,7 @@ place.  Note that wildcards are valid for source files/directories.
 
 Aliases:  SOURCE, SOURCES
 
-Example:  srcs=etc&usr&README:VAmoo_cow-1.0.0.tar.bz2,moo_cow.init&*.1
+Example:  srcs=etc&usr&README:moo_cow-1.0.0.tar.bz2,moo_cow.init&*.1
 
 2.17.  Build Stage Participation:  STAGES
 -----------------------------------------
@@ -421,7 +420,7 @@ Example:  stages=scpa
 2.18.  Generating Patches from Tags:  TAGFILE
 ---------------------------------------------
 
-By default, Avalon looks at the spec file when obtaining a list of
+By default, Mezzanine looks at the spec file when obtaining a list of
 tags for a particular module from which to generate patches.  The
 TAGFILE variable overrides that default.  The file specified *must*
 have all tags present.
@@ -434,9 +433,9 @@ Example:  tagfile=ChangeLog
 The TAR variable alters the command used for creating tarballs.
 Unlike the other calling syntax modifiers, TAR can take up to 2
 parameters.  %f is the list of source files/directories/wildcards,
-separated by spaces.  %t is the path and filename for the tarball.
-Do not define this variable without including at least %t, and don't
-use it at all unless you really need to.
+separated by spaces.  %t is the path and filename for the tarball.  Do
+not define this variable without including at least %t, and don't use
+it at all unless you really need to.
 
 Example:  tar:  gtar -zcvf %t %f
 
@@ -456,7 +455,7 @@ Example:  version=1.0.1
 
 The ZIP variable specifies the compression program to use.  It must
 accept the -d and -c switches (a la gzip and bzip2) as it is used with
-the --use-compress-program option to GNU tar.  Avalon automatically
+the --use-compress-program option to GNU tar.  Mezzanine automatically
 detects the proper compression program to use based on the filename,
 so if its algorithm proves insufficient, fix the algorithm rather than
 using this variable if at all possible.

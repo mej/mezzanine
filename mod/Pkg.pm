@@ -1,4 +1,4 @@
-# Avalon Pkg Perl Module
+# Mezzanine Pkg Perl Module
 # 
 # Copyright (C) 2001, Michael Jennings
 #
@@ -21,19 +21,19 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.17 2001/08/20 22:21:29 mej Exp $
+# $Id: Pkg.pm,v 1.18 2001/09/22 13:22:34 mej Exp $
 #
 
-package Avalon::Pkg;
+package Mezzanine::Pkg;
 
 BEGIN {
     use Exporter   ();
-    use Avalon::Util;
-    use Avalon::RevCtl;
-    use Avalon::PkgVars;
-    use Avalon::RPM;
-    use Avalon::Deb;
-    use Avalon::Tar;
+    use Mezzanine::Util;
+    use Mezzanine::RevCtl;
+    use Mezzanine::PkgVars;
+    use Mezzanine::RPM;
+    use Mezzanine::Deb;
+    use Mezzanine::Tar;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
@@ -79,7 +79,7 @@ fetch_package
     local *REVTOOL;
 
     if (! $pkg_file) {
-        return (AVALON_MISSING_SOURCES, "Nothing to fetch?");
+        return (MEZZANINE_MISSING_SOURCES, "Nothing to fetch?");
     }
     foreach my $f (split(' ', $pkg_file)) {
         if (!(-d $f) && !(-f $f && -s _)) {
@@ -88,14 +88,14 @@ fetch_package
     }
     if (! $missing) {
         dprint "No need to retrieve:  $pkg_file\n";
-        return (AVALON_DUPLICATE, undef);
+        return (MEZZANINE_DUPLICATE, undef);
     }
 
     if (&login_to_master()) {
         $err = &update_from_master($pkg_file);
         return ($err, "");
     }
-    return (AVALON_BAD_LOGIN, "Login failure");
+    return (MEZZANINE_BAD_LOGIN, "Login failure");
 }
 
 sub
@@ -107,7 +107,7 @@ package_install
     $pkg_type = &pkgvar_type();
 
     if (! $pkg_file) {
-        return (AVALON_SYNTAX_ERROR, "You cannot install without specifying a package.\n");
+        return (MEZZANINE_SYNTAX_ERROR, "You cannot install without specifying a package.\n");
     }
     if ($pkg_type eq "rpm") {
         return &rpm_install();
@@ -116,7 +116,7 @@ package_install
     } elsif ($pkg_type eq "tar") {
         return &tar_install();
     }
-    return (AVALON_BAD_PACKAGE, "Unable to identify package $pkg_file.\n");
+    return (MEZZANINE_BAD_PACKAGE, "Unable to identify package $pkg_file.\n");
 }
 
 sub
@@ -128,7 +128,7 @@ package_show_contents
     $pkg_type = &pkgvar_type();
 
     if (! $pkg_file) {
-        return (AVALON_SYNTAX_ERROR, "You cannot display contents without specifying a package.\n");
+        return (MEZZANINE_SYNTAX_ERROR, "You cannot display contents without specifying a package.\n");
     }
     if ($pkg_type eq "rpm") {
         return &rpm_show_contents($pkg_file);
@@ -137,7 +137,7 @@ package_show_contents
     } elsif ($pkg_type eq "tar") {
         return &tar_show_contents($pkg_file);
     }
-    return (AVALON_BAD_PACKAGE, "Unable to identify package $pkg_file.\n");
+    return (MEZZANINE_BAD_PACKAGE, "Unable to identify package $pkg_file.\n");
 }
 
 sub
@@ -150,7 +150,7 @@ package_query
     $pkg_type = &pkgvar_type();
 
     if (! $pkg_file) {
-        return (AVALON_SYNTAX_ERROR, "You cannot query without specifying a package.\n");
+        return (MEZZANINE_SYNTAX_ERROR, "You cannot query without specifying a package.\n");
     }
     if ($pkg_type eq "rpm") {
         return &rpm_query($query_type);
@@ -159,7 +159,7 @@ package_query
     } elsif ($pkg_type eq "tar") {
         return &tar_query($query_type);
     }
-    return (AVALON_BAD_PACKAGE, "Unable to identify package $pkg_file.\n");
+    return (MEZZANINE_BAD_PACKAGE, "Unable to identify package $pkg_file.\n");
 }
 
 ### Private functions

@@ -23,20 +23,20 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.156 2001/08/23 21:35:18 mej Exp $
+# $Id: buildtool,v 1.157 2001/09/22 13:22:33 mej Exp $
 #
 
 # Include the Perl Modules we need
 require POSIX;
 require Getopt::Long;
 use Cwd;
-use Avalon::Util;
-use Avalon::RevCtl;
-use Avalon::PkgVars;
-use Avalon::Src;
-use Avalon::Pkg;
-use Avalon::Build;
-use Avalon::Prod;
+use Mezzanine::Util;
+use Mezzanine::RevCtl;
+use Mezzanine::PkgVars;
+use Mezzanine::Src;
+use Mezzanine::Pkg;
+use Mezzanine::Build;
+use Mezzanine::Prod;
 
 # Print usage information
 sub
@@ -65,7 +65,7 @@ print_usage_info
     print "       --nocache                     Do not scan the cache (use with care)\n";
     print "       --clean                       Clean up RPM and buildroot directories when done\n";
     print "\n";
-    exit(AVALON_SUCCESS);
+    exit(MEZZANINE_SUCCESS);
 }
 
 # Normal print (i.e., don't print this in -q or -Q mode)
@@ -129,7 +129,7 @@ build_single_package
     &pkgvar_name($pkg);
     if (! ($pkgfile = &pkgvar_filename($pkgs->{$pkg}{MODULE}, $pkgs->{$pkg}{FILENAME}))) {
         &fail_package($pkg, "I don't know what file/module to build from!");
-        return AVALON_NO_SOURCES;
+        return MEZZANINE_NO_SOURCES;
     }
 
     # If there are binaries, no point in trying to build source.
@@ -139,15 +139,15 @@ build_single_package
         # Build the source
         &pkgvar_target($target);
         ($err, $msg, $outfiles) = &build_package();
-        if ($err != AVALON_SUCCESS) {
+        if ($err != MEZZANINE_SUCCESS) {
             &fail_package($pkg, $msg);
             return $err;
         }
     }
     $err = &place_package_files($pkg, $outfiles, $pkgs->{$pkg}{LOCATIONS});
-    return $err if ($err != AVALON_SUCCESS);
+    return $err if ($err != MEZZANINE_SUCCESS);
     &complete_package($pkg);
-    return AVALON_SUCCESS;
+    return MEZZANINE_SUCCESS;
 }
 
 # Spawn a child buildtool
@@ -182,7 +182,7 @@ build_package_forked
             if ($buildroot) {
                 &pkgvar_buildroot("$buildroot/$pkg.$$");
             } else {
-                &pkgvar_buildroot("/var/tmp/avalon-buildroot.$$");
+                &pkgvar_buildroot("/var/tmp/mezzanine-buildroot.$$");
             }
             $err = &build_single_package($pkg);
             close(LOGFILE) if ($GLOBAL_LOG);
@@ -240,7 +240,7 @@ download_packages
 
         nprint "$pkg..." if (! &debug_get());
         ($err, $msg) = &fetch_package();
-        if ($err != AVALON_SUCCESS && $err != AVALON_DUPLICATE) {
+        if ($err != MEZZANINE_SUCCESS && $err != MEZZANINE_DUPLICATE) {
             &fail_package($pkg, $msg);
             next;
         }
@@ -258,11 +258,11 @@ place_package_files
     # If we didn't find any, something is very wrong.
     if (! $outfiles) {
         &fail_package($pkg, "No output packages were found");
-        return AVALON_PACKAGE_FAILED;
+        return MEZZANINE_PACKAGE_FAILED;
     }
     if (! $locations) {
         wprint "No locations specified for $pkg.\n";
-        return AVALON_SUCCESS;
+        return MEZZANINE_SUCCESS;
     }
     dprint "Output files for $pkg:  $outfiles\n";
 
@@ -317,7 +317,7 @@ place_package_files
             dprint "Non-exclusive match.  Continuing on....\n";
         }
     }
-    return AVALON_SUCCESS;
+    return MEZZANINE_SUCCESS;
 }
 
 # This routine parallelizes the product build so that each package is built by an individual buildtool process.
@@ -379,7 +379,7 @@ parallel_build
         @children = grep($_ != $pid, @children);
 
         # Check to see how it existed
-        if ($err == AVALON_SUCCESS) {
+        if ($err == MEZZANINE_SUCCESS) {
             # Yay! :-)
             &complete_package($pkg);
         } else {
@@ -410,7 +410,7 @@ parallel_build
         # End of loop.  Time to spawn the next child.
     }
     &cleanup_build_tree();
-    return (scalar(@failed_pkgs) ? AVALON_PACKAGE_FAILED : AVALON_SUCCESS);
+    return (scalar(@failed_pkgs) ? MEZZANINE_PACKAGE_FAILED : MEZZANINE_SUCCESS);
 }
 
 sub
@@ -435,7 +435,7 @@ build_product
 
     # Now we clean up.
     &cleanup_build_tree();
-    return (scalar(@failed_pkgs) ? AVALON_PACKAGE_FAILED : AVALON_SUCCESS);
+    return (scalar(@failed_pkgs) ? MEZZANINE_PACKAGE_FAILED : MEZZANINE_SUCCESS);
 }
 
 # Once we're all done, summarize any failures at the very end
@@ -484,7 +484,7 @@ main
     $progname = "buildtool";
     $version = "2.1";
     umask 022;
-    $ret = AVALON_SUCCESS;
+    $ret = MEZZANINE_SUCCESS;
 
     # No input.
     open(STDIN, "</dev/null");
@@ -501,17 +501,17 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.156 $ created on $Date: 2001/08/23 21:35:18 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.157 $ created on $Date: 2001/09/22 13:22:33 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
         $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
         print "\n";
 	print "$progname $version by Michael Jennings <mej\@eterm.org>\n";
-        print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
+        print "Copyright (c) 2000-2001, Michael Jennings\n";
         print "  ($rcs_info)\n";
         print "\n";
-	return AVALON_SUCCESS;
+	return MEZZANINE_SUCCESS;
     }
     if ($opt_h) {
 	&print_usage_info();   # Never returns
@@ -558,7 +558,7 @@ main
     } else {
         $prod = $prodname = &basename(&getcwd());
     }
-    &pkgvar_buildroot($ENV{AVALON_BUILDROOT});
+    &pkgvar_buildroot($ENV{MEZZANINE_BUILDROOT});
 
     if (! $opt_clean) {
         $opt_clean = "build";
@@ -597,10 +597,10 @@ main
         if (! &parse_product_entry($prod)) {
             eprint "$prod does not seem to be a valid product or product entry.\n";
             eprint "Perhaps you made a typo?\n";
-            return AVALON_BAD_PRODUCT;
+            return MEZZANINE_BAD_PRODUCT;
         }
     }
-    return AVALON_BAD_PRODUCT if (!scalar(@packages));
+    return MEZZANINE_BAD_PRODUCT if (!scalar(@packages));
 
     dprint "Products to be built (", scalar(@packages), " packages):  ", join(" ", @products), "\n";
     if ($num_cpus > 1) {

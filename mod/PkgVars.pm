@@ -1,4 +1,4 @@
-# Avalon Package Variables Perl Module
+# Mezzanine Package Variables Perl Module
 # 
 # Copyright (C) 2001, Michael Jennings
 #
@@ -24,11 +24,11 @@
 # $Id: Pkg.pm,v 1.15 2001/08/15 00:52:02 mej Exp $
 #
 
-package Avalon::PkgVars;
+package Mezzanine::PkgVars;
 
 BEGIN {
     use Exporter   ();
-    use Avalon::Util;
+    use Mezzanine::Util;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
@@ -55,8 +55,8 @@ $pkg_target = "rpms";
 $pkg_srcs = "";
 $pkg_inst = "";
 $pkg_topdir = "";
-$pkg_instroot = "/var/tmp/avalon-instroot.$$";
-$pkg_buildroot = "/var/tmp/avalon-buildroot.$$";
+$pkg_instroot = "/var/tmp/mezzanine-instroot.$$";
+$pkg_buildroot = "/var/tmp/mezzanine-buildroot.$$";
 $pkg_arch = "i386";
 $pkg_params = "";
 $pkg_cmd = "";
@@ -210,7 +210,7 @@ pkgvar_instroot
     my $param = $_[0];
 
     if (defined($param)) {
-        $pkg_instroot = ($param ? $param : "/var/tmp/avalon-instroot.$$");
+        $pkg_instroot = ($param ? $param : "/var/tmp/mezzanine-instroot.$$");
     }
     dprint "$pkg_instroot\n";
     return $pkg_instroot;
@@ -222,7 +222,7 @@ pkgvar_buildroot
     my $param = $_[0];
 
     if (defined($param)) {
-        $pkg_buildroot = ($param ? $param : "/var/tmp/avalon-buildroot.$$");
+        $pkg_buildroot = ($param ? $param : "/var/tmp/mezzanine-buildroot.$$");
     }
     dprint "$pkg_buildroot\n";
     return $pkg_buildroot;

@@ -1,4 +1,4 @@
-# Avalon Tar Perl Module
+# Mezzanine Tar Perl Module
 # 
 # Copyright (C) 2001, Michael Jennings
 #
@@ -21,14 +21,14 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Tar.pm,v 1.1 2001/07/27 01:45:37 mej Exp $
+# $Id: Tar.pm,v 1.2 2001/09/22 13:22:34 mej Exp $
 #
 
-package Avalon::Tar;
+package Mezzanine::Tar;
 
 BEGIN {
     use Exporter   ();
-    use Avalon::Util;
+    use Mezzanine::Util;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
@@ -82,7 +82,7 @@ tar_install
     if (!open(TAR, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }
-    $err = AVALON_SUCCESS;
+    $err = MEZZANINE_SUCCESS;
     while (<TAR>) {
         chomp($line = $_);
         if ($line =~ /^tar: /) {
@@ -93,10 +93,10 @@ tar_install
     }
     close(TAR);
     dprint "\"$cmd\" returned $?\n";
-    if ($? != 0 && $err == AVALON_SUCCESS) {
-        return AVALON_UNSPECIFIED_ERROR;
+    if ($? != 0 && $err == MEZZANINE_SUCCESS) {
+        return MEZZANINE_UNSPECIFIED_ERROR;
     }
-    if ($err == AVALON_SUCCESS) {
+    if ($err == MEZZANINE_SUCCESS) {
         print "$pkg_file successfully installed.\n";
     } else {
         eprint "$pkg_file installation failed.\n";
@@ -128,16 +128,16 @@ tar_show_contents
     close(TAR);
     dprint "\"$cmd\" returned $?\n";
     if ($? != 0) {
-        return AVALON_UNSPECIFIED_ERROR;
+        return MEZZANINE_UNSPECIFIED_ERROR;
     }
-    return AVALON_SUCCESS;
+    return MEZZANINE_SUCCESS;
 }
 
 sub
 tar_query
 {
     eprint "Tar packages cannot be queried.\n";
-    return AVALON_COMMAND_INVALID;
+    return MEZZANINE_COMMAND_INVALID;
 }
 
 

@@ -1,4 +1,4 @@
-# Avalon DEB Perl Module
+# Mezzanine DEB Perl Module
 # 
 # Copyright (C) 2001, Michael Jennings
 #
@@ -21,14 +21,14 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Deb.pm,v 1.1 2001/07/27 01:45:37 mej Exp $
+# $Id: Deb.pm,v 1.2 2001/09/22 13:22:34 mej Exp $
 #
 
-package Avalon::Deb;
+package Mezzanine::Deb;
 
 BEGIN {
     use Exporter   ();
-    use Avalon::Util;
+    use Mezzanine::Util;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
@@ -82,10 +82,10 @@ deb_install
     close(DPKG);
     dprint "\"$cmd\" returned $?\n";
     if ($? != 0) {
-        return AVALON_UNSPECIFIED_ERROR;
+        return MEZZANINE_UNSPECIFIED_ERROR;
     }
     print "$pkg_file successfully installed.\n";
-    return AVALON_SUCCESS;
+    return MEZZANINE_SUCCESS;
 }
 
 sub
@@ -109,9 +109,9 @@ deb_show_contents
     close(DPKG);
     dprint "\"$cmd\" returned $?\n";
     if ($? != 0) {
-        return AVALON_UNSPECIFIED_ERROR;
+        return MEZZANINE_UNSPECIFIED_ERROR;
     }
-    return AVALON_SUCCESS;
+    return MEZZANINE_SUCCESS;
 }
 
 sub
@@ -125,7 +125,7 @@ deb_query
     if ($query_type eq "d") {
     } else {
         eprint "Unrecognized query type \"$query_type\"\n";
-        return AVALON_SYNTAX_ERROR;
+        return MEZZANINE_SYNTAX_ERROR;
     }
     $dpkg = ($pkg_prog ? $pkg_prog : "dpkg");
     $cmd = "$dpkg -I " . ($pkg_file ? "$pkg_file" : "");
@@ -148,7 +148,7 @@ deb_query
     close(DPKG);
     dprint "\"$cmd\" returned $?\n";
     if ($? != 0) {
-        return AVALON_UNSPECIFIED_ERROR;
+        return MEZZANINE_UNSPECIFIED_ERROR;
     }
     foreach $prov (@prov) {
         print "Capability:  $prov\n";
@@ -156,7 +156,7 @@ deb_query
     foreach $dep (@deps) {
         print "Dependency:  $dep\n";
     }   
-    return AVALON_SUCCESS;
+    return MEZZANINE_SUCCESS;
 }
 
 sub

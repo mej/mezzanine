@@ -1,4 +1,4 @@
-# Avalon Revision Control Perl Module
+# Mezzanine Revision Control Perl Module
 # 
 # Copyright (C) 2001, Michael Jennings
 #
@@ -21,15 +21,15 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.5 2001/08/23 21:35:18 mej Exp $
+# $Id: RevCtl.pm,v 1.6 2001/09/22 13:22:34 mej Exp $
 #
 
-package Avalon::RevCtl;
+package Mezzanine::RevCtl;
 
 BEGIN {
     use Exporter   ();
     use Cwd;
-    use Avalon::Util;
+    use Mezzanine::Util;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
@@ -455,7 +455,7 @@ update_from_master
 
     # Note:  The following exists solely because CVS is too lame to handle symlinks.
     foreach $dirname (grep(-d $_, (scalar(@file_list) ? @file_list : "."))) {
-        my $linkfile = "$dirname/.avalon.symlinks";
+        my $linkfile = "$dirname/.mezz.symlinks";
         local *SL;
 
         next if (!(-f $linkfile && -s _ && open(SL, $linkfile)));
@@ -484,7 +484,7 @@ add_new_files
     dprint &print_args(@_);
 
     if (!scalar(@_)) {
-        return AVALON_BAD_ADDITION;
+        return MEZZANINE_BAD_ADDITION;
     }
     $cmd = "/bin/sh -c \"cvs $repository add $keyword " . join(' ', @_) . "\"";
     return &talk_to_server("add", $cmd);
@@ -499,7 +499,7 @@ delete_old_files
     dprint &print_args(@_);
 
     if (!scalar(@_)) {
-        return AVALON_BAD_REMOVAL;
+        return MEZZANINE_BAD_REMOVAL;
     }
     $cmd = "/bin/sh -c \"cvs $repository remove -f $recurse " . join(' ', @_) . "\"";
     return &talk_to_server("remove", $cmd);
@@ -609,12 +609,12 @@ import_vendor_sources
     $tag =~ s/[^-_A-Z0-9]/_/g;
     if (! $rtag) {
         eprint "No valid release tag was given.  I can't import without it.\n";
-        return AVALON_INVALID_TAG;
+        return MEZZANINE_INVALID_TAG;
     } else {
         $rtag =~ s/^-r //;
     }
     $rtag =~ s/[^-_A-Z0-9]/_/g;
-    return AVALON_INVALID_TAG if (! &check_tags($module));
+    return MEZZANINE_INVALID_TAG if (! &check_tags($module));
 
     $cmd = "/bin/sh -c \"cvs $repository import $keyword $exclusive -m 'Import of $module' $module $tag $rtag\"";
     $tag = "-r $tag";
@@ -650,7 +650,7 @@ talk_to_cvs_server
         $err = 0;
         if (!open(CMD, "$cmd 2>&1 |")) {
             eprint "Execution of \"$cmd\" failed -- $!";
-            return AVALON_COMMAND_FAILED;
+            return MEZZANINE_COMMAND_FAILED;
         }
         while (<CMD>) {
             chomp($line = $_);
@@ -666,47 +666,47 @@ talk_to_cvs_server
             # First, fatal errors
             if ($line =~ /^cvs \w+: cannot find password/) {
                 eprint "You must login to the repository first.\n";
-                $err = AVALON_BAD_LOGIN;
+                $err = MEZZANINE_BAD_LOGIN;
                 last;
             } elsif ($line =~ /^cvs \[\w+ aborted\]: authorization failed: server \S+ rejected access/) {
                 eprint "Your userid or password was not valid\n";
-                $err = AVALON_BAD_LOGIN;
+                $err = MEZZANINE_BAD_LOGIN;
                 last;
             } elsif ($line =~ /^cvs \[\w+ aborted\]: \S+ requires write access to the repository/) {
                 eprint "You do not have write access to the master repository.\n";
-                $err = AVALON_ACCESS_DENIED;
+                $err = MEZZANINE_ACCESS_DENIED;
                 last;
             } elsif ($line =~ /^cvs \[\w+ aborted\]: no repository/) {
                 eprint "There is no CVS repository here.\n";
-                $err = AVALON_NO_SOURCES;
+                $err = MEZZANINE_NO_SOURCES;
             } elsif ($line =~ /^cvs server: cannot find module .(\S+). /) {
                 push @not_found, $1;
-                $err = AVALON_FILE_NOT_FOUND;
+                $err = MEZZANINE_FILE_NOT_FOUND;
             } elsif ($line =~ /^cvs server: warning: (.+) is not \(any longer\) pertinent/
                      || $line =~ /^cvs server: warning: newborn (\S+) has disappeared/) {
                 push @removed, $1;
                 if ($cmd =~ /$1/) {
                     # It's only an error if the removed file was specifically requested in the get
-                    $err = AVALON_FILE_REMOVED;
+                    $err = MEZZANINE_FILE_REMOVED;
                 }
             } elsif ($line =~ /^C (.+)$/) {
                 push @conflicts, $1;
-                $err = AVALON_CONFLICT_FOUND;
+                $err = MEZZANINE_CONFLICT_FOUND;
             } elsif ($line =~ /^cvs \[\w+ aborted\]: no such tag/
                      || $line =~ /^cvs \S+: warning: new-born \S+ has disappeared$/) {
                 eprint "$tag is not a valid tag for this file/module\n";
-                $err = AVALON_INVALID_TAG;
+                $err = MEZZANINE_INVALID_TAG;
             } elsif ($line =~ /^cvs server: (.+) already exists/ || $line =~ /^cvs server: (.+) has already been entered/) {
                 eprint "$1 already exists.  No need to add it.\n";
-                $err = AVALON_DUPLICATE;
+                $err = MEZZANINE_DUPLICATE;
             } elsif ($line =~ /^cvs server: nothing known about/) {
                 $line =~ s/^cvs server: nothing known about//;
                 if ($type eq "add") {
                     eprint "You tried to add a file which does not exist locally ($line).\n";
-                    $err = AVALON_BAD_ADDITION;
+                    $err = MEZZANINE_BAD_ADDITION;
                 } else {
                     eprint "You tried to remove a file which does not exist in the repository ($line).\n";
-                    $err = AVALON_BAD_REMOVAL;
+                    $err = MEZZANINE_BAD_REMOVAL;
                 }
 
             # Retryable errors
@@ -717,7 +717,7 @@ talk_to_cvs_server
                     sleep 3;
                 } else {
                     eprint "The CVS server was unreachable.\n";
-                    $err = AVALON_NO_SERVER;
+                    $err = MEZZANINE_NO_SERVER;
                     last;
                 }
             } elsif ($line =~ /^Unknown host (\S+)\.$/) {
@@ -727,7 +727,7 @@ talk_to_cvs_server
                     sleep 3;
                 } else {
                     eprint "The CVS server name ($1) does not resolve.\n";
-                    $err = AVALON_NO_SERVER;
+                    $err = MEZZANINE_NO_SERVER;
                     last;
                 }
             } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
@@ -737,7 +737,7 @@ talk_to_cvs_server
                     sleep 3;
                 } else {
                     eprint "The CVS server kept crashing.\n";
-                    $err = AVALON_SERVER_CRASH;
+                    $err = MEZZANINE_SERVER_CRASH;
                     last;
                 }
 
@@ -753,7 +753,7 @@ talk_to_cvs_server
     }
     if ($err == 0 && $? != 0 && $type !~ /^query_r?diff$/) {
         eprint "An unknown error must have occured, because the command returned $?\n";
-        $err = AVALON_UNSPECIFIED_ERROR;
+        $err = MEZZANINE_UNSPECIFIED_ERROR;
     }
     if ($err) {
         if ($#conflicts != -1) {
@@ -789,7 +789,7 @@ talk_to_bk_server
 {
     my ($type, $cmd) = @_;
 
-    return AVALON_UNSPECIFIED_ERROR;
+    return MEZZANINE_UNSPECIFIED_ERROR;
 }
 
 1;

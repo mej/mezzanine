@@ -1,4 +1,4 @@
-# Avalon Prod Perl Module
+# Mezzanine Prod Perl Module
 # 
 # Copyright (C) 2001, Michael Jennings
 #
@@ -21,15 +21,15 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.11 2001/09/05 19:26:28 mej Exp $
+# $Id: Prod.pm,v 1.12 2001/09/22 13:22:34 mej Exp $
 #
 
-package Avalon::Prod;
+package Mezzanine::Prod;
 
 BEGIN {
     use Exporter   ();
     use Cwd;
-    use Avalon::Util;
+    use Mezzanine::Util;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
@@ -37,7 +37,7 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('@products', '@packages', '$prods', '$pkgs', '&make_build_dir', '&make_log_dir', '&get_var_name', '&get_package_stages', '&branch_tag_prefix', '&pkg_to_release_tag', '&pkg_to_branch_tag', '&find_product_file', '&parse_product_entry', '&parse_prod_file');
+    @EXPORT      = ('@products', '@packages', '$prods', '$pkgs', '&make_build_dir', '&make_log_dir', '&get_var_name', '&find_product_file', '&parse_product_entry', '&parse_prod_file');
     %EXPORT_TAGS = ();
 
     # Exported variables go here
@@ -63,17 +63,9 @@ $proddir = ".";
 sub make_build_dir($);
 sub make_log_dir($);
 sub get_var_name($);
-sub get_package_stages($);
-sub branch_tag_prefix();
-sub pkg_to_release_tag($$);
-sub pkg_to_branch_tag($$);
-sub fail_package($$);
 sub find_product_file($$);
 sub parse_product_entry($$$);
 sub parse_prod_file($$$);
-sub summarize_failures();
-sub parallel_build();
-sub build_process();
 
 # Private functions
 
@@ -91,10 +83,10 @@ make_build_dir
     my $builddir;
 
     # Create a build area for ourselves.
-    if (defined($ENV{AVALON_BUILDDIR})) {
-        $builddir = $ENV{AVALON_BUILDDIR};
+    if (defined($ENV{MEZZANINE_BUILDDIR})) {
+        $builddir = $ENV{MEZZANINE_BUILDDIR};
     } else {
-        $builddir = $dir . "/build.avalon";
+        $builddir = $dir . "/build.mezz";
     }
     if (-f $builddir) {
         &nuke_tree($builddir);
@@ -116,10 +108,10 @@ make_log_dir
     my $dir = shift;
     my $logdir;
 
-    if (defined($ENV{AVALON_LOGDIR})) {
-        $logdir = $ENV{AVALON_LOGDIR};
+    if (defined($ENV{MEZZANINE_LOGDIR})) {
+        $logdir = $ENV{MEZZANINE_LOGDIR};
     } else {
-        $logdir = $dir . "/logs.avalon";
+        $logdir = $dir . "/logs.mezz";
     }
     if (-f $logdir) {
         &nuke_tree($logdir);
@@ -168,8 +160,8 @@ find_product_file
     dprint &print_args(@_);
 
     if (! $prodname) {
-        if (-f "prod.avalon") {
-            return "prod.avalon";
+        if (-f "prod.mezz") {
+            return "prod.mezz";
         } else {
             return 0;
         }
@@ -180,8 +172,8 @@ find_product_file
         ($prodfile = "$proddir/$prodname-$prodver") =~ s/(\.prod)?$/.prod/;
         if (-f $prodfile) {
             return $prodfile;
-        } elsif (defined($ENV{AVALON_PRODUCTS}) && -f "$ENV{AVALON_PRODUCTS}/$prodfile") {
-            return "$ENV{AVALON_PRODUCTS}/$prodfile";
+        } elsif (defined($ENV{MEZZANINE_PRODUCTS}) && -f "$ENV{MEZZANINE_PRODUCTS}/$prodfile") {
+            return "$ENV{MEZZANINE_PRODUCTS}/$prodfile";
         }
     }
 
@@ -189,8 +181,8 @@ find_product_file
     ($prodfile = "$proddir/$prodname") =~ s/(\.prod)?$/.prod/;
     if (-f $prodfile) {
         return $prodfile;
-    } elsif (defined($ENV{AVALON_PRODUCTS}) && -f "$ENV{AVALON_PRODUCTS}/$prodfile") {
-        return "$ENV{AVALON_PRODUCTS}/$prodfile";
+    } elsif (defined($ENV{MEZZANINE_PRODUCTS}) && -f "$ENV{MEZZANINE_PRODUCTS}/$prodfile") {
+        return "$ENV{MEZZANINE_PRODUCTS}/$prodfile";
     }
 
     # Give up.  It doesn't exist.

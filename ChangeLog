@@ -508,7 +508,7 @@ The option syntax should be exactly the same.
 ----------------------------------------------------------------------
 Mon Jun 19 21:54:11 2000                        Michael Jennings (mej)
 
-Spec file for Avalon.
+Spec file for Mezzanine.
 ----------------------------------------------------------------------
 Mon Jun 19 22:17:01 2000                        Michael Jennings (mej)
 
@@ -611,7 +611,7 @@ Module shouldn't be required, I don't think.
 ----------------------------------------------------------------------
 Fri Jul  7 20:13:05 2000                        Michael Jennings (mej)
 
-The finishing touches for Avalon 1.1....
+The finishing touches for Mezzanine 1.1....
 ----------------------------------------------------------------------
 Mon Jul 10 12:14:34 2000                        Michael Jennings (mej)
 
@@ -1019,7 +1019,7 @@ Thu Feb 22 18:52:47 2001                        Michael Jennings (mej)
 
 Updated README.  Cleaned up design doc with suggestions from Ted.
 Added support for buffy directory to web-sync.  Added first revision
-of the Avalon 2.0 TODO list with time guesstimates.
+of the Mezzanine 2.0 TODO list with time guesstimates.
 ----------------------------------------------------------------------
 Fri Feb 23 16:28:49 2001                        Michael Jennings (mej)
 
@@ -1111,7 +1111,7 @@ building of modules with non-default semantics.
 ----------------------------------------------------------------------
 Mon Apr  2 00:52:23 2001                        Michael Jennings (mej)
 
-Today's work, trying to get 6.2.4 building with the new Avalon stuff.
+Today's work, trying to get 6.2.4 building with the new Mezzanine stuff.
 ----------------------------------------------------------------------
 Tue Apr  3 19:15:09 2001                        Michael Jennings (mej)
 
@@ -1213,7 +1213,7 @@ Wed May  9 11:06:38 2001                        Michael Jennings (mej)
 Post-2.0 updates and bugfixes.
 ----------------------------------------------------------------------
 Wed May  9 13:48:03 2001                      Walt Drummond (drummond)
-- Added avalon.1 man page; overview for tool set
+- Added mezzanine.1 man page; overview for tool set
 - Added support for avdiff, avstatus, avlog
 - Added _some_ of the query type codes to the revtool.1 manpage
   Partially closed bug #1144
@@ -1225,7 +1225,7 @@ Oops.  Use the right makefile....
 ----------------------------------------------------------------------
 Fri May 11 09:03:16 2001                      Walt Drummond (drummond)
 
-o Changed .avalon.makefile to Makefile.avalon; hidden files in source
+o Changed .mezz.makefile to Makefile.mezz; hidden files in source
   trees are evil.
 o Changed the logic in parse_product_entry() to assume modules if
   $proddir isn't defined.
@@ -1242,7 +1242,7 @@ Tue May 29 12:23:32 2001                        Michael Jennings (mej)
 Minor fixes.
 ----------------------------------------------------------------------
 Fri Jun  8 14:05:57 2001                      Walt Drummond (drummond)
-Added sample Makefile.avalon and update buildtool manpage to reference
+Added sample Makefile.mezz and update buildtool manpage to reference
 it.
 
 ----------------------------------------------------------------------
@@ -1253,7 +1253,7 @@ directory.
 
 Fixed avtag and avrtag so you don't need the -t/-T options.
 
-Moved the SRCS info to the avalon.srcs file for in-place builds.
+Moved the SRCS info to the mezzanine.srcs file for in-place builds.
 
 Fixed revtool's login routine to only login if required.
 ----------------------------------------------------------------------
@@ -1274,7 +1274,7 @@ a purpose for which no one ever uses it.
 ----------------------------------------------------------------------
 Thu Jun 14 20:23:56 2001                        Michael Jennings (mej)
 
-For the sake of paranoia, Avalon tools will now enforce a umask of
+For the sake of paranoia, Mezzanine tools will now enforce a umask of
 0022.
 ----------------------------------------------------------------------
 Mon Jun 18 10:18:21 2001                        Michael Jennings (mej)
@@ -1291,7 +1291,7 @@ srctool for disabling interaction with the repository.  I fixed
 Bug #1318 filed by Jay; srctool (avpatch) now properly ignores *.orig
 and *.rej when generating patch files.  Other minor issues were fixed,
 but nothing that should show up on radar.  Finally, I added the
-beginnings of an Avalon FAQ in SGML format.
+beginnings of an Mezzanine FAQ in SGML format.
 ----------------------------------------------------------------------
 Fri Jul 20 08:15:14 2001                        Michael Jennings (mej)
 
@@ -1398,4 +1398,8 @@ The 0.12 release.  Looking good. :)
 Wed Sep  5 12:17:18 2001                        Michael Jennings (mej)
 
 I forget what I did here, but I think it was important. :)
+----------------------------------------------------------------------
+Sat Sep 22 13:21:12 2001                        Michael Jennings (mej)
+
+Ch-ch-ch-changes....
 ----------------------------------------------------------------------

@@ -1,4 +1,4 @@
-# Avalon RPM Perl Module
+# Mezzanine RPM Perl Module
 # 
 # Copyright (C) 2001, Michael Jennings
 #
@@ -21,15 +21,15 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.7 2001/08/20 17:34:46 mej Exp $
+# $Id: RPM.pm,v 1.8 2001/09/22 13:22:34 mej Exp $
 #
 
-package Avalon::RPM;
+package Mezzanine::RPM;
 
 BEGIN {
     use Exporter   ();
-    use Avalon::Util;
-    use Avalon::PkgVars;
+    use Mezzanine::Util;
+    use Mezzanine::PkgVars;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
@@ -79,10 +79,10 @@ rpm_form_command
 
     $type = "" if (!defined($type));
 
-    if (! &Avalon::Pkg::pkgvar_command()) {
-        &Avalon::Pkg::pkgvar_command("/bin/rpm");
+    if (! &pkgvar_command()) {
+        &pkgvar_command("/bin/rpm");
     }
-    $cmd = &Avalon::Pkg::pkgvar_command();
+    $cmd = &pkgvar_command();
     if (&pkgvar_rcfile()) {
         $cmd .= " --rcfile=\"/usr/lib/rpm/rpmrc:" . &pkgvar_rcfile() . "\"";
     }
@@ -209,18 +209,18 @@ rpm_install
     local *RPM;
 
     if (! &pkgvar_filename()) {
-        return (AVALON_SYNTAX_ERROR, "No package specified for install");
+        return (MEZZANINE_SYNTAX_ERROR, "No package specified for install");
     }
     $cmd = &rpm_form_command("install") . " -U " . &pkgvar_filename();
     if (!open(RPM, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }
-    $err = AVALON_SUCCESS;
+    $err = MEZZANINE_SUCCESS;
     while (<RPM>) {
         chomp($line = $_);
         print "$line\n";
         if ($line =~ /^error: failed .*dependencies:/) {
-            $err = AVALON_DEPENDENCIES;
+            $err = MEZZANINE_DEPENDENCIES;
             while (<RPM>) {
                 chomp($line = $_);
                 last if ($line !~ /is needed by/);
@@ -230,17 +230,17 @@ rpm_install
             $msg = "Installing this package requires the following:  " . join(" ", @failed_deps);
             last;
         } elsif ($line =~ /^Architecture is not included:/) {
-            $err = AVALON_ARCH_MISMATCH;
+            $err = MEZZANINE_ARCH_MISMATCH;
             $line =~ s/^Architecture is not included:\s+//;
             $msg = "This package does not install on the $line architecture";
         }
     }
     close(RPM);
     dprint "\"$cmd\" returned $?\n" if ($?);
-    if ($? != 0 && $err == AVALON_SUCCESS) {
-        return AVALON_UNSPECIFIED_ERROR;
+    if ($? != 0 && $err == MEZZANINE_SUCCESS) {
+        return MEZZANINE_UNSPECIFIED_ERROR;
     }
-    if ($err == AVALON_SUCCESS) {
+    if ($err == MEZZANINE_SUCCESS) {
         $msg = &pkgvar_filename() . " successfully installed";
     }
     return ($err, $msg);
@@ -278,7 +278,7 @@ rpm_query
     } elsif ($query_type eq "s") {
         $cmd .= " -q --qf 'Source:  %{SOURCERPM}\n'";
     } else {
-        return (AVALON_SYNTAX_ERROR, "Unrecognized query type \"$query_type\"\n");
+        return (MEZZANINE_SYNTAX_ERROR, "Unrecognized query type \"$query_type\"\n");
     }
     if (&pkgvar_filename()) {
         $cmd .= " -p " . &pkgvar_filename();
@@ -305,28 +305,28 @@ rpm_build
     $err = $msg = 0;
     if (!open(CMD, "$cmd </dev/null 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
-        return AVALON_COMMAND_FAILED;
+        return MEZZANINE_COMMAND_FAILED;
     }
-    $err = AVALON_SUCCESS;
+    $err = MEZZANINE_SUCCESS;
     while (<CMD>) {
         chomp($line = $_);
         print "$line\n";
         if ($line =~ /^Wrote:\s+(\S+\.\w+\.rpm)$/) {
             push @out_files, $1;
         } elsif ($line =~ /^rpm:\s*no spec files given for build/) {
-            $err = AVALON_NO_SOURCES;
+            $err = MEZZANINE_NO_SOURCES;
             $msg = "Attempted build with no spec file";
         } elsif ($line =~ /^(error: )?line \d+: [^:]+: /
                  || $line =~ /^(error: )?Failed to find \w+:/
                  || $line =~ /^(error: )?Symlink points to BuildRoot: /) {
-            $err = AVALON_SPEC_ERRORS;
+            $err = MEZZANINE_SPEC_ERRORS;
             push @spec_errors, $line;
         } elsif ($line =~ /^Bad exit status from/) {
-            $err = AVALON_BUILD_FAILURE;
+            $err = MEZZANINE_BUILD_FAILURE;
             $line =~ s/^Bad exit status from \S+ \((%\w+)\)/$1/;
             $msg = "The RPM $line stage exited abnormally";
         } elsif ($line =~ /^error: failed build dependencies:/) {
-            $err = AVALON_DEPENDENCIES;
+            $err = MEZZANINE_DEPENDENCIES;
             while (<RPM>) {
                 chomp($line = $_);
                 last if ($line !~ /is needed by/);
@@ -336,7 +336,7 @@ rpm_build
             $msg = "Building this package requires the following:  " . join(" ", @failed_deps);
             last;
         } elsif ($line =~ /^(error: )?Architecture is not included:/) {
-            $err = AVALON_ARCH_MISMATCH;
+            $err = MEZZANINE_ARCH_MISMATCH;
             $line =~ s/^(error: )?Architecture is not included:\s+//;
             $msg = "This package does not build on the $line architecture";
         } elsif ($line =~ /^(error: )?File (.*): No such file or directory$/
@@ -346,14 +346,14 @@ rpm_build
                  || $line =~ /^(error: )?No (patch number \d+)$/
                  || $line =~ /^(error: )?Could not open \%files file (\S+): No such file or directory$/
                  || $line =~ /^(error: )?File not found(?: by glob)?: (.*)$/) {
-            $err = AVALON_MISSING_FILES;
+            $err = MEZZANINE_MISSING_FILES;
             push @not_found, $2;
         }
     }
     close(CMD);
     dprint "\"$cmd\" returned $?\n" if ($?);
-    if ($? != 0 && $err == AVALON_SUCCESS) {
-        $err = AVALON_UNSPECIFIED_ERROR;
+    if ($? != 0 && $err == MEZZANINE_SUCCESS) {
+        $err = MEZZANINE_UNSPECIFIED_ERROR;
         $msg = "Unhandled package build error";
     } elsif ($#not_found != -1) {
         $msg = "The following were expected by the build, but no matching files were found:  " . join(", ", @not_found);

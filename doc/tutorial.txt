@@ -1,9 +1,9 @@
 ########################################################################
-#                           Avalon Tutorial
+#                           Mezzanine Tutorial
 #
 #  Written by:  Sean Perry
 #
-#  $Id: tutorial.txt,v 1.2 2001/05/02 21:56:10 mej Exp $
+#  $Id: tutorial.txt,v 1.3 2001/09/22 13:22:33 mej Exp $
 #
 ########################################################################
 
@@ -14,11 +14,11 @@ So you just downloaded foo.src.rpm and need to add it to the repository.
 The steps you would follow are:
   
   1) set CVSROOT
-  2) use avimport (srctool -i) on the src.rpm
+  2) use mzimport (srctool -i) on the src.rpm
 
 Example:
 $ export CVSROOT=:pserver:shaleh@cvs.engr.valinux.com:/cvs/Cujo
-$ avimport ctcs-1.2.15-1.src.rpm 
+$ mzimport ctcs-1.2.15-1.src.rpm 
 Importing ctcs-1.2.15-1.src.rpm into ctcs tree....
 
   cvs server: Importing /cvs/Cujo/ctcs/S
@@ -35,35 +35,35 @@ of the src.rpm you imported: in this case 'ctcs'.
 How to fix a bug (or add features) to a project
 -----------------------------------------------
 
-  1) use avget (revtool -g) to retrieve the new module
-  2) use avprep (srctool -p) in the module directory to give you a working
+  1) use mzget (revtool -g) to retrieve the new module
+  2) use mzprep (srctool -p) in the module directory to give you a working
      directory to hack in
-  3) use avpatch (srctool -a) to apply your changes from the working directory
-  4) use avput (revtool -i) to commit your changes
+  3) use mzpatch (srctool -a) to apply your changes from the working directory
+  4) use mzput (revtool -i) to commit your changes
 
 Example:
-$ avget ctcs
+$ mzget ctcs
 cvs server: Updating ctcs
 cvs server: Updating ctcs/F
 U ctcs/F/ctcs.spec
 cvs server: Updating ctcs/S
 U ctcs/S/ctcs-1.2.15.tar.gz
 $ cd ctcs 
-$ avprep
+$ mzprep
 Creating working directory /home/shaleh/va/ctcs/work....
 You may now chdir to ctcs/work to make changes.
-Use "avpatch -n <patch_name>" to generate a patch when done.
+Use "mzpatch -n <patch_name>" to generate a patch when done.
 $ cd work
 $ ls
 ctcs-1.2.15
 $ cd ctcs-1.2.15/
 <hack hack hack>
-$ cd ../.. # must be in the base directory for avpatch to work
-$ avpatch -n ctcs-1.2.15-function.patch # the patch name must be the full filename
+$ cd ../.. # must be in the base directory for mzpatch to work
+$ mzpatch -n ctcs-1.2.15-function.patch # the patch name must be the full filename
 Created P/ctcs-1.2.15-function.patch (21 lines).
 Patch added and ready for commit.
-$ edit F/ctcs.spec # add the new patch, the avalon tools read this
-$ avput
+$ edit F/ctcs.spec # add the new patch, the mezzanine tools read this
+$ mzput
 ? work
 cvs server: Updating .
 cvs server: Updating F
@@ -113,10 +113,10 @@ By convention, patches to external packages should be numbered starting at
 where <desc> is a very brief hint at what the patch does.  ChangeLog entries
 are required for patches and should match the format above.
 
-A warning: the avalon tools will overwrite the file named on the command line.
+A warning: the mezzanine tools will overwrite the file named on the command line.
 So if there had been a function.patch, it would have been removed.  If this
 happens to you, simply rename the patch you just created and do:
-avget P/foo.patch.  Of course if you had committed your work you will have to
+mzget P/foo.patch.  Of course if you had committed your work you will have to
 jump through more hoops.
 
 
@@ -166,7 +166,7 @@ How to make a layered product with product files
 
 Its the buzzword du jour and your boss wants it yesterday, here's how.
 
-  1) make a product file -- see the avalon docs for the deep gory details
+  1) make a product file -- see the mezzanine docs for the deep gory details
   2) use buildtool
   3) (optional) use mediatool to create an ISO
 

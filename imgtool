@@ -23,14 +23,14 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: imgtool,v 1.13 2001/09/05 19:26:27 mej Exp $
+# $Id: imgtool,v 1.14 2001/09/22 13:22:33 mej Exp $
 #
 
 # Include the Perl Modules we need
 require POSIX;
 require Getopt::Long;
 use Cwd ('&getcwd', '&abs_path');;
-use Avalon::Util;
+use Mezzanine::Util;
 
 # Print usage information
 sub
@@ -55,7 +55,7 @@ print_usage_info
     print "    -k --keep                        Keep the existing root image and add to it\n";
     print "    -f --force                       Do as much as possible despite failures\n";
     print "\n";
-    exit(AVALON_SUCCESS);
+    exit(MEZZANINE_SUCCESS);
 }
 
 sub
@@ -204,7 +204,7 @@ install_packages
             }
         }
         close(CMD);
-        if ($? != AVALON_SUCCESS) {
+        if ($? != MEZZANINE_SUCCESS) {
             if ($force) {
                 eprint "Install of $rpm failed (error $?).\n";
             } else {
@@ -212,7 +212,7 @@ install_packages
             }
         }
     }
-    return AVALON_SUCCESS;
+    return MEZZANINE_SUCCESS;
 }
 
 sub
@@ -275,29 +275,29 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.13 $ created on $Date: 2001/09/05 19:26:27 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.14 $ created on $Date: 2001/09/22 13:22:33 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
         $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
         print "\n";
 	print "$progname $version by Michael Jennings <mej\@eterm.org>\n";
-        print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
+        print "Copyright (c) 2000, Michael Jennings\n";
         print "  ($rcs_info)\n";
         print "\n";
-	return AVALON_SUCCESS;
+	return MEZZANINE_SUCCESS;
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
     }
 
     &debug_set($opt_d);
-    $imagedir = abs_path($opt_i ? $opt_i : ($ENV{"AVALON_IMAGEDIR"} ? $ENV{"AVALON_IMAGEDIR"} : "./img"));
+    $imagedir = abs_path($opt_i ? $opt_i : ($ENV{"MEZZANINE_IMAGEDIR"} ? $ENV{"MEZZANINE_IMAGEDIR"} : "./img"));
     if ($opt_D) {
         @pkgdirs = split(/[:\s]/, $opt_D);
-    } elsif ($ENV{AVALON_BUILDDIR}) {
-        @pkgdirs = glob('$ENV{AVALON_BUILDDIR}/RPMS/*');
+    } elsif ($ENV{MEZZANINE_BUILDDIR}) {
+        @pkgdirs = glob('$ENV{MEZZANINE_BUILDDIR}/RPMS/*');
     } else {
-        @pkgdirs = glob('build.avalon/RPMS/*');
+        @pkgdirs = glob('build.mezz/RPMS/*');
     }
     $keep = ($opt_k ? 1 : 0);
     $force = ($opt_f ? 1 : 0);
@@ -339,7 +339,7 @@ main
     &find_packages(@pkgs);
     &install_packages(@pkgs);
     &archive_image($archive) if ($archive);
-    return AVALON_SUCCESS;
+    return MEZZANINE_SUCCESS;
 }
 
 exit &main();

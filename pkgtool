@@ -2,7 +2,7 @@
 #
 # pkgtool -- Tool for generating source/patch files from a source code repository
 # 
-# Copyright (C) 2000, Michael Jennings
+# Copyright (C) 2001, Michael Jennings
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -23,20 +23,20 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.48 2001/08/20 17:34:45 mej Exp $
+# $Id: pkgtool,v 1.49 2001/09/22 13:22:33 mej Exp $
 #
 
 # Include the Perl Modules we need
 require POSIX;
 require Getopt::Long;
 use Cwd ('&getcwd', '&abs_path');
-use Avalon::Util;
-use Avalon::PkgVars;
-use Avalon::Pkg;
-use Avalon::RPM;
-use Avalon::Deb;
-use Avalon::Tar;
-use Avalon::Build;
+use Mezzanine::Util;
+use Mezzanine::PkgVars;
+use Mezzanine::Pkg;
+use Mezzanine::RPM;
+use Mezzanine::Deb;
+use Mezzanine::Tar;
+use Mezzanine::Build;
 
 # Print usage information
 sub
@@ -70,7 +70,7 @@ print_usage_info
     print "       --tar <tarcmd>                Use <tarcmd> as the \"tar\" command\n";
     print "       --zip <zipcmd>                Use <zipcmd> as the compression program\n";
     print "\n";
-    exit(AVALON_SUCCESS);
+    exit(MEZZANINE_SUCCESS);
 }
 
 # main() here is basically the same as main() in C
@@ -96,17 +96,17 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.48 $ created on $Date: 2001/08/20 17:34:45 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.49 $ created on $Date: 2001/09/22 13:22:33 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
         $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
         print "\n";
 	print "$progname $version by Michael Jennings <mej\@eterm.org>\n";
-        print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
+        print "Copyright (c) 2001, Michael Jennings\n";
         print "  ($rcs_info)\n";
         print "\n";
-	return AVALON_SUCCESS;
+	return MEZZANINE_SUCCESS;
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
     }
@@ -186,7 +186,7 @@ main
         } else {
             ($err, $msg, $outfiles) = &build_package();
         }
-        if ($err != AVALON_SUCCESS) {
+        if ($err != MEZZANINE_SUCCESS) {
             eprint "Package build failed:  $msg\n";
             return $err;
         }
@@ -207,7 +207,7 @@ main
         my $msg;
 
         ($err, $msg) = &package_install();
-        if ($err != AVALON_SUCCESS) {
+        if ($err != MEZZANINE_SUCCESS) {
             eprint "Unable to install package -- $msg.\n";
         } else {
             print "$msg.\n";
@@ -216,7 +216,7 @@ main
         my @results;
 
         @results = &package_show_contents();
-        if (($err = shift @results) != AVALON_SUCCESS) {
+        if (($err = shift @results) != MEZZANINE_SUCCESS) {
             eprint "Unable to examine contents of package.\n";
         }
         print join("", @results), "\n";
@@ -224,7 +224,7 @@ main
         my @results;
 
         @results = &package_query($query_type);
-        if (($err = shift @results) != AVALON_SUCCESS) {
+        if (($err = shift @results) != MEZZANINE_SUCCESS) {
             eprint "Unable to query package.\n";
         }
         print join("", @results), "\n";

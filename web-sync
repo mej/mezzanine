@@ -2,10 +2,10 @@
 #
 # web-sync - Resync engr web site with latest sources
 #
-# Michael Jennings <mej@valinux.com>
+# Michael Jennings <mej@kainx.org>
 # 28 Sept 2000
 #
-# $Id: web-sync,v 1.15 2001/06/15 03:27:38 mej Exp $
+# $Id: web-sync,v 1.16 2001/09/22 13:22:33 mej Exp $
 #
 
 umask 022
@@ -63,7 +63,7 @@ for i in $* ; do
 
     7.*)
       REMOTE_UHOST=mej@grendel
-      REMOTE_DIR=/grendel/scratch/mej/avalon/build
+      REMOTE_DIR=/grendel/scratch/mej/mezzanine/build
       LOCAL_DIR=/home/ftp/pub/software/RH-VALE/unsupported
       RH_VER=`echo $i | awk -F. '{print $1"."$2}'`
       mkdir -p $LOCAL_DIR/$i

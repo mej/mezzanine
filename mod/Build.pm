@@ -1,4 +1,4 @@
-# Avalon Build Perl Module
+# Mezzanine Build Perl Module
 # 
 # Copyright (C) 2001, Michael Jennings
 #
@@ -21,22 +21,22 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.18 2001/08/23 21:35:18 mej Exp $
+# $Id: Build.pm,v 1.19 2001/09/22 13:22:34 mej Exp $
 #
 
-package Avalon::Build;
+package Mezzanine::Build;
 
 BEGIN {
     use Exporter   ();
     use Cwd;
     use File::Copy;
-    use Avalon::Util;
-    use Avalon::PkgVars;
-    use Avalon::Pkg;
-    use Avalon::RPM;
-    use Avalon::Deb;
-    use Avalon::Tar;
-    use Avalon::Prod;
+    use Mezzanine::Util;
+    use Mezzanine::PkgVars;
+    use Mezzanine::Pkg;
+    use Mezzanine::RPM;
+    use Mezzanine::Deb;
+    use Mezzanine::Tar;
+    use Mezzanine::Prod;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
@@ -118,10 +118,10 @@ prepare_build_tree
         $name = &basename(&getcwd());
     }
     if (! $topdir) {
-        $topdir = &getcwd() . "/build.avalon";
+        $topdir = &getcwd() . "/build.mezz";
     }
     if (! $buildroot) {
-        $buildroot = "/var/tmp/avalon-buildroot.$$/$name";
+        $buildroot = "/var/tmp/mezzanine-buildroot.$$/$name";
     }
     dprint "$name | $topdir | $buildroot\n";
     &pkgvar_name($name);
@@ -182,7 +182,7 @@ get_source_list
         my $fname;
 
         wprint "No SRCS variable found.  Proceeding with default assumptions.  If the assumptions don't work,\n";
-        wprint "you will need to create an avalon.srcs file for this package.\n";
+        wprint "you will need to create an mezzanine.srcs file for this package.\n";
 
         &parse_spec_file();
 
@@ -246,7 +246,7 @@ create_source_file
         unlink($tarball);
         if (!open(CMD, "$cmd 2>&1 |")) {
             eprint "Execution of \"$cmd\" failed -- $!\n";
-            return AVALON_COMMAND_FAILED;
+            return MEZZANINE_COMMAND_FAILED;
         }
         while (<CMD>) {
             chomp($line = $_);
@@ -256,15 +256,15 @@ create_source_file
         if ($?) {
             dprint "Command returned $?\n";
             eprint "Creation of vendor source tarball $tarball failed\n";
-            return AVALON_BUILD_FAILURE;
+            return MEZZANINE_BUILD_FAILURE;
         }
     } else {
         dprint "Copying $src_files to $destdir.\n";
         if (!&copy_files(split(' ', $src_files), $destdir)) {
-            return AVALON_SYSTEM_ERROR;
+            return MEZZANINE_SYSTEM_ERROR;
         }
     }
-    return AVALON_SUCCESS;
+    return MEZZANINE_SUCCESS;
 }
 
 sub
@@ -282,7 +282,7 @@ create_source_files($)
             return $err;
         }
     }
-    return AVALON_SUCCESS;
+    return MEZZANINE_SUCCESS;
 }
 
 # Clean up the RPM build directories and the build root
@@ -455,9 +455,9 @@ build_spm
 
     @tmp = &grepdir(sub {-f $_ && -s _}, "F");
     if (!scalar(@tmp)) {
-        return (AVALON_MISSING_FILES, "@{[getcwd()]} does not seem to contain build instructions", undef);
+        return (MEZZANINE_MISSING_FILES, "@{[getcwd()]} does not seem to contain build instructions", undef);
     } elsif (scalar(@tmp) > 1) {
-        return (AVALON_BAD_MODULE, "Only one specfile/script dir allowed per package (@tmp)", undef);
+        return (MEZZANINE_BAD_MODULE, "Only one specfile/script dir allowed per package (@tmp)", undef);
     }
     &copy_files($tmp[0], "$topdir/SPECS");
     $specfile = "$topdir/SPECS/" . &basename($tmp[0]);
@@ -488,7 +488,7 @@ build_spm
 }
 
 # This function handles the "special case" FST's which have their very own
-# Makefile.avalon.  As with build_spm(), the chdir() must have already been done.
+# Makefile.mezz.  As with build_spm(), the chdir() must have already been done.
 sub
 build_cfst
 {
@@ -497,7 +497,7 @@ build_cfst
 
     dprint &print_args(@_);
 
-    if (!(-f "Makefile.avalon" && -s _)) {
+    if (!(-f "Makefile.mezz" && -s _)) {
         &show_backtrace();
         &fatal_error("Call to build_cfst() in non-CFST module.\n");
     }
@@ -511,7 +511,7 @@ build_cfst
     if (&pkgvar_command()) {
         $cmd = &pkgvar_command();
     } else {
-        $cmd = "make -f Makefile.avalon";
+        $cmd = "make -f Makefile.mezz";
     }
     $cmd .= " BUILD_DIR=$topdir BUILD_ROOT=$buildroot PKG_DIR=$pkgdir";
     if (&pkgvar_rcfile()) {
@@ -520,7 +520,7 @@ build_cfst
 
     dprint "About to run \"$cmd\"\n";
     if (!open(MAKE, "$cmd </dev/null 2>&1 |")) {
-        return (AVALON_COMMAND_FAILED, "Execution of \"$cmd\" failed -- $!", undef);
+        return (MEZZANINE_COMMAND_FAILED, "Execution of \"$cmd\" failed -- $!", undef);
     }
     $err = 0;
     while (<MAKE>) {
@@ -549,7 +549,7 @@ build_cfst
 
     if (! $outfiles) {
 	dprint "No packages found in $pkgdir\n";
-        $err = AVALON_PACKAGE_FAILED;
+        $err = MEZZANINE_PACKAGE_FAILED;
         $msg = "make finished successfully, but no packages were found in $pkgdir";
     }
     return ($err, $msg, $outfiles);
@@ -583,13 +583,13 @@ build_fst
         }
         dprint @tmp, "\n";
         if (!scalar(@tmp)) {
-            return (AVALON_MISSING_FILES, "I'm sorry, but \"$pkg\" doesn't seem to have instructions for building $target_format", undef);
+            return (MEZZANINE_MISSING_FILES, "I'm sorry, but \"$pkg\" doesn't seem to have instructions for building $target_format", undef);
         }
         $specfile = &pkgvar_instructions($tmp[0]);
     }
 
     if (! &copy($specfile, "$topdir/SPECS/")) {
-        return (AVALON_SYSTEM_ERROR, "Unable to copy $specfile to $topdir/SPECS/ -- $!\n", undef);
+        return (MEZZANINE_SYSTEM_ERROR, "Unable to copy $specfile to $topdir/SPECS/ -- $!\n", undef);
     }
     # Get ready to build, figure out what sources we need, and create them all.
     if (&parse_prod_file()) {
@@ -605,7 +605,7 @@ build_fst
 
     &get_source_list();
     $ret = &create_source_files("$topdir/SOURCES");
-    if ($ret != AVALON_SUCCESS) {
+    if ($ret != MEZZANINE_SUCCESS) {
         return ($ret, "Creation of source files failed", undef);
     }
     return &build_topdir();
@@ -627,8 +627,8 @@ build_srpm
     $pkg = &pkgvar_filename();
 
     @tmp = &rpm_show_contents();
-    if (($err = shift @tmp) != AVALON_SUCCESS) {
-        return (AVALON_NO_SOURCES, "Unable to examine the contents of ${\(&pkgvar_filename())} ($err)", undef);
+    if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
+        return (MEZZANINE_NO_SOURCES, "Unable to examine the contents of ${\(&pkgvar_filename())} ($err)", undef);
     }
     foreach my $f (grep(/spec(\.in)?$/, @tmp)) {
         my @fields;
@@ -641,12 +641,12 @@ build_srpm
         wprint "Found ${\(scalar(@specs))} spec files in $pkg?!\n";
     }
     @tmp = &rpm_install();
-    if (($err = shift @tmp) != AVALON_SUCCESS) {
-        return (AVALON_PACKAGE_FAILED, "Unable to install $pkg ($err)", undef);
+    if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
+        return (MEZZANINE_PACKAGE_FAILED, "Unable to install $pkg ($err)", undef);
     }
     @specs = grep(-f "$topdir/SPECS/$_" && -s _, @specs);
     if (scalar(@specs) != 1) {
-        return (AVALON_NO_SOURCES, "Found ${\(scalar(@specs))} spec files in $pkg?!", undef);
+        return (MEZZANINE_NO_SOURCES, "Found ${\(scalar(@specs))} spec files in $pkg?!", undef);
     }
     &pkgvar_instructions("$topdir/SPECS/$specs[0]");
     return &build_topdir();
@@ -686,12 +686,12 @@ build_package
     if (-d $pkg) {
         # It's a directory.  That means it's some type of module.
         if (!chdir($pkg)) {
-            @ret = (AVALON_SYSTEM_ERROR, "Unable to chdir into \"$pkg\" -- $!", undef);
+            @ret = (MEZZANINE_SYSTEM_ERROR, "Unable to chdir into \"$pkg\" -- $!", undef);
         }
         if (-d "F") {
             # Okay, there's an F/ directory.  I bet it's an SPM.
             @ret = &build_spm();
-        } elsif (-f "Makefile.avalon" && -s _) {
+        } elsif (-f "Makefile.mezz" && -s _) {
             # There's a custom Makefile.  It's a Custom Full Source Tree (FST).
             @ret = &build_cfst();
         } else {
@@ -708,7 +708,7 @@ build_package
             $module = &dirname($pkg);
             $pkg = &basename($pkg);
             if (!chdir($module)) {
-                @ret = (AVALON_SYSTEM_ERROR, "Unable to chdir into \"$module\" -- $!", undef);
+                @ret = (MEZZANINE_SYSTEM_ERROR, "Unable to chdir into \"$module\" -- $!", undef);
             }
             &pkgvar_filename($pkg);
         }
@@ -717,13 +717,13 @@ build_package
         } elsif ($pkg =~ /\.(tar\.|t)(gz|Z|bz2)$/) {
             @ret = &build_tarball();
         } elsif ($pkg =~ /\.rpm$/) {
-            @ret = (AVALON_NO_SOURCES, "Alright...  Who's the wiseguy that told me to recompile \"$pkg,\" a binary RPM? :-P", undef);
+            @ret = (MEZZANINE_NO_SOURCES, "Alright...  Who's the wiseguy that told me to recompile \"$pkg,\" a binary RPM? :-P", undef);
         } else {
-            @ret = (AVALON_NO_SOURCES, "I'm sorry, but I don't know how to build \"$pkg.\"", undef);
+            @ret = (MEZZANINE_NO_SOURCES, "I'm sorry, but I don't know how to build \"$pkg.\"", undef);
         }
     } else {
         # Okay, it's neither a file nor a directory.  What the hell is it?
-        @ret = (AVALON_NO_SOURCES, "I'm sorry, but I can't figure out what to do with \"$pkg.\"", undef);
+        @ret = (MEZZANINE_NO_SOURCES, "I'm sorry, but I can't figure out what to do with \"$pkg.\"", undef);
     }
     chdir($pwd);
     return @ret;

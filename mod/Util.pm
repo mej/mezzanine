@@ -1,4 +1,4 @@
-# Avalon Utilities Perl Module
+# Mezzanine Utilities Perl Module
 # 
 # Copyright (C) 2001, Michael Jennings
 #
@@ -21,10 +21,10 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.16 2001/08/09 20:05:17 mej Exp $
+# $Id: Util.pm,v 1.17 2001/09/22 13:22:34 mej Exp $
 #
 
-package Avalon::Util;
+package Mezzanine::Util;
 
 BEGIN {
     use Exporter   ();
@@ -46,15 +46,15 @@ BEGIN {
 		    '&cat_file',
                     '&parse_rpm_name', '&should_ignore', '&touch_file',
 
-		    '&AVALON_SUCCESS', '&AVALON_FATAL_ERROR', '&AVALON_SYNTAX_ERROR', '&AVALON_SYSTEM_ERROR',
-		    '&AVALON_COMMAND_FAILED', '&AVALON_DUPLICATE', '&AVALON_FILE_NOT_FOUND', '&AVALON_FILE_OP_FAILED',
-		    '&AVALON_ACCESS_DENIED', '&AVALON_BAD_ADDITION', '&AVALON_BAD_LOG_ENTRY', '&AVALON_BAD_LOGIN', 
-		    '&AVALON_BAD_REMOVAL', '&AVALON_CONFLICT_FOUND', '&AVALON_FILE_REMOVED', '&AVALON_INVALID_TAG', 
-		    '&AVALON_NEED_UPDATE', '&AVALON_NO_SERVER', '&AVALON_NO_SOURCES', '&AVALON_SERVER_CRASH', 
-		    '&AVALON_BAD_PRODUCT', '&AVALON_SPAWN_FAILED', '&AVALON_PACKAGE_FAILED', '&AVALON_ARCH_MISMATCH', 
-		    '&AVALON_BAD_MODULE', '&AVALON_BUILD_FAILURE', '&AVALON_DEPENDENCIES', '&AVALON_MISSING_FILES', 
-		    '&AVALON_SPEC_ERRORS', '&AVALON_MISSING_PKGS', '&AVALON_TERMINATED', '&AVALON_CRASHED', 
-		    '&AVALON_UNSPECIFIED_ERROR');
+		    '&MEZZANINE_SUCCESS', '&MEZZANINE_FATAL_ERROR', '&MEZZANINE_SYNTAX_ERROR', '&MEZZANINE_SYSTEM_ERROR',
+		    '&MEZZANINE_COMMAND_FAILED', '&MEZZANINE_DUPLICATE', '&MEZZANINE_FILE_NOT_FOUND', '&MEZZANINE_FILE_OP_FAILED',
+		    '&MEZZANINE_ACCESS_DENIED', '&MEZZANINE_BAD_ADDITION', '&MEZZANINE_BAD_LOG_ENTRY', '&MEZZANINE_BAD_LOGIN', 
+		    '&MEZZANINE_BAD_REMOVAL', '&MEZZANINE_CONFLICT_FOUND', '&MEZZANINE_FILE_REMOVED', '&MEZZANINE_INVALID_TAG', 
+		    '&MEZZANINE_NEED_UPDATE', '&MEZZANINE_NO_SERVER', '&MEZZANINE_NO_SOURCES', '&MEZZANINE_SERVER_CRASH', 
+		    '&MEZZANINE_BAD_PRODUCT', '&MEZZANINE_SPAWN_FAILED', '&MEZZANINE_PACKAGE_FAILED', '&MEZZANINE_ARCH_MISMATCH', 
+		    '&MEZZANINE_BAD_MODULE', '&MEZZANINE_BUILD_FAILURE', '&MEZZANINE_DEPENDENCIES', '&MEZZANINE_MISSING_FILES', 
+		    '&MEZZANINE_SPEC_ERRORS', '&MEZZANINE_MISSING_PKGS', '&MEZZANINE_TERMINATED', '&MEZZANINE_CRASHED', 
+		    '&MEZZANINE_UNSPECIFIED_ERROR');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -66,7 +66,7 @@ use vars ('@EXPORT_OK');
 
 ### Initialize exported package variables
 $debug = 0;
-$progname = "Avalon";
+$progname = "Mezzanine";
 
 ### Initialize private global variables
 
@@ -103,51 +103,51 @@ END {
 
 ### Return value constants
 # No error
-sub AVALON_SUCCESS()             {0;}
+sub MEZZANINE_SUCCESS()             {0;}
 
 # General errors
-sub AVALON_FATAL_ERROR()         {1;}
-sub AVALON_SYNTAX_ERROR()        {2;}
-sub AVALON_SYSTEM_ERROR()        {3;}
-sub AVALON_COMMAND_FAILED()      {4;}
-sub AVALON_FILE_NOT_FOUND()      {5;}
-sub AVALON_FILE_OP_FAILED()      {6;}
+sub MEZZANINE_FATAL_ERROR()         {1;}
+sub MEZZANINE_SYNTAX_ERROR()        {2;}
+sub MEZZANINE_SYSTEM_ERROR()        {3;}
+sub MEZZANINE_COMMAND_FAILED()      {4;}
+sub MEZZANINE_FILE_NOT_FOUND()      {5;}
+sub MEZZANINE_FILE_OP_FAILED()      {6;}
 
 # revtool-related errors
-sub AVALON_ACCESS_DENIED()      {21;}
-sub AVALON_BAD_ADDITION()       {22;}
-sub AVALON_BAD_LOG_ENTRY()      {23;}
-sub AVALON_BAD_LOGIN()          {24;}
-sub AVALON_BAD_REMOVAL()        {25;}
-sub AVALON_CONFLICT_FOUND()     {26;}
-sub AVALON_FILE_REMOVED()       {27;}
-sub AVALON_INVALID_TAG()        {28;}
-sub AVALON_NEED_UPDATE()        {29;}
-sub AVALON_NO_SERVER()          {30;}
-sub AVALON_NO_SOURCES()         {31;}
-sub AVALON_SERVER_CRASH()       {32;}
-sub AVALON_DUPLICATE()          {33;}
+sub MEZZANINE_ACCESS_DENIED()      {21;}
+sub MEZZANINE_BAD_ADDITION()       {22;}
+sub MEZZANINE_BAD_LOG_ENTRY()      {23;}
+sub MEZZANINE_BAD_LOGIN()          {24;}
+sub MEZZANINE_BAD_REMOVAL()        {25;}
+sub MEZZANINE_CONFLICT_FOUND()     {26;}
+sub MEZZANINE_FILE_REMOVED()       {27;}
+sub MEZZANINE_INVALID_TAG()        {28;}
+sub MEZZANINE_NEED_UPDATE()        {29;}
+sub MEZZANINE_NO_SERVER()          {30;}
+sub MEZZANINE_NO_SOURCES()         {31;}
+sub MEZZANINE_SERVER_CRASH()       {32;}
+sub MEZZANINE_DUPLICATE()          {33;}
 
 # buildtool-related errors
-sub AVALON_BAD_PRODUCT()        {51;}
-sub AVALON_SPAWN_FAILED()       {52;}
-sub AVALON_PACKAGE_FAILED()     {53;}
+sub MEZZANINE_BAD_PRODUCT()        {51;}
+sub MEZZANINE_SPAWN_FAILED()       {52;}
+sub MEZZANINE_PACKAGE_FAILED()     {53;}
 
 # pkgtool-related errors
-sub AVALON_ARCH_MISMATCH()      {61;}
-sub AVALON_BAD_MODULE()         {62;}
-sub AVALON_BUILD_FAILURE()      {63;}
-sub AVALON_DEPENDENCIES()       {64;}
-sub AVALON_MISSING_FILES()      {65;}
-sub AVALON_SPEC_ERRORS()        {66;}
+sub MEZZANINE_ARCH_MISMATCH()      {61;}
+sub MEZZANINE_BAD_MODULE()         {62;}
+sub MEZZANINE_BUILD_FAILURE()      {63;}
+sub MEZZANINE_DEPENDENCIES()       {64;}
+sub MEZZANINE_MISSING_FILES()      {65;}
+sub MEZZANINE_SPEC_ERRORS()        {66;}
 
 # compstool-related errors
-sub AVALON_MISSING_PKGS()       {81;}
+sub MEZZANINE_MISSING_PKGS()       {81;}
 
 # Abnormal errors
-sub AVALON_TERMINATED()        {120;}
-sub AVALON_CRASHED()           {121;}
-sub AVALON_UNSPECIFIED_ERROR() {127;}
+sub MEZZANINE_TERMINATED()        {120;}
+sub MEZZANINE_CRASHED()           {121;}
+sub MEZZANINE_UNSPECIFIED_ERROR() {127;}
 
 ### Function definitions
 
@@ -176,7 +176,7 @@ sub
 fatal_error(@)
 {
     print STDERR "$progname:  FATAL:  ", @_;
-    exit(AVALON_FATAL_ERROR);
+    exit(MEZZANINE_FATAL_ERROR);
 }
 
 # Debugging output
@@ -242,7 +242,7 @@ handle_signal(@)
     my $sig = $_[0];
 
     eprint "Someone sent me a SIG$sig asking me to exit, so I shall.\n";
-    exit AVALON_TERMINATED;
+    exit MEZZANINE_TERMINATED;
 }
 
 # Handle a fatal signal
@@ -252,7 +252,7 @@ handle_fatal_signal(@)
     my $sig = $_[0];
 
     eprint "Caught fatal signal SIG$sig.  Cleaning up and aborting...\n";
-    exit AVALON_CRASHED;
+    exit MEZZANINE_CRASHED;
 }
 
 # Handle a perl warning

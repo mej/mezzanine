@@ -2,10 +2,10 @@
 #
 # cdtool - The behind-the-scenes magic glue that happens before a CD is made
 #
-# Michael Jennings <mej@valinux.com>
+# Michael Jennings <mej@kainx.org>
 # 21 July 2000
 #
-# $Id: redhat-6.x-cdtool,v 1.6 2001/06/15 03:27:37 mej Exp $
+# $Id: redhat-6.x-cdtool,v 1.7 2001/09/22 13:22:33 mej Exp $
 #
 
 umask 022

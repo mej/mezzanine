@@ -23,13 +23,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: mediatool,v 1.8 2001/08/20 17:34:45 mej Exp $
+# $Id: mediatool,v 1.9 2001/09/22 13:22:33 mej Exp $
 #
 
 # Include the Perl Modules we need
 require POSIX;
 require Getopt::Long;
-use Avalon::Util;
+use Mezzanine::Util;
 
 # Print usage information
 sub
@@ -53,7 +53,7 @@ print_usage_info
     print "    -c --cmd --command <command>     Specify an alternative command\n";
     print "       --boot <image>                Specify a boot image (for an ISO)\n";
     print "\n";
-    exit(AVALON_SUCCESS);
+    exit(MEZZANINE_SUCCESS);
 }
 
 # Create a tarball from a directory
@@ -109,7 +109,7 @@ create_iso
     local *MKISOFS;
 
     $bootimg = ($boot_image ? "-b $boot_image -c boot.cat" : "");
-    $ignore = "-m CVS -m RCS -m BitKeeper -m SCCS -m .cvsignore -m '.avalon.*'";
+    $ignore = "-m CVS -m RCS -m BitKeeper -m SCCS -m .cvsignore -m '.mezz.*'";
     $cmd = "mkisofs -o $iso $ignore $bootimg -T -r -R -J -v $imagedir";
     dprint "About to run \"$cmd\"\n";
     print "Creating ISO image $iso from $imagedir....\n";
@@ -156,17 +156,17 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.8 $ created on $Date: 2001/08/20 17:34:45 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.9 $ created on $Date: 2001/09/22 13:22:33 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
         $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
         print "\n";
 	print "$progname $version by Michael Jennings <mej\@eterm.org>\n";
-        print "Copyright (c) 2001, Michael Jennings and VA Linux Systems, Inc.\n";
+        print "Copyright (c) 2001, Michael Jennings\n";
         print "  ($rcs_info)\n";
         print "\n";
-	return AVALON_SUCCESS;
+	return MEZZANINE_SUCCESS;
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
     }
@@ -179,7 +179,7 @@ main
     }
     $iso = ($opt_i ? $opt_i : 0);
     $tarball = ($opt_t ? $opt_t : 0);
-    @excludes = (scalar(@opt_x) ? @opt_x : (".avalon.*", "*.avalon", "CVS", "RCS", "SCCS", "BitKeeper", ".cvsignore"));
+    @excludes = (scalar(@opt_x) ? @opt_x : (".mezz.*", "*.mezz", "CVS", "RCS", "SCCS", "BitKeeper", ".cvsignore"));
     $boot_image = ($opt_boot ? $opt_boot : 0);
     $command = ($opt_c ? $opt_c : 0);
 
@@ -204,7 +204,7 @@ main
         &create_tarball($tarball, $dirs[0]);
     }
 
-    return AVALON_SUCCESS;
+    return MEZZANINE_SUCCESS;
 }
 
 exit &main();

@@ -1,4 +1,4 @@
-# Avalon Srctool Perl Module
+# Mezzanine Srctool Perl Module
 # 
 # Copyright (C) 2001, Michael Jennings
 #
@@ -21,16 +21,16 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.8 2001/08/20 17:34:46 mej Exp $
+# $Id: Src.pm,v 1.9 2001/09/22 13:22:34 mej Exp $
 #
 
-package Avalon::Src;
+package Mezzanine::Src;
 
 BEGIN {
     use Exporter   ();
     use File::Copy;
     use File::Find;
-    use Avalon::Util;
+    use Mezzanine::Util;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
@@ -41,7 +41,7 @@ BEGIN {
     @EXPORT      = ('$WORK_DIR', '$TMP_DIR', 
                     '&find_files', '&find_subdirs', '&generate_symlink_file',
                     '&install_spm_files', '&create_temp_space', '&clean_temp_space',
-                    '&run_cmd', '&run_av_cmd');
+                    '&run_cmd', '&run_mz_cmd');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -67,7 +67,7 @@ sub install_spm_files($);
 sub create_temp_space($$);
 sub clean_temp_space();
 sub run_cmd($$$);
-sub run_av_cmd($$$);
+sub run_mz_cmd($$$);
 
 # Private functions
 
@@ -106,7 +106,7 @@ find_subdirs($)
     return @subdirs;
 }
 
-# Generate the .avalon.symlinks file automatically from a tree
+# Generate the .mezz.symlinks file automatically from a tree
 sub
 generate_symlink_file($)
 {
@@ -120,9 +120,9 @@ generate_symlink_file($)
     $cnt = scalar(keys %links);
     if ($cnt) {
         dprint "Found $cnt symlinks.\n";
-        if (!open(SYMLINKS, ">$path/.avalon.symlinks")) {
-            eprint "Unable to open $path/.avalon.symlinks for writing -- $!\n";
-            return AVALON_SYSTEM_ERROR;
+        if (!open(SYMLINKS, ">$path/.mezz.symlinks")) {
+            eprint "Unable to open $path/.mezz.symlinks for writing -- $!\n";
+            return MEZZANINE_SYSTEM_ERROR;
         }
         foreach my $link (sort keys %links) {
             my $newlink;
@@ -135,7 +135,7 @@ generate_symlink_file($)
     } else {
         dprint "No symlinks found.\n";
     }
-    return AVALON_SUCCESS;
+    return MEZZANINE_SUCCESS;
 }
 
 # Copy source files into place
@@ -239,9 +239,9 @@ run_cmd($$$)
     return ($err, @output);
 }
 
-# Wrapper for Avalon commands specifically
+# Wrapper for Mezzanine commands specifically
 sub
-run_av_cmd($$$)
+run_mz_cmd($$$)
 {
     my ($prog, $params, $show_output) = @_;
     my ($err, $msg, $line, $cmd) = undef;

@@ -1,14 +1,14 @@
-.TH BUILDTOOL "1" "April 2001" "buildtool " VA
+.TH BUILDTOOL "1" "April 2001" "buildtool " MEZZANINE
 .SH NAME
-buildtool, avbuild \- Product Build Management Tool
+buildtool, mzbuild \- Product Build Management Tool
 .SH SYNOPSIS
 \fBbuildtool\fR [ -hdvbpqQDflPtC ]
 .br
-\fBavbuild\fR [ -hdvbpqQDflPtC ]
+\fBmzbuild\fR [ -hdvbpqQDflPtC ]
 .SH DESCRIPTION
 buildtool takes product description files ("prod files") and
 creates products from their component packages based on the
-information in those files.  It will utilize some of the other Avalon
+information in those files.  It will utilize some of the other Mezzanine
 components to perform this task.
 .SH OPTIONS
 .TP
@@ -76,26 +76,24 @@ package accumulation (\fBp\fR)
 The default is -bp if you do not specify otherwise.
 .SH OPERATION
 \fBbuildtool\fR will try to figure out what kind of source tree you're
-building.  These are an Avalon source tree, a binary SRPM package or a
-standard source tree with an Avalon-specific Makefile, called
-Makefile.avalon.  
+building.  These are an Mezzanine source tree, a binary SRPM package or a
+standard source tree with an Mezzanine-specific Makefile, called
+Makefile.mezz.  
 
-Blah Blah Blah about SRPMs and Avalon source trees.
+Blah Blah Blah about SRPMs and Mezzanine source trees.
 
-.B Tieing standard trees into Avalon.
-The Makefile.avalon file is intended to contain the glue necessary to
-bind the original source tree's build infrastructure to what Avalon
+.B Tying standard trees into Mezzanine.
+The Makefile.mezz file is intended to contain the glue necessary to
+bind the original source tree's build infrastructure to what Mezzanine
 expects.  This is usually accomplished by creating a default target
 that simply creates RPMs using the original Makefile and then copies
 the resulting source and binary RPMs to a pre-defined location.
 
-See /usr/share/doc/avalon/Makefile.avalon.sample for more details.
+See /usr/share/doc/mezzanine/Makefile.mezz.sample for more details.
 
-The preferred operation is Avalon source trees.
+The preferred operation is Mezzanine source trees.
 
 .SH SEE ALSO
-revtool(1), pkgtool(1), /usr/share/doc/avalon/product_files.txt
+revtool(1), pkgtool(1), /usr/share/doc/mezzanine/product_files.txt
 .SH AUTHORS
-Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.
-.br
-This man page initially written by Sean 'Shaleh' Perry <shaleh@valinux.com>.
+Copyright (c) 2001, Michael Jennings

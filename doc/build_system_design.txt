@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: build_system_design.txt,v 1.12 2001/04/26 00:44:28 mej Exp $
+#  $Id: build_system_design.txt,v 1.13 2001/09/22 13:22:33 mej Exp $
 #
 ########################################################################
 
@@ -15,10 +15,10 @@ concerned:  users, administrators, and customers.
 
 The Build System is the collection of all the various tools, including
 servers, scripts, etc., which are used in concert to create software
-products.  Avalon refers to the set of custom tools which simplify and
+products.  Mezzanine refers to the set of custom tools which simplify and
 streamline the process of using the Build System and are generally
 considered a part, though not the whole, of the Build System itself.
-However, since so much of the Build System is implemented in Avalon,
+However, since so much of the Build System is implemented in Mezzanine,
 the terms may be used somewhat interchangeably.
 
 1.  PROJECT GOALS AND REQUIREMENTS
@@ -63,7 +63,7 @@ product.  Anything else is simply a benefit, not a necessity.
 Facilitation and satisfaction of the above design goals will require a
 complete system composed of many individual pieces working in
 concert.  Almost all of these pieces, except for those which are
-provided by outside sources, will be engineered as part of Avalon, the
+provided by outside sources, will be engineered as part of Mezzanine, the
 build system toolkit.
 
 2.1.  Source Code Management
@@ -89,7 +89,7 @@ substitutions where necessary.
 ----------------------------
 
 In order to retrieve software packages from the master repository,
-Avalon will have to provide some mechanism for interacting with that
+Mezzanine will have to provide some mechanism for interacting with that
 repository for purposes of package retrieval and package management.
 
 All direct interaction with the master repository will be encapsulated
@@ -98,7 +98,7 @@ enough to be applicable to any source code management system.  Should
 it be determined that CVS is no longer the ideal choice for the back
 end, the inner workings of revtool would require modification to
 "talk the new language," so to speak, but its external interface (and
-by extension, all other Avalon tools) would remain unchanged.
+by extension, all other Mezzanine tools) would remain unchanged.
 
 The following tasks will be accomplished via revtool:
  - retrieving data from the master repository
@@ -117,7 +117,7 @@ in interface, syntax, etc.
 
 In order to simplify working with individual package files, as well as
 to facilitate some level of package portability between differing
-packaging systems, Avalon will employ an encapsulation layer, in the
+packaging systems, Mezzanine will employ an encapsulation layer, in the
 form of a program called pkgtool, for managing package files directly.
 The approach for this tool is analogous to that of revtool; i.e., the
 interface should be consistent regardless of package type, and should
@@ -144,7 +144,7 @@ interface, syntax, etc.
 
 Since the most efficient and most feasible way to store and manage
 packages is not necessarily the most efficient way of actually making
-changes to and working with those packages, Avalon will provide a
+changes to and working with those packages, Mezzanine will provide a
 source management tool, srctool, to automate many of the routine tasks
 performed by package maintainers.  This program will fulfill several
 requirements of the build system not directly addressed by the
@@ -165,10 +165,10 @@ developer simplicity but may change as needed.
 ----------------------
 
 The culminating force of the build system is the piece that creates
-the end result -- products.  Avalon employs a single program,
+the end result -- products.  Mezzanine employs a single program,
 buildtool, which takes product description files ("prod files") and
 creates products from their component packages based on the
-information in those files.  It will utilize some of the other Avalon
+information in those files.  It will utilize some of the other Mezzanine
 components to perform this task.
 
 Product files are designed to be a very powerful engine for describing
@@ -200,7 +200,7 @@ Specifically, builds should be distributable and parallelizable.
 2.6.  Additional Utilities
 --------------------------
 
-Over time, extraneous tools will be added to Avalon as specific needs
+Over time, extraneous tools will be added to Mezzanine as specific needs
 arise.  These tools are not a part of the build system proper, since
 they are not specifically a part of managing generic software
 products, but are nonetheless used in the ongoing maintenance of the
@@ -220,12 +220,12 @@ Existing utilities which fall into this category include:
 
 The fundamental purpose of the Build System is to automate the
 creation and management of software products.  Every task performed by
-Avalon could be done by hand instead.  However, part of the purpose of
-the Avalon toolkit is to automate complex processes and hide the
+Mezzanine could be done by hand instead.  However, part of the purpose of
+the Mezzanine toolkit is to automate complex processes and hide the
 details of their implementation from the end user.  That said, those
 who design and maintain the Build System need to know how things
 actually work in case something goes wrong, be it with the back-end
-system itself or one of the Avalon tools.
+system itself or one of the Mezzanine tools.
 
 3.1.  Server Setup
 ------------------
@@ -278,7 +278,7 @@ the other trees.
 
 All build system data will be stored in directories underneath the
 global CVS root directory, /cvs.  Each individual product should have
-its own tree.  A master project called "build" will contain the Avalon
+its own tree.  A master project called "build" will contain the Mezzanine
 tools as well as product files for all products in the system.
 
 Within each product tree will be located individual modules, one per
@@ -351,7 +351,7 @@ follow in this situation.
            or
         $ avimport pkg-1.0-1.src.rpm
 
-Avalon will automatically explode the SRPM into its component parts
+Mezzanine will automatically explode the SRPM into its component parts
 and commit them as a new SPM (source package module).  It will also
 detect if the module already exists and attempt to merge the changes,
 noting which files are duplicates.
@@ -391,7 +391,7 @@ packages.
 4.2.1.  For a Build
 -------------------
 
-As part of the build process, Avalon will automatically download all
+As part of the build process, Mezzanine will automatically download all
 packages needed for a particular product and place them in the correct
 locations.  No manual intervention is needed.
 
@@ -468,7 +468,7 @@ straightforward.
 
 The building of complete products, the end result of which is some
 type of product media, is the culmination of a lot of time and
-effort.  As with everything else, Avalon strives to automate as much
+effort.  As with everything else, Mezzanine strives to automate as much
 as possible on behalf of the developers.
 
 4.4.1.  Individual Packages
@@ -506,7 +506,7 @@ work until we determine where the build actually ends. */
 5.  TOOL SUMMARY
 ----------------
 
-All the Avalon tools and tool aliases are listed here along with brief
+All the Mezzanine tools and tool aliases are listed here along with brief
 descriptions of their purpose.  This will assist in providing a
 high-level glimpse at basic tool usage.
 

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.27 2001/08/20 18:50:11 mej Exp $
+# $Id: srctool,v 1.28 2001/09/22 13:22:33 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -32,13 +32,13 @@ require Getopt::Long;
 use Cwd ('&getcwd', '&abs_path');
 use File::Copy ('&cp', '&mv');
 
-# Avalon modules
-use Avalon::Util;
-use Avalon::RevCtl;
-use Avalon::PkgVars;
-use Avalon::RPM;
-use Avalon::Src;
-use Avalon::Pkg;
+# Mezzanine modules
+use Mezzanine::Util;
+use Mezzanine::RevCtl;
+use Mezzanine::PkgVars;
+use Mezzanine::RPM;
+use Mezzanine::Src;
+use Mezzanine::Pkg;
 
 # Print usage information
 sub
@@ -64,7 +64,7 @@ print_usage_info
     print "    -D --dir <repository>            Specify the repository to use\n";
     print "    -T --test                        Test only; do not talk to the master server\n";
     print "\n";
-    exit(AVALON_SUCCESS);
+    exit(MEZZANINE_SUCCESS);
 }
 
 # Import a package
@@ -84,22 +84,22 @@ import_package
             ($pkg, $ver, $rel) = ($1, $2, $3);
         } else {
             eprint "Invalid package for import:  $pkgfile\n";
-            return AVALON_INVALID_PACKAGE;
+            return MEZZANINE_INVALID_PACKAGE;
         }
         print "Importing $pkgfile into $pkg tree....\n\n";
         # Create a working tree to be imported
         $tmpdir = &create_temp_space($pkg, "SPM");
 	if (! $tmpdir) {
-	    return AVALON_SYSTEM_ERROR;
+	    return MEZZANINE_SYSTEM_ERROR;
 	}
 
         # Install the SRPM into the temporary directory
         &pkgvar_parameters("--define \"_sourcedir $tmpdir/S\" --define \"_specdir $tmpdir/F\"");
         ($err, $msg) = &package_install();
         &pkgvar_parameters("");
-        if ($err != AVALON_SUCCESS) {
+        if ($err != MEZZANINE_SUCCESS) {
             eprint "Unable to install $pkgfile\n";
-            return AVALON_COMMAND_FAILED;
+            return MEZZANINE_COMMAND_FAILED;
         }
 
         # The spec file should be the only file in $tmpdir/F
@@ -115,7 +115,7 @@ import_package
         $specdata = &parse_spec_file();
         if (!defined($specdata->{SPECFILE})) {
             eprint "Unable to parse spec file.\n";
-            return AVALON_COMMAND_FAILED;
+            return MEZZANINE_COMMAND_FAILED;
         }
         @srcs = values %{$specdata->{SOURCE}};
         @patches = values %{$specdata->{PATCH}};
@@ -127,7 +127,7 @@ import_package
             dprint "Moving patches to $tmpdir/P/\n";
             if (&move_files(@patches, "$tmpdir/P/") < scalar(@patches)) {
                 eprint "One or more patches could not be moved into place.\n";
-                return AVALON_FILE_OP_FAILED;
+                return MEZZANINE_FILE_OP_FAILED;
             }
         }
 
@@ -136,9 +136,9 @@ import_package
             chdir($pwd);
             if (! &mv($tmpdir, "$pwd/$pkg")) {
                 eprint "Unable to move $tmpdir to $tmpdir -- $!\n";
-                return AVALON_FILE_OP_FAILED;
+                return MEZZANINE_FILE_OP_FAILED;
             }
-            print "You specified the \"test\" (-T) option.  You will need to import the new tree by hand (avimport $pkg).\n";
+            print "You specified the \"test\" (-T) option.  You will need to import the new tree by hand (mzimport $pkg).\n";
         } else {
             chdir($tmpdir);
             $tag =~ tr/a-z/A-Z/;
@@ -146,7 +146,7 @@ import_package
             &revctl_rtag($tag);
             &revctl_exclusive(1);
             $err = &import_vendor_sources();
-            if ($err != AVALON_SUCCESS) {
+            if ($err != MEZZANINE_SUCCESS) {
                 eprint "Import of $pkgfile failed.\n";
                 return $err;
             }
@@ -173,15 +173,15 @@ import_package
 		print "For future reference, you can specify this information on the command line like this:  -n $name\n";
 	    } else {
 		eprint "No package name/version supplied for FST import\n";
-		return AVALON_MISSING_INFO;
+		return MEZZANINE_MISSING_INFO;
 	    }
 	}
 
         if ($test_only) {
-            print "You specified the \"test\" (-T) option.  You will need to import the new tree by hand (avimport -n $name).\n";
+            print "You specified the \"test\" (-T) option.  You will need to import the new tree by hand (mzimport -n $name).\n";
         } else {
             chdir($pkgfile) if ($pkgfile);
-            if (($err = &generate_symlink_file("")) != AVALON_SUCCESS) {
+            if (($err = &generate_symlink_file("")) != MEZZANINE_SUCCESS) {
                 return $err;
             }
             ($tag = $name) =~ tr/a-z/A-Z/;
@@ -189,14 +189,14 @@ import_package
             &revctl_rtag($tag);
             &revctl_exclusive(1);
             $err = &import_vendor_sources();
-            if ($err != AVALON_SUCCESS) {
+            if ($err != MEZZANINE_SUCCESS) {
                 eprint "Import of $pkgfile failed.\n";
                 return $err;
             }
         }
         chdir($pwd);
     }
-    return AVALON_SUCCESS;
+    return MEZZANINE_SUCCESS;
 }
 
 sub
@@ -216,34 +216,34 @@ prepare_tree($$)
     }
     if (!chdir($pkgdir)) {
         eprint "Unable to cd to $pkgdir -- $!\n";
-        return AVALON_INVALID_PACKAGE;
+        return MEZZANINE_INVALID_PACKAGE;
     }
 
     # Create the working directory
     &nuke_tree($WORK_DIR);
     if (!&mkdirhier($WORK_DIR)) {
         eprint "Unable to create working directory -- $!\n";
-        return AVALON_SYSTEM_ERROR;
+        return MEZZANINE_SYSTEM_ERROR;
     }
     # Create the RPM build tree
     $tmpdir = &create_temp_space($pkg, "build");
     if (! $tmpdir) {
-	return AVALON_SYSTEM_ERROR;
+	return MEZZANINE_SYSTEM_ERROR;
     }
     # Copy all the files into their proper places for RPM's use
     $spec = &install_spm_files($tmpdir);
     if (! $spec) {
-	return AVALON_SYSTEM_ERROR;
+	return MEZZANINE_SYSTEM_ERROR;
     }
     print "Creating working directory $pkgdir/$WORK_DIR....\n";
     $rpmcmd = "--define \"_topdir $tmpdir\" --define \"_builddir $pkgdir/$WORK_DIR\" --nodeps -bp $spec";
     @tmp = &run_cmd("rpm", $rpmcmd, 0);
-    if (($err = shift @tmp) != AVALON_SUCCESS) {
+    if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
         dprint join("\n  ", @tmp), "\n";
         eprint "Creation of working directory failed -- $tmp[$#tmp]\n";
     } elsif ($external) {
         print "You may now chdir to ", ($pkgdir eq $pwd ? $WORK_DIR : "$pkg/$WORK_DIR"), " to make changes.\n";
-        print "Use \"avpatch -n <patch_name>\" to generate a patch when done.\n";
+        print "Use \"mzpatch -n <patch_name>\" to generate a patch when done.\n";
     }
 
     chdir($pwd);
@@ -263,7 +263,7 @@ gen_patch($$)
         $pwd = &getcwd();
         if (!chdir($pkg)) {
             eprint "Unable to chdir to $pkg -- $!\n";
-            return AVALON_SYSTEM_ERROR;
+            return MEZZANINE_SYSTEM_ERROR;
         }
     }
 
@@ -279,11 +279,11 @@ gen_patch($$)
         }
     } elsif (! &mv($old_wd, $new_wd)) {
         eprint "Unable to move $old_wd to $new_wd -- $!\n";
-        return AVALON_SYSTEM_ERROR;
+        return MEZZANINE_SYSTEM_ERROR;
     }
     # Then create a new one using the routine above
     &pkgvar_filename("");
-    if (($err = &prepare_tree()) != AVALON_SUCCESS) {
+    if (($err = &prepare_tree()) != MEZZANINE_SUCCESS) {
         return $err;
     }
 
@@ -300,13 +300,13 @@ gen_patch($$)
         my @tmp;
 
         if (! &mkdirhier("P")) {
-            return AVALON_SYSTEM_ERROR;
+            return MEZZANINE_SYSTEM_ERROR;
         }
         if ($test_only) {
-            print "You specified the \"test\" (-T) option.  You will need to add the patch directory by hand (avadd P).\n";
+            print "You specified the \"test\" (-T) option.  You will need to add the patch directory by hand (mzadd P).\n";
         } else {
             $err = &add_new_files("P");
-            if ($err != AVALON_SUCCESS && $err != AVALON_DUPLICATE) {
+            if ($err != MEZZANINE_SUCCESS && $err != MEZZANINE_DUPLICATE) {
                 eprint "Addition of directory P failed.\n";
                 return $err;
             }
@@ -316,13 +316,13 @@ gen_patch($$)
     # Finally, process the output to save the patch
     if (!open(PATCH, ">P/$patch")) {
         eprint "Unable to open P/$patch for writing -- $!\n";
-        return AVALON_SYSTEM_ERROR;
+        return MEZZANINE_SYSTEM_ERROR;
     }
     foreach my $line (@output) {
         next if ($line =~ /^diff: /);
         if ($line =~ /^(diff|---|\+\+\+|\*\*\*)/) {
             $line =~ s/$old_wd\///;
-            $line =~ s/\Q$new_wd\E\//avalon_patched_/;
+            $line =~ s/\Q$new_wd\E\//mezzanine_patched_/;
         }
         if ($line =~ /^[-I=Rrd\+\s@\*\\]/ || $line =~ /^$/) {
             print PATCH "$line\n";
@@ -336,10 +336,10 @@ gen_patch($$)
 
     # Add the new patch file
     if ($test_only) {
-        print "You specified the \"test\" (-T) option.  You will need to add the new patch by hand (avadd P/$patch).\n";
+        print "You specified the \"test\" (-T) option.  You will need to add the new patch by hand (mzadd P/$patch).\n";
     } else {
         $err = &add_new_files("P/$patch");
-        if ($err != AVALON_SUCCESS && $err != AVALON_DUPLICATE) {
+        if ($err != MEZZANINE_SUCCESS && $err != MEZZANINE_DUPLICATE) {
             eprint "Addition of directory P/$patch failed.\n";
             return $err;
         }
@@ -351,7 +351,7 @@ gen_patch($$)
     mv($new_wd, $old_wd);
     chdir($pwd) if ($pwd);
 
-    return AVALON_SUCCESS;
+    return MEZZANINE_SUCCESS;
 }
 
 sub
@@ -372,7 +372,7 @@ merge_file($$)
         $type = 'F';
     } elsif ($new_file =~ /\.(no)?src\.rpm$/) {
         $type = 'R';
-    } elsif ($new_file =~ /^\.avalon/) {
+    } elsif ($new_file =~ /^\.mezz/) {
         $type = 'E';
     } else {
         if (-t STDIN) {
@@ -384,7 +384,7 @@ merge_file($$)
             }
         } else {
             eprint "Unable to guess the type of merge file $new_file.  You must specify it.\n";
-            return AVALON_BAD_ADDITION;
+            return MEZZANINE_BAD_ADDITION;
         }
     }
 
@@ -393,7 +393,7 @@ merge_file($$)
         $pwd = &getcwd();
         if (!chdir($pkg)) {
             eprint "Unable to chdir into $pkg -- $!\n";
-            return AVALON_SYSTEM_ERROR;
+            return MEZZANINE_SYSTEM_ERROR;
         }
     } else {
         $pkg = &basename(&getcwd);
@@ -412,21 +412,21 @@ merge_file($$)
             $dest = "$type/";
             if (! -d $type && !&mkdirhier($type)) {
                 eprint "Unable to create directory $type -- $!\n";
-                return AVALON_SYSTEM_ERROR;
+                return MEZZANINE_SYSTEM_ERROR;
             }
         }
         $dest .= &basename($new_file);
         if (! &cp($new_file, $dest)) {
             eprint "Unable to copy $new_file to $dest -- $!\n";
-            return AVALON_SYSTEM_ERROR;
+            return MEZZANINE_SYSTEM_ERROR;
         }
 
-        # Add the file to be committed later via "srctool -m" or "avmod"
+        # Add the file to be committed later via "srctool -m" or "mzmod"
         if ($test_only) {
-            print "You specified the \"test\" (-T) option.  You will need to add the new file(s) by hand (avadd $dest).\n";
+            print "You specified the \"test\" (-T) option.  You will need to add the new file(s) by hand (mzadd $dest).\n";
         } else {
             $err = &add_new_files($dest);
-            if ($err != AVALON_SUCCESS) {
+            if ($err != MEZZANINE_SUCCESS) {
                 eprint "Addition of $new_file ($dest) failed.\n";
             } else {
                 print "$new_file merged successfully.\n";
@@ -449,7 +449,7 @@ clean_package
         $pwd = &getcwd();
         if (!chdir($pkg)) {
             eprint "Unable to chdir to $pkg -- $!\n";
-            return AVALON_SYSTEM_ERROR;
+            return MEZZANINE_SYSTEM_ERROR;
         }
     } else {
         $pkg = &basename(&getcwd());
@@ -457,12 +457,12 @@ clean_package
 
     if ($test_only) {
         eprint "You specified the \"test\" (-T) option.  I will not be able to clean this module.\n";
-        return AVALON_SYNTAX_ERROR;
+        return MEZZANINE_SYNTAX_ERROR;
     }
 
     print "Cleaning and resyncing $pkg...\n";
-    @output = &run_av_cmd("revtool", &revctl_repository() . " -g", 0);
-    if (($err = shift @output) != AVALON_SUCCESS) {
+    @output = &run_mz_cmd("revtool", &revctl_repository() . " -g", 0);
+    if (($err = shift @output) != MEZZANINE_SUCCESS) {
         print @output;
         eprint "Unable to resync with repository.\n";
         return $err;
@@ -478,7 +478,7 @@ clean_package
 
     print "Cleanup of $pkg complete.\n";
     chdir($pwd) if ($pwd);
-    return AVALON_SUCCESS;
+    return MEZZANINE_SUCCESS;
 }
 
 # main() here is basically the same as main() in C
@@ -501,17 +501,17 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.27 $ created on $Date: 2001/08/20 18:50:11 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.28 $ created on $Date: 2001/09/22 13:22:33 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
         $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
         print "\n";
 	print "$progname $version by Michael Jennings <mej\@eterm.org>\n";
-        print "Copyright (c) 2001, Michael Jennings and VA Linux Systems, Inc.\n";
+        print "Copyright (c) 2001, Michael Jennings\n";
         print "  ($rcs_info)\n";
         print "\n";
-	return AVALON_SUCCESS;
+	return MEZZANINE_SUCCESS;
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
     }
@@ -538,7 +538,7 @@ main
     $SIG{TTIN} = \&handle_fatal_signal;
     $SIG{TTOU} = \&handle_fatal_signal;
 
-    if ($0 =~ /avimport$/ || $opt_i) {
+    if ($0 =~ /mzimport$/ || $opt_i) {
 	if (scalar(@flist)) {
 	    foreach $f (@flist) {
 		my $err;
@@ -550,7 +550,7 @@ main
 	} else {
 	    return &import_package();
 	}
-    } elsif ($0 =~ /avprep$/ || $opt_p) {
+    } elsif ($0 =~ /mzprep$/ || $opt_p) {
 	if (scalar(@flist)) {
 	    foreach $f (@flist) {
 		my $err;
@@ -562,7 +562,7 @@ main
 	} else {
 	    return &prepare_tree();
 	}
-    } elsif ($0 =~ /avmerge$/ || $opt_M) {
+    } elsif ($0 =~ /mzmerge$/ || $opt_M) {
         my $pkg;
 
         foreach my $f (@flist) {
@@ -575,7 +575,7 @@ main
             @flist = grep($_ ne $pkg, @flist);
         } elsif (! -d "F") {
             eprint "No valid module specified.\n";
-            return AVALON_BAD_MODULE;
+            return MEZZANINE_BAD_MODULE;
         } else {
             $pkg = "";
         }
@@ -586,7 +586,7 @@ main
             $err = &merge_file($f);
             return $err if ($err);
         }
-    } elsif ($0 =~ /avpatch$/ || $opt_a) {
+    } elsif ($0 =~ /mzpatch$/ || $opt_a) {
         my ($pkg, $patch);
 
         if (! $pkg) {
@@ -594,7 +594,7 @@ main
                 $pkg = "";
             } else {
                 eprint "No package was specified, and the current directory doesn't look like one.\n";
-                return AVALON_SYNTAX_ERROR;
+                return MEZZANINE_SYNTAX_ERROR;
             }
         }
         if (!($patch = &pkgvar_name())) {
@@ -612,13 +612,13 @@ main
                 }
             } else {
                 eprint "No patch name was specified.\n";
-                return AVALON_SYNTAX_ERROR;
+                return MEZZANINE_SYNTAX_ERROR;
             }
         }
         &pkgvar_filename($pkg);
         &pkgvar_name($patch);
         return &gen_patch();
-    } elsif ($0 =~ /avclean$/ || $opt_c) {
+    } elsif ($0 =~ /mzclean$/ || $opt_c) {
 	if (scalar(@flist)) {
 	    foreach $f (@flist) {
 		my $err;
@@ -633,7 +633,7 @@ main
     } elsif ($opt_r) {
     } else {
     }
-    return AVALON_SUCCESS;
+    return MEZZANINE_SUCCESS;
 }
 
 exit &main();

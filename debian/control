@@ -1,11 +1,11 @@
-Source: avalon
+Source: mezzanine
 Section: devel
 Priority: extra
-Maintainer: Chip Salzenberg <chip@valinux.com>
+Maintainer: Nobody <nobody@kainx.org>
 Standards-Version: 3.0.0.1
 
-Package: avalon
+Package: mezzanine
 Architecture: all
 Depends: ${perl:Depends}
-Description: The VA Software Engineering Build System
+Description: The Mezzanine Build System
  (this debian package is not official yet)

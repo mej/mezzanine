@@ -1,5 +1,5 @@
-Summary: Avalon -- The VA Software Engineering Build System
-Name: avalon
+Summary: Mezzanine -- The VA Software Engineering Build System
+Name: mezzanine
 Version: 2.1
 Release: 0.13
 Copyright: BSD with Advertising Clause
@@ -12,7 +12,7 @@ URL: http://www.valinux.com/
 Requires: perl, perl-libnet
 
 %description
-Avalon is a collection of tools, written primarily in Perl, which
+Mezzanine is a collection of tools, written primarily in Perl, which
 automate and simplify many of the tasks associated with maintaining,
 building, and releasing software products.
 
@@ -24,8 +24,8 @@ building, and releasing software products.
 %install
 rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT%{_bindir}
-mkdir -p $RPM_BUILD_ROOT%{_libdir}/perl5/site_perl/5.6.0/Avalon
-mkdir -p $RPM_BUILD_ROOT%{_libdir}/perl5/site_perl/5.005/Avalon
+mkdir -p $RPM_BUILD_ROOT%{_libdir}/perl5/site_perl/5.6.0/Mezzanine
+mkdir -p $RPM_BUILD_ROOT%{_libdir}/perl5/site_perl/5.005/Mezzanine
 mkdir -p $RPM_BUILD_ROOT%{_mandir}/man1
 
 for i in *tool pkgsort ; do
@@ -33,8 +33,8 @@ for i in *tool pkgsort ; do
 done
 
 for i in mod/*.pm ; do
-  install -m 644 $i $RPM_BUILD_ROOT%{_libdir}/perl5/site_perl/5.6.0/Avalon/
-  install -m 644 $i $RPM_BUILD_ROOT%{_libdir}/perl5/site_perl/5.005/Avalon/
+  install -m 644 $i $RPM_BUILD_ROOT%{_libdir}/perl5/site_perl/5.6.0/Mezzanine/
+  install -m 644 $i $RPM_BUILD_ROOT%{_libdir}/perl5/site_perl/5.005/Mezzanine/
 done
 
 for i in doc/man/*.1 ; do
@@ -66,7 +66,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-, root, root)
-%doc README ChangeLog doc/*.txt doc/Makefile.avalon.sample
+%doc README ChangeLog doc/*.txt doc/Makefile.mezz.sample
 %{_bindir}/*
 %{_libdir}/*
 %{_mandir}/*

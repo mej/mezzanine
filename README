@@ -5,7 +5,7 @@
 #               Craig Ross
 #               Ted T'so
 #
-#  $Id: README,v 1.15 2001/02/23 02:53:53 mej Exp $
+#  $Id: README,v 1.16 2001/09/22 13:22:33 mej Exp $
 #
 ########################################################################
 
@@ -577,7 +577,7 @@ $ revtool -bT VA-COW-4-2-8 cow
 If, on the other hand, this package is maintained by you (and therefore
 the SRPM would not ever contain patches, only new versions), this step
 would not be necessary.  Also, packages that are actively developed in
-this tree (such as Avalon) would not need to be branched.
+this tree (such as Mezzanine) would not need to be branched.
 
 4.2.  Patches
 -------------

@@ -1,12 +1,12 @@
-.TH AVALON 1  "09 MAY 2001" "AVALON(1)"
+.TH MEZZANINE 1  "09 MAY 2001" "MEZZANINE(1)" "MEZZANINE"
 .SH NAME
-avalon - VA Linux software management and build environment. 
+mezzanine - VA Linux software management and build environment. 
 .SH DESCRIPTION
 .PP
-.B Avalon 
+.B Mezzanine 
 is a suite of programs that, when used correctly, can build
 an operating system from source.  
-.B Avalon
+.B Mezzanine
 is comprised of several tools:
 .LP
 .TP
@@ -35,92 +35,92 @@ Source Code Revision Control Tool
 Source maintenance utility
 
 .SH Shortcuts
-As each of these tools provide several features, Avalon provides
+As each of these tools provide several features, Mezzanine provides
 "helper" apps that isolates individual features.
 
 .LP
 .TP 
-.BR avget, avco
+.BR mzget, mzco
 Download and/or merge the current sources from the master tree
 (revtool --get)
 .TP
-.BR avput, avci
+.BR mzput, mzci
 Upload new changes to the master tree
 (revtool --put)
 .TP
-.BR avadd, avnew
+.BR mzadd, mznew
 Mark new files for addition into the master tree
 (revtool --add)
 .TP
-.BR avremove, avrm, avkill, avnuke, avpurge
+.BR mzremove, mzrm, mzkill, mznuke, mzpurge
 Delete files and mark them for deletion in the master tree
 (revtool --remove)
 .TP
-.BR avquery, avask, avinfo
+.BR mzquery, mzask, mzinfo
 Query for a particular type of information
 (revtool --query)
 .TP
-.BR avimport
+.BR mzimport
 Import a new set of sources, or update the vendor branch for a package
 (revtool --import)
 .TP
-.BR avrtag  
+.BR mzrtag  
 Tag one or more complete modules directly 
 (revtool --rtag)
 .TP
-.BR avtag
+.BR mztag
 Specify a symbolic tag for an operation, or tag local sources 
 (revtool --tag)
 .TP
-.BR avlogin
+.BR mzlogin
 Login to the repository 
 (revtool --login)
 .TP
-.BR avreset
+.BR mzreset
 Reset sticky tags, dates, etc. in the current module 
 (revtool --reset)
 .TP
-.BR avdiff
+.BR mzdiff
 Generate diff between repository and current working directory
 (revtool -qd)
 .TP
-.BR avlog
+.BR mzlog
 Show the commit log for file(s)
 (revtool -ql)
 .TP
-.BR avstatus
+.BR mzstatus
 Show the current status of working tree
 (revtool -qs)
 .TP
-.BR avbuild
+.BR mzbuild
 Same as buildtool
 .TP
-.BR avimport
+.BR mzimport
 Import a new package/source tree 
 (srctool --import)
 .TP
-.BR avprep
+.BR mzprep
 Prepare a working tree 
 (srctool --prepare)
 .TP
-.BR avmerge
+.BR mzmerge
 Merge one or more raw files into an SPM 
 (srctool --merge)
 .TP
-.BR avpatch
+.BR mzpatch
 Apply changes in the working tree as a patch to the SPM 
 (srctool --apply)
 .TP
-.BR avmod
+.BR mzmod
 Upload modifications to the master repository 
 (srctool --modify)
 .TP
-.BR avpkg
+.BR mzpkg
 Same as pkgtool
 .TP
-.BR avrpm
+.BR mzrpm
 Same as pkgtool
 
 .SH AUTHORS
-Michael Jennings (mej@valinux.com).  
-Man page written by Walt Drummond (drummond@valinux.com).
+Michael Jennings (mej@kainx.org).  
+Man page written by Walt Drummond (drummond@wfd3.com).

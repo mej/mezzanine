@@ -2,10 +2,10 @@
 #
 # cdtool - The behind-the-scenes magic glue that happens before a CD is made
 #
-# Michael Jennings <mej@valinux.com>
+# Michael Jennings <mej@eterm.org>
 # 21 July 2000
 #
-# $Id: redhat-7.x-cdtool,v 1.16 2001/08/09 20:05:17 mej Exp $
+# $Id: redhat-7.x-cdtool,v 1.17 2001/09/22 13:22:33 mej Exp $
 #
 
 umask 022
@@ -30,10 +30,10 @@ RH_VER=`echo $VA_VER | awk -F. '{print $1"."$2}'`
 
 trap 'exit -1' 1 2 15
 
-if [ "x$AVALON_BUILDDIR" != "x" ]; then
-    BUILDDIR=$AVALON_BUILDDIR
+if [ "x$MEZZANINE_BUILDDIR" != "x" ]; then
+    BUILDDIR=$MEZZANINE_BUILDDIR
 else
-    BUILDDIR=$PWD/build.avalon
+    BUILDDIR=$PWD/build.mezz
 fi
 CD1=va-redhat-${RH_VER}-cd1
 CD2=va-redhat-${RH_VER}-cd2

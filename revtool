@@ -2,7 +2,7 @@
 #
 # revtool -- Source Code Revision Control Tool
 # 
-# Copyright (C) 2000, Michael Jennings
+# Copyright (C) 2001, Michael Jennings
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -23,13 +23,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.77 2001/08/20 17:34:45 mej Exp $
+# $Id: revtool,v 1.78 2001/09/22 13:22:33 mej Exp $
 #
 
 # Include the Perl Modules we need
 use Getopt::Long;
-use Avalon::Util;
-use Avalon::RevCtl;
+use Mezzanine::Util;
+use Mezzanine::RevCtl;
 
 # Print usage information
 sub
@@ -152,14 +152,14 @@ main
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.77 $ created on $Date: 2001/08/20 17:34:45 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.78 $ created on $Date: 2001/09/22 13:22:33 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
         $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
         print "\n";
 	print "$progname $version by Michael Jennings <mej\@eterm.org>\n";
-        print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
+        print "Copyright (c) 2001, Michael Jennings\n";
         print "  ($rcs_info)\n";
         print "\n";
 	exit(0);

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: uptool,v 1.9 2001/06/15 03:27:38 mej Exp $
+# $Id: uptool,v 1.10 2001/09/22 13:22:33 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -31,7 +31,7 @@ require POSIX;
 require Getopt::Long;
 use Cwd;
 use Net::FTP;
-use Avalon::Util;
+use Mezzanine::Util;
 
 # Print usage information
 sub
@@ -52,7 +52,7 @@ print_usage_info
     print "    -m --match --regexp <regexp>     Only pay attention to files that match this regexp\n";
     print "    -H --hash [ <bytes> ]            Print hash marks every <bytes> bytes during download\n";
     print "\n";
-    exit(AVALON_SUCCESS);
+    exit(MEZZANINE_SUCCESS);
 }
 
 sub
@@ -119,7 +119,7 @@ compare_packages()
 {
     my ($p1, $p2) = @_;
     my $ans;
-    my $cache_file = "$ENV{HOME}/.avalon.update_cache";
+    my $cache_file = "$ENV{HOME}/.mezz.update_cache";
     local *CACHE;
 
     if (-s $cache_file) {
@@ -215,7 +215,7 @@ fetch_updates(@)
 
     foreach $url (@urls) {
         # Set defaults for stuff.
-        ($port, $userid, $passwd) = ("21", "anonymous", "info\@valinux.com");
+        ($port, $userid, $passwd) = ("21", "anonymous", "info\@kainx.org");
 
         ### Parse the URL into its components.
 
@@ -316,7 +316,7 @@ fetch_updates(@)
 sub
 main
 {
-    my $ret = AVALON_SUCCESS;
+    my $ret = MEZZANINE_SUCCESS;
 
     # Set up the basic variables
     $progname = "uptool";
@@ -333,17 +333,17 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.9 $ created on $Date: 2001/06/15 03:27:38 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.10 $ created on $Date: 2001/09/22 13:22:33 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
         $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
         print "\n";
 	print "$progname $version by Michael Jennings <mej\@eterm.org>\n";
-        print "Copyright (c) 2001, Michael Jennings and VA Linux Systems, Inc.\n";
+        print "Copyright (c) 2001, Michael Jennings\n";
         print "  ($rcs_info)\n";
         print "\n";
-	return AVALON_SUCCESS;
+	return MEZZANINE_SUCCESS;
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
     }

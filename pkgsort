@@ -2,7 +2,7 @@
 #
 # pkgsort -- Tool for sorting packages
 # 
-# Copyright (C) 2000, Michael Jennings
+# Copyright (C) 2001, Michael Jennings
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -23,13 +23,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgsort,v 1.18 2001/06/15 03:27:37 mej Exp $
+# $Id: pkgsort,v 1.19 2001/09/22 13:22:33 mej Exp $
 #
 
 # Include the Perl Modules we need
 require POSIX;
 require Getopt::Long;
-use Avalon::Util;
+use Mezzanine::Util;
 
 # Print usage information
 sub
@@ -61,7 +61,7 @@ print_usage_info
     print "                       r to reverse the sort order (in addition to one of the above flags)\n";
     print "                       n for no sorting\n";
     print "\n";
-    exit(AVALON_SUCCESS);
+    exit(MEZZANINE_SUCCESS);
 }
 
 sub
@@ -123,7 +123,7 @@ get_srpm_for_rpm
         }
     }
     close(CMD);
-    if ($? != AVALON_SUCCESS) {
+    if ($? != MEZZANINE_SUCCESS) {
         &fatal_error("Query of $rpm failed (error $?).\n");
     }
     return $srpm;
@@ -399,7 +399,7 @@ query_packages
                 }
             }
             close(CMD);
-            if ($? != AVALON_SUCCESS) {
+            if ($? != MEZZANINE_SUCCESS) {
                 &fatal_error("Query of $rpm failed (error $?).\n");
             }
         }
@@ -819,17 +819,17 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.18 $ created on $Date: 2001/06/15 03:27:37 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.19 $ created on $Date: 2001/09/22 13:22:33 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
         $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
         print "\n";
 	print "$progname $version by Michael Jennings <mej\@eterm.org>\n";
-        print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
+        print "Copyright (c) 2001, Michael Jennings\n";
         print "  ($rcs_info)\n";
         print "\n";
-	return AVALON_SUCCESS;
+	return MEZZANINE_SUCCESS;
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
     }
@@ -911,7 +911,7 @@ main
     @pkgs = &sort_packages(@pkgs);
     &write_cache(@pkgs);
     &show_packages(@pkgs);
-    return AVALON_SUCCESS;
+    return MEZZANINE_SUCCESS;
 }
 
 exit &main();
