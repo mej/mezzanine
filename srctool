@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.3 2001/03/21 01:02:05 mej Exp $
+# $Id: srctool,v 1.4 2001/03/21 07:53:31 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -80,6 +80,7 @@ sub SRCTOOL_COMMAND_FAILED()  {3;}
 sub SRCTOOL_INVALID_PACKAGE() {10;}
 sub SRCTOOL_FILE_OP_FAILED()  {11;}
 sub SRCTOOL_MISSING_INFO()    {12;}
+sub SRCTOOL_SYSTEM_ERROR()    {13;}
 
 sub SRCTOOL_TERMINATED()      {50;}
 sub SRCTOOL_CRASHED()         {60;}
@@ -249,19 +250,64 @@ grepdir(&$)
     return @files;
 }
 
+# Return the files in a particular directory
+sub
+find_files
+{
+    my $dir = $_[0];
+    my @files;
+
+    @files = &grepdir(sub {-f "$dir/$_"}, $dir);
+    foreach my $f (0..$#files) {
+	$files[$f] = "$dir/$files[$f]";
+    }
+    return @files;
+}
+
+# Return the subdirectories in a particular directory
+sub
+find_subdirs
+{
+    my $dir = $_[0];
+    my @subdirs;
+
+    @subdirs = &grepdir(sub {-d "$dir/$_"}, $dir);
+    foreach my $f (0..$#subdirs) {
+	$subdirs[$f] = "$dir/$subdirs[$f]";
+    }
+    return @subdirs;
+}
+
 # Create temporary working space in /var/tmp
 sub
 create_temp_space
 {
-    my $pkg = shift;
-    my $dir;
+    my ($pkg, $type) = @_;
+    my ($dir, $d);
+    my @dirlist;
 
     $dir = "/var/tmp/srctool.$$/$pkg";
     &nuke_tree($dir);
     &mkdirhier($dir) || return "";
-    mkdir("$dir/S");
-    mkdir("$dir/P");
+    if ($type eq "SPM") {
+	@dirlist = ("S", "P", "F");
+    } elsif ($type eq "build") {
+	@dirlist = ("BUILD", "SOURCES", "SRPMS", "RPMS", "SPECS");
+    }
+    foreach $d (@dirlist) {
+	if (!&mkdirhier("$dir/$d")) {
+	    eprint "Creation of $dir/$d failed -- $!\n";
+	    return "";
+	}
+    }
     return $dir;
+}
+
+# Clean up temp space
+sub
+clean_temp_space
+{
+    return &nuke_tree("/var/tmp/srctool.$$");
 }
 
 # Generic Avalon command wrapper
@@ -322,21 +368,24 @@ import_package
         }
         print "Importing $pkgfile into $pkg tree....\n\n";
         # Create a working tree to be imported
-        $tmpdir = &create_temp_space($pkg);
-        $rpmcmd = "rpm --define \"_sourcedir $tmpdir/S\" --define \"_specdir $tmpdir\"";
+        $tmpdir = &create_temp_space($pkg, "SPM");
+	if (! $tmpdir) {
+	    return SRCTOOL_SYSTEM_ERROR;
+	}
+        $rpmcmd = "rpm --define \"_sourcedir $tmpdir/S\" --define \"_specdir $tmpdir/F\"";
         # Install the SRPM into the temporary directory
         @tmp = &run_cmd("pkgtool", "-P '$rpmcmd' -ip $pkgfile", 0);
         if (($err = shift @tmp) != 0) {
             eprint "Unable to install $pkgfile\n";
             return SRCTOOL_COMMAND_FAILED;
         }
-        # The spec file should be the only file in $tmpdir itself
-        @tmp = &grepdir(sub {-f "$tmpdir/$_"}, $tmpdir);
+        # The spec file should be the only file in $tmpdir/F
+        @tmp = &find_files("$tmpdir/F");
         if (scalar(@tmp) != 1) {
             my $n = scalar(@tmp);
             &fatal_error("$n spec files?!\n");
         }
-        $spec = "$tmpdir/" . (shift @tmp);
+        $spec = "$tmpdir/F/" . (shift @tmp);
         # Get a list of all source and patch files
         @tmp = &run_cmd("pkgtool", "-P '$rpmcmd' -Cs $spec", 0);
         if (($err = shift @tmp) != 0) {
@@ -374,8 +423,7 @@ import_package
             return $err;
         }
         chdir($pwd);
-        $tmpdir =~ s/\/$pkg//;
-        &nuke_tree($tmpdir);
+	&clean_temp_space();
     } elsif (! $pkgfile || -d $pkgfile) {
 	if (! $name || $name !~ /-/) {
 	    if (-t STDIN) {
@@ -415,7 +463,50 @@ import_package
 sub
 prepare_tree
 {
+    my $pkg = $_[0];
+    my ($pwd, $pkgdir, $cmd, $err, $msg, $spec, $tmpdir, $rpmcmd);
+    my (@srcs, @patches, @tmp);
 
+    chomp($pwd = `/bin/pwd`);
+
+    # cd into the package directory if one was specified.  If not, use the current directory.
+    if ($pkg) {
+	if (!chdir($pkg)) {
+	    eprint "Unable to cd to $pkg -- $!\n";
+	    return SRCTOOL_INVALID_PACKAGE;
+	}
+	chomp($pkgdir = `/bin/pwd`);
+    } else {
+	($pkg = $pwd) =~ s/^.*\/([^\/]+)$/$1/;
+	$pkgdir = $pwd;
+    }
+    # Find all the sources and patches and the spec file.
+    @srcs = &find_files("S");
+    @patches = &find_files("P");
+    @tmp = &find_files("F");
+    if (scalar(@tmp) != 1) {
+	my $n = scalar(@tmp);
+	&fatal_error("$n spec files?!\n");
+    }
+    $spec = "F/" . (shift @tmp);
+    # Create the RPM build tree
+    $tmpdir = &create_temp_space($pkg, "build");
+    if (! $tmpdir) {
+	return SRCTOOL_SYSTEM_ERROR;
+    }
+    # Copy all the files into their proper places for RPM's use
+    foreach my $f (@srcs, @patches) {
+	if (!link($f, "$tmpdir/SOURCES")) {
+	    eprint "Unable to copy $f into $tmpdir/SOURCES -- $!\n";
+	    return SRCTOOL_SYSTEM_ERROR;
+	}
+    }
+    if (!link($spec, "$tmpdir/SPECS")) {
+	eprint "Unable to copy $spec into $tmpdir/SPECS -- $!\n";
+	return SRCTOOL_SYSTEM_ERROR;
+    }
+    $rpmcmd = "--define \"_topdir $pkgdir\" -bp";
+    @tmp = &run_cmd("");
 }
 
 # main() here is basically the same as main() in C
@@ -436,7 +527,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.3 $ created on $Date: 2001/03/21 01:02:05 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.4 $ created on $Date: 2001/03/21 07:53:31 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -486,7 +577,16 @@ main
 	    return &import_package("", $pkgname);
 	}
     } elsif ($0 =~ /avprep$/ || $opt_p) {
-        &prepare_tree(@flist);
+	if (scalar(@flist)) {
+	    foreach $f (@flist) {
+		my $err;
+
+		$err = &prepare_tree($f);
+		return $err if ($err);
+	    }
+	} else {
+	    return &prepare_tree("");
+	}
     } elsif ($0 =~ /avmod$/ || $opt_m) {
     } elsif ($0 =~ /avpatch$/ || $opt_a) {
     } elsif ($opt_r) {

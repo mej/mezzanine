@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: todo_list.txt,v 1.9 2001/03/19 06:17:59 mej Exp $
+#  $Id: todo_list.txt,v 1.10 2001/03/21 07:53:31 mej Exp $
 #
 ########################################################################
 
@@ -16,8 +16,8 @@ New Tools [19/46]
 -----------------
  - For handling mass package updates from RedHat [2/4]
  - For manipulating source packages (srctool) [13/32]
-    - Explode and import SRPM's into SPM's [1/4]
-    - Import FST's [1/3]
+    + Explode and import SRPM's into SPM's [1/4]
+    + Import FST's [1/3]
     - Prepare working tree [2/5]
     - Generate new patches [2/4]
     - Resync patches [2/5]
