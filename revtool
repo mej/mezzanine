@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.57 2001/01/19 01:29:07 mej Exp $
+# $Id: revtool,v 1.58 2001/02/27 07:49:53 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -517,6 +517,36 @@ update_from_master
         # a previous $err if the second try succeeds.
         $err = (&talk_to_server("get", $cmd) || $err);
 
+        # Note:  The following exists solely because CVS is too lame to handle symlinks.
+        foreach $dirname (grep(-d $_, ($mode ? @co : @up))) {
+            my $linkfile = 0;
+
+            if (-f "$dirname/.avalon.symlinks") {
+                $linkfile = "$dirname/.avalon.symlinks";
+            } elsif (-f "$dirname/.buildtool.symlinks") {
+                # Supported, but deprecated
+                $linkfile = "$dirname/.buildtool.symlinks";
+            }
+            if ($linkfile) {
+                local *SL;
+
+                if (open(SL, $linkfile)) {
+                    while (<SL>) {
+                        my ($link_from, $link_to, $line);
+
+                        chomp($line = $_);
+                        next if ($line =~ /^\s*\#/ || $line !~ / -> /);
+                        ($link_from, $link_to) = split(" -> ", $line);
+                        dprint "Creating symlink:  $link_from -> $link_to\n";
+                        if (!symlink($link_to, "$dirname/$link_from")) {
+                            eprint "Unable to symlink $link_from to $link_to -- $!\n";
+                        }
+                    }
+                    close(SL);
+                }
+            }
+        }
+
         # FIXME:  Need to find and remove empty directories when checking stuff out.
     }
     return $err;
@@ -924,7 +954,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.57 $ created on $Date: 2001/01/19 01:29:07 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.58 $ created on $Date: 2001/02/27 07:49:53 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

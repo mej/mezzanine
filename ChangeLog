@@ -1025,3 +1025,9 @@ Fri Feb 23 16:28:49 2001                        Michael Jennings (mej)
 
 Nothing really changed...
 ----------------------------------------------------------------------
+Mon Feb 26 23:49:11 2001                        Michael Jennings (mej)
+
+Support tarballs as packages (rpm -ta).  Also moved the symlink
+creation to revtool from buildtool.  I need to put together a fake
+project tomorrow to test this with.
+----------------------------------------------------------------------

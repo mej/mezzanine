@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.116 2001/02/07 22:04:49 mej Exp $
+# $Id: buildtool,v 1.117 2001/02/27 07:49:53 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -378,6 +378,8 @@ get_package_stages
 
     if ($type eq "srpm") {
         return "sebpa";
+    } elsif ($type eq "tar") {
+        return "sebpa";
     } elsif ($type eq "rpm") {
         return "sbpa";
     } elsif ($type eq "module") {
@@ -641,7 +643,7 @@ parse_product_entry
     #@inp = ($line =~ m/\s*((?:\S*(?:\"[^\"]+\")?\S*)+)\s*/g);
     #pop @inp;  # There will always be an empty value at the end.  Get rid of it.
     dprint "Input is \"", join("\" \"", @inp), "\"\n";
-    if ($inp[0] =~ /^(prod|mod|s?rpm|ima?ge?)[^:]*:/) {
+    if ($inp[0] =~ /^(prod|mod|s?rpm|tar|tbz|tgz|ima?ge?)[^:]*:/) {
         # Line begins with <type>:<name>, like "module:Eterm"
         ($type, $name) = split(":", $inp[0]);
         $type =~ tr/[A-Z]/[a-z]/;
@@ -660,6 +662,8 @@ parse_product_entry
             $type = "srpm";
         } elsif ($type =~ /^rpm/) {
             $type = "rpm";
+        } elsif ($type =~ /^t(ar|bz|gz)/) {
+            $type = "tar";
         } elsif ($type =~ /^image/) {
             $type = "image";
         } else {
@@ -672,12 +676,15 @@ parse_product_entry
         $type_guess = 1;
         ($name = $inp[0]) =~ s/^\w*://;
         dprint "Guessing type of \"$name\"\n";
-        if ($name =~ /src\.rpm/) {
-            # Name ends with src.rpm.  That's an easy one.
+        if ($name =~ /src\.rpm$/) {
+            # Name ends with src.rpm.
             $type = "srpm";
-        } elsif ($name =~ /\.rpm/) {
-            # Name ends with .rpm but it's not a source RPM.  That's easy too.
+        } elsif ($name =~ /\.rpm$/) {
+            # Name ends with .rpm but it's not a source RPM. 
             $type = "rpm";
+        } elsif ($name =~ /\.(t?gz|Z|bz2)$/) {
+            # Name ends with .tgz, .Z, .bz2, etc.  Tarball.
+            $type = "tar";
         } else {
             my @contents = ();
 
@@ -1186,7 +1193,7 @@ do_bootstrap_stage
         dprint "Checking for $filename\n";
         # If it already exists , go on.
         if ((($pkgs->{$pkg}{TYPE} eq "module" || $pkgs->{$pkg}{TYPE} eq "image") && -d $filename)
-            || (($pkgs->{$pkg}{TYPE} eq "srpm" || $pkgs->{$pkg}{TYPE} eq "rpm") && -f $filename && -s _)) {
+            || (($pkgs->{$pkg}{TYPE} eq "srpm" || $pkgs->{$pkg}{TYPE} eq "rpm" || $pkgs->{$pkg}{TYPE} eq "tar") && -f $filename && -s _)) {
             nprint "$progname:  $filename already exists.  I'll assume it's the right one.\n";
             nprint "$progname:  Bootstrap stage for \"$pkg\" is complete.\n";
             next;
@@ -1198,30 +1205,10 @@ do_bootstrap_stage
             next;
         }
         if (!((($pkgs->{$pkg}{TYPE} eq "module" || $pkgs->{$pkg}{TYPE} eq "image") && -d $filename)
-            || (($pkgs->{$pkg}{TYPE} eq "srpm" || $pkgs->{$pkg}{TYPE} eq "rpm") && -f $filename && -s _))) {
+            || (($pkgs->{$pkg}{TYPE} eq "srpm" || $pkgs->{$pkg}{TYPE} eq "rpm" || $pkgs->{$pkg}{TYPE} eq "tar") && -f $filename && -s _))) {
             # If it's not there, we must've missed the error.
             &fail_package($pkg, "bootstrap", "Unhandled error condition");
             next;
-        }
-
-        # Note:  The following exists solely because CVS is too lame to handle symlinks.
-        if (-d $filename && -f "$filename/.buildtool.symlinks") {
-            local *SL;
-
-            if (open(SL, "$filename/.buildtool.symlinks")) {
-                while (<SL>) {
-                    my ($link_from, $link_to, $line);
-
-                    chomp($line = $_);
-                    next if ($line =~ /^\s*\#/ || $line !~ / -> /);
-                    ($link_from, $link_to) = split(" -> ", $line);
-                    dprint "Creating symlink:  $link_from -> $link_to\n";
-                    if (!symlink($link_to, "$filename/$link_from")) {
-                        qprint "Warning:  Unable to symlink $link_from to $link_to -- $!\n";
-                    }
-                }
-                close(SL);
-            }
         }
 
         nprint "$progname:  Bootstrap stage for \"$pkg\" is complete.\n";
@@ -1493,7 +1480,18 @@ do_build_stage
             dprint "Copying $pkgs->{$pkg}{FILENAME} to $builddir/RPMS/$arch\n";
             &mkdirhier("$builddir/RPMS/$arch");
             system("cp $pkgs->{$pkg}{FILENAME} $builddir/RPMS/$arch/");
-        } else {
+        } elsif ($pkgs->{$pkg}{TYPE} eq "tar") {
+            # Rebuild from the spec file
+            ($err, $msg, $srpm) = &build_pkgs($pkg, $pkgs->{$pkg}{FILENAME});
+            dprint "do_build_stage():  build_pkgs($pkg, $specfile) returned $err, $msg, $srpm\n";
+            if ($err) {
+                &fail_package($pkg, "build", $msg);
+            } else {
+                $srpm =~ m/^(\S+)-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/;
+                ($pkgs->{$pkg}{VERSION}, $pkgs->{$pkg}{RELEASE}) = ($2, $3);
+                dprint "Filename is $pkgs->{$pkg}{FILENAME}, version is $pkgs->{$pkg}{VERSION}, release is $pkgs->{$pkg}{RELEASE}\n";
+            }
+        } else {  # SRPM
             # Check for a target SRPM that is newer than the original SRPM and the
             # spec file.  If such an SRPM exists, skip the build stage for this package.
             $target = "$builddir/SRPMS/$pkg" . "-"
@@ -1558,7 +1556,7 @@ do_package_stage
             dprint "Output files [$pkgs->{$pkg}{OUTFILES}] saved from earlier.\n";
             @outfiles = split(" ", $pkgs->{$pkg}{OUTFILES});
         } else {
-            if ($type eq "srpm" || $type eq "module") {
+            if ($type eq "srpm" || $type eq "module" || $type eq "tar") {
                 # Find all the RPM's installed by this package
                 dprint "Opening directory $builddir/SRPMS to scan for output files.\n";
                 opendir(DIR, "$builddir/SRPMS") || &fatal_error("Cannot open directory $builddir/SRPMS -- $!\n");
@@ -1877,7 +1875,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.116 $ created on $Date: 2001/02/07 22:04:49 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.117 $ created on $Date: 2001/02/27 07:49:53 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

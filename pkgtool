@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.30 2000/11/16 23:18:47 mej Exp $
+# $Id: pkgtool,v 1.31 2001/02/27 07:49:53 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -66,6 +66,7 @@ sub PKGTOOL_SUCCESS()           {0;}
 sub PKGTOOL_FATAL_ERROR()       {1;}
 sub PKGTOOL_SYNTAX_ERROR()      {2;}
 sub PKGTOOL_COMMAND_FAILED()    {3;}
+sub PKGTOOL_COMMAND_INVALID()   {4;}
 
 sub PKGTOOL_MISSING_FILES()     {10;}
 sub PKGTOOL_SPEC_ERRORS()       {11;}
@@ -707,6 +708,48 @@ deb_install
 }
 
 sub
+tar_install
+{
+    my $pkg_file = $_[0];
+    my ($tar, $dir, $cmd, $err, $msg);
+    my (@failed_deps);
+    local *TAR;
+
+    $dir = ($rootdir ? $rootdir : "/");
+    $tar = ($pkg_prog ? $pkg_prog : "tar -C $dir");
+    if ($pkg_file =~ /\.(t?gz|Z)$/) {
+        $tar .= " --use-compress-program=gzip";
+    } elsif ($pkg_file =~ /\.bz2$/) {
+        $tar .= " --use-compress-program=bzip2";
+    }
+    $cmd = "$tar -xvf $pkg_file";
+    dprint "About to run \"$cmd\"\n";
+    if (!open(TAR, "$cmd 2>&1 |")) {
+        eprint "Execution of \"$cmd\" failed -- $!\n";
+    }
+    $err = PKGTOOL_SUCCESS;
+    while (<TAR>) {
+        chomp($line = $_);
+        if ($line =~ /^tar: /) {
+            eprint "$line\n";
+        } else {
+            dprint "   $line\n";
+        }
+    }
+    close(TAR);
+    dprint "\"$cmd\" returned $?\n";
+    if ($? != 0 && $err == PKGTOOL_SUCCESS) {
+        return PKGTOOL_UNSPECIFIED_ERROR;
+    }
+    if ($err == PKGTOOL_SUCCESS) {
+        print "$pkg_file successfully installed.\n";
+    } else {
+        eprint "$pkg_file installation failed.\n";
+    }
+    return $err;
+}
+
+sub
 rpm_show_contents
 {
     my $pkg_file = $_[0];
@@ -750,6 +793,35 @@ deb_show_contents
         print "$line\n";
     }
     close(DPKG);
+    dprint "\"$cmd\" returned $?\n";
+    if ($? != 0) {
+        return PKGTOOL_UNSPECIFIED_ERROR;
+    }
+    return PKGTOOL_SUCCESS;
+}
+
+sub
+tar_show_contents
+{
+    my $pkg_file = $_[0];
+    my ($tar, $cmd);
+    local *TAR;
+
+    $tar = ($pkg_prog ? $pkg_prog : "tar");
+    if ($pkg_file =~ /\.(t?gz|Z)$/) {
+        $tar .= " --use-compress-program=gzip";
+    } elsif ($pkg_file =~ /\.bz2$/) {
+        $tar .= " --use-compress-program=bzip2";
+    }
+    $cmd = "$tar -tvf $pkg_file";
+    dprint "About to run \"$cmd\"\n";
+    if (!open(TAR, "$cmd 2>&1 |")) {
+        eprint "Execution of \"$cmd\" failed -- $!\n";
+    }
+    while (<TAR>) {
+        print;
+    }
+    close(TAR);
     dprint "\"$cmd\" returned $?\n";
     if ($? != 0) {
         return PKGTOOL_UNSPECIFIED_ERROR;
@@ -837,6 +909,13 @@ deb_query
 }
 
 sub
+tar_query
+{
+    eprint "Tar packages cannot be queried.\n";
+    return PKGTOOL_COMMAND_INVALID;
+}
+
+sub
 rpm_build
 {
     my ($cmd, $rpm, $line);
@@ -850,6 +929,8 @@ rpm_build
     }
     if ($_[0] =~ /src\.rpm$/) {
         $cmd = "$rpm" . ($rcfile ? " --rcfile \"$rcfile\"" : "") . " --rebuild $_[0]";
+    } elsif ($_[0] =~ /\.(t?gz|Z|bz2)$/) {
+        $cmd = "$rpm" . ($rcfile ? " --rcfile \"$rcfile\"" : "") . " -ta $_[0]";
     } else {
         $cmd = "$rpm" . ($rcfile ? " --rcfile \"$rcfile\"" : "") . " -ba $_[0]";
     }
@@ -1189,7 +1270,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.30 $ created on $Date: 2000/11/16 23:18:47 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.31 $ created on $Date: 2001/02/27 07:49:53 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1271,17 +1352,19 @@ main
         }
         if (! $pkg_file) {
             # If it looks like a package, assume it is one
-            $pkg_file = join(" ", grep(/\.(rpm|deb|gz)$/, @ARGV));
+            $pkg_file = join(" ", grep(/\.(rpm|deb|t?gz|Z)$/, @ARGV));
             if ($pkg_file) {
-                @ARGV = grep($_ !~ /\.(rpm|deb|gz)$/, @ARGV);
+                @ARGV = grep($_ !~ /\.(rpm|deb|t?gz|Z)$/, @ARGV);
             }
         }
     }
     if ($pkg_file) {
-        if ($pkg_file =~ /\.(deb|gz)$/) {
+        if ($pkg_file =~ /\.(deb|diff\.gz)$/) {
             $type = "deb";
         } elsif ($pkg_file =~ /\.rpm$/) {
             $type = "rpm";
+        } elsif ($pkg_file =~ /\.(t?gz|Z|bz2)$/) {
+            $type = "tar";
         }
         dprint "Package type is $type\n";
     }
@@ -1296,6 +1379,8 @@ main
             }
         } elsif ($type eq "deb") {
             $ret = &deb_build();
+        } elsif ($type eq "tar") {
+            $ret = &rpm_build($pkg_file);
         }
     } elsif ($mode eq "install") {
         if (! $pkg_file) {
@@ -1306,12 +1391,16 @@ main
             $ret = &rpm_install($pkg_file);
         } elsif ($type eq "deb") {
             $ret = &deb_install($pkg_file);
+        } elsif ($type eq "tar") {
+            $ret = &tar_install($pkg_file);
         }
     } elsif ($mode eq "contents") {
         if ($type eq "rpm") {
             $ret = &rpm_show_contents($pkg_file);
         } elsif ($type eq "deb") {
             $ret = &deb_show_contents($pkg_file);
+        } elsif ($type eq "tar") {
+            $ret = &tar_show_contents($pkg_file);
         }
     } elsif ($mode eq "generate") {
         if (! $specfile) {
@@ -1321,6 +1410,7 @@ main
         if ($type eq "rpm") {
             $ret = &rpm_generate_source_files($specfile, $module, $srcs, $head_tag, $release_tag);
         } elsif ($type eq "deb") {
+        } elsif ($type eq "tar") {
         }
     } elsif ($mode eq "query") {
         if (! $specfile && ! $pkg_file) {
@@ -1331,6 +1421,8 @@ main
             $ret = &rpm_query($pkg_file, $query_type);
         } elsif ($type eq "deb") {
             $ret = &deb_query($pkg_file, $query_type);
+        } elsif ($type eq "tar") {
+            $ret = &tar_query($pkg_file, $query_type);
         }
     }
 
