@@ -1348,3 +1348,7 @@ Thu Aug  2 20:09:57 2001                        Michael Jennings (mej)
 Not only are parallel builds now working, but it can once again
 rebuild our entire 7.1.1 distro.  Woo-ha!
 ----------------------------------------------------------------------
+Thu Aug  9 21:03:34 2001                        Michael Jennings (mej)
+
+revtool rewrite along with the new revision control module.
+----------------------------------------------------------------------

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.15 2001/08/03 03:08:07 mej Exp $
+# $Id: Util.pm,v 1.16 2001/08/09 20:05:17 mej Exp $
 #
 
 package Avalon::Util;
@@ -298,7 +298,7 @@ print_args
             push @args, "<undef>";
         }
     }
-    return "\"" . join("\", \"", @args) . "\"";
+    return "Args:  \"" . join("\", \"", @args) . "\"\n";
 }
 
 # Make a directory hierarchy

@@ -23,13 +23,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.74 2001/07/31 22:23:00 mej Exp $
+# $Id: revtool,v 1.75 2001/08/09 20:05:17 mej Exp $
 #
 
 # Include the Perl Modules we need
-use POSIX 'strftime';
 use Getopt::Long;
 use Avalon::Util;
+use Avalon::RevCtl;
 
 # Print usage information
 sub
@@ -52,761 +52,29 @@ print_usage_info
     print "    -r --remove              Delete files and mark them for deletion in the master tree\n";
     print "    -q --query <type>        Query for a particular type of information\n";
     print "    -i --import              Import a new set of sources, or update the vendor branch for a package\n";
-    print "    -T --rtag <tag>          Tag one or more complete modules directly\n";
     print "    -t --tag <tag>           Specify a symbolic tag for an operation, or tag local sources\n";
-    print "       --ptag                Specified tag is a product tag (overrides tag checking; use with care)\n";
+    print "    -T --rtag <tag>          Tag one or more complete modules directly\n";
     print "    -b --branch              When performing a tag, make it a branch tag\n";
     print "    -l --login               Perform a login to the repository\n";
     print "    -R --recurse             Operate recursively (this is the default for some commands)\n";
     print "    -k [code]                Specify keyword handling when adding files (use -kb to add binary files)\n";
-    print "    -D --dir                 Specify an alternative repository (\$CVSROOT)\n";
+    print "    -D --dir                 Specify an alternative repository (\$REPOSITORY)\n";
     print "    -x --exclusive           Only commit the specified files\n";
-    print "       --addlist \"files\"     Specify which files to add so that adds and removes can coincide\n";
-    print "       --remlist \"files\"     Specify which files to remove so that adds and removes can coincide\n";
     print "       --reset               Reset sticky tags, dates, etc. in the current module\n";
     print "       --blind               Do not update before committing (may result in conflicts, use carefully)\n";
-    print "    -P --protocol <proto>    Specify which protocol to use (cvs or bk)\n";
     print "\n";
     exit(0);
-}
-
-# Check a tag for validity
-sub
-check_tag
-{
-    my ($module, $tag) = @_;
-
-    # The regexp's below enforce the following tag rules:
-    #   1. Branch tags must begin with a branch key, hypen, the package name, hyphen, e.g. VA-KERNEL-
-    #   2. Non-branch tags are the same, but without the branch key at the beginning, e.g. KERNEL-
-    #   3. Tags must contain only uppercase characters, underscores, and hyphens.  Note that this
-    #      rule is more restrictive than CVS's own rules but is enforced for standards compliance.
-    #   4. Product tags are only subject to rule #3.
-
-    if ($tag !~ /^[-_A-Z0-9]+$/) {
-        eprint "Tag $tag failed character constraint check.  Tags may only contain the following:  A-Z, 0-9, -, and _.\n";
-        return 0;
-    }
-    if (! $ptag) {
-        if ($opt_b) {
-            if ($tag !~ /^([A-Z]+)-$module-/) {
-                eprint "Tag $tag failed branch name check.  Branch tags must begin with the branch tag prefix.\n";
-                return 0;
-            }
-        } else {
-            if ($tag !~ /^$module-/) {
-                eprint "Tag $tag failed name check.  Tags should be in the form MODULE-VERSION-RELEASE (e.g., FOO-2_0_3-1).\n";
-                return 0;
-            }
-        }
-    }
-    return 1;
-}
-
-# This routine dispatches server requests to the appropriate
-# routine based on the selected protocol (cvs or bk).
-sub
-talk_to_server
-{
-    if ($protocol eq "cvs") {
-        return &talk_to_cvs_server(@_);
-    } elsif ($protocol eq "bk") {
-        return &talk_to_bk_server(@_);
-    }
-}
-
-# This routine handles interaction with the master CVS server
-sub
-talk_to_cvs_server
-{
-    my ($type, $cmd) = @_;
-    my ($err, $tries, $line);
-    my (@tags, @links, @ignores, @not_found, @removed, @conflicts);
-
-    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
-        $err = 0;
-        if (!open(CMD, "$cmd 2>&1 |")) {
-            eprint "Execution of \"$cmd\" failed -- $!";
-            return AVALON_COMMAND_FAILED;
-        }
-        while (<CMD>) {
-            chomp($line = $_);
-            if ($line =~ /^cvs \w+: Diffing/) {
-                dprint "$line\n";
-            } elsif ($type ne "query_tags") {
-                print "$line\n";
-            }
-
-            # The following routines do output checking for fatal errors,
-            # non-fatal (retryable) errors, and expected command output
-
-            # First, fatal errors
-            if ($line =~ /^cvs \w+: cannot find password/) {
-                eprint "You must login to the repository first.\n";
-                $err = AVALON_BAD_LOGIN;
-                last;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: authorization failed: server \S+ rejected access/) {
-                eprint "Your userid or password was not valid\n";
-                $err = AVALON_BAD_LOGIN;
-                last;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: \S+ requires write access to the repository/) {
-                eprint "You do not have write access to the master repository.\n";
-                $err = AVALON_ACCESS_DENIED;
-                last;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: no repository/) {
-                eprint "There is no CVS repository here.\n";
-                $err = AVALON_NO_SOURCES;
-            } elsif ($line =~ /^cvs server: cannot find module .(\S+). /) {
-                push @not_found, $1;
-                $err = AVALON_FILE_NOT_FOUND;
-            } elsif ($line =~ /^cvs server: warning: (.+) is not \(any longer\) pertinent/
-                     || $line =~ /^cvs server: warning: newborn (\S+) has disappeared/) {
-                push @removed, $1;
-                if ($cmd =~ /$1/) {
-                    # It's only an error if the removed file was specifically requested in the get
-                    $err = AVALON_FILE_REMOVED;
-                }
-            } elsif ($line =~ /^C (.+)$/) {
-                push @conflicts, $1;
-                $err = AVALON_CONFLICT_FOUND;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: no such tag/
-                     || $line =~ /^cvs \S+: warning: new-born \S+ has disappeared$/) {
-                eprint "$opt_t is not a valid tag for this file/module\n";
-                $err = AVALON_INVALID_TAG;
-            } elsif ($line =~ /^cvs server: (.+) already exists/ || $line =~ /^cvs server: (.+) has already been entered/) {
-                eprint "$1 already exists.  No need to add it.\n";
-                $err = AVALON_DUPLICATE;
-            } elsif ($line =~ /^cvs server: nothing known about/) {
-                $line =~ s/^cvs server: nothing known about//;
-                if ($type eq "add") {
-                    eprint "You tried to add a file which does not exist locally ($line).\n";
-                    $err = AVALON_BAD_ADDITION;
-                } else {
-                    eprint "You tried to remove a file which does not exist in the repository ($line).\n";
-                    $err = AVALON_BAD_REMOVAL;
-                }
-
-            # Retryable errors
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server was unreachable.\n";
-                    $err = AVALON_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^Unknown host (\S+)\.$/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "I can't seem to resolve $1.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server name ($1) does not resolve.\n";
-                    $err = AVALON_NO_SERVER;
-                    last;
-                }
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server kept crashing.\n";
-                    $err = AVALON_SERVER_CRASH;
-                    last;
-                }
-
-            # Expected output
-            } elsif ($line =~ /^\s*Existing Tags:\s*$/) {
-                if ($type eq "query_tags") {
-                    my $tmp;
-
-                    while (($tmp = <CMD>) !~ /^\s*$/) {
-                        last if ($tmp =~ /^\s*No Tags Exist\s*$/);
-                        $tmp =~ s/^\s*(\S+)\s+\((\w+):\s*([\d.]+)\)$/$1 at $2 $3/;
-                        push @tags, $tmp;
-                    }
-                    last;
-                }
-            } elsif ($line =~ /^I (.+)$/) {
-                push @ignores, $1;
-            } elsif ($line =~ /^L (.+)$/) {
-                push @links, $1;
-            }
-        }
-        close(CMD);
-        dprint "\"$cmd\" returned $?\n" if ($?);
-    }
-    if ($err == 0 && $? != 0 && $type !~ /^query_r?diff$/) {
-        eprint "An unknown error must have occured, because the command returned $?\n";
-        $err = AVALON_UNSPECIFIED_ERROR;
-    }
-    if ($err) {
-        if ($#conflicts != -1) {
-            eprint "The following files had conflicts:  ", join(" ", @conflicts), "\n";
-        }
-        if ($#not_found != -1) {
-            eprint "The following files/modules were not found in the repository:  ", join(" ", @not_found), "\n";
-        }
-    } else {
-        if ($type eq "query_tags") {
-            if ($#tags >= 0) {
-                print @tags;
-            } else {
-                print "No tags found.\n";
-            }
-        }
-    }
-    if ($#removed != -1) {
-        print "The following files/modules were removed from the repository:  ", join(" ", @removed), "\n";
-    }
-    if ($#links >= 0) {
-        print "The following symbolic links were ignored (not imported):  ", join(" ", @links), "\n";
-    }
-    if ($#ignores >= 0) {
-        print "The following files were ignored (not imported):  ", join(" ", @ignores), "\n";
-    }
-    return ($err);
-}
-
-# This routine handles interaction with the master BK server
-sub
-talk_to_bk_server
-{
-    my ($type, $cmd) = @_;
-
-    return AVALON_UNSPECIFIED_ERROR;
-}
-
-# Login to the repository
-sub
-login_to_master
-{
-    my $login = $_[0];
-    my ($cmd, $line, $pass, $err, $msg, $found);
-    local (*CMD, *CVSPASS);
-
-    if (open(CVSPASS, "$ENV{HOME}/.cvspass")) {
-        $found = 0;
-        while (<CVSPASS>) {
-            chomp($line = $_);
-            if ($line =~ /^$login/) {
-                $found = 1;
-                last;
-            }
-        }
-        close(CVSPASS);
-        if ($found) {
-            dprint "Login not required.\n";
-            return 1;
-        }
-    }
-    if (-t STDIN) {
-        $cmd = "/bin/sh -c \"cvs -d $login login\"";
-        $err = &talk_to_server("login", $cmd);
-        if ($err) {
-            return 0;
-        }
-    } else {
-        dprint "Performing automated login with an empty password.\n";
-        open(CVSPASS, ">> $ENV{HOME}/.cvspass");
-        print CVSPASS "$login A\n";
-        close(CVSPASS);
-    }
-    return 1;
-}
-
-# Commit changes to the master repository
-sub
-commit_to_master
-{
-    my $logfile = "/var/tmp/.cvs.commit.$$";
-    my ($cmd, $username, $fullname, $err, $tries, $line, $module);
-    my @stat_info;
-    my $cwd = `pwd`;
-    my $file_list = join(" ", @_);
-
-    $cwd =~ s/^\S+\/([^\/]+)$/$1/;  # Remove all but the last part
-    chomp($cwd);
-    dprint "cwd is $cwd\n";
-    open(LOGFILE, ">$logfile") || die("Cannot write to $logfile -- $!\n");
-    dprint("Opened log file $logfile for commit log\n");
-    $username = $ENV{"LOGNAME"};
-    @pw_info = getpwnam($username);
-    if ($pw_info[6] =~ /,/) {
-        my @gecos = split(",", $pw_info[6], -1);
-
-        $fullname = $gecos[0];
-    } else {
-        $fullname = $pw_info[6];
-    }
-    printf LOGFILE "%-25s%45s\n\n", scalar localtime, ($fullname ? "$fullname ($username)" : "$username");
-    close(LOGFILE);
-    chomp($module = &cat_file("CVS/Repository"));
-    dprint "Current directory is \"$cwd\", module name is \"$module\"\n";
-    if (! $opt_x) {
-        if (($module ne $cwd) && (! -f "ChangeLog")) {
-            # We're not in the module directory and there's no ChangeLog here.  Offer to cd to it.
-            wprint "This commit is not being done from the top of the module, and I see no ChangeLog here.\n";
-            wprint "I will proceed without writing a ChangeLog entry.  If you are in the wrong directory,\n";
-            wprint "hit Ctrl-C now or exit your editor without writing an entry.  If you want me to write\n";
-            wprint "a ChangeLog entry for you here, abort the commit as above and touch ChangeLog.\n";
-            sleep(1);
-        } else {
-            if (! -f "ChangeLog") {
-                if (open(CL, ">ChangeLog")) {
-                    print "WARNING:  You have no ChangeLog here.  I have created one for you.\n";
-                    &add_new_files("ChangeLog");
-                } else {
-                    print "WARNING:  Unable to create ChangeLog:  $!\n";
-                    $opt_x = 1;
-                }
-            } else {
-                if (! -w "ChangeLog") {
-                    chmod(0644, "ChangeLog");
-                }
-                if (open(CL, ">>ChangeLog")) {
-                    if ($file_list !~ /^\s*$/ && $file_list !~ /ChangeLog/) {
-                        $file_list = "$file_list ChangeLog";
-                    }
-                } else {
-                    print "WARNING:  Unable to write to ChangeLog:  $!\n";
-                    $opt_x = 1;
-                }
-            }
-        }
-    }
-    print "Please edit your commit message now...\n";
-    system($ENV{"EDITOR"} ? $ENV{"EDITOR"} : "vi", $logfile);
-
-    # Abort if the logfile was not modified or is too small.
-    @stat_info = stat($logfile);
-    if ($stat_info[7] <= 72) {
-        print "Commit message was unmodified or is too short.  Aborting commit.\n";
-        return AVALON_BAD_LOG_ENTRY;
-    }
-    if (! $opt_x) {
-        open(LOGFILE, "<$logfile");
-        while (<LOGFILE>) {
-            print CL $_;
-        }
-        print CL "----------------------------------------------------------------------\n";
-        close(CL);
-        close(LOGFILE);
-    }
-
-    $cmd = sprintf("/bin/sh -c \"cvs $cvsroot commit %s -F $logfile $file_list\"", ($opt_t ? "-r $opt_t" : ""));
-    $err = &talk_to_server("put", $cmd);
-    unlink $logfile, "$logfile~";
-    return ($err);
-}
-
-# Update from the master repository
-sub
-update_from_master
-{
-    my $file_list = join(" ", @_);
-    my ($tag, $err, $tries, $line, $cmd, $file, $mode);
-    my (@conflicts, @not_found, @removed, @co, @up);
-
-    if ($opt_reset) {
-        $tag = "-A";
-    } elsif ($opt_t) {
-        $tag = "-r $opt_t";
-    }
-    dprint "File list is \"$file_list\", tag is \"$tag\"\n";
-
-    # Figure out which files/modules exist and update those.  Checkout the rest.
-    foreach $file (split(/\s+/, $file_list)) {
-        if (-e $file) {
-            dprint "Updating $file\n";
-            push @up, $file;
-        } else {
-            dprint "Checking out $file\n";
-            push @co, $file;
-        }
-    }
-    if ($#up == -1 && $#co == -1) {
-        @up = (" ");
-    }
-
-    foreach $mode (0, 1) {
-        my ($flist, $subcmd);
-
-        if ($mode) {
-            next if ($#co < 0);
-            $flist = join(" ", @co);
-            $subcmd = "checkout $tag";
-        } else {
-            next if ($#up < 0);
-            $flist = join(" ", @up);
-            $subcmd = "update $tag -Pd";
-        }
-        $cmd = "/bin/sh -c \"cvs $cvsroot $subcmd $flist\"";
-        # The weird OR on the next line makes sure we don't lose
-        # a previous $err if the second try succeeds.
-        $err = (&talk_to_server("get", $cmd) || $err);
-
-        # Note:  The following exists solely because CVS is too lame to handle symlinks.
-        foreach $dirname (grep(-d $_, ($mode ? @co : @up))) {
-            my $linkfile = 0;
-
-            if (-f "$dirname/.avalon.symlinks") {
-                $linkfile = "$dirname/.avalon.symlinks";
-            } elsif (-f "$dirname/.buildtool.symlinks") {
-                # Supported, but deprecated
-                $linkfile = "$dirname/.buildtool.symlinks";
-            }
-            if ($linkfile) {
-                local *SL;
-
-                if (open(SL, $linkfile)) {
-                    while (<SL>) {
-                        my ($link_from, $link_to, $line);
-
-                        chomp($line = $_);
-                        next if ($line =~ /^\s*\#/ || $line !~ / -> /);
-                        ($link_from, $link_to) = split(" -> ", $line);
-                        dprint "Creating symlink:  $link_from -> $link_to\n";
-                        if (!symlink($link_to, "$dirname/$link_from")) {
-                            eprint "Unable to symlink $link_from to $link_to -- $!\n";
-                        }
-                    }
-                    close(SL);
-                }
-            }
-        }
-
-        # FIXME:  Need to find and remove empty directories when checking stuff out.
-    }
-    return $err;
-}
-
-# Add new files
-sub
-add_new_files
-{
-    my @files = @_;
-    my ($file_list, $cmd, $err, $tries, $line);
-
-    if ($#files == -1) {
-        if (-t STDIN) {
-            print "You've asked me to add files, but you didn't tell me what files to add.\n";
-            print "Please enter a whitespace-separated list of files or wildcards:\n";
-            chomp($file_list = <STDIN>);
-            @files = glob($file_list);
-        } else {
-            return AVALON_BAD_ADDITION;
-        }
-    }
-    $file_list = join(" ", @files);
-    $cmd = sprintf("/bin/sh -c \"cvs $cvsroot add %s $file_list\"", ($opt_k ? "-k$opt_k" : ""));
-    $err = &talk_to_server("add", $cmd);
-    return ($err);
-}
-
-# Delete old files
-sub
-delete_old_files
-{
-    my @files = @_;
-    my ($file_list, $cmd, $err, $tries, $line);
-
-    if ($#files == -1) {
-        if (-t STDIN) {
-            print "You've asked me to remove files, but you didn't tell me what files to remove.\n";
-            print "Please enter a whitespace-separated list of files or wildcards:\n";
-            chomp($file_list = <STDIN>);
-            @files = glob($file_list);
-        } else {
-            return AVALON_BAD_REMOVAL;
-        }
-    }
-    $file_list = join(" ", @files);
-    $cmd = sprintf("/bin/sh -c \"cvs $cvsroot remove -f %s $file_list\"", ($opt_R ? "-R" : ""));
-    $err = &talk_to_server("remove", $cmd);
-    return ($err);
-}
-
-# List tags
-sub
-query_tags
-{
-    my @files = @_;
-    my ($file_list, $cmd, $err, $tries, $line);
-    my @tags;
-
-    $file_list = join(" ", @files);
-    $cmd = "/bin/sh -c \"cvs $cvsroot status -v $file_list\"";
-    $err = &talk_to_server("query_tags", $cmd);
-    return $err;
-}
-
-# Query file/directory status
-sub
-query_status
-{
-    my @files = @_;
-    my ($file_list, $cmd, $err, $tries, $line);
-
-    $file_list = join(" ", @files);
-    $cmd = "/bin/sh -c \"cvs $cvsroot status -v $file_list\"";
-    $err = &talk_to_server("query_status", $cmd);
-    return $err;
-}
-
-sub
-query_log
-{
-    my @files = @_;
-    my ($file_list, $cmd, $err, $tries, $line);
-
-    $file_list = join(" ", @files);
-    $cmd = "/bin/sh -c \"cvs $cvsroot log $file_list\"";
-    $err = &talk_to_server("query_log", $cmd);
-    return $err;
-}
-
-sub
-query_annotation
-{
-    my @files = @_;
-    my ($file_list, $cmd, $err, $tries, $line, $rev);
-
-    $file_list = join(" ", @files);
-    $rev = "-r $tag -f" if ($tag);
-    $cmd = "/bin/sh -c \"cvs $cvsroot annotate $rev $file_list\"";
-    $err = &talk_to_server("query_annotation", $cmd);
-    return $err;
-}
-
-sub
-query_diff
-{
-    my @files = @_;
-    my ($file_list, $cmd, $err, $rev1, $rev2, $tries, $line);
-
-    $file_list = join(" ", @files);
-    if ($tag && $tag =~ /\s/) {
-        ($rev1, $rev2) = split(/\s+/, $tag);
-    } elsif ($rtag && $rtag =~ /\s/) {
-        ($rev1, $rev2) = split(/\s+/, $rtag);
-    } elsif ($tag && $rtag) {
-        $rev1 = $tag;
-        $rev2 = $rtag;
-    } elsif ($tag || $rtag) {
-        eprint "Two tags (if any) are required to do a diff.\n";
-        return AVALON_INVALID_TAG;
-    }
-    $rev1 = "-r $rev1" if ($rev1);
-    $rev2 = "-r $rev2" if ($rev2);
-    $cmd = "/bin/sh -c \"cvs $cvsroot diff -N -R -u $rev1 $rev2 $file_list\"";
-    $err = &talk_to_server("query_diff", $cmd);
-    return $err;
-}
-
-sub
-query_release_diff
-{
-    my @files = @_;
-    my ($file_list, $cmd, $err, $rev1, $rev2, $tries, $line);
-
-    $file_list = join(" ", @files);
-    if ($tag && $tag =~ /\s/) {
-        ($rev1, $rev2) = split(/\s+/, $tag);
-    } elsif ($rtag && $rtag =~ /\s/) {
-        ($rev1, $rev2) = split(/\s+/, $rtag);
-    } elsif ($tag && $rtag) {
-        $rev1 = $tag;
-        $rev2 = $rtag;
-    } else {
-        eprint "Two tags (if any) are required to do a diff.\n";
-        return AVALON_INVALID_TAG;
-    }
-    $cmd = "/bin/sh -c \"cvs $cvsroot rdiff -R -u -r $rev1 -r $rev2 $file_list\"";
-    $err = &talk_to_server("query_rdiff", $cmd);
-    return $err;
-}
-
-# Tag the sources
-sub
-tag_local_sources
-{
-    my $file_list = join(" ", @_);
-    my ($module, $mod_tag, $line, $tries, $err, $msg);
-    local *CMD;
-
-    if (-d "CVS") {
-        chomp($module = &cat_file("CVS/Repository"));
-    } elsif ($_[0] && -d "$_[0]/CVS") {
-        $module = $_[0];
-    } else {
-        eprint "I don't see any CVS sources to tag here....\n";
-        return AVALON_NO_SOURCES;
-    }
-    ($mod_tag = $module) =~ tr/[a-z]/[A-Z]/;
-
-    if (! &check_tag($mod_tag, $tag)) {
-        eprint "Tag \"$tag\" is not valid for module $module\n";
-        return AVALON_INVALID_TAG;
-    }
-
-    $cmd = "/bin/sh -c \"cvs $cvsroot tag -F " . ($opt_b ? "-b " : "") . "$tag $file_list\"";
-    $err = &talk_to_server("tag", $cmd);
-    return $err;
-}
-
-# Tag the repository
-sub
-tag_repository_sources
-{
-    my $file_list = join(" ", @_);
-    my ($module, $mod_tag, $line, $tries, $err, $msg);
-    local *CMD;
-
-    if (-d "CVS") {
-        chomp($module = &cat_file("CVS/Repository"));
-    } elsif ($_[0]) {
-        $module = $_[0];
-    } else {
-        eprint "I don't see any CVS sources to tag here....\n";
-        return AVALON_NO_SOURCES;
-    }
-    ($mod_tag = $module) =~ tr/[a-z]/[A-Z]/;
-
-    if (! &check_tag($mod_tag, $rtag)) {
-        eprint "Tag \"$rtag\" is not valid for module $module\n";
-        return AVALON_INVALID_TAG;
-    }
-
-    $cmd = "/bin/sh -c \"cvs $cvsroot rtag -F " . ($opt_b ? "-b " : "") . "$rtag $file_list\"";
-    $err = &talk_to_server("rtag", $cmd);
-    return $err;
-}
-
-# Import a new set of vendor sources for a new module
-sub
-import_vendor_sources
-{
-    my ($module, $vendor_tag, $release_tag, $version, $cmd, $line, $tries, $err, $msg);
-    my (@ignores, @links, @conflicts);
-    local *CMD;
-
-    if ($#_ == 0) {
-        $module = $_[0];
-    } else {
-        chomp($module = `pwd`);
-        $module =~ s/^.*\/([^\/]+)$/$1/;
-    }
-    ($vendor_tag = $module) =~ tr/[a-z]/[A-Z]/;
-    $vendor_tag =~ s/[^-A-Z0-9]/_/g;
-    if ($tag) {
-        $release_tag = $tag;
-    } elsif ($rtag) {
-        $release_tag = $rtag;
-    } elsif (-t STDIN) {
-        print "Enter the release tag (in the form $vendor_tag-<version>):\n";
-        chomp($release_tag = <STDIN>);
-    } else {
-        eprint "No valid release tag was given.  I can't import without it.\n";
-        return AVALON_INVALID_TAG;
-    }
-    dprint "Using module name $module, vendor tag $vendor_tag, release tag $release_tag\n";
-
-    $opt_b = 0;  # Stupidity protection  :-)
-    if (! &check_tag($vendor_tag, $release_tag)) {
-        eprint "Release tag \"$release_tag\" is not valid for module $module\n";
-        return AVALON_INVALID_TAG;
-    }
-    ($version = $release_tag) =~ s/${vendor_tag}-//;
-    $version =~ tr/_/./;
-    $version =~ tr/[A-Z]/[a-z]/;
-    $msg = "Import of $module $version";
-
-    $cmd = "/bin/sh -c \"cvs $cvsroot import"
-            . ' -k' . ($opt_k || 'o')
-            . ($opt_x ? ' -I!' : '')
-            . " -m '$msg' $module $vendor_tag $release_tag\"";
-    $err = &talk_to_server("import", $cmd);
-    return $err;
 }
 
 # main() here is basically the same as main() in C
 sub
 main
 {
-    if ($login) {
-        &login_to_master($login);
-        return if ($mode eq "login");
-    }
-    if ($mode eq "import") {
-        &import_vendor_sources(@ARGV);
-    } elsif ($mode eq "query") {
-        if ($query eq "t") {
-            &query_tags(@ARGV);
-        } elsif ($query eq "s") {
-            &query_status(@ARGV);
-        } elsif ($query eq "l") {
-            &query_log(@ARGV);
-        } elsif ($query eq "a") {
-            &query_annotation(@ARGV);
-        } elsif ($query eq "d") {
-            &query_diff(@ARGV);
-        } elsif ($query eq "D") {
-            &query_release_diff(@ARGV);
-        }
-    } elsif ($mode eq "tag") {
-        &tag_local_sources(@ARGV);
-    } elsif ($mode eq "rtag") {
-        &tag_repository_sources(@ARGV);
-    } else {
-        if ($opt_addlist) {
-            $addlist = $opt_addlist;
-        } elsif ($opt_a) {
-            $addlist = join(" ", @ARGV);
-            @ARGV = ();
-        } else {
-            $addlist = 0;
-        }
-        if ($opt_remlist) {
-            $remlist = $opt_remlist;
-        } elsif ($opt_r && !$opt_a) {
-            $remlist = join(" ", @ARGV);
-            @ARGV = ();
-        } else {
-            $remlist = 0;
-        }
-        if ($addlist) {
-            &add_new_files($addlist);
-        }
-        if ($remlist) {
-            &delete_old_files($remlist);
-        }
-        if ($opt_g || $opt_reset) {
-            $retval = &update_from_master(@ARGV);
-        } elsif ($opt_p) {
-            if ($opt_blind || !($retval = &update_from_master($opt_x ? @ARGV : undef))) {
-                if ($opt_x) {
-                    &commit_to_master(@ARGV, ($addlist ? $addlist : undef), ($remlist ? $remlist : undef));
-                } else {
-                    &commit_to_master();
-                }
-            }
-        }
-    }
-}
-
-BEGIN {
-
     # Set up the basic variables
     $progname = "revtool";
-    $version = "2.0";
+    $version = "2.1";
     &print_usage_info() if (!scalar(@ARGV) && &basename($0) !~ /^av/);
-    $argc = $#ARGV + 2;
     $retval = 0;
-    $defproto = "cvs";
     umask 022;
 
     # Synchronize output so it doesn't get all jumbled
@@ -816,17 +84,13 @@ BEGIN {
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "g|get", "p|put", "a|add", "r|remove",
                    "q|query=s", "R|recurse", "t|tag=s", "i|import", "k=s", "D|dir=s",
-                   "x|exclusive", "addlist=s", "remlist=s", "T|rtag=s", "l|login", "b|branch",
-                   "ptag", "reset", "blind", "P|protocol");
+                   "x|exclusive", "T|rtag=s", "l|login", "b|branch", "reset", "blind",
+                   "P|protocol=s");
 
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
     &debug_set($opt_d);
-    $protocol = ($opt_P ? $opt_P : $defproto);
-    if (!grep($protocol eq $_, ("cvs", "bk"))) {
-        eprint "Invalid protocol \"$protocol\".  Using default protocol $defproto.\n";
-        $protocol = $defproto;
-    }
+    $revctl_system = $opt_P if ($opt_P);
 
     # Set the mode, first based on executable name...
     if ($0 =~ /(get|co|checkout)$/) {
@@ -886,31 +150,9 @@ BEGIN {
     } elsif ($opt_l) {
         $mode = "login";
     }
-    $cvsroot = "-d $opt_D" if ($opt_D);
-    if ($opt_t) {
-        $tag = $opt_t;
-    } elsif ($mode eq "tag") {
-        $tag = shift @ARGV;
-    }
-    if ($opt_T) {
-        $rtag = $opt_T;
-    } elsif ($mode eq "rtag") {
-        $rtag = shift @ARGV;
-    }
-    $ptag = ($opt_ptag ? ($tag ? $tag : $rtag) : $opt_ptag);
-    dprint "Debugging is on, mode is $mode, CVSROOT is $cvsroot, tag is $tag, rtag is $rtag\n";
-    if ($opt_l) {
-        if ($opt_D) {
-            $login = $opt_D;
-        } elsif (-f "CVS/Root") {
-            chomp($login = &cat_file("CVS/Root"));
-        } elsif ($ENV{CVSROOT}) {
-            $login = $ENV{CVSROOT};
-        }
-    }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.74 $ created on $Date: 2001/07/31 22:23:00 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.75 $ created on $Date: 2001/08/09 20:05:17 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -925,12 +167,73 @@ BEGIN {
     if ($opt_h) {
 	&print_usage_info();   # Never returns
     }
+
+    &set_repository($opt_D);
+    &set_keyword_expansion($opt_k);
+    &set_recursion($opt_R);
+    &set_branching($opt_b);
+    &set_sticky_clear($opt_reset);
+    &set_exclusive($opt_x);
+    &set_tag($opt_t);
+    &set_rtag($opt_T);
+    dprint "Debugging is on, mode is $mode, CVSROOT is ${\(&set_repository())},"
+        . " tag is ${\(&set_tag())}, rtag is ${\(&set_rtag())}\n";
+
+    if ($opt_l) {
+        &login_to_master();
+        return if ($mode eq "login");
+    }
+    if ($mode eq "import") {
+        &import_vendor_sources(@ARGV);
+    } elsif ($mode eq "query") {
+        if ($query eq "t") {
+            &query_tags(@ARGV);
+        } elsif ($query eq "s") {
+            &query_status(@ARGV);
+        } elsif ($query eq "l") {
+            &query_log(@ARGV);
+        } elsif ($query eq "a") {
+            &query_annotation(@ARGV);
+        } elsif ($query eq "d") {
+            &query_diff(@ARGV);
+        } elsif ($query eq "D") {
+            &query_release_diff(@ARGV);
+        }
+    } elsif ($mode eq "tag") {
+        &set_tag(shift @ARGV) if (! &set_tag());
+        &tag_local_sources(@ARGV);
+    } elsif ($mode eq "rtag") {
+        &set_rtag(shift @ARGV) if (! &set_rtag());
+        &tag_repository_sources(@ARGV);
+    } else {
+        if ($opt_a) {
+            &add_new_files(@ARGV);
+        } elsif ($opt_r) {
+            &delete_old_files(@ARGV);
+        }
+        if ($mode eq "get" || &set_sticky_clear()) {
+            $retval = &update_from_master(@ARGV);
+        } elsif ($mode eq "put") {
+            if ($opt_blind || !($retval = &update_from_master(&set_exclusive() ? @ARGV : undef))) {
+                my $logfile;
+
+                if (&set_exclusive()) {
+                    $logfile = &do_changelog_entry(scalar(grep($_ eq "ChangeLog", @ARGV)));
+                    if ($logfile) {
+                        $retval = &commit_to_master($logfile, @ARGV);
+                        unlink($logfile, "$logfile~");
+                    }
+                } else {
+                    $logfile = &do_changelog_entry(1);
+                    if ($logfile) {
+                        $retval = &commit_to_master($logfile);
+                        unlink($logfile, "$logfile~");
+                    }
+                }
+            }
+        }
+    }
+    return $retval;
 }
 
-&main();
-
-END {
-
-}
-
-exit $retval;
+exit &main();
