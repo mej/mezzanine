@@ -1,0 +1,153 @@
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook V3.1//EN" [
+<!ENTITY MZ "Mezzanine">
+<!ENTITY MZVER "1.1">
+<!ENTITY DOCID "$Id: FAQ.sgml,v 1.1 2001/07/18 22:47:49 mej Exp $">
+]>
+<article class="FAQ">
+<artheader>
+  <title>&MZ; &MZVER; FAQ</title>
+  <author><firstname>Michael</firstname><surname>Jennings</surname></author>
+  <authorinitials>mej</authorinitials>
+  <copyright><year>2001</year></copyright>
+</artheader>
+
+<para>
+  This document answers some frequently-asked questions (FAQ's) about
+  Mezzanine.  Use the table of contents below to find the question
+  that pertains to your situation, or browse through all the questions
+  in order.
+</para>
+
+<qandaset defaultlabel="number">
+  <qandadiv>
+    <title>General Questions</title>
+    <qandaentry id="g1q1">
+      <question>
+        <para>What is &MZ;?</para>
+      </question>
+      <answer>
+        <para>
+          &MZ; is a set of tools, mostly written in Perl, which
+          simplify and expedite the tasks involved with creating and
+          maintaining a software product.  This is mostly used in the
+          creation of the underground Linux distribution called
+          Vermillion, but it can be applied to any product of any nature
+          or size.
+        </para>
+        <para>
+          Currently only RPM/SRPM packages are supported, along with
+          &MZ;'s own custom SPM and FST formats for helping RPM and CVS
+          work together well.  Further, it has only been tested with Red
+          Hat's distribution of Linux, but in theory it should work with
+          any RPM-based distro.
+        </para>
+      </answer>
+    </qandaentry>
+    <qandaentry id="g1q2">
+      <question>
+        <para>Who wrote &MZ;?</para>
+      </question>
+      <answer>
+        <para>
+          &MZ; was written by Michael Jennings, also known as "KainX" on
+          IRC and "mej" via e-mail or in person.  He is also responsible
+          for Eterm, a terminal emulator for the X Window System; libast,
+          a small library of handy functions; and Vermillion, the custom
+          RedHat-based Linux distribution.
+        </para>
+      </answer>
+    </qandaentry>
+    <qandaentry id="g1q3">
+      <question>
+        <para>Why should I use it?</para>
+      </question>
+      <answer>
+        <para>
+          &MZ; makes maintaining software packages much easier.
+          Specifically, it automates the processes of importing packages
+          into source code control, creating patch files for changes to
+          the base source, building products and their component packages,
+          creating installation media for products, and so forth.
+        </para>
+        <para>
+          If you have a RedHat-based Linux system and have tried
+          downloading and building SRPM's from other places, you have
+          likely experienced the difficulty of patching the source and
+          adding those patches to the SRPM.  &MZ; makes this very
+          easy.
+        </para>
+      </answer>
+    </qandaentry>
+    <qandaentry id="g1q4">
+      <question>
+        <para>Why Red Hat and not Debian/Slackware/SuSe?</para>
+      </question>
+      <answer>
+        <para>
+          Well, there are two answers to this question, really.  The first
+          answer explains why I originally went with RedHat.  After using
+          Debian for awhile at 3Com and when I first arrived at VA Linux,
+          I grew extremely annoyed and frustrated with dselect, dpkg, and
+          apt.  VA was still selling servers back then, and they all came
+          pre-loaded with a custom version of RedHat.
+        </para>
+        <para>
+          When my frustration level finally reached critical, I switched
+          over to VA's custom distro (VA Linux 6.1.1 at the time).  I
+          never looked back.  It worked exactly the way I wanted it to,
+          and it took me no time at all to learn the in's and out's of RPM
+          packaging.
+        </para>
+        <para>
+          Eventually, I began maintaining VA's distro myself.  It soon got
+          a name change due to RedHat lawyers throwing a hissy fit; it was
+          henceforth known as "Red Hat Linux with VA Linux Enhancements,"
+          or "RH-VALE."  (It was originally "RH/VALE," but you can't use
+          '/' in filenames....)
+        </para>
+        <para>
+          Now, for the second part of this question:  Why did I stick with
+          RedHat?  The RPM-based philosophy is far more compatible with
+          this type of development.  The Debian community, especially the
+          group of developers, are largely zealots who do not feel that
+          individuals or small groups should be creating and releasing
+          their own .deb packages.  Furthermore, IMHO, Debian has its head
+          fairly well entrenched in RMS's posterior; RMS has long since
+          lost sight of the true vision and goal, preferring instead to
+          focus on ego-centric concerns, and I refuse to be party to his
+          religious activism.
+        </para>
+        <para>
+          Yes, there are other RPM-based distro's.  I don't really have a
+          problem with Linux-Mandrake, as they seem to do a much better
+          job at keeping up with package updates in a stable, useable
+          manner.  I refuse to use SuSe due to the unfortunate fascist
+          nature of its YaST config tool.
+        </para>
+        <para>
+          First and foremost, however, I use RedHat because it's the
+          distro with which I am most familiar and about which I have the
+          most knowledge and expertise.  In the end, it all boils down to
+          that.
+        </para>
+      </answer>
+    </qandaentry>
+    <qandaentry id="g1q5">
+      <question>
+        <para>Do you plan to support other formats in the future?</para>
+      </question>
+      <answer>
+        <para>
+          There are currently hooks in place for Debian support.  I do not
+          use Debian, nor do I use dpkg, so I have no fleshed out the
+          backend code for those sections yet.  In theory, it shouldn't be
+          too much work; the biggest problem will be the fact that the
+          creators of dpkg elected to not have a true source package
+          format (a la SRPM).
+        </para>
+      </answer>
+    </qandaentry>
+  </qandadiv>
+</qandaset>
+
+</article>

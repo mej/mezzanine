@@ -5,7 +5,7 @@
 # Michael Jennings <mej@eterm.org>
 # 21 July 2000
 #
-# $Id: bootable-cdtool,v 1.5 2001/11/29 11:56:05 mej Exp $
+# $Id: bootable-cdtool,v 1.6 2001/12/20 22:33:18 mej Exp $
 #
 
 umask 022
@@ -49,7 +49,7 @@ KERNEL_VER=`ls -1 boot/vmlinuz-*netboot | sed 's!boot/vmlinuz-!!'`
 test -d boot && mv boot isolinux && ln -s isolinux boot
 cp -a /usr/lib/syslinux/isolinux.bin $IMAGE/boot/
 test -d root && mv root home/ && ln -s home/root root
-mkdir -p -m 755 var/sys
+mkdir -p -m 755 var/sys var/hd
 touch var/sys/kernel.h && rm -f boot/kernel.h && ln -s /var/sys/kernel.h boot/kernel.h
 rm -f boot/System.map
 ln -sf System.map-${KERNEL_VER} boot/System.map
@@ -66,10 +66,17 @@ for i in nfs nfslock ; do
     chroot $IMAGE /sbin/chkconfig --del $i
 done
 chroot $IMAGE /usr/sbin/netconfig --bootproto=dhcp -d eth0 --hostname=localhost --domain=localdomain
+test -x usr/lib/ICAClient/npica.so && install -m 755 usr/lib/ICAClient/npica.so usr/lib/netscape/plugins/
 for i in usr/lib/netscape/plugins/* ; do
-    rm -f usr/lib/mozilla/plugins/`basename $i` && ln -s /$i usr/lib/mozilla/plugins/`basename $i`
+    rm -f usr/lib/mozilla/plugins/`basename $i` && cp -a /$i usr/lib/mozilla/plugins/`basename $i`
+done
+for i in usr/X11R6/lib/X11/fonts/{misc,Type1,Speedo,75dpi,100dpi} usr/share/fonts/*/T* \
+         usr/share/AbiSuite/fonts usr/X11R6/lib/X11/fonts/latin2/{Type1,100dpi} \
+         usr/share/fonts/ISO8859-[79]/{misc,Type1,75dpi,100dpi} usr/share/fonts/KOI8-R/100dpi ; do
+    test -d $i && chroot $IMAGE /usr/X11R6/bin/mkfontdir /$i
 done
 (cd $POST_FILES ; tar --exclude .cvsignore --exclude CVS --exclude ChangeLog -cf - .) | (cd $IMAGE ; tar -xf -)
+mv usr/lib/security/*.so lib/security/
 
 tar -zcf boot/etc.tgz etc
 

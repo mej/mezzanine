@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.28 2001/09/22 13:22:33 mej Exp $
+# $Id: srctool,v 1.29 2001/12/20 22:33:18 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -60,6 +60,7 @@ print_usage_info
     print "    -M --merge                       Merge one or more raw files into an SPM\n";
     print "    -a --apply --patch               Apply changes in the working tree as a patch to the SPM\n";
     print "    -c --clean                       Clean up a package tree\n";
+    print "    -r --resync                      Prepare to sync the repository with the current sources\n";
     print "    -n --name <name>                 Specify the name of a package (-i) or patch (-a)\n";
     print "    -D --dir <repository>            Specify the repository to use\n";
     print "    -T --test                        Test only; do not talk to the master server\n";
@@ -239,13 +240,13 @@ prepare_tree($$)
     $rpmcmd = "--define \"_topdir $tmpdir\" --define \"_builddir $pkgdir/$WORK_DIR\" --nodeps -bp $spec";
     @tmp = &run_cmd("rpm", $rpmcmd, 0);
     if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
-        dprint join("\n  ", @tmp), "\n";
         eprint "Creation of working directory failed -- $tmp[$#tmp]\n";
     } elsif ($external) {
         print "You may now chdir to ", ($pkgdir eq $pwd ? $WORK_DIR : "$pkg/$WORK_DIR"), " to make changes.\n";
         print "Use \"mzpatch -n <patch_name>\" to generate a patch when done.\n";
     }
 
+    &clean_temp_space();
     chdir($pwd);
     return $err;
 }
@@ -481,6 +482,75 @@ clean_package
     return MEZZANINE_SUCCESS;
 }
 
+# Get a tree back in sync with your checkout
+sub
+sync_package
+{
+    my ($pkg, $pwd, $err, $done);
+    my (@output, @new, @old, @add, @rm);
+
+    $pkg = &pkgvar_filename();
+    if ($pkg) {
+        $pwd = &getcwd();
+        if (!chdir($pkg)) {
+            eprint "Unable to chdir to $pkg -- $!\n";
+            return MEZZANINE_SYSTEM_ERROR;
+        }
+    } else {
+        $pkg = &basename(&getcwd());
+    }
+
+    if ($test_only) {
+        eprint "You specified the \"test\" (-T) option.  I will not be able to sync this module.\n";
+        return MEZZANINE_SYNTAX_ERROR;
+    }
+
+    print "Syncing $pkg...\n";
+
+    @output = &run_mz_cmd("revtool", &revctl_repository() . " -g", 0);
+    if (($err = shift @output) != MEZZANINE_SUCCESS) {
+        print @output;
+        eprint "Unable to contact repository.\n";
+        return $err;
+    }
+    foreach my $a (grep(/^\?\s/, @output)) {
+        $a =~ s/^\?\s+//;
+        push @add, $a;
+    }
+    push @new, @add;
+    foreach my $r (grep(/^U\s/, @output)) {
+        $r =~ s/^U\s+//;
+        push @rm, $r;
+    }
+    push @old, @rm;
+    for (; scalar(@add); ) {
+        @output = &run_mz_cmd("revtool", &revctl_repository() . " -a " . join(" ", @add), 0);
+        @add = ();
+        foreach my $a (grep(/^\?\s/, @output)) {
+            $a =~ s/^\?\s+//;
+            push @add, $a;
+        }
+        push @new, @add;
+    }
+    if (scalar(@rm)) {
+        @output = &run_mz_cmd("revtool", &revctl_repository() . " -r " . join(" ", @rm), 0);
+    }
+
+    if (!scalar(@new) && !scalar(@old)) {
+        print "No additions or removals were needed.\n";
+    } else {
+        if (scalar(@new)) {
+            print "Added files/directories:  ", join(" ", sort(@new)), "\n";
+        }
+        if (scalar(@old)) {
+            print "Removed files/directories:  ", join(" ", sort(@old)), "\n";
+        }
+    }
+    print "Sync of $pkg complete.  Your changes will not be finalized until you commit them.\n";
+    chdir($pwd) if ($pwd);
+    return MEZZANINE_SUCCESS;
+}
+
 # main() here is basically the same as main() in C
 sub
 main
@@ -501,7 +571,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.28 $ created on $Date: 2001/09/22 13:22:33 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.29 $ created on $Date: 2001/12/20 22:33:18 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -630,7 +700,18 @@ main
 	} else {
 	    return &clean_package();
 	}
-    } elsif ($opt_r) {
+    } elsif ($0 =~ /mz(re)?sync$/ || $opt_r) {
+	if (scalar(@flist)) {
+	    foreach $f (@flist) {
+		my $err;
+
+                &pkgvar_filename($f);
+		$err = &sync_package();
+		return $err if ($err);
+	    }
+	} else {
+	    return &sync_package();
+	}
     } else {
     }
     return MEZZANINE_SUCCESS;

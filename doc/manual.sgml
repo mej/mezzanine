@@ -1,0 +1,44 @@
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V3.1//EN" [
+<!ENTITY MZ "Mezzanine">
+<!ENTITY MZVER "1.1">
+<!ENTITY DOCID "$Id: FAQ.sgml,v 1.1 2001/07/18 22:47:49 mej Exp $">
+]>
+<book>
+<bookinfo>
+  <title>&MZ; &MZVER;</title>
+  <author><firstname>Michael</firstname><surname>Jennings</surname></author>
+  <edition>&DOCID;</edition>
+  <pubdate>2001</pubdate>
+  <copyright><year>2001</year><holder>Michael Jennings</holder></copyright>
+</bookinfo>
+
+<chapter id="c1">
+  <title></title>
+  <sect1 id="c1s1">
+    <title></title>
+    <para>
+    </para>
+  </sect1>
+  <sect1 id="c1s2">
+    <title></title>
+    <para>
+    </para>
+  </sect1>
+  <sect1 id="c1s3">
+    <title></title>
+    <para>
+    </para>
+  </sect1>
+  <sect1 id="c1s4">
+    <title></title>
+    <para>
+    </para>
+  </sect1>
+  <sect1 id="c1s5">
+    <title></title>
+    <para>
+    </para>
+  </sect1>
+</chapter>
+
+</book>

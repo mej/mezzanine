@@ -1,7 +1,7 @@
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
-Version: 1.0
-Release: 0.6
+Version: 1.1
+Release: 0.2
 Copyright: BSD with Advertising Clause
 Group: Development/Tools
 Source: %{name}.tar.gz
@@ -21,10 +21,24 @@ building, and releasing software products.
 %prep
 %setup -n %{name} -T -c -a 0
 
+%build
+cd doc
+for i in *.sgml ; do
+  FNAME=${i%%%%.sgml}
+  jade -t sgml -i html -d mezzanine.dsl \
+    -V "%%stylesheet%%=${FNAME}.css" \
+    -V "%%root-filename%%=${FNAME}" \
+    -V nochunks -V rootchunk \
+    $i
+done
+
 %install
+PERL_VERSION=`perl -V | perl -ne 'if (/\@INC/) {$inc = 1;}
+                                  elsif ($inc && m!/lib/! && m!/site_perl/([\.\d]+)/?$!)
+                                    {print "$1\n";}'`
 rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT%{_bindir}
-mkdir -p $RPM_BUILD_ROOT%{_libdir}/perl5/site_perl/5.6.0/Mezzanine
+mkdir -p $RPM_BUILD_ROOT%{_libdir}/perl5/site_perl/${PERL_VERSION}/Mezzanine
 mkdir -p $RPM_BUILD_ROOT%{_mandir}/man1
 
 for i in *tool pkgsort ; do
@@ -32,7 +46,7 @@ for i in *tool pkgsort ; do
 done
 
 for i in mod/*.pm ; do
-  install -m 644 $i $RPM_BUILD_ROOT%{_libdir}/perl5/site_perl/5.6.0/Mezzanine/
+  install -m 644 $i $RPM_BUILD_ROOT%{_libdir}/perl5/site_perl/${PERL_VERSION}/Mezzanine/
 done
 
 for i in doc/man/*.1 ; do
@@ -45,7 +59,7 @@ done
     ln -s revtool mz$i
     echo ".so revtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/mz$i.1
   done
-  for i in import prep mod merge patch clean ; do
+  for i in import prep mod merge patch clean sync ; do
     ln -s srctool mz$i
     echo ".so srctool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/mz$i.1
   done
@@ -64,6 +78,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-, root, root)
+%doc doc/*.html doc/*.sgml
 %{_bindir}/*
 %{_libdir}/*
 %{_mandir}/*

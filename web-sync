@@ -5,7 +5,7 @@
 # Michael Jennings <mej@kainx.org>
 # 28 Sept 2000
 #
-# $Id: web-sync,v 1.16 2001/09/22 13:22:33 mej Exp $
+# $Id: web-sync,v 1.17 2001/12/20 22:33:18 mej Exp $
 #
 
 umask 022
@@ -16,10 +16,17 @@ elif [ "x$USER" = "x" ]; then
   USER=`whoami`
 fi
 
+LOCAL_DIR=/var/web/vermillion
+REMOTE_HOST=antigen.nplus1.net
+REMOTE_DIR=/os/build.mezzanine
+REMOTE_USER=$USER
+REMOTE_GROUP=www-data
+
+REMOTE_UHOST=$USER@$REMOTE_HOST
 SCP_CMD="scp -C"
-RSYNC_CMD="rsync -av --exclude=CVS --exclude=.cvsignore --exclude=.*.symlinks --delete --delete-excluded"
-CHOWN_CMD="chown -R $USER:engr"
-CHMOD_CMD="chmod -R ug+w,a+r"
+RSYNC_CMD="rsync -e $HOME/bin/office -Pav --exclude=CVS --exclude=.cvsignore --exclude=.*.symlinks --delete --delete-excluded"
+CHOWN_CMD="chown -R $REMOTE_USER:$REMOTE_GROUP"
+CHMOD_CMD="chmod -R u+w,a+r,og-w"
 
 if [ "x$1" = "x" ]; then
   echo "Usage:  `/bin/basename $0` <version> [ <version> ... ]"
@@ -37,10 +44,10 @@ for i in $* ; do
         cd $LOCAL_DIR/$i/$j
         echo "*** Synchronizing $j ***"
         mkdir -p $LOCAL_DIR/$i/$j/cd
-        $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-$j-rpms/ $LOCAL_DIR/$i/$j/cd/
+        $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/vermillion-$j-rpms/ $LOCAL_DIR/$i/$j/cd/
         echo "*** Copying ISO images ***"
         mkdir -p $LOCAL_DIR/$i/$j/iso
-        $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-$j-'*'.iso $LOCAL_DIR/$i/$j/iso/
+        $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/vermillion-redhat-$j-'*'.iso $LOCAL_DIR/$i/$j/iso/
         echo "*** Creating RPMS directory ***"
         mkdir -p $LOCAL_DIR/$i/$j/RPMS
         rm -f RPMS/*.rpm
@@ -48,9 +55,9 @@ for i in $* ; do
         echo "*** Creating SRPMS directory ***"
         mkdir -p $LOCAL_DIR/$i/$j/SRPMS
         if [ "$j" = "os" ]; then
-            $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-$j-srpms/SRPMS/ $LOCAL_DIR/$i/$j/SRPMS/
+            $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/vermillion-$j-srpms/SRPMS/ $LOCAL_DIR/$i/$j/SRPMS/
         else
-            $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-$j-srpms/Powertools/SRPMS/ $LOCAL_DIR/$i/$j/SRPMS/
+            $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/vermillion-$j-srpms/Powertools/SRPMS/ $LOCAL_DIR/$i/$j/SRPMS/
         fi
         echo "*** Fixing ownerships and permissions ***"
         $CHOWN_CMD RPMS SRPMS iso
@@ -62,28 +69,23 @@ for i in $* ; do
       ;;
 
     7.*)
-      REMOTE_UHOST=mej@grendel
-      REMOTE_DIR=/grendel/scratch/mej/mezzanine/build
-      LOCAL_DIR=/home/ftp/pub/software/RH-VALE/unsupported
-      RH_VER=`echo $i | awk -F. '{print $1"."$2}'`
-      mkdir -p $LOCAL_DIR/$i
       cd $LOCAL_DIR/$i
       echo "*** Synchronizing network install image ***"
       mkdir -p $LOCAL_DIR/$i/os/image
-      $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-${RH_VER}-net/ $LOCAL_DIR/$i/os/image/
+      $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/vermillion-$i-net/ $LOCAL_DIR/$i/os/image/
       echo "*** Copying ISO images ***"
       mkdir -p $LOCAL_DIR/$i/os/iso
-      $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-os-'*'.iso $LOCAL_DIR/$i/os/iso/
+      $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/vermillion-os-'*'.iso $LOCAL_DIR/$i/os/iso/
       echo "*** Synchronizing extras ***"
       mkdir -p $LOCAL_DIR/$i/extras/image
-      $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-${RH_VER}-extras/ $LOCAL_DIR/$i/extras/image/
+      $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/vermillion-$i-extras/ $LOCAL_DIR/$i/extras/image/
       echo "*** Copying ISO images ***"
       mkdir -p $LOCAL_DIR/$i/extras/iso
-      $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-extras-'*'.iso $LOCAL_DIR/$i/extras/iso/
+      $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/vermillion-extras-'*'.iso $LOCAL_DIR/$i/extras/iso/
       for j in RPMS SRPMS ; do
         echo "*** Synchronizing $j ***"
         mkdir -p $LOCAL_DIR/$i/$j
-        $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-${RH_VER}-www/$j/ $LOCAL_DIR/$i/$j/
+        $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/vermillion-$i-www/$j/ $LOCAL_DIR/$i/$j/
       done
       echo "*** Fixing ownerships and permissions ***"
       $CHOWN_CMD RPMS SRPMS os/iso extras/iso

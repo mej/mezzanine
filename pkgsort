@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgsort,v 1.20 2001/10/05 16:14:52 mej Exp $
+# $Id: pkgsort,v 1.21 2001/12/20 22:33:18 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -316,12 +316,17 @@ consistency_check
 
     # Look for unresolved dependencies
     foreach $pkg (keys %requires) {
+        dprint "Checking dependencies for $pkg...";
         foreach $dep (@{$requires{$pkg}}) {
-            if (!defined($what_provides{$dep})) {
+            if (defined($what_provides{$dep})) {
+                print STDERR "$dep ($what_provides{$dep}[0])..." if (&debug_get());
+            } else {
+                print STDERR "$dep (NONE)..." if (&debug_get());
                 xpush @{$unresolved_deps{$dep}}, $pkg;
                 $oops = 1;
             }
         }
+        print STDERR "done.\n" if (&debug_get());
     }
 
     # Make sure no two packages provide the same thing
@@ -339,16 +344,24 @@ consistency_check
         if (scalar(%unresolved_deps)) {
             eprint "The following dependencies are unresolved:\n";
             foreach $dep (keys %unresolved_deps) {
-                eprint "    $dep is required by ", join(", ", @{$unresolved_deps{$dep}}), "\n";
+                my $pkg;
+
+                chomp($pkg = `/bin/rpm -q --whatprovides $dep`);
+                $pkg =~ s/-[^-]+-[^-]+$//;
+                xpush @needed_pkgs, $pkg;
+                eprint "    $dep is required by ", join(", ", @{$unresolved_deps{$dep}}), " [$pkg]\n";
             }
         }
         if (scalar(%conflicts)) {
             eprint "The following file/provision conflicts were found:\n";
             foreach $cap (keys %conflicts) {
                 eprint "    $cap is provided by ", join(", ", @{$conflicts{$cap}}), "\n";
+                xpush @conflict_pkgs, join(" & ", @{$conflicts{$cap}});
             }
         }
         if (! $force) {
+            eprint "Additional packages needed:  ", join(" ", @needed_pkgs), "\n";
+            eprint "Conflicting packages:  ", join(", ", @conflict_pkgs), "\n\n";
             &fatal_error("Consistency check failed.  Aborting.\n");
         } else {
             print "Consistency check failed.  Resulting package set may not function properly.\n";
@@ -852,7 +865,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.20 $ created on $Date: 2001/10/05 16:14:52 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.21 $ created on $Date: 2001/12/20 22:33:18 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
