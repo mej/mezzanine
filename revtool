@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.48 2000/08/07 21:35:52 mej Exp $
+# $Id: revtool,v 1.49 2000/08/07 22:00:54 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -318,10 +318,12 @@ talk_to_cvs_server
             eprint "The following files/modules were removed from the repository:  ", join(" ", @removed), "\n";
         }
     } else {
-        if ($#tags >= 0) {
-            print @tags;
-        } else {
-            print "No tags found.\n";
+        if ($type eq "query_tags") {
+            if ($#tags >= 0) {
+                print @tags;
+            } else {
+                print "No tags found.\n";
+            }
         }
     }
     if ($#links >= 0) {
@@ -874,7 +876,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.48 $ created on $Date: 2000/08/07 21:35:52 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.49 $ created on $Date: 2000/08/07 22:00:54 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

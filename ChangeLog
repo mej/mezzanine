@@ -757,3 +757,7 @@ Finally got time to do that massive overhaul of the server interaction
 stuff.  It's now contained entirely in a single function.  This will
 need some regression testing, of course.
 ----------------------------------------------------------------------
+Mon Aug  7 15:02:40 2000                        Michael Jennings (mej)
+
+Minor output bug.
+----------------------------------------------------------------------
