@@ -484,3 +484,7 @@ Sat Jun 17 10:20:48 2000                        Michael Jennings (mej)
 Pre-scan the existing binary RPM's before parallelizing.  Otherwise,
 even an incremental build takes over 2 hours. :(
 ----------------------------------------------------------------------
+Sat Jun 17 11:24:16 2000                        Michael Jennings (mej)
+
+Buglet fix.
+----------------------------------------------------------------------
