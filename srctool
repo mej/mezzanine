@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.5 2001/03/21 23:31:13 mej Exp $
+# $Id: srctool,v 1.6 2001/03/22 02:35:55 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -32,7 +32,7 @@ require Getopt::Long;
 
 # Constants
 #
-$WORK_DIR = ".avalon.work";
+$WORK_DIR = "work";
 $TMP_DIR = "/var/tmp/srctool.$$";
 
 # Return codes for revtool
@@ -316,7 +316,7 @@ clean_temp_space
     return &nuke_tree($TMP_DIR);
 }
 
-# Generic Avalon command wrapper
+# Generic wrapper to grab command output
 sub
 run_cmd
 {
@@ -325,11 +325,7 @@ run_cmd
     my @output;
     local *CMD;
 
-    if ($debug) {
-        $cmd = "$prog -d $params";
-    } else {
-        $cmd = "$prog $params";
-    }
+    $cmd = "$prog $params";
 
     dprint "About to run $cmd\n";
     if (!open(CMD, "$cmd 2>&1 |")) {
@@ -340,10 +336,6 @@ run_cmd
         push @output, $line;
         if ($show_output) {
             print "$show_output$line\n";
-            # Check the output for errors.  May not work for non-Avalon programs.
-            if ($line =~ /^\w+:\s*error:\s*(\S.*)$/i) {
-                $msg = $1;
-            }
         } else {
             dprint "From $prog -> $line\n";
         }
@@ -351,6 +343,28 @@ run_cmd
     close(CMD);
     $err = $? >> 8;
     dprint "\"$cmd\" returned $err\n";
+    return ($err, @output);
+}
+
+# Wrapper for Avalon commands specifically
+sub
+run_av_cmd
+{
+    my ($prog, $params, $show_output) = @_;
+    my ($err, $msg, $line, $cmd) = undef;
+    my (@output, @tmp);
+
+    $params = "--debug $params" if ($debug);
+    @output = &run_cmd($prog, $params, $show_output);
+    $err = shift @output;
+    if ($err) {
+        my @tmp;
+
+        @tmp = grep(/^\w+:\s*error:\s*(\S.*)$/i, @output);
+        if (scalar(@tmp)) {
+            $msg = $tmp[$#tmp];
+        }
+    }
     return ($err, ($show_output ? $msg : @output));
 }
 
@@ -380,7 +394,7 @@ import_package
 	}
         $rpmcmd = "rpm --define \"_sourcedir $tmpdir/S\" --define \"_specdir $tmpdir/F\"";
         # Install the SRPM into the temporary directory
-        @tmp = &run_cmd("pkgtool", "-P '$rpmcmd' -ip $pkgfile", 0);
+        @tmp = &run_av_cmd("pkgtool", "-P '$rpmcmd' -ip $pkgfile", 0);
         if (($err = shift @tmp) != 0) {
             eprint "Unable to install $pkgfile\n";
             return SRCTOOL_COMMAND_FAILED;
@@ -391,9 +405,9 @@ import_package
             my $n = scalar(@tmp);
             &fatal_error("$n spec files?!\n");
         }
-        $spec = "$tmpdir/F/" . (shift @tmp);
+        $spec = $tmp[0];
         # Get a list of all source and patch files
-        @tmp = &run_cmd("pkgtool", "-P '$rpmcmd' -Cs $spec", 0);
+        @tmp = &run_av_cmd("pkgtool", "-P '$rpmcmd' -Cs $spec", 0);
         if (($err = shift @tmp) != 0) {
             eprint "Unable to catalog $pkgfile\n";
             return SRCTOOL_COMMAND_FAILED;
@@ -423,7 +437,7 @@ import_package
         $tag = "$pkg-$ver-$rel";
         $tag =~ tr/a-z/A-Z/;
         $tag =~ s/\./_/g;
-        ($err, $msg) = &run_cmd("revtool", "-xit $tag", "  ");
+        ($err, $msg) = &run_av_cmd("revtool", "-xit $tag", "  ");
         if ($err) {
             eprint "Import of $pkgfile failed -- $msg\n";
             return $err;
@@ -456,7 +470,7 @@ import_package
 	chdir($pkgfile) if ($pkgfile);
         ($tag = $name) =~ tr/a-z/A-Z/;
         $tag =~ s/\./_/g;
-        ($err, $msg) = &run_cmd("revtool", "-xit $tag", "  ");
+        ($err, $msg) = &run_av_cmd("revtool", "-xit $tag", "  ");
         if ($err) {
             eprint "Import of $pkgfile failed -- $msg\n";
             return $err;
@@ -470,7 +484,7 @@ sub
 prepare_tree
 {
     my $pkg = $_[0];
-    my ($pwd, $pkgdir, $cmd, $err, $msg, $spec, $tmpdir, $rpmcmd);
+    my ($pwd, $pkgdir, $cmd, $err, $msg, $spec, $tmpdir, $rpmcmd, $tmp);
     my (@srcs, @patches, @tmp);
 
     chomp($pwd = `/bin/pwd`);
@@ -487,6 +501,7 @@ prepare_tree
 	$pkgdir = $pwd;
     }
     # Create the working directory
+    &nuke_tree($WORK_DIR);
     if (!mkdir($WORK_DIR)) {
         eprint "Unable to create working directory -- $!\n";
         return SRCTOOL_SYSTEM_ERROR;
@@ -499,7 +514,7 @@ prepare_tree
 	my $n = scalar(@tmp);
 	&fatal_error("$n spec files?!\n");
     }
-    $spec = "F/" . (shift @tmp);
+    $spec = $tmp[0];
     # Create the RPM build tree
     $tmpdir = &create_temp_space($pkg, "build");
     if (! $tmpdir) {
@@ -507,17 +522,26 @@ prepare_tree
     }
     # Copy all the files into their proper places for RPM's use
     foreach my $f (@srcs, @patches) {
-	if (!link($f, "$tmpdir/SOURCES")) {
+        my $fname;
+
+        ($fname = $f) =~ s/^.\///;
+	if (!link($f, "$tmpdir/SOURCES/$fname")) {
 	    eprint "Unable to copy $f into $tmpdir/SOURCES -- $!\n";
 	    return SRCTOOL_SYSTEM_ERROR;
 	}
     }
-    if (!link($spec, "$tmpdir/SPECS")) {
+    ($tmp = $spec) =~ s/^.\///;
+    if (!link($spec, "$tmpdir/SPECS/$tmp")) {
 	eprint "Unable to copy $spec into $tmpdir/SPECS -- $!\n";
 	return SRCTOOL_SYSTEM_ERROR;
     }
-    $rpmcmd = "--define \"_topdir $pkgdir\" --define \"_builddir $pkgdir/$WORK_DIR\" -bp $spec";
+    print "Creating working directory $pkgdir/$WORK_DIR....\n";
+    $rpmcmd = "--define \"_topdir $tmpdir\" --define \"_builddir $pkgdir/$WORK_DIR\" -bp $spec";
     @tmp = &run_cmd("rpm", $rpmcmd, 0);
+    if (($err = shift @tmp) != 0) {
+        eprint "Creation of working directory failed -- $tmp[$#tmp]\n";
+    }
+    return $err;
 }
 
 # main() here is basically the same as main() in C
@@ -538,7 +562,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.5 $ created on $Date: 2001/03/21 23:31:13 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.6 $ created on $Date: 2001/03/22 02:35:55 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
