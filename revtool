@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.30 2000/06/20 18:55:22 mej Exp $
+# $Id: revtool,v 1.31 2000/06/20 23:00:46 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -38,6 +38,7 @@ sub REVTOOL_SERVER_CRASH()        {2;}
 sub REVTOOL_BAD_LOGIN()           {3;}
 sub REVTOOL_COMMAND_FAILED()      {4;}
 sub REVTOOL_ACCESS_DENIED()       {5;}
+sub REVTOOL_NO_SOURCES()          {6;}
 
 # 21-40 are retrieval/update errors
 sub REVTOOL_FILE_NOT_FOUND()      {21;}
@@ -146,7 +147,7 @@ login_to_master
     my ($cmd, $line, $pass, $err, $msg, $found);
     local (*CMD, *CVSPASS);
 
-    if (-t) {
+    if (-t STDIN) {
         $cmd = "/bin/sh -c \"cvs -d $login login\"";
         dprint "About to run $cmd\n";
         if (!open(CMD, "$cmd 2>&1 |")) {
@@ -174,6 +175,7 @@ login_to_master
             return 0;
         }
     } else {
+        dprint "Performing automated login with an empty password.\n";
         open(CVSPASS, "$ENV{HOME}/.cvspass") || return 0;
         $found = 0;
         while (<CVSPASS>) {
@@ -184,7 +186,10 @@ login_to_master
             }
         }
         close(CVSPASS);
-        if (! $found) {
+        if ($found) {
+            dprint "Login not required.\n";
+        } else {
+            dprint "Login not found.  Adding cvspass entry.\n";
             open(CVSPASS, ">> $ENV{HOME}/.cvspass");
             print CVSPASS "$login A\n";
             close(CVSPASS);
@@ -300,7 +305,8 @@ update_from_master
     my ($tag, $err, $tries, $line, $cmd, $file, $mode);
     my (@conflicts, @not_found, @removed, @co, @up);
 
-    if ($opt_t) {
+    # The tag options only apply to gets we're doing because of -g, not -p
+    if ($opt_t && $opt_g) {
         $tag = "-r $opt_t";
     }
     dprint "File list is \"$file_list\", tag is \"$tag\"\n";
@@ -414,7 +420,7 @@ add_new_files
     my ($file_list, $cmd, $err, $tries, $line);
 
     if ($#files == -1) {
-        if (-t) {
+        if (-t STDIN) {
             print "You've asked me to add files, but you didn't tell me what files to add.\n";
             print "Please enter a whitespace-separated list of files or wildcards:\n";
             $file_list = <STDIN>;
@@ -489,7 +495,7 @@ delete_old_files
     my ($file_list, $cmd, $err, $tries, $line);
 
     if ($#files == -1) {
-        if (-t) {
+        if (-t STDIN) {
             print "You've asked me to remove files, but you didn't tell me what files to remove.\n";
             print "Please enter a whitespace-separated list of files or wildcards:\n";
             $file_list = <STDIN>;
@@ -565,7 +571,7 @@ list_tags
     my @tags;
 
     $file_list = join(" ", @files);
-    $cmd = sprintf("/bin/sh -c \"cvs $cvsroot status -v $file_list\"", ($opt_R ? "-R" : ""));
+    $cmd = "/bin/sh -c \"cvs $cvsroot status -v $file_list\"";
 
     for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
         $err = 0;
@@ -632,21 +638,262 @@ list_tags
 sub
 tag_local_sources
 {
+    my $file_list = join(" ", @_);
+    my ($module, $mod_tag, $line, $tries, $err, $msg);
+    local *CMD;
 
+    if (-d "CVS") {
+        chomp($module = &cat_file("CVS/Repository"));
+    } elsif ($_[0] && -d "$_[0]/CVS") {
+        $module = $_[0];
+    } else {
+        eprint "I don't see any CVS sources to tag here....\n";
+        return REVTOOL_NO_SOURCES;
+    }
+    ($mod_tag = $module) =~ tr/[a-z]/[A-Z]/;
+
+    # Okay, the regexp's below enforce the following tag rules:
+    #   1. Branch tags must begin with a branch key, hypen, the package name, hyphen, e.g. VA-KERNEL-
+    #   2. Non-branch tags are the same, but without the branch key at the beginning, e.g. KERNEL-
+    #   3. Tags must contain only uppercase characters and hyphens.  Note that this rule is more
+    #      restrictive than CVS's own rules but is enforced for standards compliance.
+    if (($opt_b && $tag !~ /^([A-Z]+)-$mod_tag-/) || (! $opt_b && $tag !~ /^$mod_tag-/)
+        || $tag !~ /^[-A-Z]+$/) {
+        eprint "Tag \"$tag\" is not valid for module $module\n";
+        return REVTOOL_INVALID_TAG;
+    }
+
+    $cmd = sprintf("/bin/sh -c \"cvs $cvsroot tag -F ", ($opt_b ? "-b " : ""), "$tag $file_list\"");
+
+    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
+        $err = 0;
+        dprint "About to run $cmd\n";
+        if (!open(CMD, "$cmd 2>&1 |")) {
+            eprint "Execution of \"$cmd\" failed -- $!";
+            return REVTOOL_COMMAND_FAILED;
+        }
+        while (<CMD>) {
+            chomp($line = $_);
+            dprint "$line\n";
+            # Check the output for errors
+            if ($line =~ /^cvs \w+: cannot find password/) {
+                eprint "You must login to the repository first.\n";
+                $err = REVTOOL_BAD_LOGIN;
+                last;
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
+                if ($tries < 10) {
+                    $err = -1;
+                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
+                    sleep 3;
+                } else {
+                    eprint "The CVS server was unreachable.\n";
+                    $err = REVTOOL_NO_SERVER;
+                    last;
+                }
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
+                if ($tries < 10) {
+                    $err = -1;
+                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
+                    sleep 3;
+                } else {
+                    eprint "The CVS server kept crashing.\n";
+                    $err = REVTOOL_SERVER_CRASH;
+                    last;
+                }
+            }
+        }
+        close(CMD);
+        dprint "\"$cmd\" returned $?\n";
+    }
+    if ($err == 0 && $? != 0) {
+        eprint "An unknown error must have occured, because the command returned $?\n";
+        $err = REVTOOL_UNSPECIFIED_ERROR;
+    }
+    return $err;
 }
 
-# Import a vendor branch
+# Import a new set of vendor sources for a new module
 sub
 import_vendor_sources
 {
+    my ($module, $vendor_tag, $release_tag, $version, $line, $tries, $err, $msg);
+    my (@ignores, @links, @conflicts);
+    local *CMD;
 
+    if ($#_ == 0) {
+        $module = $_[0];
+    } else {
+        chomp($module = `pwd`);
+    }
+    ($vendor_tag = $module) =~ tr/[a-z]/[A-Z]/;
+    $vendor_tag =~ s/[^-A-Z]/-/g;
+    if ($tag) {
+        $release_tag = $tag;
+    } elsif ($rtag) {
+        $release_tag = $rtag;
+    } elsif (-t STDIN) {
+        print "Enter the release tag (in the form $vendor_tag-<version>):\n";
+        $release_tag = <STDIN>;
+    } else {
+        eprint "No valid release tag was given.  I can't import without it.\n";
+        return REVTOOL_INVALID_TAG;
+    }
+    dprint "Using module name $module, vendor tag $vendor_tag, release tag $release_tag\n";
+
+    # Okay, the regexp's below enforce the following tag rules:
+    #   1. The release tag must start with the package name and a hyphen, e.g. KERNEL-
+    #   2. Tags must contain only uppercase characters and hyphens.  Note that this rule is more
+    #      restrictive than CVS's own rules but is enforced for standards compliance.
+    if ($release_tag !~ /^$vendor_tag-/ || $release_tag !~ /^[-A-Z]+$/) {
+        eprint "Release tag \"$tag\" is not valid for module $module\n";
+        return REVTOOL_INVALID_TAG;
+    }
+    ($version = $release_tag) =~ s/^[^-]+-//;
+    $version =~ tr/-/./;
+    $version =~ tr/[A-Z]/[a-z]/;
+    $msg = "Import of $module $version";
+
+    $cmd = sprintf("/bin/sh -c \"cvs $cvsroot import ", ($opt_k ? "-k $opt_k " : ""),
+                   ($opt_x ? "-I! " : ""), "-m '$msg' $module $vendor_tag $release_tag");
+
+    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
+        $err = 0;
+        dprint "About to run $cmd\n";
+        if (!open(CMD, "$cmd 2>&1 |")) {
+            eprint "Execution of \"$cmd\" failed -- $!";
+            return REVTOOL_COMMAND_FAILED;
+        }
+        while (<CMD>) {
+            chomp($line = $_);
+            dprint "$line\n";
+            # Read the output
+            if ($line =~ /^cvs \w+: cannot find password/) {
+                eprint "You must login to the repository first.\n";
+                $err = REVTOOL_BAD_LOGIN;
+                last;
+            } elsif ($line =~ /^I (.+)$/) {
+                push @ignores, $1;
+            } elsif ($line =~ /^L (.+)$/) {
+                push @links, $1;
+            } elsif ($line =~ /^C (.+)$/) {
+                push @conflicts, $1;
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
+                if ($tries < 10) {
+                    $err = -1;
+                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
+                    sleep 3;
+                } else {
+                    eprint "The CVS server was unreachable.\n";
+                    $err = REVTOOL_NO_SERVER;
+                    last;
+                }
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
+                if ($tries < 10) {
+                    $err = -1;
+                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
+                    sleep 3;
+                } else {
+                    eprint "The CVS server kept crashing.\n";
+                    $err = REVTOOL_SERVER_CRASH;
+                    last;
+                }
+            }
+        }
+        close(CMD);
+        dprint "\"$cmd\" returned $?\n";
+    }
+    if ($err == 0 && $? != 0) {
+        eprint "An unknown error must have occured, because the command returned $?\n";
+        $err = REVTOOL_UNSPECIFIED_ERROR;
+    }
+    if ($#links >= 0) {
+        print "The following symbolic links were ignored (not imported):  ", join(" ", @links), "\n";
+    }
+    if ($#ignores >= 0) {
+        print "The following files were ignored (not imported):  ", join(" ", @ignores), "\n";
+    }
+    if ($#conflicts >= 0) {
+        print "The following files conflict with existing files:  ", join(" ", @conflicts), "\n";
+    }
+    return $err;
 }
 
 # Tag the repository
 sub
 tag_repository_sources
 {
+    my $file_list = join(" ", @_);
+    my ($module, $mod_tag, $line, $tries, $err, $msg);
+    local *CMD;
 
+    if (-d "CVS") {
+        chomp($module = &cat_file("CVS/Repository"));
+    } elsif ($_[0] && -d "$_[0]/CVS") {
+        $module = $_[0];
+    } else {
+        eprint "I don't see any CVS sources to tag here....\n";
+        return REVTOOL_NO_SOURCES;
+    }
+    ($mod_tag = $module) =~ tr/[a-z]/[A-Z]/;
+
+    # Okay, the regexp's below enforce the following tag rules:
+    #   1. Branch tags must begin with a branch key, hypen, the package name, hyphen, e.g. VA-KERNEL-
+    #   2. Non-branch tags are the same, but without the branch key at the beginning, e.g. KERNEL-
+    #   3. Tags must contain only uppercase characters and hyphens.  Note that this rule is more
+    #      restrictive than CVS's own rules but is enforced for standards compliance.
+    if (($opt_b && $tag !~ /^([A-Z]+)-$mod_tag-/) || (! $opt_b && $tag !~ /^$mod_tag-/)
+        || $tag !~ /^[-A-Z]+$/) {
+        eprint "Tag \"$tag\" is not valid for module $module\n";
+        return REVTOOL_INVALID_TAG;
+    }
+
+    $cmd = sprintf("/bin/sh -c \"cvs $cvsroot rtag -F ", ($opt_b ? "-b " : ""), "$tag $file_list\"");
+
+    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
+        $err = 0;
+        dprint "About to run $cmd\n";
+        if (!open(CMD, "$cmd 2>&1 |")) {
+            eprint "Execution of \"$cmd\" failed -- $!";
+            return REVTOOL_COMMAND_FAILED;
+        }
+        while (<CMD>) {
+            chomp($line = $_);
+            dprint "$line\n";
+            # Check the output for errors
+            if ($line =~ /^cvs \w+: cannot find password/) {
+                eprint "You must login to the repository first.\n";
+                $err = REVTOOL_BAD_LOGIN;
+                last;
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
+                if ($tries < 10) {
+                    $err = -1;
+                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
+                    sleep 3;
+                } else {
+                    eprint "The CVS server was unreachable.\n";
+                    $err = REVTOOL_NO_SERVER;
+                    last;
+                }
+            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
+                if ($tries < 10) {
+                    $err = -1;
+                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
+                    sleep 3;
+                } else {
+                    eprint "The CVS server kept crashing.\n";
+                    $err = REVTOOL_SERVER_CRASH;
+                    last;
+                }
+            }
+        }
+        close(CMD);
+        dprint "\"$cmd\" returned $?\n";
+    }
+    if ($err == 0 && $? != 0) {
+        eprint "An unknown error must have occured, because the command returned $?\n";
+        $err = REVTOOL_UNSPECIFIED_ERROR;
+    }
+    return $err;
 }
 
 # main() here is basically the same as main() in C
@@ -655,12 +902,17 @@ main
 {
     if ($login) {
         &login_to_master($login);
+        return if ($mode eq "login");
     }
-    if ($query) {
+    if ($mode eq "import") {
+        &import_vendor_sources(@ARGV);
+    } elsif ($mode eq "query") {
         if ($query eq "t") {
             &list_tags(@ARGV);
         } elsif ($query eq "s") {
             # Query file stats
+        } elsif ($query eq "l") {
+            # Query file log
         }
     } else {
         if ($opt_addlist) {
@@ -696,6 +948,13 @@ main
                 }
             }
         }
+        if (! $opt_g) {
+            if ($tag) {
+                &tag_local_sources();
+            } elsif ($rtag) {
+                &tag_repository_sources();
+            }
+        }
     }
 }
 
@@ -714,7 +973,7 @@ BEGIN {
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "g|get", "p|put", "a|add", "r|remove",
                    "q|query=s", "R|recurse", "t|tag=s", "i|import=s", "k=s", "D|dir=s",
-                   "x|exclusive", "addlist=s", "remlist=s", "T|rtag=s", "l|login");
+                   "x|exclusive", "addlist=s", "remlist=s", "T|rtag=s", "l|login", "b|branch");
 
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
@@ -735,10 +994,14 @@ BEGIN {
         $mode = "remove";
     } elsif ($opt_t) {
         $mode = "tag";
-    } elsif ($opt_T) {
+    } elsif ($opt_T || $opt_b) {
         $mode = "rtag";
+    } elsif ($opt_l) {
+        $mode = "login";
     }
     $cvsroot = "-d $opt_D" if ($opt_D);
+    $tag = $opt_t;
+    $rtag = $opt_T;
     if ($opt_l) {
         if ($opt_D) {
             $login = $opt_D;
@@ -750,7 +1013,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.30 $ created on $Date: 2000/06/20 18:55:22 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.31 $ created on $Date: 2000/06/20 23:00:46 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -525,3 +525,7 @@ Added support for logging into the repository via revtool.  Also added
 automated password-less logins if stdin is not a tty.  This should
 help support varying CVSROOT's.
 ----------------------------------------------------------------------
+Tue Jun 20 16:10:31 2000                        Michael Jennings (mej)
+
+Added the code for importing and tagging.  Untested at this point.
+----------------------------------------------------------------------
