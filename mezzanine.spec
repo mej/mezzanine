@@ -1,7 +1,7 @@
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
 Version: 1.7
-Release: 0.14
+Release: 0.15
 Copyright: BSD
 Group: Development/Tools
 Source: %{name}.tar.gz
@@ -10,7 +10,7 @@ Packager: Michael Jennings <mej@kainx.org>
 Vendor: KainX.Org (http://www.kainx.org/)
 URL: http://www.kainx.org/mezzanine/
 Requires: perl, perl(Net::FTP), perl(Cwd), perl(POSIX), perl(File::Copy), perl(Getopt::Long), perl(File::Find)
-BuildRequires: docbook-style-dsssl
+#BuildSuggests: docbook-style-dsssl
 BuildArch: noarch
 
 %description
@@ -24,16 +24,18 @@ building, and releasing software products.
 %setup -n %{name} -T -c -a 0
 
 %build
-cd doc
+(
+    cd doc
 for i in *.sgml ; do
-  FNAME=${i%%%%.sgml}
-  jade -t sgml -i html -d mezzanine.dsl \
-    -D /usr/share/sgml/docbook/dsssl-stylesheets \
-    -V "%%stylesheet%%=${FNAME}.css" \
-    -V "%%root-filename%%=${FNAME}" \
-    -V nochunks -V rootchunk \
-    $i
-done
+      FNAME=${i%%%%.sgml}
+      jade -t sgml -i html -d mezzanine.dsl \
+        -D /usr/share/sgml/docbook/dsssl-stylesheets \
+        -V "%%stylesheet%%=${FNAME}.css" \
+        -V "%%root-filename%%=${FNAME}" \
+        -V nochunks -V rootchunk \
+        $i
+    done
+) || :
 
 %install
 %define perl_vendorlib %(eval "`perl -V:installvendorlib`"; echo $installvendorlib)

@@ -471,3 +471,7 @@ Fri Jun  4 16:30:09 2004                        Michael Jennings (mej)
 
 Fixed mid-module import.
 ----------------------------------------------------------------------
+Thu Jun 10 17:04:18 2004                        Michael Jennings (mej)
+
+Fixed several bugs nabbed by Greg Kurtzer <greg@caosity.org>.
+----------------------------------------------------------------------

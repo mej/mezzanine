@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.41 2004/06/04 20:30:24 mej Exp $
+# $Id: srctool,v 1.42 2004/06/10 21:04:48 mej Exp $
 #
 
 use strict;
@@ -131,7 +131,9 @@ import_package
             $tag =~ s/\./_/g;
             &revctl_rtag($tag);
             &revctl_exclusive(1);
-            if (-r "$pwd/CVS/Repository") {
+            if ($OPTION{"path"}) {
+                $module = "$OPTION{path}/$pkg";
+            } elsif (-r "$pwd/CVS/Repository") {
                 my $tmp = &cat_file("$pwd/CVS/Repository");
 
                 chomp($tmp);
@@ -188,9 +190,20 @@ import_package
             $tag =~ s/\./_/g;
             &revctl_rtag($tag);
             &revctl_exclusive(1);
-            $err = &import_vendor_sources();
+            if ($OPTION{"path"}) {
+                my $module = $OPTION{"path"};
+
+                if ($pkgfile) {
+                    $module .= "/$pkgfile";
+                } else {
+                    $module .= '/' . &basename($pwd);
+                }
+                $err = &import_vendor_sources($module);
+            } else {
+                $err = &import_vendor_sources();
+            }
             if ($err != MEZZANINE_SUCCESS) {
-                eprint "Import of $pkgfile failed.\n";
+                eprintf("Import of %s failed.\n", (($pkgfile) ? ($pkgfile) : (".")));
                 return $err;
             }
         }
@@ -687,7 +700,7 @@ main
                "path|P=s");
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.41 $ created on $Date: 2004/06/04 20:30:24 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.42 $ created on $Date: 2004/06/10 21:04:48 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.185 2004/06/04 17:16:40 mej Exp $
+# $Id: buildtool,v 1.186 2004/06/10 21:04:48 mej Exp $
 #
 
 use strict;
@@ -232,7 +232,7 @@ sub
 scan_rpm_dirs
 {
     my $topdir;
-    my @contents;
+    my @contents = ();
     my %siblings;
 
     nprint "Updating state information....\n";
@@ -242,10 +242,12 @@ scan_rpm_dirs
 
     # Pre-scan all the binary RPM's for future use.  We need to know what SRPM
     # each binary came from, because some (lame) packages change the base name.
-    if ($buildtree_layout eq "orc") {
-        find({ "wanted" => sub { ! -d $_ && $_ =~ /\.rpm$/ && push @contents, $_ }, "no_chdir" => 1 }, $topdir);
-    } else {
-        find({ "wanted" => sub { ! -d $_ && $_ =~ /\.rpm$/ && push @contents, $_ }, "no_chdir" => 1 }, "$topdir/RPMS");
+    if (-d $topdir) {
+        if ($buildtree_layout eq "orc") {
+            find({ "wanted" => sub { ! -d $_ && $_ =~ /\.rpm$/ && push @contents, $_ }, "no_chdir" => 1 }, $topdir);
+        } else {
+            find({ "wanted" => sub { ! -d $_ && $_ =~ /\.rpm$/ && push @contents, $_ }, "no_chdir" => 1 }, "$topdir/RPMS");
+        }
     }
     foreach my $rpm (sort(@contents)) {
         my ($aref, $rpmfile, $name, $path, $mtime);
@@ -680,17 +682,12 @@ parallel_build
 
     # Create the directories for building this product
     if ($buildtree_layout eq "orc") {
-        $builddir = (($ENV{"MEZZANINE_BUILDDIR"}) ?
-                     ($ENV{"MEZZANINE_BUILDDIR"}) :
-                     (&getcwd() . "/build.mezz"));
-        $logdir = $builddir;
+        $builddir = $ENV{"MEZZANINE_BUILDDIR"};
+        $logdir = $ENV{"MEZZANINE_LOGDIR"};
         &pkgvar_topdir($builddir);
     } else {
-        $builddir = &make_build_dir((($ENV{"MEZZANINE_BUILDDIR"}) ?
-                                     ($ENV{"MEZZANINE_BUILDDIR"}) :
-                                     (&getcwd() . "/build.mezz")));
-        $logdir = &make_log_dir((($ENV{"MEZZANINE_LOGDIR"}) ?
-                                 ($ENV{"MEZZANINE_LOGDIR"}) : ("$builddir/logs")));
+        $builddir = &make_build_dir($ENV{"MEZZANINE_BUILDDIR"});
+        $logdir = &make_log_dir($ENV{"MEZZANINE_LOGDIR"});
         &pkgvar_topdir($builddir);
 
         # Need to do this here for parallel builds because it's not parallel-safe.  Race condition. :(
@@ -866,17 +863,12 @@ build_product
 
     # Create the directories for building this product
     if ($buildtree_layout eq "orc") {
-        $builddir = (($ENV{"MEZZANINE_BUILDDIR"}) ?
-                     ($ENV{"MEZZANINE_BUILDDIR"}) :
-                     (&getcwd() . "/build.mezz"));
-        $logdir = $builddir;
+        $builddir = $ENV{"MEZZANINE_BUILDDIR"};
+        $logdir = $ENV{"MEZZANINE_LOGDIR"};
         &pkgvar_topdir($builddir);
     } else {
-        $builddir = &make_build_dir((($ENV{"MEZZANINE_BUILDDIR"}) ?
-                                     ($ENV{"MEZZANINE_BUILDDIR"}) :
-                                     (&getcwd() . "/build.mezz")));
-        $logdir = &make_log_dir((($ENV{"MEZZANINE_LOGDIR"}) ?
-                                 ($ENV{"MEZZANINE_LOGDIR"}) : ("$builddir/logs")));
+        $builddir = &make_build_dir($ENV{"MEZZANINE_BUILDDIR"});
+        $logdir = &make_log_dir($ENV{"MEZZANINE_LOGDIR"});
         &pkgvar_topdir($builddir);
     }
 
@@ -991,7 +983,7 @@ main
                "savecfg|save-config");
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.185 $ created on $Date: 2004/06/04 17:16:40 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.186 $ created on $Date: 2004/06/10 21:04:48 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
@@ -1063,9 +1055,12 @@ main
         if ($OPTION{"parallel"}) {
             my ($mult, $add) = (1, 0);
 
-            $OPTION{"parallel"} =~ m/^(?:[Xx]([\d.]+))?([-+][\d.]+)?$/;
-            ($mult, $add) = ($1, $2);
-            $num_processes = $num_processes * ($mult ? $mult : 1) + ($add ? $add : 0);
+            if ($OPTION{"parallel"} =~ m/^(?:[Xx]([\d.]+))?([-+][\d.]+)?$/) {
+                ($mult, $add) = ($1, $2);
+                $num_processes = $num_processes * ($mult ? $mult : 1) + ($add ? $add : 0);
+            } elsif ($OPTION{"parallel"} =~ /^=(\d+)$/) {
+                $num_processes = $1;
+            }
         }
         $config->set("PARALLELIZE", $OPTION{"parallel"});
     } else {
@@ -1120,10 +1115,18 @@ main
         my $instroot_reset = $config->set("INSTROOT_RESET", $OPTION{"instroot-reset"} || $config->get("INSTROOT_RESET"));
         my $instroot_copy = $config->set("INSTROOT_COPY", $OPTION{"instroot-copy"} || $config->get("INSTROOT_COPY"));
 
+        # If we're building in parallel, the INSTROOT value is our source.
+        if ($num_processes > 1) {
+            $config->set("INSTROOT_SOURCE_RSYNC", $config->get("INSTROOT"));
+        }
+
         # If we have $MEZZANINE_INSTROOT_SOURCE_RSYNC and we don't have the options,
         # automagically fill the commands in appropriately.  If needed, authentication
         # info and other flags can be added to $MEZZANINE_INSTROOT_SOURCE_RSYNC.
-        if ($config->set("INSTROOT_SOURCE_RSYNC", $config->get("INSTROOT_SOURCE_RSYNC") || $ENV{"MEZZANINE_INSTROOT_SOURCE_RSYNC"})) {
+        if ($config->get("INSTROOT_SOURCE_RSYNC")) {
+            if ($config->get("INSTROOT_SOURCE_RSYNC") !~ /\/$/) {
+                $config->set("INSTROOT_SOURCE_RSYNC", $config->get("INSTROOT_SOURCE_RSYNC") . '/');
+            }
             if (! $instroot_init) {
                 $instroot_init = $config->set("INSTROOT_INIT", sprintf("rsync -Haz --delete --delete-after --exclude=/proc %s",
                                                                        $config->get("INSTROOT_SOURCE_RSYNC")));
@@ -1137,12 +1140,20 @@ main
             }
         }
 
+        # Make sure the INIT and RESET commands end in a /, lest the rsync not work.
+        if (($instroot_init =~ /rsync/i) && ($instroot_init !~ /\/$/)) {
+            $instroot_init .= '/';
+        }
+        if (($instroot_reset =~ /rsync/i) && ($instroot_reset !~ /\/$/)) {
+            $instroot_reset .= '/';
+        }
+
         # Now set all the variables using fallbacks.
         ($instroot, $instroot_init, $instroot_reset, $instroot_copy)
             = &set_instroot_info($instroot, $instroot_init, $instroot_reset, $instroot_copy);
         &assign_product_variable($prod, "INSTROOT", $config->set("INSTROOT", $instroot));
 
-        # If we have $instroot_init, the other two are guaranteed to be set by fallbacks.
+        # If we have $instroot_init, the other two are guaranteed to have been set by set_instroot_info().
         if ($instroot_init) {
             &assign_product_variable($prod, "INSTROOT_INIT", $config->set("INSTROOT_INIT", $instroot_init));
             &assign_product_variable($prod, "INSTROOT_RESET", $config->set("INSTROOT_RESET", $instroot_reset));
@@ -1152,6 +1163,11 @@ main
 
     # *Now* we can look at our SRPM directories.
     if (scalar(@{$OPTION{"srcdir"}})) {
+
+        if (scalar(@{$OPTION{"srcdir"}}) == 1) {
+            @{$OPTION{"srcdir"}} = split(':', $OPTION{"srcdir"}->[0]);
+        }
+
         # This must happen *after* the instroot stuff above.
         foreach my $srcdir (@{$OPTION{"srcdir"}}) {
             my @pkg_list;
@@ -1181,6 +1197,9 @@ main
                                 || "/usr/build/bin:/usr/local/build/bin:/usr/lib/qt-1.45/bin:/usr/lib/qt-2.1.0/bin"
                                 . ":/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/X11R6/bin:/usr/kerberos/sbin"
                                 . ":/usr/kerberos/bin:.");
+    $ENV{"MEZZANINE_BUILDDIR"} = $config->set("BUILDDIR", $config->get("BUILDDIR") || $ENV{"MEZZANINE_BUILDDIR"} || (&getcwd() . "/build.mezz"));
+    $ENV{"MEZZANINE_LOGDIR"} = $config->set("LOGDIR", $config->get("LOGDIR") || $ENV{"MEZZANINE_LOGDIR"} || $ENV{"MEZZANINE_BUILDDIR"});
+
     # Don't hard code any RPATH's into binaries
     delete $ENV{"LD_RUN_PATH"};
     delete $ENV{"LD_LIBRARY_PATH"};
