@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.76 2000/06/21 02:46:28 mej Exp $
+# $Id: buildtool,v 1.77 2000/06/26 23:17:35 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -483,6 +483,7 @@ initial_setup
     chdir("$builddir");
 
     # Pre-scan all the binary RPM's for future use in possibly parallel processes.
+    nprint "Updating state information....\n";
     dprint "Scanning binary RPM's in $builddir/RPMS for their corresponding SRPM's.\n";
     @contents = glob("$builddir/RPMS/*/*.rpm");
     foreach $rpm (@contents) {
@@ -1668,7 +1669,17 @@ summarize_failures
     $ns = $#packages + 1;
     $nf = $#failed_pkgs + 1;
     $nt = $ns + $nf;
-    qprintf "Package Summary:  Out of %d total packages, %d succeeded and %d failed.\n", $nt, $ns, $nf;
+    qprint "Package Summary:  Out of $nt total packages,";
+    if ($ns) {
+        qprint(" ", ($ns == $nt ? "all" : "$ns"), " succeeded");
+        if ($nf) {
+            qprint " and";
+        }
+    }
+    if ($nf) {
+        qprint(" ", ($nf == $nt ? "all" : "$nf"), " failed");
+    }
+    qprint ".\n";
 
     foreach $pkg (@failed_pkgs) {
         if ($failure->{$pkg}{MESSAGE}) {
@@ -1813,7 +1824,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.76 $ created on $Date: 2000/06/21 02:46:28 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.77 $ created on $Date: 2000/06/26 23:17:35 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1931,7 +1942,7 @@ main
         }
     }
     if ($prod) {
-        qprint "$progname:  Building product:  $prodname $prodver\n";
+        qprint "$progname:  Building product:  $prodname", ($prodver ? " $prodver" : ""), "\n";
     } else {
         eprint "You didn't tell me what to build, so I'm not quite sure what to do.\n";
         eprint "If you aren't familiar with how to use $progname, try $progname --help.\n";

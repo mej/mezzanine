@@ -4,7 +4,7 @@
 #  Written by:  Michael Jennings
 #               Ted T'so
 #
-#  $Id: README,v 1.8 2000/06/20 18:55:22 mej Exp $
+#  $Id: README,v 1.9 2000/06/26 23:17:35 mej Exp $
 #
 ########################################################################
 
@@ -18,20 +18,28 @@ policies which govern its contents, so those planning on adding to
 and/or maintaining part(s) of the tree should read those sections
 carefully.
 
-For those wishing to simply build a particular VA product, you will
-find a directory called products under this one.  It contains a series
-of files with .prod extensions.  Find the file with the name of the
-product you wish to build, then invoke the following command at your
-shell prompt:
+For those wishing to simply build a particular VA product, the first
+step is to make sure you can access the repository.  To do this, set
+the CVSROOT environment variable to the following value:
 
-$ ./buildtool -p <product>
+:pserver:anonymous@engr.su.valinux.com:/cvs/build
+
+Next, cd into the directory where you want the build to occur and type
+the following command:
+
+$ revtool -g products
+
+This will obtain the product files from the master server and place
+them into a directory called products underneath the current
+directory.  Find the file with the name of the product you wish to
+build, then invoke the following command at your shell prompt:
+
+$ buildtool -p <product>
 
 ...where <product> is the name of the product file, but without the
-.prod on the end.  This command should be run by your regular user
-account (not root) and should be run from the directory which contains
-buildtool and this README file.  Executing this command will build all
-packages associated with that product, both binary and source packages.
-If you wish to build ISO images as well, use -bi as well as -p.
+.prod on the end.  Executing this command will build all packages
+associated with that product, both binary and source packages.  If you
+wish to build ISO images as well, use "buildtool -bi -p <product>".
 
 The following sections will have more detailed information on how to
 use the system, so if you are going to be involved in the actual day-
@@ -222,11 +230,119 @@ Examples:
 2.4.  Querying the Master Server
 --------------------------------
 
+Much information is stored on the master server and in local
+CVS-maintained files which can be very helpful to the developer.
+Thus, revtool supports several options for querying the master server
+to obtain various handy bits of information.  All the query options
+use the syntax "-qX", where X is one of the following:
+
+	t		List tags
+	s		Show status relative to master repository
+	l		Display the change log
+	a		Display annotated source
+	d		Generate a diff
+	D		Generate a repository diff
+
+All query options except 'd' require that one or more files or
+directories be specified on the command line, and those files will be
+queried for the requested information.  You can also specify
+files/directories for the diff query, but as long as the current
+directory contains revision-controlled sources, it's not required.
+
+Examples:
+
+  To display a list of known tags on the README file:
+     revtool -qt README
+
+  To display the status of the FAQ file:
+     revtool -qs FAQ
+
+  To display the e.c file annotated with revision numbers:
+     revtool -qa e.c
+
+  To generate a diff between two tags on a directory:
+     revtool -qd -t 'FOO-1-0 FOO-1-0-PATCH-1' foo-1.0
+
+
 2.5.  Creating Modules for New Packages
 ---------------------------------------
 
+The process of taking non-revision-controlled sources on your local
+hard disk and creating revision-controlled modules from them is known
+as "importing."  Proper procedure for importing new packages into the
+repository will be discussed in the package maintainer's guide below.
+This section simply gives the proper revtool syntax for creating the
+new tree.
+
+Imports are done using revtool's "-i" or "--import" options.  A tag
+for the initial revision of each file (a.k.a. the "release tag") must
+also be specified via the -t option.  The branch tag (the "vendor
+tag") is derived from the module name.  The module name should be
+specified on the command line; if it isn't, the name of the current
+directory is used instead.
+
+Note that some revision control systems, like CVS, ignore certain
+types of files when importing foreign sources.  Symbolic links are a
+noteable example, as are files whose names begin with '.'.  Although
+symlinks are always ignored by CVS, you can request that no normal
+files be ignored, regardless of their names.  Use the "-x" option for
+this purpose.
+
+Also note that the default keyword expansion mode requested by revtool
+is "-ko" (keep original keywords).  If you wish to specify key/value
+or binary expansion rules, be sure to specify "-kkv" or "-kb"
+(respectively) when doing the import.
+
+Examples:
+
+  To import a new package "foo" version 2.0:
+     revtool -it FOO-2-0 foo
+
+  To import a new package, cow 4.2.8, without ignoring dotfiles:
+     revtool -xit COW-4-2-8 cow
+
+  To import a directory containing binary files:
+     revtool -kb -xit SUSE-6-4 contrib-suse
+
+
 2.6.  Tagging Sources
 ---------------------
+
+For revision control systems like CVS which operate on the basis of
+file-level revisions (as opposed to the changeset methodology of
+Aegis, BitKeeper, ClearCase, etc.), one of the most important ways of
+keeping track of intermediate changes is tagging.  Tagging is a
+mechanism through which a symbolic name is given to a set of related
+changes.  This is generally done immediately after a commit.  Use the
+"-t" or "--tag" options to set tags based on the revisions of your
+current local source files.  Use "-T" or "--rtag" to tag the
+repository default branch directly.  (You won't do this very often.)
+You must specify the module name(s) when doing an rtag.
+
+The way tagging works can initially be hard to understand.  The most
+important thing to realize is that tagging does NOT affect your local
+source files.  It does not assign sticky tags.  What it does is this.
+Each file you've obtained from the master server has a revision number
+associated with it.  Tagging goes through each local source file,
+finds its revision number, and specifies that the tag you've chosen
+should correspond with that particular revision of that particular
+file.  Use "revtool -qs" to examine the file revisions you have
+checked out, the tags those files have, and the corresponding revision
+numbers for those tags.
+
+When tagging the repository (rtagging), rather than checking the
+revisions of the files you've checked out, it simply picks the latest
+revision of each file on the default branch; i.e., it works exactly as
+if you checked out the module ("revtool -g module") and then tagged
+the checkout ("revtool -t tag").
+
+Examples:
+
+  To tag the revisions of each file that you have checked out:
+     revtool -t FOO-1-0
+
+  To tag the default branch of the cow package:
+     revtool -T COW-4-2-8 cow
 
 
 3.  BUILDING PRODUCTS
