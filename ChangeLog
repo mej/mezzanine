@@ -660,3 +660,7 @@ Thu Jul 13 20:55:23 2000                        Michael Jennings (mej)
 Allow the -x option to override the automatic ChangeLog creation.
 Some modules (namely the CD images) must not have ChangeLogs in them.
 ----------------------------------------------------------------------
+Fri Jul 14 11:40:21 2000                        Michael Jennings (mej)
+
+Don't waste time creating sources that already exist.
+----------------------------------------------------------------------

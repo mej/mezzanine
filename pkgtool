@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.15 2000/07/12 03:51:59 mej Exp $
+# $Id: pkgtool,v 1.16 2000/07/14 18:32:49 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -462,6 +462,28 @@ update_to_tag
     $err = $?;
     dprintf "Command returned $err (%d)\n", $err >> 8;
     return @new_files;
+}
+
+sub
+check_for_source_files
+{
+    my ($src_files, $tarball, $destdir) = @_;
+
+    if ($tarball) {
+        # Check to see if the tarball exists
+        if (-f "$destdir/$tarball" && -s _) {
+            return 1;
+        } else {
+            return 0;
+        }
+    } else {
+        foreach $src (split(" ", $src_files)) {
+            if ((! -f "$destdir/$src") || (! -s _)) {
+                return 0;
+            }
+        }
+        return 1;
+    }
 }
 
 sub
@@ -942,9 +964,13 @@ rpm_generate_source_files
             next if ($#tmp < 0);
             dprint "\@tmp contains $#tmp + 1 elements:  ", join(" ", @tmp), "\n";
             $src_files = join(" ", @tmp);
-            $err = &create_source_file($src_files, $tarball, $destdir, $tar, $zip);
-            if ($err) {
-                return $err;
+            if (&check_for_sources($src_files, $tarball, $destdir)) {
+                dprint "Not creating ", ($tarball ? $tarball : "\"$src_files\""), " -- Already exists.\n";
+            } else {
+                $err = &create_source_file($src_files, $tarball, $destdir, $tar, $zip);
+                if ($err) {
+                    return $err;
+                }
             }
             foreach $num (@sources) {
                 if (($tarball && $source{$num} =~ /$tarball$/)
@@ -978,6 +1004,10 @@ rpm_generate_source_files
                 &touch_file("$destdir$source");
                 next;
             }
+            if (&check_for_sources($source, 0, $destdir)) {
+                dprint "Not creating $source -- Already exists.\n";
+                next;
+            }
             &update_to_tag($last_tag{$source{$num}}) if ($prev_tag ne $last_tag{$source{$num}});
             @new_files = &update_to_tag($tag);
             @new_files = grep(! &should_ignore($_), @new_files);
@@ -1002,6 +1032,10 @@ rpm_generate_source_files
                 &touch_file("$destdir$patch{$num}");
                 next;
             }
+            if (&check_for_sources($patch, 0, $destdir)) {
+                dprint "Not creating $patch -- Already exists.\n";
+                next;
+            }
             $err = &gen_diff($modname, $src_files, $last_tag{$patch{$num}}, $tag, "$destdir$patch{$num}");
             if ($err) {
                 return $err;
@@ -1013,9 +1047,13 @@ rpm_generate_source_files
         foreach $src (@srcs) {
             ($src_files, $tarball) = split(":", $src);
             $src_files =~ s/\&/ /g;
-            $err = &create_source_file($src_files, $tarball, $destdir, $tar, $zip);
-            if ($err) {
-                return $err;
+            if (&check_for_sources($src_files, $tarball, $destdir)) {
+                dprint "Not creating ", ($tarball ? $tarball : "\"$src_files\""), " -- Already exists.\n";
+            } else {
+                $err = &create_source_file($src_files, $tarball, $destdir, $tar, $zip);
+                if ($err) {
+                    return $err;
+                }
             }
         }
     }
@@ -1044,7 +1082,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.15 $ created on $Date: 2000/07/12 03:51:59 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.16 $ created on $Date: 2000/07/14 18:32:49 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
