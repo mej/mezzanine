@@ -203,3 +203,7 @@ Sun Nov 30 13:10:53 2003                        Michael Jennings (mej)
 
 Changed srctool test mode to "local" mode.  And made it work right.
 ----------------------------------------------------------------------
+Sun Nov 30 16:43:03 2003                        Michael Jennings (mej)
+
+Patch re-generation works now.
+----------------------------------------------------------------------

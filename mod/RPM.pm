@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.14 2003/06/02 17:10:09 mej Exp $
+# $Id: RPM.pm,v 1.15 2003/11/30 20:12:00 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -38,6 +38,7 @@ BEGIN {
     @ISA         = ('Exporter');
     # Exported functions go here
     @EXPORT      = ('$specdata', '&rpm_form_command', '&parse_spec_file',
+                    '&disable_patch', '&enable_patch',
                     '&rpm_install', '&rpm_show_contents', '&rpm_query',
                     '&rpm_build', '&rpm_compare_versions');
     %EXPORT_TAGS = ( );
@@ -59,6 +60,8 @@ $specdata = 0;
 ### Function prototypes
 sub rpm_form_command($);
 sub parse_spec_file();
+sub disable_patch($);
+sub enable_patch($);
 sub rpm_install();
 sub rpm_show_contents();
 sub rpm_query($);
@@ -155,7 +158,7 @@ parse_spec_file
         } elsif ((! $stage) && $line =~ /^\s*(\w+)\s*:\s*(.*)\s*$/) {
             my ($var, $value) = ($1, $2);
 
-            $var =~ tr/[A-Z]/[a-z]/;
+            $var = lc($var);
             if ($var eq "name") {
                 $pkg = $value;
                 @{$specdata->{PKGS}} = ($pkg);
@@ -208,6 +211,82 @@ parse_spec_file
         }
     }
     return $specdata;
+}
+
+sub
+disable_patch($)
+{
+    my $patch = $_[0];
+    my $specfile = &pkgvar_instructions();
+    my $line;
+    my @contents;
+    local *SPECFILE;
+
+    dprint "Patch $patch in $specfile is being commented out.\n";
+    if (! $specfile) {
+        return 0;
+    }
+
+    dprint "Reading original spec file source from $specfile.\n";
+    open(SPECFILE, $specfile) || return 0;
+    @contents = <SPECFILE>;
+    close(SPECFILE);
+
+    dprint "Rewriting spec file.\n";
+    open(SPECFILE, ">$specfile") || return 0;
+    foreach my $line (@contents) {
+        chomp($line);
+        if ($line =~ /^\s*\%patch(\d*)\s+/) {
+            my $patch_num = $1;
+
+            if ((($patch_num) && ($patch_num eq $patch))
+                || (!($patch_num) && !($patch))) {
+                dprint "Disabling:  $line\n";
+                $line = '#' . $line;
+            }
+        }
+        print SPECFILE "$line\n";
+    }
+    close(SPECFILE);
+    return 1;
+}
+
+sub
+enable_patch($)
+{
+    my $patch = $_[0];
+    my $specfile = &pkgvar_instructions();
+    my $line;
+    my @contents;
+    local *SPECFILE;
+
+    dprint "Patch $patch in $specfile is being un-commented.\n";
+    if (! $specfile) {
+        return 0;
+    }
+
+    dprint "Reading original spec file source from $specfile.\n";
+    open(SPECFILE, $specfile) || return 0;
+    @contents = <SPECFILE>;
+    close(SPECFILE);
+
+    dprint "Rewriting spec file.\n";
+    open(SPECFILE, ">$specfile") || return 0;
+    foreach my $line (@contents) {
+        chomp($line);
+        if ($line =~ /^\s*\#\s*\%patch(\d*)\s+/) {
+            my $patch_num = $1;
+
+            if ((($patch_num) && ($patch_num eq $patch))
+                || (!($patch_num) && !($patch))) {
+                dprint "Enabling:  $line\n";
+                $line =~ s/^\s*\#//;
+            }
+        }
+        print SPECFILE "$line\n";
+    }
+    close(SPECFILE);
+    return 1;
 }
 
 sub

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.34 2003/11/30 16:40:28 mej Exp $
+# $Id: srctool,v 1.35 2003/11/30 20:12:00 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -236,9 +236,22 @@ gen_patch($$)
 
     $patch = &pkgvar_name();
     if ($patch =~ /^\d+$/) {
-        # Here is where we redo the spec file to comment out
+        # Redo the spec file to comment out
         # the patch we're about to regenerate.
+        if (! &pkgvar_instructions()) {
+            my @tmp = &grepdir(sub {$_ =~ /\.spec(\.in)?$/}, "F");
 
+            if (scalar(@tmp) != 1) {
+                eprintf("%d spec files?!\n", scalar(@tmp));
+                return MEZZANINE_SPEC_ERRORS;
+            }
+            &pkgvar_instructions($tmp[0]);
+        }
+        dprint "Disabling patch $patch to regenerate.\n";
+        if (! &disable_patch($patch)) {
+            eprint "Unable to disable patch $patch.\n";
+            return MEZZANINE_FILE_OP_FAILED;
+        }
     }
 
     $old_wd = $WORK_DIR;
@@ -259,6 +272,18 @@ gen_patch($$)
     &pkgvar_filename("");
     if (($err = &prepare_tree()) != MEZZANINE_SUCCESS) {
         return $err;
+    }
+
+    # Re-enable the patch
+    if ($patch =~ /^\d+$/) {
+        my $specdata = &parse_spec_file();
+
+        dprint "Re-enabling regenerated patch $patch ($specdata->{PATCH}{$patch}).\n";
+        if (! &enable_patch($patch)) {
+            eprint "Unable to re-enable patch $patch.\n";
+            return MEZZANINE_FILE_OP_FAILED;
+        }
+        $patch = $specdata->{"PATCH"}{$patch};
     }
 
     # Now diff the two trees and save the output
@@ -591,7 +616,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.34 $ created on $Date: 2003/11/30 16:40:28 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.35 $ created on $Date: 2003/11/30 20:12:00 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
