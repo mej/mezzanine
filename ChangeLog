@@ -290,3 +290,8 @@ Tue Jun  6 12:23:42 2000                        Michael Jennings (mej)
 
 Well now that was just dumb.
 ----------------------------------------------------------------------
+Tue Jun  6 19:58:58 2000                        Michael Jennings (mej)
+
+This should fix the remaining bugs in the build process up until the
+unfinished part of the accumulation stage.
+----------------------------------------------------------------------

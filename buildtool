@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.39 2000/06/06 19:12:32 mej Exp $
+# $Id: buildtool,v 1.40 2000/06/07 02:48:04 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -344,7 +344,7 @@ get_package_stages
     my $type = $_[0];
 
     if ($type eq "rpm") {
-        return "spia";
+        return "sbpia";
     } elsif ($type eq "module") {
         return "scpia";
     } elsif ($type eq "image") {
@@ -569,10 +569,8 @@ parse_product_entry
 
     dprint "parse_product_entry():  Module is $module, name is $name\n";
     # Add defaults for stuff that is required
-    if ($type eq "module") {
-        if (defined($pkgvars{REVISION}) && $pkgvars{REVISION} =~ /^head$/i) {
-            undef $pkgvars{REVISION};
-        }
+    if ($type eq "module" || $type eq "image") {
+        # Anything needed here?
     } elsif ($type eq "srpm" || $type eq "rpm") {
         if ($name =~ /^(\S+)\.(\w+)\.rpm$/) {
             ($name, $arch) = ($1, $2);
@@ -604,9 +602,6 @@ parse_product_entry
             }
         }
         $filename = sprintf("%s$name-$pkgvars{VERSION}-$pkgvars{RELEASE}.$arch.rpm", ($module ? "$module/" : ""));
-        if (defined($pkgvars{REVISION}) && $pkgvars{REVISION} =~ /^head$/i) {
-            undef $pkgvars{REVISION};
-        }
     }
 
     # Check for duplicates
@@ -648,6 +643,10 @@ parse_product_entry
                 $pkgs->{$name}{$pkgvar} = $val;
             }
         }
+    }
+    if ($pkgs->{$name}{REVISION} =~ /^head$/i) {
+        # This goes here to avoid the fallback mechanism above.
+        undef $pkgs->{$name}{REVISION};
     }
     if (!defined $pkgs->{$name}{STAGES}) {
         $pkgs->{$name}{STAGES} = &get_package_stages($type);
@@ -1285,30 +1284,41 @@ do_build_stage
         }
         nprint "$progname:  Starting build stage for the \"$pkg\" package....  (${\(&get_timestamp())})\n";
 
-        # Check for a target SRPM that is newer than the original SRPM and the
-        # spec file.  If such an SRPM exists, skip the build stage for this package.
-        $target = "$builddir/SRPMS/$pkg" . "-"
-                   . "$pkgs->{$pkg}{VERSION}" . "-" . "$pkgs->{$pkg}{RELEASE}.src.rpm";
-        $specfile = $pkgs->{$pkg}{SPECFILE};
-        dprint "Target SRPM is $target\n";
-        if (-f $target) {
-            $target_age = -M _;
-            $orig_age = -M $pkgs->{$pkg}{FILENAME};
-            $spec_age = -M $specfile;
-            dprint "File ages:  $orig_age for $pkgs->{$pkg}{FILENAME}, $target_age for $target,"
-                    . " and $spec_age for $specfile\n";
-            if ($target_age < $spec_age && $target_age < $orig_age) {
-                nprint "$progname:  The target SRPM already exists.\n";
-                nprint "$progname:  Build stage for \"$pkg\" is complete.\n";
-                next;
-            }
-        }
+        if ($pkgs->{$pkg}{TYPE} eq "rpm") {
+            my $arch;
 
-        # Rebuild from the spec file
-        ($err, $msg, $srpm) = &build_rpms($pkg, $specfile);
-        dprint "do_build_stage():  build_rpms($pkg, $specfile) returned $err, $msg, $srpm\n";
-        if ($err) {
-            &fail_package($pkg, "build", $msg);
+            # Binary package.  Just move it into place.
+            $pkgs->{$pkg}{FILENAME} =~ m/\.(\w+)\.rpm/;
+            $arch = $1;
+            dprint "Copying $pkgs->{$pkg}{FILENAME} to $builddir/RPMS/$arch\n";
+            &mkdirhier("$builddir/RPMS/$arch");
+            system("cp $pkgs->{$pkg}{FILENAME} $builddir/RPMS/$arch/");
+        } else {
+            # Check for a target SRPM that is newer than the original SRPM and the
+            # spec file.  If such an SRPM exists, skip the build stage for this package.
+            $target = "$builddir/SRPMS/$pkg" . "-"
+                       . "$pkgs->{$pkg}{VERSION}" . "-" . "$pkgs->{$pkg}{RELEASE}.src.rpm";
+            $specfile = $pkgs->{$pkg}{SPECFILE};
+            dprint "Target SRPM is $target\n";
+            if (-f $target) {
+                $target_age = -M _;
+                $orig_age = -M $pkgs->{$pkg}{FILENAME};
+                $spec_age = -M $specfile;
+                dprint "File ages:  $orig_age for $pkgs->{$pkg}{FILENAME}, $target_age for $target,"
+                        . " and $spec_age for $specfile\n";
+                if ($target_age < $spec_age && $target_age < $orig_age) {
+                    nprint "$progname:  The target SRPM already exists.\n";
+                    nprint "$progname:  Build stage for \"$pkg\" is complete.\n";
+                    next;
+                }
+            }
+
+            # Rebuild from the spec file
+            ($err, $msg, $srpm) = &build_rpms($pkg, $specfile);
+            dprint "do_build_stage():  build_rpms($pkg, $specfile) returned $err, $msg, $srpm\n";
+            if ($err) {
+                &fail_package($pkg, "build", $msg);
+            }
         }
         nprint "$progname:  Build stage for \"$pkg\" is complete.  (${\(&get_timestamp())})\n";
     }
@@ -1350,6 +1360,7 @@ do_package_stage
         $release = $pkgs->{$pkg}{RELEASE};
         undef @outfiles;
 
+        dprint "Checking for output files for $pkg $version-$release\n";
         if ($pkgs->{$pkg}{OUTFILES}) {
             dprint "Output files [$pkgs->{$pkg}{OUTFILES}] saved from earlier.\n";
             @outfiles = split(" ", $pkgs->{$pkg}{OUTFILES});
@@ -1473,7 +1484,7 @@ summarize_failures
 sub
 parallel_build
 {
-    my ($pid, $err, $idx, $pkg, $logfile, $line, $nprocs, $done, $left);
+    my ($pid, $err, $idx, $pkg, $logfile, $line, $nprocs, $done, $left, $failed);
     my (@children, @vars, @p);
     my %child_pkg;
     local *ERRLOG;
@@ -1506,7 +1517,8 @@ parallel_build
         nprint "$progname:  Currently building:  $line\n";
         $done = $idx - $#children - 1;
         $left = $#p + 1 - $done;
-        nprint "$progname:  $done packages completed, $left to go.\n";
+        $failed = $#failed_pkgs + 1;
+        nprint "$progname:  $done packages completed ($failed failed), $left to go.\n";
 
         # Wait for a child to die
         $pid = waitpid(-1, 0);
@@ -1536,7 +1548,7 @@ parallel_build
                 @tmp = <ERRLOG>;
                 close(ERRLOG);
                 chomp($line = $tmp[$#tmp]);
-                if ($line =~ /^$progname:  Error:  Package \S+ failed at the (\w+) stage:  (.*)$/) {
+                if ($line =~ /^$progname:  Error:  Package \S+ failed at the [a-z ]+ stage:  (.*)$/) {
                     &fail_package($pkg, $1, $2);
                 } else {
                     $line =~ s/^\w+:  (Error:  )?\s*//;
@@ -1592,7 +1604,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.39 $ created on $Date: 2000/06/06 19:12:32 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.40 $ created on $Date: 2000/06/07 02:48:04 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
