@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.51 2000/09/09 05:47:32 mej Exp $
+# $Id: revtool,v 1.52 2000/09/26 23:32:22 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -90,6 +90,7 @@ print_usage_info
     print "       --addlist \"files\"     Specify which files to add so that adds and removes can coincide\n";
     print "       --remlist \"files\"     Specify which files to remove so that adds and removes can coincide\n";
     print "       --reset               Reset sticky tags, dates, etc. in the current module\n";
+    print "       --blind               Do not update before committing (may result in conflicts, use carefully)\n";
     print "    -P --protocol <proto>    Specify which protocol to use (cvs or bk)\n";
     print "\n";
     exit(0);
@@ -402,7 +403,13 @@ commit_to_master
     dprint("Opened log file $logfile for commit log\n");
     $username = $ENV{"LOGNAME"};
     @pw_info = getpwnam($username);
-    $fullname = $pw_info[6];
+    if ($pw_info[6] =~ /,/) {
+        my @gecos = split(",", $pw_info[6], -1);
+
+        $fullname = $gecos[0];
+    } else {
+        $fullname = $pw_info[6];
+    }
     printf LOGFILE "%-25s%45s\n\n", scalar localtime, ($fullname ? "$fullname ($username)" : "$username");
     close(LOGFILE);
     chomp($module = &cat_file("CVS/Repository"));
@@ -415,13 +422,24 @@ commit_to_master
     }
     if (! $opt_x) {  # This extra check will go away when the above section is fleshed out.
         if (! -f "ChangeLog") {
-            open(CL, ">ChangeLog");
-            print "WARNING:  You have no ChangeLog here.  I have created one for you.\n";
-            &add_new_files("ChangeLog");
+            if (open(CL, ">ChangeLog")) {
+                print "WARNING:  You have no ChangeLog here.  I have created one for you.\n";
+                &add_new_files("ChangeLog");
+            } else {
+                print "WARNING:  Unable to create ChangeLog:  $!\n";
+                $opt_x = 1;
+            }
         } else {
-            open(CL, ">>ChangeLog");
-            if ($file_list !~ /^\s*$/ && $file_list !~ /ChangeLog/) {
-                $file_list = "$file_list ChangeLog";
+            if (! -w "ChangeLog") {
+                chmod(0644, "ChangeLog");
+            }
+            if (open(CL, ">>ChangeLog")) {
+                if ($file_list !~ /^\s*$/ && $file_list !~ /ChangeLog/) {
+                    $file_list = "$file_list ChangeLog";
+                }
+            } else {
+                print "WARNING:  Unable to write to ChangeLog:  $!\n";
+                $opt_x = 1;
             }
         }
     }        
@@ -446,7 +464,7 @@ commit_to_master
 
     $cmd = sprintf("/bin/sh -c \"cvs $cvsroot commit %s -F $logfile $file_list\"", ($opt_t ? "-r $opt_t" : ""));
     $err = &talk_to_server("put", $cmd);
-    unlink $logfile;
+    unlink $logfile, "$logfile~";
     return ($err);
 }
 
@@ -802,7 +820,7 @@ main
         if ($opt_g || $opt_reset) {
             $retval = &update_from_master(@ARGV);
         } elsif ($opt_p) {
-            if (!($retval = &update_from_master($opt_x ? @ARGV : undef))) {
+            if ($opt_blind || !($retval = &update_from_master($opt_x ? @ARGV : undef))) {
                 if ($opt_x) {
                     &commit_to_master(@ARGV, ($addlist ? $addlist : undef), ($remlist ? $remlist : undef));
                 } else {
@@ -830,7 +848,7 @@ BEGIN {
     @valid_opts = ("h|help", "v|version", "d|debug", "g|get", "p|put", "a|add", "r|remove",
                    "q|query=s", "R|recurse", "t|tag=s", "i|import", "k=s", "D|dir=s",
                    "x|exclusive", "addlist=s", "remlist=s", "T|rtag=s", "l|login", "b|branch",
-                   "ptag", "reset", "P|protocol");
+                   "ptag", "reset", "blind", "P|protocol");
 
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
@@ -878,7 +896,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.51 $ created on $Date: 2000/09/09 05:47:32 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.52 $ created on $Date: 2000/09/26 23:32:22 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

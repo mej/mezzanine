@@ -830,3 +830,8 @@ Tue Sep 26 15:58:36 2000                        Michael Jennings (mej)
 
 Only rescan the binary RPM's if we need to.
 ----------------------------------------------------------------------
+Tue Sep 26 16:50:44 2000                        Michael Jennings (mej)
+
+Enhancements to revtool from Chip Salzenberg <chip@valinux.com>.  This
+closes patch ID's 2-5.
+----------------------------------------------------------------------
