@@ -1,0 +1,75 @@
+#!/bin/sh -x
+#
+# cdtool - The behind-the-scenes magic glue that happens before a CD is made
+#
+# Michael Jennings <mej@valinux.com>
+# 21 July 2000
+#
+# $Id: cdtool,v 1.1 2000/07/21 22:46:01 mej Exp $
+#
+
+trap 'exit -1' 1 2 15
+
+if [ -z "$BASE_DIR" ]; then
+  BASE_DIR=`pwd`
+fi
+BUILD_DIR=$BASE_DIR/build
+
+IMAGE=$BUILD_DIR/va-os-rpms
+TMP_IMAGE=$BUILD_DIR/img.bak
+SYSLINUX_DIR=syslinux-1.45
+
+# Make a copy of the ISO image tree
+cd $BUILD_DIR
+[ -d $TMP_IMAGE ] && rm -rf $TMP_IMAGE
+cp -a $IMAGE $TMP_IMAGE
+
+# Build syslinux
+cd $TMP_IMAGE/misc/src/trees/$SYSLINUX_DIR
+make
+cd ..
+
+# Update the image trees and initrd files
+make all
+
+# Create the disk images
+# NOTE:  You can safely ignore messages during "do-make" like:
+#    cpio: /tmp/mkimage.mnt-18505/./.cvsignore: Invalid argument
+make do-make
+make clean
+(cd $SYSLINUX_DIR ; make clean ; rm -f bootsect.bin ldlinux.bin ldlinux.sys ldlinux.lst)
+
+# Remove the initrd images and image trees.  No longer needed.
+rm -rf *.img cdrom hdstg2 initrd local netstg2 network pcmcia boot/vmlinuz
+
+# Clean up anaconda
+cd ../anaconda ; make clean
+
+# Generate the diff
+cd $BUILD_DIR
+diff -x CVS -x .cvsignore -ur $IMAGE $TMP_IMAGE >& img.patch
+${EDITOR:-vi} img.patch
+
+# Make sure there's nothing new popping up unexpectedly.
+ONLY=`grep '^Only' img.patch | sed 's/: /\//' | awk '{print $3}'`
+if [ -n "$ONLY" ]; then
+  echo "The following files were found only in one tree:"
+  echo $ONLY
+  echo
+  echo "This is probably a problem.  Correct it, then hit Enter to continue."
+  read
+fi
+
+# Copy over all the changed files
+rm -f img.sh
+grep '^Binary' img.patch | awk '{print "cp -a "$5" "$3}' > img.sh
+sh img.sh
+
+# Regenerate the package list ($IMAGE/RedHat/base/hdlist) from $IMAGE/RedHat/base/comps
+cd $IMAGE/misc/src/anaconda/utils
+./genhdlist $IMAGE
+cd $IMAGE
+
+echo "I'm about to commit this.  Ctrl-C now to abort, or Enter to commit."
+read
+revtool -xp
