@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Deb.pm,v 1.2 2001/09/22 13:22:34 mej Exp $
+# $Id: Deb.pm,v 1.3 2002/01/04 21:43:17 mej Exp $
 #
 
 package Mezzanine::Deb;
@@ -63,16 +63,58 @@ END {
 ### Function definitions
 
 sub
+deb_form_command
+{
+    my $type = shift;
+    my $cmd;
+
+    $type = "" if (!defined($type));
+
+    if (&pkgvar_topdir()) {
+        $cmd = "cd " . &pkgvar_topdir() " && ";
+    } else {
+        $cmd = "";
+    }
+    if ($type eq "build") {
+        if (! &pkgvar_command()) {
+            &pkgvar_command("dpkg-buildpackage");
+        }
+        $cmd .= &pkgvar_command();
+        if (&pkgvar_buildroot()) {
+            $cmd .= " --buildroot=\"" . &pkgvar_buildroot() . "\"";
+        }
+    } elsif ($type eq "install") {
+        if (! &pkgvar_command()) {
+            &pkgvar_command("dpkg");
+        }
+        $cmd .= &pkgvar_command();
+        if (&pkgvar_instroot()) {
+            $cmd .= " --root=\"" . &pkgvar_instroot() . "\"";
+        }
+    } elsif ($type eq "contents") {
+    } elsif ($type eq "query") {
+    }
+    if (&pkgvar_parameters()) {
+        $cmd .= " " . &pkgvar_parameters();
+    }
+    dprint "Command:  $cmd\n";
+    return $cmd;
+}
+
+sub
 deb_install
 {
-    my $pkg_file = $_[0];
-    my ($dpkg, $cmd);
-    my @inp;
+    my $cmd;
     local *DPKG;
 
-    $dpkg = ($pkg_prog ? $pkg_prog : "dpkg");
-    $cmd = "$dpkg -x $pkg_file";
-    dprint "About to run \"$cmd\"\n";
+    if (! &pkgvar_filename()) {
+        return (MEZZANINE_SYNTAX_ERROR, "No package specified for install");
+    }
+    if (&pkgvar_subtype() eq "sdeb") {
+        $cmd = &deb_form_command("install") . " -x " . &pkgvar_filename();
+    } else {
+        $cmd = &deb_form_command("install") . " -i " . &pkgvar_filename();
+    }
     if (!open(DPKG, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }
@@ -80,54 +122,41 @@ deb_install
         print;
     }
     close(DPKG);
-    dprint "\"$cmd\" returned $?\n";
     if ($? != 0) {
-        return MEZZANINE_UNSPECIFIED_ERROR;
+        return (MEZZANINE_UNSPECIFIED_ERROR, &pkgvar_command() . " returned " . ($? >> 8));
     }
-    print "$pkg_file successfully installed.\n";
-    return MEZZANINE_SUCCESS;
+    return (MEZZANINE_SUCCESS, &pkgvar_filename() . " successfully installed.");
 }
 
 sub
 deb_show_contents
 {
-    my $pkg_file = $_[0];
-    my ($dpkg, $cmd, $line);
+    my ($cmd, $line);
+    my @results;
     local *DPKG;
 
-    $dpkg = ($pkg_prog ? $pkg_prog : "dpkg");
-    $cmd = "$dpkg -c " . ($pkg_file ? "$pkg_file" : "");
-    dprint "About to run \"$cmd\"\n";
+    if (! &pkgvar_filename()) {
+        return (MEZZANINE_SYNTAX_ERROR, "No package specified for query");
+    }
+    $cmd = &deb_form_command("contents") . " -c " . &pkgvar_filename();
     if (!open(DPKG, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }
-    while (<DPKG>) {
-        chomp;
-        ($line = $_) =~ s/^.* \.(\/.*)$/$1/;
-        print "$line\n";
-    }
+    @results = <DPKG>;
     close(DPKG);
-    dprint "\"$cmd\" returned $?\n";
-    if ($? != 0) {
-        return MEZZANINE_UNSPECIFIED_ERROR;
-    }
-    return MEZZANINE_SUCCESS;
+    return ($? >> 8, @results);
 }
 
 sub
 deb_query
 {
-    my ($pkg_file, $query_type) = @_;
-    my ($dpkg, $cmd, $line);
+    my $query_type = $_[0];
+    my ($cmd, $line);
     my (@prov, @deps);
     local *DPKG;
 
+    $cmd = &deb_form_command("query") . " -I";
     if ($query_type eq "d") {
-    } else {
-        eprint "Unrecognized query type \"$query_type\"\n";
-        return MEZZANINE_SYNTAX_ERROR;
-    }
-    $dpkg = ($pkg_prog ? $pkg_prog : "dpkg");
     $cmd = "$dpkg -I " . ($pkg_file ? "$pkg_file" : "");
     dprint "About to run \"$cmd\"\n";
     if (!open(DPKG, "$cmd 2>&1 |")) {
@@ -156,6 +185,10 @@ deb_query
     foreach $dep (@deps) {
         print "Dependency:  $dep\n";
     }   
+    } else {
+        eprint "Unrecognized query type \"$query_type\"\n";
+        return MEZZANINE_SYNTAX_ERROR;
+    }
     return MEZZANINE_SUCCESS;
 }
 

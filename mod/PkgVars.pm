@@ -36,7 +36,7 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('&pkgvar_reset', '&pkgvar_name', '&pkgvar_type', '&pkgvar_filename', '&pkgvar_target', '&pkgvar_srcs', '&pkgvar_instructions', '&pkgvar_topdir', '&pkgvar_instroot', '&pkgvar_buildroot', '&pkgvar_architecture', '&pkgvar_parameters', '&pkgvar_command', '&pkgvar_rcfile', '&pkgvar_tar', '&pkgvar_zip', '&pkgvar_cleanup', '&get_package_path', '&identify_package');
+    @EXPORT      = ('&pkgvar_reset', '&pkgvar_name', '&pkgvar_type', '&pkgvar_subtype', '&pkgvar_filename', '&pkgvar_target', '&pkgvar_srcs', '&pkgvar_instructions', '&pkgvar_topdir', '&pkgvar_instroot', '&pkgvar_buildroot', '&pkgvar_architecture', '&pkgvar_parameters', '&pkgvar_command', '&pkgvar_rcfile', '&pkgvar_tar', '&pkgvar_zip', '&pkgvar_cleanup', '&get_package_path', '&identify_package_type');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -65,11 +65,13 @@ $pkg_tar = "";
 $pkg_zip = "";
 $pkg_cleanup = "none";
 %pkg_type = ();
+%pkg_subtype = ();
 
 ### Function prototypes
 sub pkgvar_reset();
 sub pkgvar_name($);
 sub pkgvar_type($);
+sub pkgvar_subtype($);
 sub pkgvar_filename($);
 sub pkgvar_target($);
 sub pkgvar_srcs(@);
@@ -85,7 +87,7 @@ sub pkgvar_tar($);
 sub pkgvar_zip($);
 sub pkgvar_cleanup($);
 sub get_package_path($$);
-sub identify_package($);
+sub identify_package_type();
 
 # Private functions
 
@@ -134,10 +136,30 @@ pkgvar_type
     my $param = $_[0];
 
     if (defined($param)) {
-        $pkg_type{$pkg_file} = ($param ?  $param : &identify_package());
+        if ($param) {
+            $pkg_type{$pkg_file} = $param;
+        } else {
+            &identify_package_type();
+        }
     }
     dprint "$pkg_type{$pkg_file}\n";
     return $pkg_type{$pkg_file};
+}
+
+sub
+pkgvar_subtype
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        if ($param) {
+            $pkg_subtype{$pkg_file} = $param;
+        } else {
+            &identify_package_type();
+        }
+    }
+    dprint "$pkg_subtype{$pkg_file}\n";
+    return $pkg_subtype{$pkg_file};
 }
 
 sub
@@ -151,7 +173,7 @@ pkgvar_filename
         }
         $pkg_file = ($param ?  $param : "");
     }
-    &identify_package() if ($pkg_file && !$pkg_type{$pkg_file});
+    &identify_package_type() if ($pkg_file && !$pkg_type{$pkg_file});
     dprint "$pkg_file\n";
     return $pkg_file;
 }
@@ -333,16 +355,26 @@ get_package_path
 
 # Figure out the type of a particular package file
 sub
-identify_package
+identify_package_type
 {
     if (substr($pkg_file, -4, 4) eq ".rpm") {
         $pkg_type{$pkg_file} = "rpm";
+        if (substr($pkg_file, -7, 7) eq "src.rpm") {
+            $pkg_subtype{$pkg_file} = "srpm";
+        } else {
+            $pkg_subtype{$pkg_file} = "rpm";
+        }
     } elsif (substr($pkg_file, -4, 4) eq ".deb") {
         $pkg_type{$pkg_file} = "deb";
+        if (substr($pkg_file, -7, 7) eq "src.deb") {
+            $pkg_subtype{$pkg_file} = "sdeb";
+        } else {
+            $pkg_subtype{$pkg_file} = "deb";
+        }
     } elsif ($pkg_file =~ /\.(tar\.|t)?(gz|bz|bz2|Z)$/) {
-        $pkg_type{$pkg_file} = "tar";
+        $pkg_type{$pkg_file} = $pkg_subtype{$pkg_file} = "tar";
     } else {
-        $pkg_type{$pkg_file} = "";
+        $pkg_type{$pkg_file} = $pkg_subtype{$pkg_file} = "";
     }
     dprint "Identified $pkg_file as $pkg_type{$pkg_file}\n";
 }
