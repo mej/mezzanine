@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.148 2001/07/27 21:27:18 mej Exp $
+# $Id: buildtool,v 1.149 2001/07/31 03:33:54 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -73,6 +73,48 @@ sub nprint     {print  @_ if ($GLOBAL_LOG || $verbosity >= 2);}
 sub qprintf    {printf @_ if ($GLOBAL_LOG || $verbosity >= 1);}
 sub qprint     {print  @_ if ($GLOBAL_LOG || $verbosity >= 1);}
 
+# What to do if a package completes successfully
+sub
+complete_package
+{
+    my $pkg = $_[0];
+
+    push @completed_pkgs, $pkg;
+    nprint "Package build for $pkg completed successfully.\n";
+}
+
+# What to do if a package fails
+sub
+fail_package
+{
+    my ($pkg, $msg) = @_;
+
+    push @failed_pkgs, $pkg;
+    if ($msg) {
+        $msg =~ s/\.+$//;
+        $failure->{$pkg}{MESSAGE} = $msg;
+        eprint "Package \"$pkg\" failed:  $msg.\n";
+    } else {
+        eprint "Package \"$pkg\" failed with an unknown error.\n";
+    }
+}
+
+# Remove failed packages from the list
+sub
+update_package_list(\@)
+{
+    my $parray = $_[0];
+    my @p = @{$parray};
+    my @tmp;
+
+    foreach my $pkg (@p) {
+        if (!grep($_ eq $pkg, @failed_pkgs)) {
+            push @tmp, $pkg;
+        }
+    }
+    return (@{$parray} = @tmp);
+}
+
 # Spawn a child buildtool
 sub
 spawn_cmd
@@ -118,21 +160,12 @@ download_packages
 
     nprint "Downloading packages, please wait..." if (! &debug_get());
     foreach $pkg (@packages) {
-        my ($module, $filename) = ($pkgs->{$pkg}{MODULE}, $pkgs->{$pkg}{FILENAME});
         my ($files, $tag, $cvsroot);
 
         $err = 0;
-        if ($filename eq $module) {
-            dprint "\"$filename\" vs. \"$module\" == 1\n";
-            $files = $module;
-        } else {
-            dprint "\"$filename\" vs. \"$module\" == 0\n";
-            $files = "$module/$filename";
-        }
+        $files = &get_package_path($pkgs->{$pkg}{MODULE}, $pkgs->{$pkg}{FILENAME});
         if (defined($pkgs->{$pkg}{BINS})) {
-            foreach my $bin (@{$pkgs->{$pkg}{BINS}}) {
-                $files .= " $bin";
-            }
+            $files = join(' ', $files, @{$pkgs->{$pkg}{BINS}});
         }
 	# Set the proper CVSROOT and tag for the checkout.
         if ($global_tree) {
@@ -155,7 +188,7 @@ download_packages
 
         nprint "$pkg..." if (! &debug_get());
         ($err, $msg) = &fetch_package("", $files, $tag, $cvsroot);
-        if ($err) {
+        if ($err != AVALON_SUCCESS && $err != AVALON_DUPLICATE) {
             &fail_package($pkg, $msg);
             next;
         }
@@ -164,88 +197,75 @@ download_packages
 }
 
 sub
-place_package
+place_package_files
 {
-    my ($path, $version, $release, $type);
+    my ($pkg, $outfiles, $locations) = @_;
     my @outfiles;
     my @contents;
-    my @p;
-    local *DIR;
 
-    @p = @packages;
-
-    foreach $pkg (@p) {
-        nprint "$progname:  Starting package accumulation stage for the \"$pkg\" package....\n";
-        $type = $pkgs->{$pkg}{TYPE};
-        $version = $pkgs->{$pkg}{VERSION};
-        $release = $pkgs->{$pkg}{RELEASE};
-        undef @outfiles;
-
-	### Look for output files.  Hopefully we recorded them from earlier.  If not, hunt for them.
-        dprint "Checking for output files for $pkg $version-$release\n";
-        if ($pkgs->{$pkg}{OUTFILES}) {
-            dprint "Output files [$pkgs->{$pkg}{OUTFILES}] saved from earlier.\n";
-            @outfiles = split(" ", $pkgs->{$pkg}{OUTFILES});
-        } else {
-            if ($type eq "srpm" || $type eq "module" || $type eq "tar") {
-                # Find all the RPM's installed by this package
-                dprint "Opening directory $builddir/SRPMS to scan for output files.\n";
-                foreach $rpm (&grepdir(sub {/^\Q$pkg-\E\S*\Q$version-$release\E\.(?:no)?src\.rpm$/}, "$builddir/SRPMS")) {
-                    dprint "Got output file $rpm\n";
-                    push @outfiles, "$builddir/SRPMS/$rpm";
-                }
-
-                dprint "Opening directory $builddir/RPMS to scan for output files.\n";
-                @contents = glob("$builddir/RPMS/*/*.rpm");
-                foreach $rpm (@contents) {
-                    my $srpm;
-
-                    dprint "Checking $rpm\n";
-                    if (defined $srpm_of_rpm{$rpm}) {
-                        $srpm = $srpm_of_rpm{$rpm};
-                    } else {
-                        $srpm = `rpm -qp $rpm --queryformat \"%{SOURCERPM}\"`;
-                        $srpm_of_rpm{$rpm} = $srpm;
-                    }
-                    if ($srpm =~ /^\Q$pkg-\E\S*\Q$version-$release\E\.(?:no)?src\.rpm$/) {
-                        dprint "Got output file $rpm\n";
-                        push @outfiles, $rpm;
-                    }
-                }
-            } elsif ($type eq "rpm") {
-                my ($filename, $arch, $outfile);
-
-                ($filename = $pkgs->{$pkg}{FILENAME}) =~ s/^.*\/([^\/]+)$/$1/;
-                ($arch = $filename) =~ s/^.*\.(\w+)\.rpm$/$1/;
-                $outfile = "$builddir/RPMS/$arch/$filename";
-                dprint "Output RPM is $outfile\n";
-                if (-f $outfile) {
-                    push @outfiles, $outfile;
-                }
-            }
-        }
-
-	# If we didn't find any, something is very wrong.
-        if ($#outfiles == -1) {
-            &fail_package($pkg, "package accumulation", "No output RPM's were found");
-            next;
-        }
-        dprint "Output files for $pkg:  ", join(" ", @outfiles), "\n";
-
-        # Copy each RPM into the appropriate place
-        foreach $rpm (@outfiles) {
-            my $found;
-
-            $found = &place_file($pkg, $rpm);
-            if ($found == 0) {
-                qprint "Warning:  No location found matching $rpm\n";
-            } else {
-                dprint "Found $found locations for $rpm\n";
-            }
-        }
-        nprint "$progname:  Package accumulation stage for \"$pkg\" is complete.\n";
+    # If we didn't find any, something is very wrong.
+    if (! $outfiles) {
+        &fail_package($pkg, "No output packages were found");
+        return AVALON_PACKAGE_FAILED;
     }
-    qprint "$progname:  Package accumulation stage is now complete.  (${\(&get_timestamp())})\n";
+    if (! $locations) {
+        wprint "No locations specified for $pkg.\n";
+        return AVALON_SUCCESS;
+    }
+    dprint "Output files for $pkg:  $outfiles\n";
+
+    # Copy each package into the appropriate place
+    foreach my $file (split(' ', $outfiles)) {
+        foreach my $loc (split(",", $locations)) {
+            my ($regex, $stop, $dest);
+
+            # Format is:  /regexp/.path  where . is some delimiter character that
+            # tells us whether to check other locations or stop once we match
+            # (':' to continue looking for matches, or '=' to stop if a match is found).
+            dprint "Testing location \"$loc\"\n";
+            if ($loc !~ m/^\/([^\/]+)\/(.)(\S+)?$/) {
+                eprint "Location specifier \"$loc\" is invalid.\n";
+                next;
+            }
+            ($regex, $stop, $dest) = ($1, $2, $3);
+            if ($stop eq "!") {
+                # A negative match test.  If we get a match, don't accept it.
+                next if ($file =~ $regex);
+            } else {
+                # No match.  Try next location.
+                next if ($file !~ $regex);
+            }
+            dprint "Match found.\n";
+
+            if ($dest) {
+                # If the destination does not contain a filename, add the filename portion of
+                # $file to the directory path in $dest.  The destination could be used to rename
+                # a file, however; that's why this check is in place.
+                if (substr($dest, -3, 3) ne substr($file, -3, 3)) {
+                    my $tmp;
+
+                    ($tmp = $file) =~ s/^.*\/([^\/]+)$/$1/;
+                    $dest = "$dest/$tmp";
+                }
+                # If it exists, delete it
+                if (-e $dest) {
+                    &nuke_tree($dest);
+                }
+                # Then link it
+                dprint "ln -f $file $dest\n";
+                if (!link($file, $dest)) {
+                    &fail_package($pkg, "Unable to create $dest as a link to $file -- $!");
+                    last;
+                }
+            }
+
+            # If the stop character is '=', stop checking for matches for this package.
+            # If it's ':' (actually, any other character than '='), keep looking for matches.
+            last if ($stop eq "=");
+            dprint "Non-exclusive match.  Continuing on....\n";
+        }
+    }
+    return AVALON_SUCCESS;
 }
 
 # Once we're all done, summarize any failures at the very end
@@ -253,33 +273,35 @@ place_package
 sub
 summarize_failures
 {
-    my ($ns, $nf, $nt);
+    my ($ns, $nf, $nt, $nb, $face);
 
     # $ns is the number of successful packages.  $nf is the number of failures.
     # $nt is the total number of packages we tried to build.
-    $ns = scalar(@packages);
+    $ns = scalar(@completed_pkgs);
     $nf = scalar(@failed_pkgs);
-    $nt = $ns + $nf;
-    dprint "Successful:  $ns    Failed:  $nf    Total:  $nt\n";
+    $nt = scalar(@packages);
+    $nb = $nt - $ns - $nf;
 
-    qprint "Package Summary:  Out of $nt total packages,";
-    if ($ns) {
-        qprint(" ", ($ns == $nt ? "all" : "$ns"), " succeeded");
-        if ($nf) {
-            qprint " and";
-        }
+    if ($ns == $nt) {
+        $face = ":-)";
+    } elsif ($nf == $nt) {
+        $face = ":-(";
+    } elsif ($ns > $nf) {
+        $face = ":-}";
+    } elsif ($nf > $ns) {
+        $face = ":-{";
+    } else {
+        $face = ":-|";
     }
-    if ($nf) {
-        qprint(" ", ($nf == $nt ? "all" : "$nf"), " failed");
-    }
-    qprint ".\n";
+
+    qprint "Build Summary:  $ns Successful    $nf Failed    $nb Not Built    $nt Total    $face\n";
 
     if ($nf) {
         foreach $pkg (@failed_pkgs) {
             if ($failure->{$pkg}{MESSAGE}) {
-                eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage:  $failure->{$pkg}{MESSAGE}.\n";
+                eprint "Package \"$pkg\" failed:  $failure->{$pkg}{MESSAGE}.\n";
             } else {
-                eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage.\n";
+                eprint "Package \"$pkg\" failed; reason unknown.  Check the log to see what went wrong.\n";
             }
         }
     }
@@ -370,37 +392,49 @@ parallel_build
 sub
 build_product
 {
-    my packages = @_;
+    my @packages = @_;
+    my $builddir;
 
     # Create a build area for ourselves.
-    if (!mkdir("build.avalon", 0755)) {
+    if (defined($ENV{AVALON_BUILDDIR})) {
+        $builddir = $ENV{AVALON_BUILDDIR};
+    } else {
+        $builddir = &getcwd() . "/build.avalon";
+    }
+    if (!(-d $builddir || mkdir($builddir, 0755))) {
         &fatal_error("Unable to create build directory -- $!\n");
     }
-    if (!chdir("build.avalon")) {
+    if (!chdir($builddir)) {
         &fatal_error("Unable to chdir to build directory -- $!\n");
     }
 
     # Download all the packages.
     &download_packages(@packages);
+    @packages = &update_package_list(@packages);
 
-    # Call build_package() for each package; we don't care how that happens yet.
+    # Call build_package() for each package; we don't care how that works as long as it does. :-)
     foreach my $pkg (@packages) {
         my ($module, $err, $msg, $outfiles);
 
-        if ($pkgs->{$pkg}{MODULE}) {
-            $module = $pkgs->{$pkg}{MODULE};
-        } elsif ($pkgs->{$pkg}{FILENAME}) {
-            $module = $pkgs->{$pkg}{FILENAME};
+        if ($pkgs->{$pkg}{TYPE} eq "image") {
+            # Nothing to do here.
+            next;
+        }
+        if ($pkgs->{$pkg}{BINS}) {
+            $outfiles = join(' ', $pkgs->{$pkg}{FILENAME}, @{$pkgs->{$pkg}{BINS}});
         } else {
-            &fail_package($pkg, "I don't know what to build from!");
-            next;
+            if (! ($module = &get_package_path($pkgs->{$pkg}{MODULE}, $pkgs->{$pkg}{FILENAME}))) {
+                &fail_package($pkg, "I don't know what file/module to build from!");
+                next;
+            }
+            ($err, $msg, $outfiles) = &build_package($module, &getcwd(), undef, $target);
+            if ($err != AVALON_SUCCESS) {
+                &fail_package($pkg, $msg);
+                next;
+            }
         }
-        ($err, $msg, $outfiles) = &build_package($module, &getcwd(), undef, $target);
-        if ($err != AVALON_SUCCESS) {
-            &fail_package($pkg, $msg);
-            next;
-        }
-        &place_package($pkg, $outfiles);
+        &place_package_files($pkg, $outfiles, $pkgs->{$pkg}{LOCATIONS});
+        &complete_package($pkg);
     }
 
     # Now we clean up.
@@ -432,7 +466,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.148 $ created on $Date: 2001/07/27 21:27:18 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.149 $ created on $Date: 2001/07/31 03:33:54 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

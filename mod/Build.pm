@@ -21,13 +21,15 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.7 2001/07/27 21:27:18 mej Exp $
+# $Id: Build.pm,v 1.8 2001/07/31 03:33:55 mej Exp $
 #
 
 package Avalon::Build;
 
 BEGIN {
     use Exporter   ();
+    use Cwd;
+    use File::Copy;
     use Avalon::Util;
     use Avalon::Pkg;
     use Avalon::RPM;
@@ -61,9 +63,9 @@ sub get_source_list($$$$);
 sub create_source_file($$$$$);
 sub create_source_files($$$\@);
 sub cleanup_build_tree($$$);
-sub build_rpms_from_topdir($$);
-sub build_debs_from_topdir($$);
-sub build_topdir($$$);
+sub build_rpms_from_topdir($$$);
+sub build_debs_from_topdir($$$);
+sub build_topdir($$$$);
 sub build_spm($$$$);
 sub build_cfst($$$$);
 sub build_fst($$$$);
@@ -110,16 +112,17 @@ prepare_build_tree(\$\$\$)
     # we are passed references to the variables, not the values.  The brief quantity
     # of goop below uses $n, $t, and $b as the references, then copies the values to
     # $name, $topdir, and $buildroot so that the rest of the code is readable. :-)
-    if (! $$n) {
-        $$n = &basename(&getcwd());
+    if (! $n) {
+        $n = &basename(&getcwd());
     }
-    if (! $$t) {
-        $$t = &getcwd() . "/build.avalon";
+    if (! $t) {
+        $t = &getcwd() . "/build.avalon";
     }
-    if (! $$b) {
-        $$b = "/var/tmp/avalon-buildroot.$$/$name";
+    if (! $b) {
+        $b = "/var/tmp/avalon-buildroot.$$/$n";
     }
-    ($name, $topdir, $buildroot) = ($$n, $$t, $$b);
+    ($name, $topdir, $buildroot) = ($n, $t, $b);
+    dprint "$name | $topdir | $buildroot\n";
     ### End of reference-handling goop
 
     # If the topdir doesn't exist, create it.
@@ -132,13 +135,16 @@ prepare_build_tree(\$\$\$)
     # Create the RPM directories also.  Same deal as above.
     foreach my $dir ("BUILD", "SRPMS", "RPMS", "SPECS", "SOURCES") {
         if (! -d "$topdir/$dir") {
+            if (-f "$topdir/$dir") {
+                # It's a bogus file.  Nuke it.
+                &nuke_tree("$topdir/$dir");
+            }
             mkdir("$topdir/$dir", 0755) || &fatal_error("Cannot create $topdir/$dir -- $!\n");
         }
     }
 
     # If the build root exists, get rid of it, then make a new (empty) one.
     if (-d $buildroot) {
-        nprint "Buildroot $buildroot exists.  I am removing it.\n";
         &nuke_tree($buildroot);
     }
     mkdir($buildroot, 0775);
@@ -182,7 +188,7 @@ get_source_list
         wprint "No SRCS variable found.  Proceeding with default assumptions.  If the assumptions don't work,\n";
         wprint "you will need to create an avalon.srcs file for this package.\n";
 
-        foreach my $fname (&grepdir(sub {! &should_ignore($_);}, ".")) {
+        foreach my $fname (&grepdir(sub {! &should_ignore($_);})) {
             if (-d $fname) {
                 my @tmp;
 
@@ -200,7 +206,7 @@ get_source_list
         }
     }
 
-    dprint "Preparing to generate sources \"", join(" ", @srcs), "\".\n";
+    dprint "Using SRCS variable \"", join(" ", @srcs), "\".\n";
     return @srcs;
 }
 
@@ -211,10 +217,9 @@ create_source_file
     my $cmd;
     local *CMD;
 
-    dprint "Source files:  \"$src_files\"\n";
+    $destdir .= '/' if (substr($destdir, -1, 1) ne '/');
     if ($tarball) {
-        print "Generating $tarball...\n";
-        $destdir .= '/' if (substr($destdir, -1, 1) ne '/');
+        dprint "Generating $destdir$tarball from \"$src_files\"...\n";
         if ($tar) {
             $cmd = $tar;
             $cmd =~ s/\%f/$src_files/;
@@ -235,7 +240,6 @@ create_source_file
             $cmd = "tar --exclude CVS --exclude RCS --exclude BitKeeper --exclude SCCS"
                    . "$zip -cf ${destdir}$tarball $src_files";
         }
-        dprint "Creating $tarball:  $cmd\n";
         unlink($tarball);
         if (!open(CMD, "$cmd 2>&1 |")) {
             eprint "Execution of \"$cmd\" failed -- $!\n";
@@ -246,19 +250,17 @@ create_source_file
             print "tar output -> $line\n";
         }
         close(CMD);
-        dprint "Command returned $?\n";
         if ($?) {
+            dprint "Command returned $?\n";
             eprint "Creation of vendor source tarball $tarball failed\n";
             return AVALON_BUILD_FAILURE;
         }
     } else {
         my $rc;
 
-        print "Copying $src_files to $destdir.\n";
-        $rc = system("cp -f $src_files $destdir") >> 8;
-        if ($rc) {
-            eprint "Unable to copy $src_files to $destdir -- $!\n";
-            return AVALON_BUILD_FAILURE;
+        dprint "Copying $src_files to $destdir.\n";
+        if (!&copy_files(split(' ', $src_files), $destdir)) {
+            return AVALON_SYSTEM_ERROR;
         }
     }
     return AVALON_SUCCESS;
@@ -271,6 +273,7 @@ create_source_files($ $ $ \@)
     my ($err, $src_files, $tarball);
 
     # Create all the source files we need.
+    dprint "$destdir, $tar, $zip, $srcs (@{$srcs})\n";
     foreach my $src (@{$srcs}) {
         ($src_files, $tarball) = split(":", $src);
         $src_files =~ s/\&/ /g;
@@ -301,8 +304,7 @@ cleanup_build_tree
         @dirs = ("$topdir/BUILD", "$topdir/SOURCES", "$topdir/SRPMS", "$topdir/RPMS", "$topdir/SPECS", $buildroot);
     }
     foreach my $f (@dirs) {
-        nprint "$progname:  Cleaning up $f\n";
-        &nuke_tree($f) || qprint "Warning:  Removal of $f failed -- $!\n";
+        &nuke_tree($f);
     }
 }
 
@@ -310,18 +312,12 @@ cleanup_build_tree
 sub
 build_rpms_from_topdir
 {
-    my ($topdir, $buildroot) = @_;
-    my ($cmd, $specfile);
-    my @tmp;
+    my ($specfile, $topdir, $buildroot) = @_;
+    my $cmd;
 
-    $cmd = "/bin/rpm --define '_topdir $topdir' --define 'optflags $ENV{CFLAGS}'"
+    $cmd = "/bin/rpm --define '_topdir $topdir' --define 'optflags $ENV{CFLAGS}'";
     if ($buildroot) {
         $cmd .= " --buildroot=\"$buildroot\"";
-    }
-    @tmp = &grepdir(sub {$_ !~ /^\.\.?$/}, "$topdir/SPECS");
-    if (!($specfile = $tmp[0])) {
-        &show_backtrace();
-        return (AVALON_FILE_NOT_FOUND, "No specfile?  Somebody screwed up!", undef);
     }
     $cmd .= " -ba $specfile";
     return &rpm_build($cmd);
@@ -331,7 +327,7 @@ build_rpms_from_topdir
 sub
 build_debs_from_topdir
 {
-    my ($topdir, $buildroot) = @_;
+    my ($script_dir, $topdir, $buildroot) = @_;
     my $cmd;
 
     # Goop goes here.
@@ -343,20 +339,20 @@ build_debs_from_topdir
 sub
 build_topdir
 {
-    my ($topdir, $buildroot, $target_format) = @_;
+    my ($specfile, $topdir, $buildroot, $target_format) = @_;
 
     if ($target_format eq "rpms") {
-        return &build_rpms_from_topdir($topdir, $buildroot);
+        return &build_rpms_from_topdir($specfile, $topdir, $buildroot);
     } elsif ($target_format eq "debs") {
-        return &build_debs_from_topdir($topdir, $buildroot);
+        return &build_debs_from_topdir($specfile, $topdir, $buildroot);
     } else {
         my ($err, $msg, $outfiles);
 
-        ($err, $msg, $outfiles) = &build_rpms_from_topdir($topdir, $buildroot);
+        ($err, $msg, $outfiles) = &build_rpms_from_topdir($specfile, $topdir, $buildroot);
         if ($err) {
             return ($err, $msg, $outfiles);
         }
-        return &build_debs_from_topdir($topdir, $buildroot);
+        return &build_debs_from_topdir($specfile, $topdir, $buildroot);
     }
 }
 
@@ -367,6 +363,7 @@ sub
 build_spm
 {
     my ($pkg, $topdir, $buildroot, $target_format) = @_;
+    my $specfile;
     my @tmp;
 
     if (! -d "F") {
@@ -375,15 +372,18 @@ build_spm
     }
     &prepare_build_tree($pkg, $topdir, $buildroot);
 
-    @tmp = &grepdir(sub {$_ !~ /^\.\.?$/}, "F");
+    @tmp = &grepdir(sub {-f $_ && -s _}, "F");
     if (!scalar(@tmp)) {
-        return (AVALON_BAD_PACKAGE, "$pkg does not seem to contain build instructions", undef);
+        return (AVALON_MISSING_FILES, "@{[getcwd()]} does not seem to contain build instructions", undef);
+    } elsif (scalar(@tmp) > 1) {
+        return (AVALON_BAD_MODULE, "Only one specfile/script dir allowed per package (@tmp)", undef);
     }
-    &copy_files(@tmp, "$topdir/SPECS");
-    @tmp = (&grepdir(sub {$_ !~ /^\.\.?$/}, "S"), &grepdir(sub {$_ !~ /^\.\.?$/}, "P"));
-    &copy_files(@tmp "$topdir/SOURCES");
+    &copy_files($tmp[0], "$topdir/SPECS");
+    $specfile = "$topdir/SPECS/" . &basename($tmp[0]);
+    @tmp = (&grepdir(sub {-f $_ && -s _}, "S"), &grepdir(sub {-f $_ && -s _}, "P"));
+    &copy_files(@tmp, "$topdir/SOURCES");
 
-    return &build_topdir($topdir, $buildroot, $target_format);
+    return &build_topdir($specfile, $topdir, $buildroot, $target_format);
 }
 
 # This function handles the "special case" FST's which have their very own
@@ -411,7 +411,7 @@ build_cfst
     $err = 0;
     while (<MAKE>) {
         chomp($line = $_);
-        nprint "$line\n";
+        dprint "$line\n";
         if ($line =~ /^make[^:]*:\s+\*\*\*\s+(.*)$/ && ! $msg) {
             $msg = $1;
         }
@@ -453,28 +453,28 @@ build_fst
 
     # Look for the build instructions (spec file, debian/ directory, etc.)
     if ($target_format eq "rpms") {
-        @tmp = &grepdir(sub {/spec(\.in)?$/}, ".");
+        @tmp = &grepdir(sub {/spec(\.in)?$/});
     } elsif ($target_format eq "debs") {
-        @tmp = &grepdir(sub {$_ =~ m/debian/ && -d $_}, ".");
+        @tmp = &grepdir(sub {$_ =~ m/debian/ && -d $_});
     } else {
-        @tmp = &grepdir(sub {/spec(\.in)?$/ || ($_ =~ m/debian/ && -d $_)}, ".");
+        @tmp = &grepdir(sub {/spec(\.in)?$/ || ($_ =~ m/debian/ && -d $_)});
     }
     if (!scalar(@tmp)) {
-        return (AVALON_BAD_PACKAGE, "I'm sorry, but \"$pkg\" doesn't seem to have instructions for building $target_format", undef);
+        return (AVALON_MISSING_FILES, "I'm sorry, but \"$pkg\" doesn't seem to have instructions for building $target_format", undef);
     }
     $specfile = $tmp[0];
-    if (! &cp($specfile, "$topdir/SPECS/")) {
+    if (! &copy($specfile, "$topdir/SPECS/")) {
         return (AVALON_SYSTEM_ERROR, "Unable to copy $specfile to $topdir/SPECS/ -- $!\n", undef);
     }
     # Get ready to build, figure out what sources we need, and create them all.
     &prepare_build_tree($pkg, $topdir, $buildroot);
     @srcs = &get_source_list($specfile, ".", undef);
-    $ret = &create_source_files("$topdir/SOURCES", undef, undef, @srcs);
+    $ret = &create_source_files("$topdir/SOURCES", "", "", \@srcs);
     if ($ret != AVALON_SUCCESS) {
         return ($ret, "Creation of source files failed", undef);
     }
 
-    return &build_topdir($topdir, $buildroot, $target_format);
+    return &build_topdir($specfile, $topdir, $buildroot, $target_format);
 }
 
 # Source RPM's can be rebuilt with this function.  build_package() usually handles the
@@ -487,7 +487,7 @@ build_srpm
 
     &prepare_build_tree($pkg, $topdir, $buildroot);
     # Explode SRPM here
-    return &build_topdir($topdir, $buildroot, $target_format);
+    return &build_topdir($specfile, $topdir, $buildroot, $target_format);
 }
 
 # Plain old tarballs can be rebuilt into packages using this function, as long as they
@@ -527,14 +527,14 @@ build_package
         }
         if (-d "F") {
             # Okay, there's an F/ directory.  I bet it's an SPM.
-            @ret = &build_spm(".", $topdir, $buildroot, $target_format);
+            @ret = &build_spm($pkg, $topdir, $buildroot, $target_format);
         } elsif (-f "Makefile.avalon" && -s _) {
             # There's a custom Makefile.  It's a Custom Full Source Tree (FST).
-            @ret = &build_cfst(".", $topdir, $buildroot, $target_format);
+            @ret = &build_cfst($pkg, $topdir, $buildroot, $target_format);
         } else {
             # If it's not either of the above, it better be a standard Full Source Tree (FST),
             # and it better conform to the proper assumptions or provide other instructions.
-            @ret = &build_fst(".", $topdir, $buildroot, $target_format);
+            @ret = &build_fst($pkg, $topdir, $buildroot, $target_format);
         }
         chdir($pwd);
         return @ret;
@@ -553,13 +553,13 @@ build_package
         } elsif ($pkg =~ /\.(tar\.|t)(gz|Z|bz2)$/) {
             return &build_tarball($pkg, $module, $topdir, $buildroot, $target_format);
         } elsif ($pkg =~ /\.rpm$/) {
-            return (AVALON_BAD_PACKAGE, "Alright...  Who's the wiseguy that told me to recompile \"$pkg,\" a binary RPM? :-P", undef);
+            return (AVALON_NO_SOURCES, "Alright...  Who's the wiseguy that told me to recompile \"$pkg,\" a binary RPM? :-P", undef);
         } else {
-            return (AVALON_BAD_PACKAGE, "I'm sorry, but I don't know how to build \"$pkg.\"", undef);
+            return (AVALON_NO_SOURCES, "I'm sorry, but I don't know how to build \"$pkg.\"", undef);
         }
     } else {
         # Okay, it's neither a file nor a directory.  What the hell is it?
-        return (AVALON_BAD_PACKAGE, "I'm sorry, but I can't figure out what to do with \"$pkg.\"", undef);
+        return (AVALON_NO_SOURCES, "I'm sorry, but I can't figure out what to do with \"$pkg.\"", undef);
     }
 }
 

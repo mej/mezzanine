@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.10 2001/07/26 03:13:50 mej Exp $
+# $Id: Pkg.pm,v 1.11 2001/07/31 03:33:55 mej Exp $
 #
 
 package Avalon::Pkg;
@@ -36,7 +36,7 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('$specdata', '&parse_spec_file', '&parse_srcs_file', '&fetch_package');
+    @EXPORT      = ('$specdata', '&get_package_path', '&parse_spec_file', '&parse_srcs_file', '&fetch_package');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -52,6 +52,7 @@ $specdata = 0;
 ### Initialize private global variables
 
 ### Function prototypes
+sub get_package_path($$);
 sub parse_spec_file($$);
 sub parse_srcs_file($);
 sub fetch_package($$$$$);
@@ -65,6 +66,25 @@ END {
 }
 
 ### Function definitions
+
+# Convert a module and a filename to a full path
+sub
+get_package_path
+{
+    my ($module, $filename) = @_;
+
+    if ($module && $filename) {
+        if ($module ne $filename) {
+            return "$module/$filename";
+        } else {
+            return $filename;
+        }
+    } elsif ($module) {
+        return $module;
+    } else {
+        return $filename;
+    }
+}
 
 # Parse spec file
 sub
@@ -210,17 +230,17 @@ fetch_package
 {
     my ($module, $filename, $tag, $cvsroot, $opts) = @_;
     my ($err, $msg, $line) = undef;
+    my $missing = 0;
     local *REVTOOL;
 
     $filename = "" if (!defined($filename));
     $tag = "" if (!defined($tag));
     $cvsroot = "" if (!defined($cvsroot));
     $opts = "" if (!defined($opts));
-    dprint "$module, $filename, $tag, $cvsroot, $opts\n";
-    if ($module && $filename) {
-        $filename = "$module/$filename";
-    } elsif ($module) {
-        $filename = $module;
+    dprint "Getting $filename", ($module ? " (in $module) " : ""), ($cvsroot ? " from $cvsroot" : ""),
+           ($tag ? " using $tag" : ""), ($opts ? " and extra options $opts" : ""), ".\n";
+    if (! ($filename = &get_package_path($module, $filename))) {
+        return (AVALON_BAD_PACKAGE, "Could not determine what package(s)/module(s) to retrieve.");
     }
     if ($cvsroot) {
         $cvsroot = "-D $cvsroot";
@@ -233,14 +253,17 @@ fetch_package
         }
     }
 
-    dprint "Checking for $filename\n";
-    # If it already exists, go on.
-    if (($module && -d $module) || (-f $filename && -s _)) {
-        return 2;
+    foreach my $f (split(' ', $filename)) {
+        if (!(-d $f) && !(-f $f && -s _)) {
+            $missing = 1;
+        }
+    }
+    if (! $missing) {
+        dprint "No need to retrieve:  $filename\n";
+        return (AVALON_DUPLICATE, undef);
     }
 
     $cmd = "revtool -l $cvsroot $tag $opts -g $filename";
-    dprint "About to run $cmd\n";
     if (!open(REVTOOL, "$cmd 2>&1 |")) {
         return (AVALON_COMMAND_FAILED, "Execution of \"$cmd\" failed -- $!");
     }
@@ -255,7 +278,7 @@ fetch_package
     }
     close(REVTOOL);
     $err = $? >> 8;
-    dprint "\"$cmd\" returned $err\n";
+    dprint "\"$cmd\" returned $err\n" if ($err != AVALON_SUCCESS);
     return ($err, ($msg ? $msg : "Unknown error"));
 }
 

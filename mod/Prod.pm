@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.3 2001/07/25 02:57:32 mej Exp $
+# $Id: Prod.pm,v 1.4 2001/07/31 03:33:55 mej Exp $
 #
 
 package Avalon::Prod;
@@ -36,7 +36,7 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('@products', '@packages', '@failed_pkgs', '$prods', '$pkgs', '$failure', '&get_var_name', '&get_package_stages', '&branch_tag_prefix', '&pkg_to_release_tag', '&pkg_to_branch_tag', '&place_file', '&fail_package', '&find_product_file', '&parse_product_entry', '&parse_prod_file');
+    @EXPORT      = ('@products', '@packages', '$prods', '$pkgs', '&get_var_name', '&get_package_stages', '&branch_tag_prefix', '&pkg_to_release_tag', '&pkg_to_branch_tag', '&find_product_file', '&parse_product_entry', '&parse_prod_file');
     %EXPORT_TAGS = ();
 
     # Exported variables go here
@@ -56,7 +56,7 @@ $failure = undef;
 
 ### Initialize private global variables
 $proddir = ".";
-@allvars = ();
+@allvars = ("TAG", "CVSROOT", "LOCATIONS");
 
 ### Function prototypes
 sub get_var_name($);
@@ -64,7 +64,6 @@ sub get_package_stages($);
 sub branch_tag_prefix();
 sub pkg_to_release_tag($$);
 sub pkg_to_branch_tag($$);
-sub place_file($$$);
 sub fail_package($$);
 sub find_product_file($$);
 sub parse_product_entry($$$);
@@ -127,82 +126,6 @@ pkg_to_branch_tag
     my ($pkg_name, $pkg_version) = @_;
 
     return (&branch_tag_prefix() . &pkg_to_release_tag($pkg_name, $pkg_version));
-}
-
-# Find the proper location within the image for an output file
-sub
-place_file
-{
-    my ($pkg, $loc, $file) = @_;
-    my $found = 0;
-
-    dprint "place_file(\"$pkg\", \"$loc\", \"$file\") called.\n";
-
-    foreach $location (split(",", $loc)) {
-        my ($regex, $stop, $dest, $image, $subdir);
-
-        # Format is:  /regexp/.path  where . is some delimiter character that
-        # tells us whether to check other locations or stop once we match
-	# (':' to continue looking for matches, or '=' to stop if a match is found).
-        dprint "Testing location \"$location\"\n";
-        if ($location !~ m/^\/([^\/]+)\/(.)(\S+)?$/) {
-            eprint "Location specifier \"$location\" is invalid.\n";
-            next;
-        }
-        ($regex, $stop, $dest) = ($1, $2, $3);
-        if ($stop eq "!") {
-            # A negative match test.  If we get a match, don't accept it.
-            next if ($file =~ $regex);
-        } else {
-            # No match.  Try next location.
-            next if ($file !~ $regex);
-        }
-        dprint "Match found.\n";
-
-        if ($dest) {
-            # If the destination does not contain a filename, add the filename portion of
-            # $file to the directory path in $dest.  The destination could be used to rename
-            # a file, however; that's why this check is in place.
-            if (substr($dest, -3, 3) ne substr($file, -3, 3)) {
-                my $tmp;
-
-                ($tmp = $file) =~ s/^.*\/([^\/]+)$/$1/;
-                $dest = "$dest/$tmp";
-            }
-            # If it exists, delete it
-            if (-e $dest) {
-                &nuke_tree($dest);
-            }
-            # Then link it
-            dprint "ln -f $file $dest\n";
-            if (!link($file, $dest)) {
-                &fail_package($pkg, "package accumulation", "Unable to hard-link $dest to $file -- $!");
-                return $found;
-            }
-        }
-        $found++;
-
-        # If the stop character is '=', stop checking for matches for this package.
-        # If it's ':' (actually, any other character than '='), keep looking for matches.
-        last if ($stop eq "=");
-        dprint "Non-exclusive match.  Continuing on....\n";
-    }
-    return $found;
-}
-
-# What to do if a package fails
-sub
-fail_package
-{
-    my ($pkg, $msg) = @_;
-
-    push @failed_pkgs, $pkg;
-    if ($msg) {
-        $msg =~ s/\.+$//;
-        eprint "Package \"$pkg\" failed:  $msg.\n";
-    } else {
-        eprint "Package \"$pkg\" failed with an unknown error.\n";
-    }
 }
 
 # Locate the product file for a particular product
@@ -456,7 +379,7 @@ parse_product_entry
     foreach $pkgvar (keys %pkgvars) {
         if ($pkgvars{$pkgvar} !~ /^$/) {
             $pkgs->{$name}{$pkgvar} = $pkgvars{$pkgvar};
-            xpush(@allvars, $var);
+            xpush(@allvars, $pkgvar);
             dprint "parse_product_entry():  Added variable $pkgvar to package $name with value \"$pkgs->{$name}{$pkgvar}\"\n";
         }
     }
@@ -464,10 +387,6 @@ parse_product_entry
     # variable for the current package, see if it has a value for the parent product
     # of that package.  If not, try the parent product of that product, and continue
     # going back through the product hierarchy until we find a value or run out or products.
-    #
-    # FIXME:  Perhaps these shouldn't be hard-coded.  Perhaps we should keep a list of
-    #         all package/product variables we've encountered thus far and iterate
-    #         through those only, since we're guaranteed no others will have a fallback.
     foreach $pkgvar (@allvars) {
         if (! $pkgs->{$name}{$pkgvar}) {
             my ($pkg, $val) = undef;

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.10 2001/07/27 01:45:37 mej Exp $
+# $Id: Util.pm,v 1.11 2001/07/31 03:33:55 mej Exp $
 #
 
 package Avalon::Util;
@@ -196,12 +196,11 @@ dprintf(@)
 sub
 dprint(@)
 {
-    my @dbg;
     my ($f, $l, $s);
 
     return if (! $debug);
-    @dbg = caller(1);
-    ($f, $l, $s) = @dbg[1, 2, 3];
+    (undef, undef, undef, $s) = caller(1);
+    (undef, $f, $l) = caller(0);
     $f =~ s/^.*\/([^\/]+)$/$1/;
     print "[$f/$l/$s()] ", @_;
 }
@@ -269,11 +268,14 @@ BEGIN {
 sub
 show_backtrace
 {
-    my ($pkg, $file, $line, $subroutine, $i);
+    my ($file, $line, $subroutine, $i);
+    my @tmp;
 
-    print "STACK TRACE:\n";
+    print "\n\nSTACK TRACE:\n";
     print "------------\n";
-    for ($i = 1; ($pkg, $file, $line, $subroutine) = caller($i); $i++) {
+    for ($i = 1; @tmp = caller($i); $i++) {
+        $subroutine = $tmp[3];
+        (undef, $file, $line) = caller($i - 1);
         $file =~ s/^.*\/([^\/]+)$/$1/;
         print ' ' x $i, "$subroutine() at $file:$line\n";
     }
@@ -344,7 +346,6 @@ move_files
         $dest .= '/' if ($dest !~ /\/$/);
         $addname = 1;
     }
-    dprint "\$dest is $dest, \$addname is $addname\n";
     foreach my $f (@flist) {
         my $target;
 
@@ -353,7 +354,6 @@ move_files
         } else {
             $target = $dest;
         }
-        dprint "Moving $f to $target\n";
         if (!&File::Copy::move($f, $target)) {
             eprint "Unable to move $f to $target -- $!\n";
             return $fcnt;
@@ -378,22 +378,21 @@ copy_files
         $dest .= '/' if ($dest !~ /\/$/);
         $addname = 1;
     }
-    dprint "\$dest is $dest, \$addname is $addname\n";
-    foreach my $f (@flist) {
+    foreach my $f (grep(sub {print "$_\n"; -f $_}, @flist)) {
         my $target;
 
         if ($addname) {
-            ($target = $f) =~ s/^(.*\/)?([^\/]+)$/$dest$2/;
+            $target = $dest . &basename($f);
         } else {
             $target = $dest;
         }
-        dprint "Copying $f to $target\n";
         if (!&File::Copy::copy($f, $target)) {
-            eprint "Unable to copy $f to $target -- $!\n";
+            eprint "Unable to copy $f to $target -- $!.  Copied $fcnt files.\n";
             return $fcnt;
         }
         $fcnt++;
     }
+    dprint "Copied all $fcnt files to $dest.\n";
     return $fcnt;
 }
 
@@ -422,11 +421,18 @@ sub
 grepdir(& $)
 {
     my ($func, $dir) = @_;
+    my ($i, $cnt);
     my @files;
     local *DIR;
 
-    opendir(DIR, $dir) || return 0;
-    @files = grep(&$func($_), readdir(DIR));
+    if ($dir) {
+        opendir(DIR, $dir) || return 0;
+        $dir .= '/' if (substr($dir, -1, 1) ne '/');
+    } else {
+        opendir(DIR, ".") || return 0;
+        $dir = "";
+    }
+    @files = grep(&$func($_ = ($dir . $_)), readdir(DIR));
     closedir(DIR);
     return @files;
 }

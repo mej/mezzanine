@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.1 2001/07/27 01:45:37 mej Exp $
+# $Id: RPM.pm,v 1.2 2001/07/31 03:33:55 mej Exp $
 #
 
 package Avalon::RPM;
@@ -36,7 +36,7 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ();
+    @EXPORT      = ('&rpm_install', '&rpm_show_contents', '&rpm_query', '&rpm_generate_source_files', '&rpm_build');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -53,6 +53,11 @@ use vars ('@EXPORT_OK');
 ### Initialize private global variables
 
 ### Function prototypes
+sub rpm_install($);
+sub rpm_show_contents($);
+sub rpm_query($$);
+sub rpm_generate_source_files($$$$$$);
+sub rpm_build($);
 
 # Private functions
 
@@ -188,7 +193,6 @@ rpm_build
     local *CMD;
 
     $err = $msg = 0;
-    dprint "About to run \"$cmd\"\n";
     if (!open(CMD, "$cmd </dev/null 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
         return AVALON_COMMAND_FAILED;
@@ -199,9 +203,9 @@ rpm_build
         print "$line\n";
         if ($line =~ /^Wrote:\s+(\S+\.\w+\.rpm)$/) {
             push @out_files, $1;
-        } elsif ($line =~ /^line \d+: [^:]+: /
-                 || $line =~ /^Failed to find \w+:/
-                 || $line =~ /^Symlink points to BuildRoot: /) {
+        } elsif ($line =~ /^(error: )?line \d+: [^:]+: /
+                 || $line =~ /^(error: )?Failed to find \w+:/
+                 || $line =~ /^(error: )?Symlink points to BuildRoot: /) {
             $err = AVALON_SPEC_ERRORS;
             push @spec_errors, $line;
         } elsif ($line =~ /^Bad exit status from/) {
@@ -218,30 +222,30 @@ rpm_build
             }
             $msg = "Building this package requires the following:  " . join(" ", @failed_deps);
             last;
-        } elsif ($line =~ /^Architecture is not included:/) {
+        } elsif ($line =~ /^(error: )?Architecture is not included:/) {
             $err = AVALON_ARCH_MISMATCH;
-            $line =~ s/^Architecture is not included:\s+//;
+            $line =~ s/^(error: )?Architecture is not included:\s+//;
             $msg = "This package does not build on the $line architecture";
-        } elsif ($line =~ /^File (.*): No such file or directory$/
-                 || $line =~ /^Bad file: (.*): No such file or directory$/
-                 || $line =~ /^File is not a regular file: (.*)$/
-                 || $line =~ /^Unable to open icon (\S+):$/
-                 || $line =~ /^No (patch number \d+)$/
-                 || $line =~ /^Could not open \%files file (\S+): No such file or directory$/
-                 || $line =~ /^File not found(?: by glob)?: (.*)$/) {
+        } elsif ($line =~ /^(error: )?File (.*): No such file or directory$/
+                 || $line =~ /^(error: )?Bad file: (.*): No such file or directory$/
+                 || $line =~ /^(error: )?File is not a regular file: (.*)$/
+                 || $line =~ /^(error: )?Unable to open icon (\S+):$/
+                 || $line =~ /^(error: )?No (patch number \d+)$/
+                 || $line =~ /^(error: )?Could not open \%files file (\S+): No such file or directory$/
+                 || $line =~ /^(error: )?File not found(?: by glob)?: (.*)$/) {
             $err = AVALON_MISSING_FILES;
-            push @not_found, $1;
+            push @not_found, $2;
         }
     }
     close(CMD);
-    dprint "\"$cmd\" returned $?\n";
+    dprint "\"$cmd\" returned $?\n" if ($?);
     if ($? != 0 && $err == AVALON_SUCCESS) {
         $err = AVALON_UNSPECIFIED_ERROR;
         $msg = "Unhandled package build error";
     } elsif ($#not_found != -1) {
         $msg = "The following were expected by the build, but no matching files were found:  " . join(", ", @not_found);
     } elsif ($#spec_errors != -1) {
-        $msg = sprintf("The spec file contains the following errors:  " . join(", ", @spec_errors);
+        $msg = "The spec file contains the following errors:  " . join(", ", @spec_errors);
     }
 
     return ($err, $msg, join(' ', @out_files));
