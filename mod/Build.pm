@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.8 2001/07/31 03:33:55 mej Exp $
+# $Id: Build.pm,v 1.9 2001/08/01 03:28:22 mej Exp $
 #
 
 package Avalon::Build;
@@ -102,28 +102,23 @@ count_cpus
 sub
 prepare_build_tree(\$\$\$)
 {
-    my ($n, $t, $b) = @_;
-    my ($name, $topdir, $buildroot);
+    my ($name, $topdir, $buildroot) = @_;
     my ($rpmmacros, $rpmrc);
     local *RPMMACROS;
     local *RPMRC;
 
     # In order to alter the values of $name, $topdir, and $buildroot in the caller,
-    # we are passed references to the variables, not the values.  The brief quantity
-    # of goop below uses $n, $t, and $b as the references, then copies the values to
-    # $name, $topdir, and $buildroot so that the rest of the code is readable. :-)
-    if (! $n) {
-        $n = &basename(&getcwd());
+    # we are passed references to the variables, not the values.
+    if (! $name) {
+        $name = &basename(&getcwd());
     }
-    if (! $t) {
-        $t = &getcwd() . "/build.avalon";
+    if (! $topdir) {
+        $topdir = &getcwd() . "/build.avalon";
     }
-    if (! $b) {
-        $b = "/var/tmp/avalon-buildroot.$$/$n";
+    if (! $buildroot) {
+        $buildroot = "/var/tmp/avalon-buildroot.$$/$n";
     }
-    ($name, $topdir, $buildroot) = ($n, $t, $b);
     dprint "$name | $topdir | $buildroot\n";
-    ### End of reference-handling goop
 
     # If the topdir doesn't exist, create it.
     if (! -d "$topdir") {

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.5 2001/07/31 22:23:00 mej Exp $
+# $Id: Prod.pm,v 1.6 2001/08/01 03:28:22 mej Exp $
 #
 
 package Avalon::Prod;
@@ -36,7 +36,7 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('@products', '@packages', '$prods', '$pkgs', '&get_var_name', '&get_package_stages', '&branch_tag_prefix', '&pkg_to_release_tag', '&pkg_to_branch_tag', '&find_product_file', '&parse_product_entry', '&parse_prod_file');
+    @EXPORT      = ('@products', '@packages', '$prods', '$pkgs', '&make_build_dir', '&make_log_dir', '&get_var_name', '&get_package_stages', '&branch_tag_prefix', '&pkg_to_release_tag', '&pkg_to_branch_tag', '&find_product_file', '&parse_product_entry', '&parse_prod_file');
     %EXPORT_TAGS = ();
 
     # Exported variables go here
@@ -59,6 +59,8 @@ $proddir = ".";
 @allvars = ("TAG", "CVSROOT", "LOCATIONS");
 
 ### Function prototypes
+sub make_build_dir($);
+sub make_log_dir($);
 sub get_var_name($);
 sub get_package_stages($);
 sub branch_tag_prefix();
@@ -79,6 +81,55 @@ END {
 }
 
 ### Function definitions
+
+# Create the top-level build directory for doing product builds
+sub
+make_build_dir
+{
+    my $dir = shift;
+    my $builddir;
+
+    # Create a build area for ourselves.
+    if (defined($ENV{AVALON_BUILDDIR})) {
+        $builddir = $ENV{AVALON_BUILDDIR};
+    } else {
+        $builddir = $dir . "/build.avalon";
+    }
+    if (-f $builddir) {
+        &nuke_tree($builddir);
+    }
+    if (!(-d $builddir || mkdir($builddir, 0755))) {
+        &fatal_error("Unable to create build directory -- $!\n");
+    }
+    if (!chdir($builddir)) {
+        &fatal_error("Unable to chdir to build directory -- $!\n");
+    }
+    return $builddir;
+}
+
+# Create the directory to keep the log files for parallel/distributed builds
+sub
+make_log_dir
+{
+    my $dir = shift;
+    my $logdir;
+
+    if (defined($ENV{AVALON_LOGDIR})) {
+        $logdir = $ENV{AVALON_LOGDIR};
+    } else {
+        $logdir = $dir . "/logs.avalon";
+    }
+    if (-f $logdir) {
+        &nuke_tree($logdir);
+    }
+    if (!(-d $logdir || mkdir($logdir, 0755))) {
+        &fatal_error("Unable to create log directory -- $!\n");
+    }
+    if (!chdir($logdir)) {
+        &fatal_error("Unable to chdir to log directory -- $!\n");
+    }
+    return $logdir;
+}
 
 # Translate abbreviated variable names into their canonical forms
 sub
@@ -436,7 +487,6 @@ parse_prod_file($$$)
 
     # Ignore everything until we encounter a product name
     ($skip_to_name, $skip_to_next_ver, $found) = (1, 0, 0); 
-    @allvars = ();
     while (<PROD>) {
         chomp($line = $_);
         dprint "Parsing $prodfile:  \"$line\"\n";

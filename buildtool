@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.149 2001/07/31 03:33:54 mej Exp $
+# $Id: buildtool,v 1.150 2001/08/01 03:28:22 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -99,25 +99,56 @@ fail_package
     }
 }
 
-# Remove failed packages from the list
+# Remove failed packages and packages we don't build from the list
 sub
 update_package_list(\@)
 {
-    my $parray = $_[0];
+    my $parray = shift;
     my @p = @{$parray};
-    my @tmp;
 
+    @{$parray} = ();
     foreach my $pkg (@p) {
         if (!grep($_ eq $pkg, @failed_pkgs)) {
-            push @tmp, $pkg;
+            push @{$parray}, $pkg;
         }
     }
-    return (@{$parray} = @tmp);
+    @{$parray} = grep($pkgs->{$_}{TYPE} ne "image", @{$parray});
+    return (@{$parray});
+}
+
+# Build a single package from source (if needed) and place the resulting files where they go.
+sub
+build_single_package
+{
+    my $pkg = shift;
+    my ($module, $err, $msg, $outfiles);
+
+    # Binaries or not, we need to know the full path and name of the source package.
+    if (! ($module = &get_package_path($pkgs->{$pkg}{MODULE}, $pkgs->{$pkg}{FILENAME}))) {
+        &fail_package($pkg, "I don't know what file/module to build from!");
+        return AVALON_NO_SOURCES;
+    }
+
+    # If there are binaries, no point in trying to build source.
+    if ($pkgs->{$pkg}{BINS}) {
+        $outfiles = join(' ', $module, @{$pkgs->{$pkg}{BINS}});
+    } else {
+        # Build the source
+        ($err, $msg, $outfiles) = &build_package($module, &getcwd(), undef, $target);
+        if ($err != AVALON_SUCCESS) {
+            &fail_package($pkg, $msg);
+            return $err;
+        }
+    }
+    $err = &place_package_files($pkg, $outfiles, $pkgs->{$pkg}{LOCATIONS});
+    return $err if ($err != AVALON_SUCCESS);
+    &complete_package($pkg);
+    return AVALON_SUCCESS;
 }
 
 # Spawn a child buildtool
 sub
-spawn_cmd
+build_package_forked
 {
     my ($pkg, $logfile) = @_;
     my $pid;
@@ -128,10 +159,13 @@ spawn_cmd
             nprint "Spawned child process $pid to build $pkg (log file is $logfile)\n";
             return $pid;
         } elsif (defined $pid) {
+            my $err;
+
             # Child -- reset state as needed and jump to build process
             close $GLOBAL_LOG if ($GLOBAL_LOG);
             open(STDOUT, ">/dev/null");
             open(STDIN, "</dev/null");
+            &nuke_tree($logfile) if (-e $logfile);
             if (!open(LOGFILE, ">$logfile")) {
                 eprint "Unable to open $logfile -- $!\n";
             } else {
@@ -140,8 +174,9 @@ spawn_cmd
                 open(STDERR, ">&LOGFILE");
                 select LOGFILE; $| = 1;
             }
+            $err = &build_single_package($pkg);
             close(LOGFILE) if ($GLOBAL_LOG);
-            exit (AVALON_SUCCESS);
+            exit ($err);
         } elsif ($! !~ /No more processes/ && $! !~ /Resource temporarily unavailable/) {
             &fatal_error("fork() failed -- $!\n");
         }
@@ -268,6 +303,120 @@ place_package_files
     return AVALON_SUCCESS;
 }
 
+# This routine parallelizes the product build so that each package is built by an individual buildtool process.
+sub
+parallel_build
+{
+    my @packages = @_;
+    my ($pwd, $builddir, $logdir);
+    my (@children, @vars);
+    my %child_pkg;
+
+    # Create the directories for building this product
+    $pwd = &getcwd();
+    $builddir = &make_build_dir($pwd);
+    $logdir = &make_log_dir($pwd);
+
+    # Download all the packages.
+    &download_packages(@packages);
+    &update_package_list(@packages);
+
+    qprint "$progname:  Beginning $num_cpus-way build of ${\(scalar(@packages))} packages.  (${\(&get_timestamp())})\n";
+    for (; scalar(@packages) || scalar(@children);) {
+        my ($pid, $line, $left, $failed, $bldg, $err);
+
+        # As long as there are packages left to build or children left to wait on, we loop.
+        for (; scalar(@children) < $num_cpus;) {
+            my ($pkg, $logfile);
+
+            # Spawn child processes until we fill up our allotment ($num_cpus)
+            $pkg = shift @packages;
+            $logfile = "$logdir/$pkg.log";
+            $pid = &build_package_forked($pkg, $logfile);
+            push @children, $pid;
+            $child_pkg{$pid} = $pkg;
+        }
+
+        # Okay, we can't build anything more right now.  Print some status info.
+        $line = "";
+        foreach my $pid (@children) {
+            $line .= "$child_pkg{$pid} ($pid)    ";
+        }
+        nprint "$progname:  Currently building:  $line\n";
+        nprint "$progname:  ${\(scalar(@completed_pkgs))} packages completed (${\(scalar(@failed_pkgs))} failed), "
+            . "${\(scalar(@children))} building, ${\(scalar(@packages))} in queue.\n";
+
+        # This loop waits until one of our immediate children dies before continuing.
+        do {
+            $pid = waitpid(-1, 0);
+        } while (! ($pkg = $child_pkg{$pid}));
+        $err = $? >> 8;
+        if ($pid == -1) {
+            # This should never happen.
+            eprint "Ummm, waitpid() returned -1.  That wasn't very nice.  I'm offended.\n";
+            next;
+        }
+
+        # Remove the child from our PID list
+        @children = grep($_ != $pid, @children);
+
+        # Check to see how it existed
+        if ($err == AVALON_SUCCESS) {
+            # Yay! :-)
+            nprint "Child process $pid for package $pkg completed successfully.  (${\(&get_timestamp())})\n";
+            &complete_package($pkg);
+        } else {
+            my @tmp;
+            local *ERRLOG;
+
+            # Doh, it failed.  Look through the log file to try and find the problem.
+            if (!open(ERRLOG, "$builddir/logs/$pkg.log")) {
+                &fail_package($pkg, "Child process returned $err but the log file is missing");
+                next;
+            }
+            @tmp = <ERRLOG>;
+            close(ERRLOG);
+            # If the last line doesn't match, take the last line out of all the lines that do.
+            if ($tmp[$#tmp] !~ /error: /i) {
+                @tmp = grep($_ =~ /error: /i, @tmp);
+            }
+            chomp($line = $tmp[$#tmp]);
+            # Record that the package failed.
+            if ($line =~ /^$progname:  Error:  Package \S+ failed:  (.*)$/) {
+                &fail_package($pkg, $1);
+            } else {
+                $line = "Couldn't find error in log" if (! $line);
+                $line =~ s/^\w+:\s*Error:\s*//;
+                &fail_package($pkg, "Child process exited with code $err -- $line");
+            }
+        }
+        # End of loop.  Time to spawn the next child.
+    }
+    qprint "$progname:  Parallel build complete.  (${\(&get_timestamp())})\n";
+}
+
+sub
+build_product
+{
+    my @packages = @_;
+    my $builddir;
+
+    $builddir = &make_build_dir(&getcwd());
+
+    # Download all the packages.
+    &download_packages(@packages);
+    &update_package_list(@packages);
+
+    # Call build_package() for each package; we don't care how that works as long as it does. :-)
+    foreach my $pkg (@packages) {
+        &build_single_package($pkg);
+    }
+
+    # Now we clean up.
+    #&cleanup($opt_clean);
+    return (scalar(@failed_pkgs) ? AVALON_PACKAGE_FAILED : AVALON_SUCCESS);
+}
+
 # Once we're all done, summarize any failures at the very end
 # so that they're easy to find if the user is generating a log.
 sub
@@ -307,141 +456,6 @@ summarize_failures
     }
 }
 
-# This routine handles the role of "master buildtool"
-sub
-parallel_build
-{
-    my ($pid, $err, $idx, $pkg, $logfile, $line, $nprocs, $done, $left, $failed, $bldg);
-    my (@children, @vars, @p);
-    my %child_pkg;
-    local *ERRLOG;
-
-    @p = ($#_ >= 0 ? @_ : @packages);
-    if (! -d "$basedir/logs") {
-        mkdir("$basedir/logs", 0755) || &fatal_error("Unable to mkdir $basedir/logs -- $!\n");
-    }
-    $idx = 0;
-    # Set $nprocs equal to the index within @children that should not be exceeded.
-    $nprocs = $num_cpus - 1;
-    # The "!$idx || " part of the test below is required because perl's do...while construct
-    # sucks.  You can't use next/last from within it.  Someone shoot whoever decided that.
-    qprintf "$progname:  Beginning $num_cpus-way build of %d packages.  (${\(&get_timestamp())})\n", $#p + 1;
-    while (!$idx || $#children >= 0) {
-        for (; $idx <= $#p && $#children < $nprocs; $idx++) {
-            # Spawn a buildtool child process to handle the next package
-            $pkg = $p[$idx];
-            $logfile = "$basedir/logs/$pkg.log";
-            $pid = &spawn_cmd($pkg, $logfile);
-            push @children, $pid;
-            $child_pkg{$pid} = $pkg;
-        }
-
-        # Out of space for children for now.
-        $line = "";
-        foreach $pid (@children) {
-            $line .= "$child_pkg{$pid} ($pid)    ";
-        }
-        nprint "$progname:  Currently building:  $line\n";
-        $bldg = $#children + 1;
-        $done = $idx - $#children - 1;
-        $left = $#p + 1 - $done - $bldg;
-        $failed = $#failed_pkgs + 1;
-        nprint "$progname:  $done packages completed ($failed failed), $bldg building, $left in queue.\n";
-
-        # Wait for a child to die
-        $pid = waitpid(-1, 0);
-        next if (! $child_pkg{$pid});
-        $pkg = $child_pkg{$pid};
-        $err = $? >> 8;
-        if ($pid == -1) {
-            # This should never happen.
-            eprint "Ummm, waitpid() returned -1.  That wasn't very nice.  I'm offended.\n";
-            next;
-        }
-        @children = grep($_ != $pid, @children);
-        if ($err == AVALON_SUCCESS) {
-            nprint "Child process $pid for package $pkg completed successfully.  (${\(&get_timestamp())})\n";
-        } else {
-            dprint "Child process $pid for package $pkg failed, returning $err.\n";
-            if ($err == AVALON_SPAWN_FAILED) {
-                &fail_package($pkg, "pre-build", "exec() of child failed");
-            } else {
-                my @tmp;
-
-                # The last line of the logfile should give the error message
-                if (!open(ERRLOG, "$basedir/logs/$pkg.log")) {
-                    &fail_package($pkg, "???", "Child process returned $err but the log file is missing");
-                    next;
-                }
-                @tmp = <ERRLOG>;
-                close(ERRLOG);
-                chomp($line = $tmp[$#tmp]);
-                if ($line =~ /^$progname:  Error:  Package \S+ failed at the ([a-z ]+) stage:  (.*)$/) {
-                    &fail_package($pkg, $1, $2);
-                } else {
-                    $line =~ s/^\w+:  (Error:  )?\s*//;
-                    &fail_package($pkg, "???", "Child process exited with code $err -- $line");
-                }
-            }
-        }
-        # End of loop.  Time to spawn the next child.
-    }
-    qprint "$progname:  Parallel build complete.  (${\(&get_timestamp())})\n";
-}
-
-sub
-build_product
-{
-    my @packages = @_;
-    my $builddir;
-
-    # Create a build area for ourselves.
-    if (defined($ENV{AVALON_BUILDDIR})) {
-        $builddir = $ENV{AVALON_BUILDDIR};
-    } else {
-        $builddir = &getcwd() . "/build.avalon";
-    }
-    if (!(-d $builddir || mkdir($builddir, 0755))) {
-        &fatal_error("Unable to create build directory -- $!\n");
-    }
-    if (!chdir($builddir)) {
-        &fatal_error("Unable to chdir to build directory -- $!\n");
-    }
-
-    # Download all the packages.
-    &download_packages(@packages);
-    @packages = &update_package_list(@packages);
-
-    # Call build_package() for each package; we don't care how that works as long as it does. :-)
-    foreach my $pkg (@packages) {
-        my ($module, $err, $msg, $outfiles);
-
-        if ($pkgs->{$pkg}{TYPE} eq "image") {
-            # Nothing to do here.
-            next;
-        }
-        if ($pkgs->{$pkg}{BINS}) {
-            $outfiles = join(' ', $pkgs->{$pkg}{FILENAME}, @{$pkgs->{$pkg}{BINS}});
-        } else {
-            if (! ($module = &get_package_path($pkgs->{$pkg}{MODULE}, $pkgs->{$pkg}{FILENAME}))) {
-                &fail_package($pkg, "I don't know what file/module to build from!");
-                next;
-            }
-            ($err, $msg, $outfiles) = &build_package($module, &getcwd(), undef, $target);
-            if ($err != AVALON_SUCCESS) {
-                &fail_package($pkg, $msg);
-                next;
-            }
-        }
-        &place_package_files($pkg, $outfiles, $pkgs->{$pkg}{LOCATIONS});
-        &complete_package($pkg);
-    }
-
-    # Now we clean up.
-    #&cleanup($opt_clean);
-
-}
-
 # main() here is basically the same as main() in C
 sub
 main
@@ -450,6 +464,7 @@ main
     $progname = "buildtool";
     $version = "2.1";
     umask 022;
+    $ret = AVALON_SUCCESS;
 
     # No input.
     open(STDIN, "</dev/null");
@@ -466,7 +481,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.149 $ created on $Date: 2001/07/31 03:33:54 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.150 $ created on $Date: 2001/08/01 03:28:22 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -583,12 +598,10 @@ main
     return AVALON_BAD_PRODUCT if (!scalar(@packages));
 
     dprint "Products to be built (", scalar(@packages), " packages):  ", join(" ", @products), "\n";
-    return &build_product(@packages);
+    $ret = &build_product(@packages);
+    &summarize_failures();
+    close($GLOBAL_LOG) if ($GLOBAL_LOG);
+    return $ret;
 }
 
 exit &main();
-
-END {
-    &summarize_failures() if (! $slave);
-    close($GLOBAL_LOG) if ($GLOBAL_LOG);
-}
