@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.135 2001/05/01 03:38:40 mej Exp $
+# $Id: buildtool,v 1.136 2001/05/02 21:56:10 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -285,7 +285,7 @@ place_file
         if ($dest) {
             # Grab the first part of the destination path, make sure it's an image module
             ($image = $dest) =~ s/^([^\/]+)\/.*$/$1/;
-            if ($dest != $builddir && (!defined($pkgs->{$image}{TYPE}) || ($pkgs->{$image}{TYPE} ne "image"))) {
+            if (($dest ne $builddir) && (!defined($pkgs->{$image}{TYPE}) || ($pkgs->{$image}{TYPE} ne "image"))) {
                 qprint "Warning:  Destination \"$dest\" is not a package of type \"image\".\n";
             }
 
@@ -303,13 +303,13 @@ place_file
                 &nuke_tree($dest);
             }
             # Then link it
-            dprint "Linking $dest to $file\n";
+            dprint "ln -f $file $dest\n";
             if (!link($file, $dest)) {
-                &fail_package($pkg, "package accumulation", "Unable to hard-link to $file from $dest -- $!");
+                &fail_package($pkg, "package accumulation", "Unable to hard-link $dest to $file -- $!");
                 return $found;
             }
-            $found++;
         }
+        $found++;
 
         # If the stop character is '=', stop checking for matches for this package.
         # If it's ':' (actually, any other character than '='), keep looking for matches.
@@ -652,7 +652,6 @@ parse_product_entry
             }
             delete $pkgvars{BINS};
             @{$pkgs->{$name}{BINS}} = @tmp;
-            $pkgs->{$name}{STAGES} =~ s/c//;
         }
     }
 
@@ -713,6 +712,9 @@ parse_product_entry
     # If we haven't been told which stages we want, use the defaults.
     if (!defined $pkgs->{$name}{STAGES}) {
         $pkgs->{$name}{STAGES} = &get_package_stages($type);
+        if (defined($pkgs->{$name}{BINS})) {
+            $pkgs->{$name}{STAGES} =~ s/c//;
+        }
     }
     # Add the package name to the list of packages
     push @packages, $name;
@@ -1205,6 +1207,11 @@ do_component_stage
         } elsif ($pkgs->{$pkg}{TYPE} eq "srpm") {
             my $rpmrc = "$buildroot/$pkg-rpmrc";
 
+            if (defined($pkgs->{$pkg}{BINS})) {
+                dprint "This package shouldn't even be using the component stage!  Skipping it.\n";
+                next;
+            }
+
             undef @manifest;
             $rpm = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
 
@@ -1336,15 +1343,23 @@ do_build_stage
             return (AVALON_PACKAGE_FAILED, "Could not chdir into $builddir/$pkgs->{$pkg}{MODULE} -- $!", 0);
         }
         if (defined($pkgs->{$pkg}{BINS})) {
-            my ($arch, $rpm);
+            my ($arch, $rpm, $file, $dest);
 
             # Source and binaries.
-            dprint "Copying $pkgs->{$pkg}{FILENAME} to $builddir/SRPMS/\n";
-            &mkdirhier("$builddir/SRPMS");
-            system("cp $pkgs->{$pkg}{FILENAME} $builddir/SRPMS/");
-            $rpm = $pkgs->{$pkg}{FILENAME};
-            $rpm =~ s/^.*\/([^\/]+)$/$1/;
-            $pkgs->{$pkg}{OUTFILES} = "$builddir/SRPMS/$rpm";
+            $file = $pkgs->{$pkg}{FILENAME};
+            $rpm = &basename($file);
+            $dest = "$builddir/SRPMS/" . $rpm;
+            if (-s $dest) {
+                dprint "$dest already exists.\n";
+            } else {
+                dprint "ln -f $file $dest\n";
+                &mkdirhier("$builddir/SRPMS") if (! -d "$builddir/SRPMS");
+                if (!link($file, $dest)) {
+                    return (AVALON_PACKAGE_FAILED, "Could not link $dest to $file -- $!", 0);
+                }
+            }
+            $pkgs->{$pkg}{OUTFILES} = $dest;
+            chdir($builddir);
             foreach $rpm (@{$pkgs->{$pkg}{BINS}}) {
                 my $bin;
 
@@ -1352,19 +1367,32 @@ do_build_stage
                 $arch = $2;
                 $bin = "$builddir/RPMS/$arch/$1.$arch.rpm";
                 $pkgs->{$pkg}{OUTFILES} .= " $bin";
-                dprint "Copying $rpm to $builddir/RPMS/$arch\n";
-                &mkdirhier("$builddir/RPMS/$arch");
-                system("cp $builddir/$rpm $builddir/RPMS/$arch/");
+                if (-s $bin) {
+                    dprint "$bin already exists\n";
+                } else {
+                    dprint "ln -f $rpm $bin\n";
+                    &mkdirhier("$builddir/RPMS/$arch") if (! -d "$builddir/RPMS/$arch");
+                    if (!link($rpm, $bin)) {
+                        return (AVALON_PACKAGE_FAILED, "Could not link $bin to $rpm -- $!", 0);
+                    }
+                }
             }
         } elsif ($pkgs->{$pkg}{TYPE} eq "rpm") {
-            my $arch;
+            my ($rpm, $arch, $dest);
 
             # Binary package.  Just move it into place.
-            $pkgs->{$pkg}{FILENAME} =~ m/\.(\w+)\.rpm/;
+            ($rpm = $pkgs->{$pkg}{FILENAME}) =~ m/\.(\w+)\.rpm/;
             $arch = $1;
-            dprint "Copying $pkgs->{$pkg}{FILENAME} to $builddir/RPMS/$arch\n";
-            &mkdirhier("$builddir/RPMS/$arch");
-            system("cp $pkgs->{$pkg}{FILENAME} $builddir/RPMS/$arch/");
+            $dest = "$builddir/RPMS/$arch/" . &basename($rpm);
+            if (-s $dest) {
+                dprint "$dest already exists.\n";
+            } else {
+                dprint "ln -f $rpm $dest\n";
+                &mkdirhier("$builddir/RPMS/$arch") if (! -d "$builddir/RPMS/$arch");
+                if (!link($rpm, $dest)) {
+                    return (AVALON_PACKAGE_FAILED, "Could not link $dest to $rpm -- $!", 0);
+                }
+            }
         } elsif ($pkgs->{$pkg}{TYPE} eq "tar") {
             # Rebuild from the tarball
             ($err, $msg, $srpm) = &build_pkgs($pkg, $pkgs->{$pkg}{FILENAME});
@@ -1534,7 +1562,9 @@ cleanup
     my $type = $_[0];
     my @dirs;
 
-    if ($type =~ /temp/i) {
+    if ($type =~ /no(ne)?/i) {
+        return;
+    } elsif ($type =~ /temp/i) {
         @dirs = ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SPECS", $buildroot);
     } elsif ($type =~ /rpm/i) {
         @dirs = ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SRPMS", "$builddir/RPMS", "$builddir/SPECS");
@@ -1561,6 +1591,8 @@ summarize_failures
     $ns = scalar(@packages);
     $nf = scalar(@failed_pkgs);
     $nt = $ns + $nf;
+    dprint "Successful:  $ns    Failed:  $nf    Total:  $nt\n";
+
     qprint "Package Summary:  Out of $nt total packages,";
     if ($ns) {
         qprint(" ", ($ns == $nt ? "all" : "$ns"), " succeeded");
@@ -1758,7 +1790,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.135 $ created on $Date: 2001/05/01 03:38:40 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.136 $ created on $Date: 2001/05/02 21:56:10 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1922,10 +1954,10 @@ main
     if ($end_stage ne "Z") {  # -dbZ, a.k.a. How To Debug the Parser :-)
         &initial_setup();
         &build_process();
-        &cleanup($opt_clean) if (defined($opt_clean));
+        &cleanup($opt_clean);
     } else {
         # This way we can just do cleanup. :-)
-        &cleanup($opt_clean) if (defined($opt_clean));
+        &cleanup($opt_clean);
     }
     return (defined(@failed_pkgs) && $#failed_pkgs != -1) ? AVALON_PACKAGE_FAILED : AVALON_SUCCESS;
 }

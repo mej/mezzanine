@@ -1,3 +1,12 @@
+########################################################################
+#                           Avalon Tutorial
+#
+#  Written by:  Sean Perry
+#
+#  $Id: tutorial.txt,v 1.2 2001/05/02 21:56:10 mej Exp $
+#
+########################################################################
+
 How to import a new src.rpm
 ---------------------------
 
@@ -8,7 +17,7 @@ The steps you would follow are:
   2) use avimport (srctool -i) on the src.rpm
 
 Example:
-$ export CVSROOT=:pserver:shaleh@cvs.engr:/cvs/Cujo
+$ export CVSROOT=:pserver:shaleh@cvs.engr.valinux.com:/cvs/Cujo
 $ avimport ctcs-1.2.15-1.src.rpm 
 Importing ctcs-1.2.15-1.src.rpm into ctcs tree....
 
@@ -50,8 +59,8 @@ ctcs-1.2.15
 $ cd ctcs-1.2.15/
 <hack hack hack>
 $ cd ../.. # must be in the base directory for avpatch to work
-$ avpatch -n function.patch # the patch name must be the full filename
-Created P/function.patch (21 lines).
+$ avpatch -n ctcs-1.2.15-function.patch # the patch name must be the full filename
+Created P/ctcs-1.2.15-function.patch (21 lines).
 Patch added and ready for commit.
 $ edit F/ctcs.spec # add the new patch, the avalon tools read this
 $ avput
@@ -59,7 +68,7 @@ $ avput
 cvs server: Updating .
 cvs server: Updating F
 cvs server: Updating P
-A P/function.patch
+A P/ctcs-1.2.15-function.patch
 cvs server: Updating S
 WARNING:  You have no ChangeLog here.  I have created one for you.
 cvs server: scheduling file `ChangeLog' for addition
@@ -76,16 +85,19 @@ Checking in ChangeLog;
 /cvs/Cujo/ctcs/ChangeLog,v  <--  ChangeLog
 initial revision: 1.1
 done
-RCS file: /cvs/Cujo/ctcs/P/function.patch,v
+RCS file: /cvs/Cujo/ctcs/P/ctcs-1.2.15-function.patch,v
 done
-Checking in P/function.patch;
-/cvs/Cujo/ctcs/P/function.patch,v  <--  function.patch
+Checking in P/ctcs-1.2.15-function.patch;
+/cvs/Cujo/ctcs/P/ctcs-1.2.15-function.patch,v  <--  ctcs-1.2.15-function.patch
 initial revision: 1.1
 done
 $ ls
 CVS  ChangeLog  F  P  S  work
 $ cat ChangeLog 
-Wed Apr 25 13:36:39 2001                                 Sean (shaleh)
+Wed Apr 25 13:36:39 2001                           Sean Perry (shaleh)
+
+Patch1000: ctcs-1.2.15-function.patch
+
 removed all instances of the keyword 'function'
 ----------------------------------------------------------------------
 
@@ -95,6 +107,11 @@ to.
 
 As you can see, a 'P' directory now exists.  This directory will contain all
 of the patches against the source.
+
+By convention, patches to external packages should be numbered starting at
+1000.  All patches should be named using the form <pkg>-<version>-<desc>.patch,
+where <desc> is a very brief hint at what the patch does.  ChangeLog entries
+are required for patches and should match the format above.
 
 A warning: the avalon tools will overwrite the file named on the command line.
 So if there had been a function.patch, it would have been removed.  If this
@@ -185,7 +202,7 @@ Now this:
 contrib-rh-7.1/anacron-2.3-16.src.rpm bins=bin-rh-7.1/anacron
 
 is another form of the module line above.  It says check the anacron srpm out
-of the contrib-rh-7.1 repositiry, but use the compiled rpm (the bins line) if
+of the contrib-rh-7.1 repository, but use the compiled rpm (the bins line) if
 one is available.  Without the bins line the srpm would be checked out and
 compiled with the resulting rpm used in the product.
 

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.20 2001/05/01 03:38:40 mej Exp $
+# $Id: srctool,v 1.21 2001/05/02 21:56:10 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -256,8 +256,9 @@ gen_patch($$)
     # Now diff the two trees and save the output
     @output = run_cmd("diff", "-Nur $old_wd $new_wd", 0);
     if (($err = shift @output) == 2) {
-        eprint "Unable to generate patch file -- $output[$#output].\n";
-        return AVALON_SYSTEM_ERROR;
+        foreach my $msg (grep(/^diff: /, @output)) {
+            eprint "$msg\n";
+        }
     }
 
     # If the patch directory doesn't exist, create it.
@@ -281,6 +282,7 @@ gen_patch($$)
         return AVALON_SYSTEM_ERROR;
     }
     foreach my $line (@output) {
+        next if ($line =~ /^diff: /);
         if ($line =~ /^(diff|---|\+\+\+|\*\*\*)/) {
             $line =~ s/$old_wd\///;
             $line =~ s/\Q$new_wd\E\//avalon_patched_/;
@@ -439,7 +441,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.20 $ created on $Date: 2001/05/01 03:38:40 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.21 $ created on $Date: 2001/05/02 21:56:10 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
