@@ -1,0 +1,236 @@
+#!/usr/bin/perl -w
+#
+# compstool -- Tool for verifying the integrity of comps files
+# 
+# Copyright (C) 2000, Michael Jennings
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies of the Software, its documentation and marketing & publicity
+# materials, and acknowledgment shall be given in the documentation, materials
+# and software packages that this Software was used.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+# $Id: compstool,v 1.1 2000/11/11 00:12:56 mej Exp $
+#
+
+# Include the Perl Modules we need
+require POSIX;
+require Getopt::Long;
+
+# Constants
+#
+# Return codes for compstool
+sub COMPSTOOL_SUCCESS()           {0;}
+sub COMPSTOOL_FATAL_ERROR()       {1;}
+
+sub COMPSTOOL_MISSING_PKGS()      {10;}
+
+sub COMPSTOOL_TERMINATED()        {50;}
+sub COMPSTOOL_CRASHED()           {60;}
+sub COMPSTOOL_UNSPECIFIED_ERROR   {127;}
+
+# Print usage information
+sub
+print_usage_info
+{
+    print "\n";
+    $leader = "$progname $version Usage Information";
+    $underbar = $leader;
+    $underbar =~ s/./-/g;
+    print "$leader\n$underbar\n";
+    print "\n";
+    print "  Syntax:   compstool [ options ]\n";
+    print "\n";
+    print "    -h --help                        Show this usage information\n";
+    print "    -d --debug                       Turn on debugging\n";
+    print "    -v --version                     Show version and copyright\n";
+    print "    -D --dir <directory>             Specify \"directory\" as the full path to the CD image\n";
+    print "\n";
+    exit(COMPSTOOL_SUCCESS);
+}
+
+# Generate timestamp for debugging/log file
+sub
+get_timestamp
+{
+    return POSIX::strftime("%A, %d %B %Y %H:%M:%S %Z", localtime);
+}
+
+# Report a fatal error
+sub
+fatal_error
+{
+    my $msg = "$progname:  FATAL:  $_[0]";
+
+    print STDERR $msg;
+    exit(COMPSTOOL_FATAL_ERROR);
+}
+
+# Debugging output
+sub
+dprintf
+{
+    return if (! $debug);
+    print "[debug:$progname] ";
+    printf @_;
+}
+sub
+dprint
+{
+    my @dbg;
+    my ($f, $l, $s);
+
+    return if (! $debug);
+    @dbg = caller(1);
+    ($f, $l, $s) = @dbg[1, 2, 3];
+    $f =~ s/^.*\/([^\/]+)$/$1/;
+    print "[$f/$l/$s()] ", @_;
+}
+
+# Print an error
+sub
+eprintf
+{
+    print "$progname:  Error:  ";
+    printf @_;
+}
+sub
+eprint
+{
+    print "$progname:  Error:  ", @_;
+}
+
+# Handle a terminate signal
+sub
+handle_signal
+{
+    my $sig = $_[0];
+
+    eprint "Someone sent me a SIG$sig asking me to exit, so I shall.\n";
+    close($GLOBAL_LOG) if ($GLOBAL_LOG);
+    exit COMPSTOOL_TERMINATED;
+}
+
+# Handle a fatal signal
+sub
+handle_fatal_signal
+{
+    my $sig = $_[0];
+
+    eprint "Caught fatal signal SIG$sig.  Cleaning up and aborting...\n";
+    close($GLOBAL_LOG) if ($GLOBAL_LOG);
+    exit COMPSTOOL_CRASHED;
+}
+
+# Handle a perl warning
+sub
+handle_warning
+{
+    dprint @_;
+}
+
+sub
+parse_comps_file
+{
+    my ($comps, $pkgdir) = @_;
+    local (*COMPS, *DIR);
+    my $line;
+    my (@pkgs, @missing);
+
+    opendir(DIR, $pkgdir) || &fatal_error("Unable to open package directory ($pkgdir) -- $!\n");
+    @pkgs = grep($_ =~ /\.rpm$/, readdir(DIR));
+    closedir(DIR);
+    dprint "Package files found:  \"", join("\", \"", @pkgs), "\"\n";
+
+    open(COMPS, $comps) || &fatal_error("Unable to open comps file ($comps) -- $!\n");
+    while (<COMPS>) {
+        chomp($line = $_);
+        next if ($line !~ m/^\s*(\S+:)?\s*(\S+)\s*$/);
+        $line = $1;
+        dprint "Looking at $line\n";
+        if (!grep($_ eq $line, @pkgs)) {
+            push @missing, $line;
+        }
+    }
+    close(COMPS);
+
+    if (scalar(@missing)) {
+        eprint "The following packages are missing:  ", join(" ", @missing), "\n";
+        return COMPSTOOL_MISSING_PKGS;
+    } else {
+        return COMPSTOOL_SUCCESS;
+    }
+}
+
+# main() here is basically the same as main() in C
+sub
+main
+{
+    my $ret;
+
+    # Set up the basic variables
+    $progname = "compstool";
+    $version = "1.0";
+
+    # See the Getopt::Long man page for details on the syntax of this line
+    @valid_opts = ("h|help", "v|version", "d|debug", "D|dir=s");
+    Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
+    Getopt::Long::GetOptions(@valid_opts);
+
+    # Post-parse the options stuff
+    select STDOUT; $| = 1;
+    if ($opt_v) {
+        # Do not edit this variable.  It is updated automatically by CVS when you commit
+        my $rcs_info = 'CVS Revision $Revision: 1.1 $ created on $Date: 2000/11/11 00:12:56 $ by $Author: mej $ ';
+
+        $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
+        $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
+        $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
+        print "\n";
+	print "$progname $version by Michael Jennings <mej\@eterm.org>\n";
+        print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
+        print "  ($rcs_info)\n";
+        print "\n";
+	return COMPSTOOL_SUCCESS;
+    } elsif ($opt_h) {
+	&print_usage_info();   # Never returns
+        # This is a really silly way to shut up the "used only once" warnings.
+        $opt_h = $opt_v = $opt_D = 0;
+    }
+
+    $imagedir = ($opt_D ? $opt_D : "");
+
+    # Signal handling
+    $SIG{HUP} = 'IGNORE';
+    $SIG{INT} = \&handle_signal;
+    $SIG{TERM} = \&handle_signal;
+    $SIG{QUIT} = \&handle_fatal_signal;
+    $SIG{ILL} = \&handle_fatal_signal;
+    $SIG{ABRT} = \&handle_fatal_signal;
+    $SIG{FPE} = \&handle_fatal_signal;
+    $SIG{SEGV} = \&handle_fatal_signal;
+    $SIG{BUS} = \&handle_fatal_signal;
+    $SIG{TSTP} = \&handle_fatal_signal;
+    $SIG{TTIN} = \&handle_fatal_signal;
+    $SIG{TTOU} = \&handle_fatal_signal;
+    $SIG{__WARN__} = \&handle_warning;
+
+    $ret = &parse_comps_file("$imagedir/RedHat/base/comps", "$imagedir/RedHat/RPMS");
+
+    return $ret;
+}
+
+exit &main();

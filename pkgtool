@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.28 2000/11/09 23:33:26 mej Exp $
+# $Id: pkgtool,v 1.29 2000/11/11 00:12:56 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1043,12 +1043,23 @@ rpm_generate_source_files
         &update_to_tag($release_tag) if ($release_tag);
         foreach $src (@srcs) {
             my @tmp;
+            my $i;
 
             ($src_files, $tarball) = split(":", $src);
             @tmp = split(/[\&\s]+/, $src_files);
-            dprint "\"$src_files\", \"$tarball\", ", join(" ", @tmp), "\n";
+            if ($tarball) {
+                dprint "\"$src_files\", \"$tarball\", (", join('|', @tmp), ")\n";
+            } else {
+                dprint "\"$src_files\", (", join('|', @tmp), ")\n";
+            }
+            for ($i = 0; $i < scalar(@tmp); ) {
+                my @matches = glob($tmp[$i]);
+
+                splice(@tmp, $i, 1, @matches);
+                $i += scalar(@matches);
+            }
             @all_srcs = (@all_srcs, @tmp);
-            @tmp = grep(-e $_, @tmp);
+            #@tmp = grep(-e $_, @tmp);
             next if ($#tmp < 0);
             dprint "\@tmp contains ", scalar(@tmp), " elements:  ", join(" ", @tmp), "\n";
             $src_files = join(" ", @tmp);
@@ -1171,7 +1182,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.28 $ created on $Date: 2000/11/09 23:33:26 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.29 $ created on $Date: 2000/11/11 00:12:56 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
