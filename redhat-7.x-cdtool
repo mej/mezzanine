@@ -5,7 +5,7 @@
 # Michael Jennings <mej@eterm.org>
 # 21 July 2000
 #
-# $Id: redhat-7.x-cdtool,v 1.22 2002/06/24 15:51:55 mej Exp $
+# $Id: redhat-7.x-cdtool,v 1.23 2002/07/10 02:47:16 mej Exp $
 #
 
 umask 022
@@ -124,3 +124,10 @@ for i in 1 2 3 4 5 6 7 ; do
     mediatool -i vermillion-os-${V_VER}-cd$i.iso -D vermillion-${V_VER}-cd$i $CDIMG
 done
 test -d vermillion-${V_VER}-extras && mediatool -i vermillion-extras-${V_VER}.iso -D vermillion-${V_VER}-extras
+
+if (apt-get -v >/dev/null 2>&1); then
+    cd $NET/RedHat
+    ln -s RPMS RPMS.all
+    ln -s hdlist base/hdlist.all
+    genbasedir --topdir=$BUILDDIR/$NET RedHat all
+fi
