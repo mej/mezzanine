@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.47 2001/08/15 00:52:02 mej Exp $
+# $Id: pkgtool,v 1.48 2001/08/20 17:34:45 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -31,6 +31,7 @@ require POSIX;
 require Getopt::Long;
 use Cwd ('&getcwd', '&abs_path');
 use Avalon::Util;
+use Avalon::PkgVars;
 use Avalon::Pkg;
 use Avalon::RPM;
 use Avalon::Deb;
@@ -95,7 +96,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.47 $ created on $Date: 2001/08/15 00:52:02 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.48 $ created on $Date: 2001/08/20 17:34:45 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -157,6 +158,9 @@ main
             &pkgvar_filename(".");
         }
     }
+    if (! &pkgvar_topdir()) {
+        &pkgvar_cleanup("build");
+    }
 
     # Signal handling
     $SIG{HUP} = 'IGNORE';
@@ -197,29 +201,31 @@ main
             print "\n";
         }
         print "\n";
-        &cleanup_build_tree(($err ? "temp" : "build"));
+        &pkgvar_cleanup("temp") if ($err);
+        &cleanup_build_tree();
     } elsif ($mode eq "install") {
-        my @results;
+        my $msg;
 
-        @results = &package_install($pkg_file);
-        if (($err = shift @results) != AVALON_SUCCESS) {
-            eprint "Unable to install $pkg_file (error $err).\n";
+        ($err, $msg) = &package_install();
+        if ($err != AVALON_SUCCESS) {
+            eprint "Unable to install package -- $msg.\n";
+        } else {
+            print "$msg.\n";
         }
-        print join("", @results), "\n";
     } elsif ($mode eq "contents") {
         my @results;
 
-        @results = &package_show_contents($pkg_file);
+        @results = &package_show_contents();
         if (($err = shift @results) != AVALON_SUCCESS) {
-            eprint "Unable to examine contents of $pkg_file (error $err).\n";
+            eprint "Unable to examine contents of package.\n";
         }
         print join("", @results), "\n";
     } elsif ($mode eq "query") {
         my @results;
 
-        @results = &package_query($pkg_file, $query_type);
+        @results = &package_query($query_type);
         if (($err = shift @results) != AVALON_SUCCESS) {
-            eprint "Unable to query $pkg_file (error $err).\n";
+            eprint "Unable to query package.\n";
         }
         print join("", @results), "\n";
     }

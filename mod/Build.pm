@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.15 2001/08/15 00:52:02 mej Exp $
+# $Id: Build.pm,v 1.16 2001/08/20 17:34:45 mej Exp $
 #
 
 package Avalon::Build;
@@ -31,6 +31,7 @@ BEGIN {
     use Cwd;
     use File::Copy;
     use Avalon::Util;
+    use Avalon::PkgVars;
     use Avalon::Pkg;
     use Avalon::RPM;
     use Avalon::Deb;
@@ -343,27 +344,8 @@ build_rpms_from_tarball
 {
     my $cmd;
 
-    if (! &pkgvar_command()) {
-        &pkgvar_command("/bin/rpm");
-    }
-    $cmd = &pkgvar_command() . " --define 'optflags $ENV{CFLAGS}'";
-    if (&pkgvar_rcfile()) {
-        $cmd .= " --rcfile=\"/usr/lib/rpm/rpmrc:" . &pkgvar_rcfile() . "\"";
-    }
-    if (&pkgvar_topdir()) {
-        $cmd .= " --define '_topdir " . &pkgvar_topdir() . "'";
-    }
-    if (&pkgvar_buildroot()) {
-        $cmd .= " --buildroot=\"" . &pkgvar_buildroot() . "\"";
-    }
-    if (&pkgvar_architecture()) {
-        $cmd .= " --target=\"" . &pkgvar_architecture() . "\"";
-    }
-    if (&pkgvar_parameters()) {
-        $cmd .= " " . &pkgvar_parameters();
-    }
+    $cmd = &rpm_form_command("build");
     if (&pkgvar_filename()) {
-        # Paranoia
         $cmd .= " -ta " . &pkgvar_filename();
     } else {
         &show_backtrace();
@@ -379,25 +361,7 @@ build_debs_from_tarball
     my $cmd;
 
     ### FIXME:  This needs to be fixed for Debian
-    if (! &pkgvar_command()) {
-        &pkgvar_command("/usr/bin/dpkg");
-    }
-    $cmd = &pkgvar_command() . " --define 'optflags $ENV{CFLAGS}'";
-    if (&pkgvar_rcfile()) {
-        $cmd .= " --rcfile=\"/usr/lib/rpm/rpmrc:" . &pkgvar_rcfile() . "\"";
-    }
-    if (&pkgvar_topdir()) {
-        $cmd .= " --define '_topdir " . &pkgvar_topdir() . "'";
-    }
-    if (&pkgvar_buildroot()) {
-        $cmd .= " --buildroot=\"" . &pkgvar_buildroot() . "\"";
-    }
-    if (&pkgvar_architecture()) {
-        $cmd .= " --target=\"" . &pkgvar_architecture() . "\"";
-    }
-    if (&pkgvar_parameters()) {
-        $cmd .= " " . &pkgvar_parameters();
-    }
+    $cmd = &deb_form_command("build");
     if (&pkgvar_instructions()) {
         $cmd .= " -ba " . &pkgvar_instructions();
     } elsif (&pkgvar_filename()) {
@@ -416,25 +380,7 @@ build_rpms_from_topdir
 {
     my $cmd;
 
-    if (! &pkgvar_command()) {
-        &pkgvar_command("/bin/rpm");
-    }
-    $cmd = &pkgvar_command() . " --define 'optflags $ENV{CFLAGS}'";
-    if (&pkgvar_rcfile()) {
-        $cmd .= " --rcfile=\"/usr/lib/rpm/rpmrc:" . &pkgvar_rcfile() . "\"";
-    }
-    if (&pkgvar_topdir()) {
-        $cmd .= " --define '_topdir " . &pkgvar_topdir() . "'";
-    }
-    if (&pkgvar_buildroot()) {
-        $cmd .= " --buildroot=\"" . &pkgvar_buildroot() . "\"";
-    }
-    if (&pkgvar_architecture()) {
-        $cmd .= " --target=\"" . &pkgvar_architecture() . "\"";
-    }
-    if (&pkgvar_parameters()) {
-        $cmd .= " " . &pkgvar_parameters();
-    }
+    $cmd = &rpm_form_command("build");
     if (&pkgvar_instructions()) {
         $cmd .= " -ba " . &pkgvar_instructions();
     } elsif (&pkgvar_filename()) {
@@ -454,25 +400,7 @@ build_debs_from_topdir
     my $cmd;
 
     ### FIXME:  This needs to be fixed for Debian
-    if (! &pkgvar_command()) {
-        &pkgvar_command("/usr/bin/dpkg");
-    }
-    $cmd = &pkgvar_command() . " --define 'optflags $ENV{CFLAGS}'";
-    if (&pkgvar_rcfile()) {
-        $cmd .= " --rcfile=\"/usr/lib/rpm/rpmrc:" . &pkgvar_rcfile() . "\"";
-    }
-    if (&pkgvar_topdir()) {
-        $cmd .= " --define '_topdir " . &pkgvar_topdir() . "'";
-    }
-    if (&pkgvar_buildroot()) {
-        $cmd .= " --buildroot=\"" . &pkgvar_buildroot() . "\"";
-    }
-    if (&pkgvar_architecture()) {
-        $cmd .= " --target=\"" . &pkgvar_architecture() . "\"";
-    }
-    if (&pkgvar_parameters()) {
-        $cmd .= " " . &pkgvar_parameters();
-    }
+    $cmd = &deb_form_command("build");
     if (&pkgvar_instructions()) {
         $cmd .= " -ba " . &pkgvar_instructions();
     } elsif (&pkgvar_filename()) {
@@ -555,8 +483,7 @@ build_spm
 sub
 build_cfst
 {
-    my ($pkg, $td, $br, $target_format) = @_;
-    my ($err, $msg, $cmd, $make, $pkgdir, $outfiles);
+    my ($err, $msg, $cmd, $pkgdir, $outfiles, $topdir, $buildroot, $target_format);
     local *MAKE;
 
     dprint &print_args(@_);
@@ -565,11 +492,22 @@ build_cfst
         &show_backtrace();
         &fatal_error("Call to build_cfst() in non-CFST module.\n");
     }
-    &prepare_build_tree($pkg, $td, $br);
 
+    &prepare_build_tree();
+    $topdir = &pkgvar_topdir();
+    $buildroot = &pkgvar_buildroot();
+    $target_format = &pkgvar_target();
     $pkgdir = "$topdir/RPMS";
-    $make = "make -f Makefile.avalon";
-    $cmd = "$make $target_format BUILD_DIR=$topdir BUILD_ROOT=$buildroot RPMRC=$buildroot/$pkg-rpmrc PKG_DIR=$pkgdir";
+
+    if (&pkgvar_command()) {
+        $cmd = &pkgvar_command();
+    } else {
+        $cmd = "make -f Makefile.avalon";
+    }
+    $cmd .= " BUILD_DIR=$topdir BUILD_ROOT=$buildroot PKG_DIR=$pkgdir";
+    if (&pkgvar_rcfile()) {
+        $cmd .= " RCFILE=" . &pkgvar_rcfile();
+    }
 
     dprint "About to run \"$cmd\"\n";
     if (!open(MAKE, "$cmd </dev/null 2>&1 |")) {
@@ -605,7 +543,6 @@ build_cfst
         $err = AVALON_PACKAGE_FAILED;
         $msg = "make finished successfully, but no packages were found in $pkgdir";
     }
-    chdir($pwd) if (defined($pwd));
     return ($err, $msg, $outfiles);
 }
 
@@ -614,40 +551,55 @@ build_cfst
 sub
 build_fst
 {
-    my ($pkg, $td, $br, $target_format) = @_;
-    my ($specfile, $cmd, $ret);
+    my ($specfile, $cmd, $ret, $topdir, $buildroot, $target_format);
     my (@srcs, @tmp);
 
     dprint &print_args(@_);
-    $pkg = &basename(&getcwd()) if ($pkg eq ".");
-
-    # Look for the build instructions (spec file, debian/ directory, etc.)
-    if ($target_format eq "rpms") {
-        @tmp = &grepdir(sub {/spec(\.in)?$/});
-    } elsif ($target_format eq "debs") {
-        @tmp = &grepdir(sub {$_ =~ m/debian/ && -d $_});
-    } else {
-        @tmp = &grepdir(sub {/spec(\.in)?$/ || ($_ =~ m/debian/ && -d $_)});
-    }
-    dprint @tmp, "\n";
-    if (!scalar(@tmp)) {
-        return (AVALON_MISSING_FILES, "I'm sorry, but \"$pkg\" doesn't seem to have instructions for building $target_format", undef);
-    }
 
     &prepare_build_tree();
-    $specfile = $tmp[0];
+    $topdir = &pkgvar_topdir();
+    $buildroot = &pkgvar_buildroot();
+    $target_format = &pkgvar_target();
+    $specfile = &pkgvar_instructions();
+    $pkgdir = "$topdir/RPMS";
+
+    # Look for the build instructions (spec file, debian/ directory, etc.)
+    if (! $specfile) {
+        if ($target_format eq "rpms") {
+            @tmp = &grepdir(sub {/spec(\.in)?$/});
+        } elsif ($target_format eq "debs") {
+            @tmp = &grepdir(sub {$_ =~ m/debian/ && -d $_});
+        } else {
+            @tmp = &grepdir(sub {/spec(\.in)?$/ || ($_ =~ m/debian/ && -d $_)});
+        }
+        dprint @tmp, "\n";
+        if (!scalar(@tmp)) {
+            return (AVALON_MISSING_FILES, "I'm sorry, but \"$pkg\" doesn't seem to have instructions for building $target_format", undef);
+        }
+        $specfile = &pkgvar_instructions($tmp[0]);
+    }
+
     if (! &copy($specfile, "$topdir/SPECS/")) {
         return (AVALON_SYSTEM_ERROR, "Unable to copy $specfile to $topdir/SPECS/ -- $!\n", undef);
     }
     # Get ready to build, figure out what sources we need, and create them all.
-    &parse_prod_file();
+    if (&parse_prod_file()) {
+        my $pkg = &pkgvar_name();
+
+        if ($pkgs->{$pkg}{SRCS}) {
+            &pkgvar_srcs($pkgs->{$pkg}{SRCS});
+        }
+        if ($pkgs->{$pkg}{ARCH}) {
+            &pkgvar_architecture($pkgs->{$pkg}{ARCH});
+        }
+    }
+
     &get_source_list();
     $ret = &create_source_files("$topdir/SOURCES");
     if ($ret != AVALON_SUCCESS) {
         return ($ret, "Creation of source files failed", undef);
     }
-
-    return &build_topdir($specfile, $target_format);
+    return &build_topdir();
 }
 
 # Source RPM's can be rebuilt with this function.  build_package() usually handles the
@@ -656,20 +608,22 @@ build_fst
 sub
 build_srpm
 {
-    my ($pkg, $td, $br, $target_format) = @_;
     my $err;
     my (@tmp, @specs);
 
     dprint &print_args(@_);
 
-    &prepare_build_tree($pkg, $td, $br);
+    &prepare_build_tree();
     @tmp = &rpm_show_contents($pkg);
     if (($err = shift @tmp) != AVALON_SUCCESS) {
         return (AVALON_NO_SOURCES, "Unable to examine the contents of $pkg ($err)", undef);
     }
     foreach my $f (grep(/spec(\.in)?$/, @tmp)) {
+        my @fields;
+
         chomp($f);
-        push @specs, $f;
+        @fields = split(' ', $f);
+        push @specs, $fields[8];
     }
     if (scalar(@specs) != 1) {
         wprint "Found ${\(scalar(@specs))} spec files in $pkg?!\n";
@@ -690,12 +644,12 @@ build_srpm
 sub
 build_tarball
 {
-    my ($pkg, $td, $br, $target_format) = @_;
-    my $cmd;
+    my ($target_format, $cmd);
 
     dprint &print_args(@_);
 
-    &prepare_build_tree($pkg, $td, $br);
+    $target_format = &pkgvar_target();
+    &prepare_build_tree();
     if ($target_format eq "rpms") {
         return &build_rpms_from_tarball($pkg);
     } elsif ($target_format eq "debs") {
@@ -708,57 +662,48 @@ build_tarball
 sub
 build_package
 {
-    my ($pkg, $td, $br, $target_format) = @_;
-    my $pwd;
+    my ($pwd, $pkg);
     my @ret;
 
     dprint &print_args(@_);
 
     $pwd = &getcwd();
-
-    if ($target_format =~ /rpm/i) {
-        $target_format = "rpms";
-    } elsif ($target_format =~ /deb/i) {
-        $target_format = "debs";
-    } else {
-        $target_format = "all";
-    }
+    $pkg = &pkgvar_filename();
 
     if (-d $pkg) {
-
         # It's a directory.  That means it's some type of module.
         if (!chdir($pkg)) {
             return (AVALON_SYSTEM_ERROR, "Unable to chdir into \"$pkg\" -- $!", undef);
         }
         if (-d "F") {
             # Okay, there's an F/ directory.  I bet it's an SPM.
-            @ret = &build_spm($pkg, $td, $br, $target_format);
+            @ret = &build_spm();
         } elsif (-f "Makefile.avalon" && -s _) {
             # There's a custom Makefile.  It's a Custom Full Source Tree (FST).
-            @ret = &build_cfst($pkg, $td, $br, $target_format);
+            @ret = &build_cfst();
         } else {
             # If it's not either of the above, it better be a standard Full Source Tree (FST),
             # and it better conform to the proper assumptions or provide other instructions.
-            @ret = &build_fst($pkg, $td, $br, $target_format);
+            @ret = &build_fst();
         }
         chdir($pwd);
         return @ret;
     } elsif (-f _ && -s _) {
         # It's a file.  Must be a package file of some type.
-
         # Split the actual package name from any path information.
-        if ($pkg =~ m|^(.*)/([^/]+)$|) {
+        if ($pkg =~ /\//) {
             my $module;
 
-            ($module, $pkg) = ($1, $2);
+            $module = &dirname($pkg);
+            $pkg = &basename($pkg);
             if (!chdir($module)) {
                 return (AVALON_SYSTEM_ERROR, "Unable to chdir into \"$module\" -- $!", undef);
             }
         }
         if ($pkg =~ /src\.rpm$/) {
-            @ret = &build_srpm($pkg, $td, $br, $target_format);
+            @ret = &build_srpm();
         } elsif ($pkg =~ /\.(tar\.|t)(gz|Z|bz2)$/) {
-            @ret = &build_tarball($pkg, $td, $br, $target_format);
+            @ret = &build_tarball();
         } elsif ($pkg =~ /\.rpm$/) {
             return (AVALON_NO_SOURCES, "Alright...  Who's the wiseguy that told me to recompile \"$pkg,\" a binary RPM? :-P", undef);
         } else {

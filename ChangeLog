@@ -1373,3 +1373,8 @@ Tue Aug 14 17:54:45 2001                        Michael Jennings (mej)
 
 Just checking in today's stuff.  This is not necessarily functional.
 ----------------------------------------------------------------------
+Mon Aug 20 10:36:18 2001                        Michael Jennings (mej)
+
+Completely reworked the package variable mechanism.  No more need to
+pass every silly parameter under the sun.
+----------------------------------------------------------------------

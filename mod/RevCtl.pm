@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.3 2001/08/15 00:52:02 mej Exp $
+# $Id: RevCtl.pm,v 1.4 2001/08/20 17:34:46 mej Exp $
 #
 
 package Avalon::RevCtl;
@@ -37,7 +37,7 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('&revctl_set_system', '&revctl_set_repository', '&revctl_set_keyword_expansion', '&revctl_set_recursion', '&revctl_set_branching', '&revctl_set_sticky_clear', '&revctl_set_exclusive', '&revctl_set_strict_tagging', '&revctl_set_tag', '&revctl_set_rtag', '&check_tag', '&login_to_master', 'do_changelog_entry', '&make_repository_path', '&commit_to_master', '&update_from_master', '&add_new_files', '&delete_old_files', '&query_tags', '&query_status', '&query_logs', '&query_annotation', '&query_diff', '&query_release_diff', '&tag_local_sources', '&tag_repository_sources', '&import_vendor_sources');
+    @EXPORT      = ('&revctl_reset', '&revctl_system', '&revctl_command', '&revctl_repository', '&revctl_keyword_expansion', '&revctl_recursion', '&revctl_branching', '&revctl_sticky_clear', '&revctl_exclusive', '&revctl_strict_tagging', '&revctl_tag', '&revctl_rtag', '&check_tag', '&login_to_master', 'do_changelog_entry', '&make_repository_path', '&commit_to_master', '&update_from_master', '&add_new_files', '&delete_old_files', '&query_status', '&query_logs', '&query_annotation', '&query_diff', '&query_release_diff', '&tag_local_sources', '&tag_repository_sources', '&import_vendor_sources');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -53,6 +53,7 @@ use vars ('@EXPORT_OK');
 
 ### Initialize private global variables
 $revctl_system = "cvs";
+$revctl_cmd = "/usr/bin/cvs";
 $repository = "";
 $keyword = "-ko";
 $recurse = "";
@@ -64,16 +65,18 @@ $tag = "";
 $rtag = "";
 
 ### Function prototypes
-sub revctl_set_system($);
-sub revctl_set_repository($);
-sub revctl_set_keyword_expansion($);
-sub revctl_set_recursion($);
-sub revctl_set_branching($);
-sub revctl_set_sticky_clear($);
-sub revctl_set_exclusive($);
-sub revctl_set_strict_tagging($);
-sub revctl_set_tag($);
-sub revctl_set_rtag($);
+sub revctl_reset();
+sub revctl_system($);
+sub revctl_command($);
+sub revctl_repository($);
+sub revctl_keyword_expansion($);
+sub revctl_recursion($);
+sub revctl_branching($);
+sub revctl_sticky_clear($);
+sub revctl_exclusive($);
+sub revctl_strict_tagging($);
+sub revctl_tag($);
+sub revctl_rtag($);
 sub check_tag($$$);
 sub make_repository_path($$$$);
 sub login_to_master();
@@ -82,7 +85,6 @@ sub commit_to_master(@);
 sub update_from_master(@);
 sub add_new_files(@);
 sub delete_old_files(@);
-sub query_tags(@);
 sub query_status(@);
 sub query_logs(@);
 sub query_annotation(@);
@@ -105,40 +107,47 @@ END {
 
 ### These functions set the private globals used by this module.
 sub
-revctl_set_system
+revctl_reset
+{
+    &revctl_system("");
+    &revctl_command("");
+    &revctl_repository("");
+    &revctl_keyword_expansion("");
+    &revctl_recursion("");
+    &revctl_branching("");
+    &revctl_sticky_clear("");
+    &revctl_exclusive("");
+    &revctl_strict_tagging("");
+    &revctl_tag("");
+    &revctl_rtag("");
+}
+
+sub
+revctl_system
 {
     my $param = $_[0];
 
     if (defined($param)) {
-        if ($param eq "cvs") {
-            $revctl_system = "cvs";
-            $repository = "";
-            $keyword = "-ko";
-            $recurse = "";
-            $branch = "";
-            $reset = "";
-            $exclusive = "";
-            $tag = "";
-            $rtag = "";
-        } elsif ($param eq "bk") {
-            $revctl_system = "bk";
-            $repository = "";
-            $keyword = "";
-            $recurse = "";
-            $branch = "";
-            $reset = "";
-            $exclusive = "";
-            $tag = "";
-            $rtag = "";
-        } else {
-            eprint "Unknown revision control system:  $param\n";
-        }
+        $revctl_system = ($param ? $param : "cvs");
     }
+    dprint "$revctl_system\n";
     return $revctl_system;
 }
 
 sub
-revctl_set_repository
+revctl_command
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        $revctl_cmd = ($param ? $param : $revctl_system);
+    }
+    dprint "$revctl_cmd\n";
+    return $revctl_cmd;
+}
+
+sub
+revctl_repository
 {
     my $param = $_[0];
 
@@ -149,7 +158,7 @@ revctl_set_repository
 }
 
 sub
-revctl_set_keyword_expansion
+revctl_keyword_expansion
 {
     my $param = $_[0];
 
@@ -160,7 +169,7 @@ revctl_set_keyword_expansion
 }
 
 sub
-revctl_set_recursion
+revctl_recursion
 {
     my $param = $_[0];
 
@@ -171,7 +180,7 @@ revctl_set_recursion
 }
 
 sub
-revctl_set_branching
+revctl_branching
 {
     my $param = $_[0];
 
@@ -182,7 +191,7 @@ revctl_set_branching
 }
 
 sub
-revctl_set_sticky_clear
+revctl_sticky_clear
 {
     my $param = $_[0];
 
@@ -193,7 +202,7 @@ revctl_set_sticky_clear
 }
 
 sub
-revctl_set_exclusive
+revctl_exclusive
 {
     my $param = $_[0];
 
@@ -204,7 +213,7 @@ revctl_set_exclusive
 }
 
 sub
-revctl_set_strict_tagging
+revctl_strict_tagging
 {
     my $param = $_[0];
 
@@ -215,7 +224,7 @@ revctl_set_strict_tagging
 }
 
 sub
-revctl_set_tag
+revctl_tag
 {
     my $param = $_[0];
 
@@ -226,7 +235,7 @@ revctl_set_tag
 }
 
 sub
-revctl_set_rtag
+revctl_rtag
 {
     my $param = $_[0];
 
@@ -496,18 +505,6 @@ delete_old_files
     return &talk_to_server("remove", $cmd);
 }
 
-# List tags
-sub
-query_tags
-{
-    my $cmd;
-
-    dprint &print_args(@_);
-
-    $cmd = "/bin/sh -c \"cvs $repository status -v " . join(' ', @_) . "\"";
-    return &talk_to_server("query_tags", $cmd);
-}
-
 # Query file/directory status
 sub
 query_status
@@ -619,7 +616,7 @@ import_vendor_sources
     $rtag =~ s/[^-_A-Z0-9]/_/g;
     return AVALON_INVALID_TAG if (! &check_tags($module));
 
-    $cmd = "/bin/sh -c \"cvs $repository import $keyword $exact -m 'Import of $module' $module $tag $rtag\"";
+    $cmd = "/bin/sh -c \"cvs $repository import $keyword $exclusive -m 'Import of $module' $module $tag $rtag\"";
     $tag = "-r $tag";
     $rtag = "-r $rtag";
     return &talk_to_server("import", $cmd);
@@ -649,7 +646,7 @@ talk_to_cvs_server
 
     dprint &print_args(@_);
 
-    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
+    for ($tries = 0; (($tries == 0) || ($err == -1)); $tries++) {
         $err = 0;
         if (!open(CMD, "$cmd 2>&1 |")) {
             eprint "Execution of \"$cmd\" failed -- $!";
@@ -659,7 +656,7 @@ talk_to_cvs_server
             chomp($line = $_);
             if ($line =~ /^cvs \w+: Diffing/) {
                 dprint "$line\n";
-            } elsif ($type ne "query_tags") {
+            } else {
                 print "$line\n";
             }
 
@@ -745,17 +742,6 @@ talk_to_cvs_server
                 }
 
             # Expected output
-            } elsif ($line =~ /^\s*Existing Tags:\s*$/) {
-                if ($type eq "query_tags") {
-                    my $tmp;
-
-                    while (($tmp = <CMD>) !~ /^\s*$/) {
-                        last if ($tmp =~ /^\s*No Tags Exist\s*$/);
-                        $tmp =~ s/^\s*(\S+)\s+\((\w+):\s*([\d.]+)\)$/$1 at $2 $3/;
-                        push @tags, $tmp;
-                    }
-                    last;
-                }
             } elsif ($line =~ /^I (.+)$/) {
                 push @ignores, $1;
             } elsif ($line =~ /^L (.+)$/) {

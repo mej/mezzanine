@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.7 2001/07/25 02:57:32 mej Exp $
+# $Id: Src.pm,v 1.8 2001/08/20 17:34:46 mej Exp $
 #
 
 package Avalon::Src;
@@ -85,12 +85,7 @@ find_files($)
     my @files;
 
     return @files if (! -d $dir);
-    @files = &grepdir(sub {-f "$dir/$_" && $_ !~ /^\./}, $dir);
-    if (scalar(@files)) {
-        foreach my $f (0..$#files) {
-            $files[$f] = "$dir/$files[$f]";
-        }
-    }
+    @files = &grepdir(sub {-f $_ && $_ !~ /\.$/}, $dir);
     return @files;
 }
 

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.6 2001/08/15 00:52:02 mej Exp $
+# $Id: RPM.pm,v 1.7 2001/08/20 17:34:46 mej Exp $
 #
 
 package Avalon::RPM;
@@ -29,6 +29,7 @@ package Avalon::RPM;
 BEGIN {
     use Exporter   ();
     use Avalon::Util;
+    use Avalon::PkgVars;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
@@ -36,7 +37,7 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('$specdata', '&parse_spec_file', '&rpm_install', '&rpm_show_contents', '&rpm_query', '&rpm_generate_source_files', '&rpm_build');
+    @EXPORT      = ('$specdata', '&rpm_form_command', '&parse_spec_file', '&rpm_install', '&rpm_show_contents', '&rpm_query', '&rpm_build');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -54,20 +55,55 @@ $specdata = 0;
 ### Initialize private global variables
 
 ### Function prototypes
+sub rpm_form_command($);
 sub parse_spec_file();
-sub rpm_install(@);
-sub rpm_show_contents($);
-sub rpm_query($$);
-sub rpm_generate_source_files($$$$$$);
+sub rpm_install();
+sub rpm_show_contents();
+sub rpm_query($);
 sub rpm_build($);
 
 # Private functions
+sub add_define($$);
+sub replace_defines($);
 
 ### Module cleanup
 END {
 }
 
 ### Function definitions
+
+sub
+rpm_form_command
+{
+    my $type = shift;
+
+    $type = "" if (!defined($type));
+
+    if (! &Avalon::Pkg::pkgvar_command()) {
+        &Avalon::Pkg::pkgvar_command("/bin/rpm");
+    }
+    $cmd = &Avalon::Pkg::pkgvar_command();
+    if (&pkgvar_rcfile()) {
+        $cmd .= " --rcfile=\"/usr/lib/rpm/rpmrc:" . &pkgvar_rcfile() . "\"";
+    }
+    if (&pkgvar_topdir()) {
+        $cmd .= " --define '_topdir " . &pkgvar_topdir() . "'";
+    }
+    if ($type eq "build") {
+        $cmd .= " --define 'optflags $ENV{CFLAGS}'";
+        if (&pkgvar_buildroot()) {
+            $cmd .= " --buildroot=\"" . &pkgvar_buildroot() . "\"";
+        }
+        if (&pkgvar_architecture()) {
+            $cmd .= " --target=\"" . &pkgvar_architecture() . "\"";
+        }
+    }
+    if (&pkgvar_parameters()) {
+        $cmd .= " " . &pkgvar_parameters();
+    }
+    dprint "Command:  $cmd\n";
+    return $cmd;
+}
 
 # Parse spec file
 sub
@@ -168,15 +204,14 @@ parse_spec_file
 sub
 rpm_install
 {
-    my ($pkg_file, $topdir, $params) = @_;
-    my ($rpm, $cmd, $rc, $err, $msg);
+    my ($cmd, $err, $msg, $line);
     my (@failed_deps);
     local *RPM;
 
-    $rpm = ($pkg_prog ? $pkg_prog : "rpm");
-    $topdir = ($topdir ? "--define '_topdir $topdir'" : "");
-    $params = "" if (! $params);
-    $cmd = "$rpm $params $topdir -U $pkg_file";
+    if (! &pkgvar_filename()) {
+        return (AVALON_SYNTAX_ERROR, "No package specified for install");
+    }
+    $cmd = &rpm_form_command("install") . " -U " . &pkgvar_filename();
     if (!open(RPM, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }
@@ -184,7 +219,7 @@ rpm_install
     while (<RPM>) {
         chomp($line = $_);
         print "$line\n";
-        if ($line =~ /^error: failed build dependencies:/) {
+        if ($line =~ /^error: failed .*dependencies:/) {
             $err = AVALON_DEPENDENCIES;
             while (<RPM>) {
                 chomp($line = $_);
@@ -192,7 +227,7 @@ rpm_install
                 $line =~ s/^\s+(\S+)\s+is needed by .*$/$1/;
                 push @failed_deps, $line;
             }
-            $msg = sprintf("Installing this package requires the following:  %s", join(" ", @failed_deps));
+            $msg = "Installing this package requires the following:  " . join(" ", @failed_deps);
             last;
         } elsif ($line =~ /^Architecture is not included:/) {
             $err = AVALON_ARCH_MISMATCH;
@@ -206,26 +241,19 @@ rpm_install
         return AVALON_UNSPECIFIED_ERROR;
     }
     if ($err == AVALON_SUCCESS) {
-        print "$pkg_file successfully installed.\n";
-    } else {
-        eprint "$msg\n";
+        $msg = &pkgvar_filename() . " successfully installed";
     }
-    return $err;
+    return ($err, $msg);
 }
 
 sub
 rpm_show_contents
 {
-    my $pkg_file = $_[0];
-    my ($rpm, $cmd, $rc);
+    my $cmd;
     my @results;
     local *RPM;
 
-    dprint &print_args(@_);
-
-    $rpm = ($pkg_prog ? $pkg_prog : "rpm");
-    $rc = ($rcfile ? "--rcfile '/usr/lib/rpm/rpmrc:$rcfile'" : "");
-    $cmd = "$rpm $rc -qlv " . ($pkg_file ? "-p $pkg_file" : "");
+    $cmd = &rpm_form_command("contents") . " -qlv -p " . &pkgvar_filename();
     if (!open(RPM, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }
@@ -238,22 +266,25 @@ rpm_show_contents
 sub
 rpm_query
 {
-    my ($pkg_file, $query_type) = @_;
-    my ($rpm, $cmd, $rc);
+    my $query_type = $_[0];
+    my $cmd;
     my (@results);
     local *RPM;
 
+    $cmd = &rpm_form_command("query");
     if ($query_type eq "d") {
-        $rpm_opt = "-q --qf '[Contains:  %{FILENAMES}\n][Provides:  %{PROVIDES}\n][Requires:  %{REQUIRENAME} %{REQUIREFLAGS:depflags} %{REQUIREVERSION}\n]'";
+        $cmd .= " -q --qf '[Contains:  %{FILENAMES}\n][Provides:  %{PROVIDES}\n]"
+            . "[Requires:  %{REQUIRENAME} %{REQUIREFLAGS:depflags} %{REQUIREVERSION}\n]'";
     } elsif ($query_type eq "s") {
-        $rpm_opt = "-q --qf 'Source:  %{SOURCERPM}\n'";
+        $cmd .= " -q --qf 'Source:  %{SOURCERPM}\n'";
     } else {
-        eprint "Unrecognized query type \"$query_type\"\n";
-        return AVALON_SYNTAX_ERROR;
+        return (AVALON_SYNTAX_ERROR, "Unrecognized query type \"$query_type\"\n");
     }
-    $rpm = ($pkg_prog ? $pkg_prog : "rpm");
-    $rc = ($rcfile ? "--rcfile '/usr/lib/rpm/rpmrc:$rcfile'" : "");
-    $cmd = "$rpm $rc $rpm_opt " . ($pkg_file ? "-p $pkg_file" : "-a");
+    if (&pkgvar_filename()) {
+        $cmd .= " -p " . &pkgvar_filename();
+    } else {
+        $cmd .= " -a";
+    }
     if (!open(RPM, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }
@@ -261,16 +292,6 @@ rpm_query
     close(RPM);
     dprint "\"$cmd\" returned $?\n" if ($?);
     return ($? >> 8, @results);
-}
-
-sub
-rpm_generate_source_files
-{
-    my ($specfile, $module, $srcs, $destdir, $tar, $zip) = @_;
-    my @srcs;
-
-    @srcs = &get_source_list($specfile, $module, $srcs, $destdir);
-    return &create_source_files($destdir, $tar, $zip, @srcs);
 }
 
 sub
@@ -344,5 +365,48 @@ rpm_build
 }
 
 ### Private functions
+
+# Add a %define
+sub
+add_define($$)
+{
+    my ($var, $value) = @_;
+
+    $specdata->{DEFINES}{$var} = $value;
+    dprint "Added \%define:  $var -> $specdata->{DEFINES}{$var}\n";
+}
+
+# Replace %define's in a spec file line with their values
+sub
+replace_defines($)
+{
+    my $line = $_[0];
+
+    while ($line =~ /\%(\w+)/g) {
+        my $var = $1;
+
+        dprint "Found macro:  $var\n";
+        if (defined $specdata->{DEFINES}{$var}) {
+            dprint "Replacing with:  $specdata->{DEFINES}{$var}\n";
+            $line =~ s/\%$var/$specdata->{DEFINES}{$var}/g;
+            reset;
+        } else {
+            dprint "Definition not found.\n";
+        }
+    }
+    while ($line =~ /\%\{([^\}]+)\}/g) {
+        my $var = $1;
+
+        dprint "Found macro:  $var\n";
+        if (defined $specdata->{DEFINES}{$var}) {
+            dprint "Replacing with:  $specdata->{DEFINES}{$var}\n";
+            $line =~ s/\%\{$var\}/$specdata->{DEFINES}{$var}/g;
+            reset;
+        } else {
+            dprint "Definition not found.\n";
+        }
+    }
+    return $line;
+}
 
 1;

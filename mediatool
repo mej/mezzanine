@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: mediatool,v 1.7 2001/06/15 03:27:37 mej Exp $
+# $Id: mediatool,v 1.8 2001/08/20 17:34:45 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -156,7 +156,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.7 $ created on $Date: 2001/06/15 03:27:37 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.8 $ created on $Date: 2001/08/20 17:34:45 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -179,7 +179,7 @@ main
     }
     $iso = ($opt_i ? $opt_i : 0);
     $tarball = ($opt_t ? $opt_t : 0);
-    @excludes = (scalar(@opt_x) ? @opt_x : (".avalon.*", "CVS", "RCS", "SCCS", "BitKeeper", ".cvsignore"));
+    @excludes = (scalar(@opt_x) ? @opt_x : (".avalon.*", "*.avalon", "CVS", "RCS", "SCCS", "BitKeeper", ".cvsignore"));
     $boot_image = ($opt_boot ? $opt_boot : 0);
     $command = ($opt_c ? $opt_c : 0);
 
