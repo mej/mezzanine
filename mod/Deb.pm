@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Deb.pm,v 1.3 2002/01/04 21:43:17 mej Exp $
+# $Id: Deb.pm,v 1.4 2002/02/18 18:48:53 mej Exp $
 #
 
 package Mezzanine::Deb;
@@ -71,7 +71,7 @@ deb_form_command
     $type = "" if (!defined($type));
 
     if (&pkgvar_topdir()) {
-        $cmd = "cd " . &pkgvar_topdir() " && ";
+        $cmd = "cd " . &pkgvar_topdir() . " && ";
     } else {
         $cmd = "";
     }

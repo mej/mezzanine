@@ -1,5 +1,5 @@
 <!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook V3.1//EN" [
-<!ENTITY MZ "Mezzanine">
+<!ENTITY MZ "<application>Mezzanine</application>">
 <!ENTITY MZVER "1.1">
 <!ENTITY DOCID "$Id: FAQ.sgml,v 1.1 2001/07/18 22:47:49 mej Exp $">
 ]>
@@ -8,7 +8,6 @@
   <title>&MZ; &MZVER; FAQ</title>
   <author><firstname>Michael</firstname><surname>Jennings</surname></author>
   <authorinitials>mej</authorinitials>
-  <copyright><year>2001</year></copyright>
 </artheader>
 
 <para>
@@ -31,8 +30,8 @@
           simplify and expedite the tasks involved with creating and
           maintaining a software product.  This is mostly used in the
           creation of the underground Linux distribution called
-          Vermillion, but it can be applied to any product of any nature
-          or size.
+          <ulink url="http://www.kainx.org/vermillion/">Vermillion</ulink>,
+          but it can be applied to any product of any nature or size.
         </para>
         <para>
           Currently only RPM/SRPM packages are supported, along with
@@ -148,6 +147,324 @@
       </answer>
     </qandaentry>
   </qandadiv>
+
+  <qandadiv>
+    <title>&MZ; and Source Code Management</title>
+    <qandaentry id="g2q1">
+      <question>
+        <para>Why would I want to do SCM with &MZ;?</para>
+      </question>
+      <answer>
+        <para>
+          &MZ; provides a series of wrappers around source code
+          management.  Currently, the only interface which has been
+          fleshed out is the CVS one, but others could easily be
+          added.
+        </para>
+        <para>
+          SCM tools can be flexible and powerful, but that also means
+          they tend to complicate the simpler things.  &MZ; has
+          several tools that streamline and automate the most common
+          SCM tasks.
+        </para>
+      </answer>
+    </qandaentry>
+    <qandaentry id="g2q2">
+      <question>
+        <para>Which commands use SCM?</para>
+      </question>
+      <answer>
+        <table frame="sides">
+          <title>&MZ; SCM Command Summary</title>
+          <tgroup cols="2" align="left" colsep="1" rowsep="0">
+            <colspec colnum="1" colname="c1">
+            <colspec colnum="2" colname="c2">
+            <spanspec spanname="footerspan" namest="c1" nameend="c2" align="center">
+            <tfoot>
+              <row>
+                <entry spanname="footerspan"><para>
+                  Note that there are other &MZ; commands that also
+                  interact with the repository.  However, they are
+                  not simply encapsulated repository operations, so
+                  they are not listed here.
+                </para></entry>
+              </row>
+            </tfoot>
+            <tbody>
+              <row>
+                <entry><filename>mzadd</filename></entry>
+                <entry>Mark new files for inclusion in repository</entry>
+              </row>
+              <row>
+                <entry><filename>mzdiff</filename></entry>
+                <entry>Generate a diff between current source and repository</entry>
+              </row>
+              <row>
+                <entry><filename>mzget</filename></entry>
+                <entry>Download latest source from repository</entry>
+              </row>
+              <row>
+                <entry><filename>mzlog</filename></entry>
+                <entry>View log of changes to one or more files</entry>
+              </row>
+              <row>
+                <entry><filename>mzlogin</filename></entry>
+                <entry>Login to the repository</entry>
+              </row>
+              <row>
+                <entry><filename>mzput</filename></entry>
+                <entry>Upload any changes in your local source to the repository</entry>
+              </row>
+              <row>
+                <entry><filename>mzreset</filename></entry>
+                <entry>Remove any persistent meta-information (tags, dates) in local source</entry>
+              </row>
+              <row>
+                <entry><filename>mzrm</filename></entry>
+                <entry>Mark files for removal from repository</entry>
+              </row>
+              <row>
+                <entry><filename>mzrtag</filename></entry>
+                <entry>Symbolically tag repository sources</entry>
+              </row>
+              <row>
+                <entry><filename>mzstat</filename></entry>
+                <entry>Obtain status information on file(s)</entry>
+              </row>
+              <row>
+                <entry><filename>mztag</filename></entry>
+                <entry>Symbolically tag local sources</entry>
+              </row>
+            </tbody>
+          </tgroup>
+        </table>
+      </answer>
+    </qandaentry>
+    <qandaentry id="g2q3">
+      <question>
+        <para>I want to get sources from a different repository.  How do I do that?</para>
+      </question>
+      <answer>
+        <para>
+          All the repository commands in the table above share a
+          common interface.  This allows you to combine certain
+          operations so that you can do things more efficiently.  This
+          is especially obvious in this particular scenario.
+        </para>
+        <para>
+          Let's say you want to use &MZ; to obtain the latest CVS
+          sources for <ulink
+          url="http://www.eterm.org/">Eterm</ulink>, but your
+          <envar>$CVSROOT</envar> is already setup for a different
+          repository.  We'll furthermore assume that you have never
+          obtained these sources before, and that you want to do so
+          anonymously.  Using CVS directly, you would enter:
+        </para>
+        <screen>
+          cvs -d :pserver:anonymous@cvs.enlightenment.sourceforge.net:/cvsroot/enlightenment login
+          cvs -d :pserver:anonymous@cvs.enlightenment.sourceforge.net:/cvsroot/enlightenment co eterm
+        </screen>
+        <para>
+          However, &MZ; will allow you to combine the two steps into
+          one.  It will even check your
+          <filename>~/.cvspass</filename> to see if you actually need
+          to perform the "login" or not.  The command is:
+        </para>
+        <screen>
+          mzget -lD :pserver:anonymous@cvs.enlightenment.sourceforge.net:/cvsroot/enlightenment eterm
+        </screen>
+        <para>
+          The <userinput>-l</userinput> option causes a login to be
+          performed if needed.  It does not take any options, so the
+          <userinput>-D</userinput> option may follow it immediately
+          without needing another <userinput>-</userinput>.  The
+          <userinput>-D</userinput> option specifies a repository
+          other than the default; in this case, the
+          <ulink url="http://www.enlightenment.org/">Enlightenment</ulink>
+          CVS repository.  The rest of the command line (which is
+          simply "<userinput>eterm</userinput>" in this example, but
+          could contain as many names as desired) consists of the
+          names of modules to download.
+        </para>
+      </answer>
+    </qandaentry>
+    <qandaentry id="g2q4">
+      <question>
+        <para>When I upload my changes, what actually happens?</para>
+      </question>
+      <answer>
+        <para>
+          As you may have noticed, the
+          <filename>mzput</filename> command actually does a lot
+          more than just upload your changes to the repository.  For
+          example, the very first thing it does (by default; use the
+          <userinput>--blind</userinput> option to override this) is
+          download an update from the repository to make sure that
+          there are no conflicts and that you have the latest
+          changes.  If any conflicts are found, the upload will not
+          even be attempted (since it would fail anyway).
+        </para>
+        <para>
+          If the update is successful,
+          <filename>mzput</filename> will note the date/time,
+          your userid, and your name (assuming it's in the GECOS
+          field), and will create a template for a ChangeLog entry.
+          It will then open this template in an editor (chosen from
+          <envar>$EDITOR</envar>) for you to fill in.  It will not
+          permit an empty ChangeLog message; in fact, if nothing is
+          added to the template, the upload will be aborted.
+        </para>
+        <para>
+          After you save your ChangeLog entry and exit the editor, the
+          contents of the template will be appended to the ChangeLog
+          file in the current directory (it will be created and added
+          to the upload if not present) followed by a separator line.
+          The ChangeLog file is then added to the list of files to
+          upload, and the upload is performed.
+        </para>
+        <para>
+          It is common for developers to want to add or remove files
+          and upload them at the same time.  By default, if any file
+          or directory names are specified on the
+          <filename>mzput</filename> command line, only those
+          files/directories will be uploaded.  However, if the
+          <userinput>-a</userinput> option is specified, a general
+          upload will be done, and the files/directories listed on the
+          command line will be added to the repository.  This is a
+          shorter way of accomplishing the same task as:
+        </para>
+        <screen>
+          mzadd file1 file2 file3
+          mzput
+        </screen>
+        <para>
+          The <userinput>-r</userinput> option may be used in an
+          identical fashion to remove files and upload changes to the
+          repository, a shortcut for
+        </para>
+        <screen>
+          mzrm file1 file2 file3
+          mzput
+        </screen>
+        <para>
+          You may additionally specify the <userinput>-x</userinput>
+          option to indicate that only those files which have been
+          added/removed should be synced to the repository.
+          Furthermore, <userinput>-x</userinput> as an option to
+          <filename>mzput</filename> by itself indicates that
+          the ChangeLog file should be neither appended to, nor
+          created, nor uploaded.
+        </para>
+      </answer>
+    </qandaentry>
+    <qandaentry id="g2q5">
+      <question>
+        <para>How do I create a branch?</para>
+      </question>
+      <answer>
+        <para>
+          The first step is to determine whether or not you want to
+          create the branch from the sources you have locally, or if
+          you want to branch off from the head of the main trunk of
+          the repository.  That will determine whether you use
+          <filename>mztag</filename> (for the former case) or
+          <filename>mzrtag</filename> (for the latter case).  For
+          purposes of this example, I'll use the former case.  Tagging
+          the repository directly isn't appreciably different.
+        </para>
+        <para>
+          Next, you need to choose the tag you want.  Tags should
+          contain uppercase letters, underscores, and hyphens only.  I
+          highly recommend tagging things using the package name and
+          version number, replacing spaces with hyphens and dots with
+          underscores.  For example, if you were to be tagging version
+          0.9.1 of Eterm, use the tag
+          <userinput>ETERM-0_9_1</userinput>.  This makes translating
+          back and forth between tags and package/version pairs easy.
+        </para>
+        <para>
+          Last, note the use of the <userinput>-b</userinput> option,
+          which signifies that a branch should be created using the
+          specified tag as its name.  And finally, the command:
+        </para>
+        <screen>
+          mztag -b FOO-1_0
+        </screen>
+      </answer>
+    </qandaentry>
+  </qandadiv>
+
+  <qandadiv>
+    <title>Managing Individual Packages with &MZ;</title>
+    <qandaentry id="g3q1">
+      <question>
+        <para>How do I get a package into the system?</para>
+      </question>
+      <answer>
+        <para>
+        </para>
+        <para>
+        </para>
+        <para>
+        </para>
+      </answer>
+    </qandaentry>
+    <qandaentry id="g3q2">
+      <question>
+        <para>What's an SPM? FST? CFST?</para>
+      </question>
+      <answer>
+        <para>
+        </para>
+        <para>
+        </para>
+        <para>
+        </para>
+      </answer>
+    </qandaentry>
+    <qandaentry id="g3q3">
+      <question>
+        <para>How do I add a patch to a package?</para>
+      </question>
+      <answer>
+        <para>
+        </para>
+        <para>
+        </para>
+        <para>
+        </para>
+      </answer>
+    </qandaentry>
+    <qandaentry id="g3q4">
+      <question>
+        <para>How do I build a package?</para>
+      </question>
+      <answer>
+        <para>
+        </para>
+        <para>
+        </para>
+        <para>
+        </para>
+      </answer>
+    </qandaentry>
+  </qandadiv>
+
+<!--
+  <qandadiv>
+    <title></title>
+    <qandaentry id="g1q1">
+      <question>
+        <para></para>
+      </question>
+      <answer>
+        <para>
+        </para>
+      </answer>
+    </qandaentry>
+  </qandadiv>
+-->
+
 </qandaset>
 
 </article>

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.21 2001/11/04 13:46:30 mej Exp $
+# $Id: Build.pm,v 1.22 2002/02/18 18:48:53 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -354,7 +354,7 @@ build_debs_from_tarball
         $cmd .= " --rebuild " . &pkgvar_filename();
     } else {
         &show_backtrace();
-        &fatal_error("Bad call to build_rpms_from_topdir()!\n");
+        &fatal_error("Bad call to build_debs_from_topdir()!\n");
     }
     return &deb_build($cmd);
 }

@@ -23,11 +23,11 @@
 
 (define %body-attr%
  (list
-   (list "BGCOLOR" "#000000")
-   (list "TEXT" "#FFFFFF")
-   (list "LINK" "#6666FF")
+   (list "BGCOLOR" "#FFFFFF")
+   (list "TEXT" "#333333")
+   (list "LINK" "#666666")
    (list "VLINK" "#999999")
-   (list "ALINK" "#6666FF")))
+   (list "ALINK" "#666666")))
 
 (define %html-ext% ".html")
 

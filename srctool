@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.29 2001/12/20 22:33:18 mej Exp $
+# $Id: srctool,v 1.30 2002/02/18 18:48:53 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -72,71 +72,35 @@ print_usage_info
 sub
 import_package
 {
-    my ($pkgfile, $name, $err, $msg, $cmd, $pwd, $tmpdir, $rpmcmd, $pkg, $ver, $rel, $spec, $tag, $specdata);
+    my ($pkgfile, $name, $err, $msg, $cmd, $pwd, $tmpdir, $rpmcmd, $pkg, $ver, $rel, $arch, $spec, $tag, $specdata);
     my (@contents, @srcs, @patches, @tmp);
 
     $pwd = &getcwd();
     $pkgfile = &pkgvar_filename();
     $name = &pkgvar_name();
 
+    # Create a working tree to be imported
     if ($pkgfile && -f $pkgfile) {
-        # If it's a file, make sure it's an SRPM
-        if (&basename($pkgfile) =~ /^([^\/]+)-([^-]+)-([^-]+)\.(no)?src\.rpm$/) {
-            ($pkg, $ver, $rel) = ($1, $2, $3);
-        } else {
+        ($pkg, $ver, $rel, $arch) = &parse_rpm_name($pkgfile);
+        if ($arch !~ /^(no)?src$/) {
             eprint "Invalid package for import:  $pkgfile\n";
             return MEZZANINE_INVALID_PACKAGE;
         }
+
         print "Importing $pkgfile into $pkg tree....\n\n";
-        # Create a working tree to be imported
+
+        # Create temp space for importing SPM
         $tmpdir = &create_temp_space($pkg, "SPM");
-	if (! $tmpdir) {
-	    return MEZZANINE_SYSTEM_ERROR;
-	}
-
-        # Install the SRPM into the temporary directory
-        &pkgvar_parameters("--define \"_sourcedir $tmpdir/S\" --define \"_specdir $tmpdir/F\"");
-        ($err, $msg) = &package_install();
-        &pkgvar_parameters("");
-        if ($err != MEZZANINE_SUCCESS) {
-            eprint "Unable to install $pkgfile\n";
-            return MEZZANINE_COMMAND_FAILED;
+        if (! $tmpdir) {
+            return MEZZANINE_SYSTEM_ERROR;
         }
-
-        # The spec file should be the only file in $tmpdir/F
-        @tmp = &find_files("$tmpdir/F");
-        if (scalar(@tmp) != 1) {
-            my $n = scalar(@tmp);
-            &fatal_error("$n spec files in $tmpdir/F?!\n");
-        }
-        $spec = $tmp[0];
-
-        # Get a list of all source and patch files
-        &pkgvar_instructions($spec);
-        $specdata = &parse_spec_file();
-        if (!defined($specdata->{SPECFILE})) {
-            eprint "Unable to parse spec file.\n";
-            return MEZZANINE_COMMAND_FAILED;
-        }
-        @srcs = values %{$specdata->{SOURCE}};
-        @patches = values %{$specdata->{PATCH}};
-        dprint "Specfile $spec, sources ", join(' ', @srcs), ", patches ", join(' ', @patches), "\n";
-
-        # Move the patches to $tmpdir/P/
-        if (scalar(@patches)) {
-            chdir("$tmpdir/S");
-            dprint "Moving patches to $tmpdir/P/\n";
-            if (&move_files(@patches, "$tmpdir/P/") < scalar(@patches)) {
-                eprint "One or more patches could not be moved into place.\n";
-                return MEZZANINE_FILE_OP_FAILED;
-            }
-        }
+        &convert_srpm_to_spm($pkgfile, $tmpdir);
 
         $tag = "$pkg-$ver-$rel";
         if ($test_only) {
             chdir($pwd);
             if (! &mv($tmpdir, "$pwd/$pkg")) {
-                eprint "Unable to move $tmpdir to $tmpdir -- $!\n";
+                eprint "Unable to move $tmpdir to $pwd/$pkg -- $!\n";
                 return MEZZANINE_FILE_OP_FAILED;
             }
             print "You specified the \"test\" (-T) option.  You will need to import the new tree by hand (mzimport $pkg).\n";
@@ -397,12 +361,14 @@ merge_file($$)
             return MEZZANINE_SYSTEM_ERROR;
         }
     } else {
-        $pkg = &basename(&getcwd);
+        $pkg = &basename(&getcwd());
     }
 
     dprint "Merging $new_file ($type) into $pkg\n";
     if ($type eq 'R') {
-        # Merge in new files from an SRPM.  TODO
+        # Merge in new files from an SRPM.
+        &convert_srpm_to_spm($new_file, ".");
+        print "You will need to run 'mzsync' next.  Also, don't forget to remove old patches/sources.\n";
     } else {
         my @output;
 
@@ -571,7 +537,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.29 $ created on $Date: 2001/12/20 22:33:18 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.30 $ created on $Date: 2002/02/18 18:48:53 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.9 2001/09/22 13:22:34 mej Exp $
+# $Id: Src.pm,v 1.10 2002/02/18 18:48:53 mej Exp $
 #
 
 package Mezzanine::Src;
@@ -30,7 +30,11 @@ BEGIN {
     use Exporter   ();
     use File::Copy;
     use File::Find;
+    use Cwd ('&getcwd');
     use Mezzanine::Util;
+    use Mezzanine::PkgVars;
+    use Mezzanine::Pkg;
+    use Mezzanine::RPM;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
@@ -41,7 +45,7 @@ BEGIN {
     @EXPORT      = ('$WORK_DIR', '$TMP_DIR', 
                     '&find_files', '&find_subdirs', '&generate_symlink_file',
                     '&install_spm_files', '&create_temp_space', '&clean_temp_space',
-                    '&run_cmd', '&run_mz_cmd');
+                    '&convert_srpm_to_spm', '&run_cmd', '&run_mz_cmd');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -66,6 +70,7 @@ sub generate_symlink_file($);
 sub install_spm_files($);
 sub create_temp_space($$);
 sub clean_temp_space();
+sub convert_srpm_to_spm($);
 sub run_cmd($$$);
 sub run_mz_cmd($$$);
 
@@ -207,6 +212,58 @@ sub
 clean_temp_space()
 {
     return &nuke_tree($TMP_DIR);
+}
+
+sub
+convert_srpm_to_spm($)
+{
+    my ($pkgfile, $destdir) = @_;
+    my ($err, $msg, $rpmcmd, $spec, $specdata);
+    my (@srcs, @patches, @tmp);
+
+    # Install the SRPM into the temporary directory
+    &pkgvar_filename($pkgfile);
+    $destdir = &getcwd() if ($destdir =~ /^\.\/?$/);
+    &pkgvar_parameters("--define \"_sourcedir $destdir/S\" --define \"_specdir $destdir/F\"");
+    ($err, $msg) = &package_install();
+    &pkgvar_parameters("");
+    if ($err != MEZZANINE_SUCCESS) {
+        eprint "Unable to install $pkgfile\n";
+        return MEZZANINE_COMMAND_FAILED;
+    }
+
+    # The spec file should be the only file in $destdir/F
+    @tmp = &find_files("$destdir/F");
+    if (scalar(@tmp) != 1) {
+        my $n = scalar(@tmp);
+        &fatal_error("$n spec files in $destdir/F?!\n");
+    }
+    $spec = $tmp[0];
+
+    # Get a list of all source and patch files
+    &pkgvar_instructions($spec);
+    $specdata = &parse_spec_file();
+    if (!defined($specdata->{SPECFILE})) {
+        eprint "Unable to parse spec file.\n";
+        return MEZZANINE_COMMAND_FAILED;
+    }
+    @srcs = values %{$specdata->{SOURCE}};
+    @patches = values %{$specdata->{PATCH}};
+    dprint "Specfile $spec, sources ", join(' ', @srcs), ", patches ", join(' ', @patches), "\n";
+
+    # Move the patches to $destdir/P/
+    if (scalar(@patches)) {
+        chdir("$destdir/S");
+        dprint "Moving patches to $destdir/P/\n";
+        if (&move_files(@patches, "$destdir/P/") < scalar(@patches)) {
+            eprint "One or more patches could not be moved into place.\n";
+            return MEZZANINE_FILE_OP_FAILED;
+        }
+    }
+    &limit_files(&basename($spec), "$destdir/F");
+    &limit_files(@srcs, "$destdir/S");
+    &limit_files(@patches, "$destdir/P");
+    return MEZZANINE_SUCCESS;
 }
 
 # Generic wrapper to grab command output

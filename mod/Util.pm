@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.18 2001/10/05 16:14:52 mej Exp $
+# $Id: Util.pm,v 1.19 2002/02/18 18:48:53 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -41,7 +41,7 @@ BEGIN {
                     '&debug_get', '&debug_set',
 		    '&get_timestamp', '&fatal_error', '&dprintf', '&dprint', '&eprintf', '&eprint', '&wprintf', '&wprint',
 		    '&handle_signal', '&handle_fatal_signal', '&handle_warning', '&show_backtrace', '&print_args',
-		    '&mkdirhier', '&nuke_tree', '&move_files', '&copy_files', '&basename', '&dirname', '&grepdir',
+		    '&mkdirhier', '&nuke_tree', '&move_files', '&copy_files', '&basename', '&dirname', '&grepdir', '&limit_files',
 		    '&xpush',
 		    '&cat_file',
                     '&parse_rpm_name', '&should_ignore', '&touch_file',
@@ -92,6 +92,7 @@ sub basename($);
 sub dirname($);
 sub grepdir(& $);
 sub xpush(\@; @);
+sub limit_files(@ $);
 sub cat_file($);
 sub parse_rpm_name($);
 sub should_ignore($);
@@ -464,6 +465,25 @@ grepdir(& $)
     @files = grep(&$func($_ = ($dir . $_)), readdir(DIR));
     closedir(DIR);
     return @files;
+}
+
+# Remove files in a directory which are not in the list
+sub
+limit_files(@ $)
+{
+    my $dir = pop;
+    my @files = @_;
+    my @contents;
+    local *DIR;
+
+    @contents = &grepdir(sub {! -d $_}, $dir);
+    foreach my $f (@contents) {
+        if (!grep($_ eq &basename($f), @files)) {
+            dprint "Removing $f\n";
+            unlink($f) || eprint "Unable to remove $f -- $!\n";
+        }
+    }
+    return 1;
 }
 
 # Exclusive push.  Only push if the item(s) aren't already in the list
