@@ -1,6 +1,6 @@
 %define name     avalon
 %define ver      2.0
-%define rel      0.11
+%define rel      0.12
 %define prefix   /usr
 
 Summary: Avalon -- The VA Software Engineering Build System
@@ -13,7 +13,6 @@ Source: %{name}.tar.gz
 BuildRoot: /tmp/%{name}-%{ver}-root
 Packager: Michael Jennings <mej@valinux.com>
 Vendor: VA Linux Systems (http://www.valinux.com/)
-Docdir: %{prefix}/doc
 URL: http://www.valinux.com/
 Requires: perl, perl-libnet
 
@@ -32,7 +31,7 @@ rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT%{prefix}/bin
 mkdir -p $RPM_BUILD_ROOT%{prefix}/lib/perl5/site_perl/5.6.0/Avalon
 mkdir -p $RPM_BUILD_ROOT%{prefix}/lib/perl5/site_perl/5.005/Avalon
-mkdir -p $RPM_BUILD_ROOT%{prefix}/man/man1
+mkdir -p $RPM_BUILD_ROOT%{_mandir}/man1
 
 for i in *tool pkgsort ; do
   install -m 755 $i $RPM_BUILD_ROOT%{prefix}/bin/
@@ -41,6 +40,10 @@ done
 for i in mod/*.pm ; do
   install -m 644 $i $RPM_BUILD_ROOT%{prefix}/lib/perl5/site_perl/5.6.0/Avalon/
   install -m 644 $i $RPM_BUILD_ROOT%{prefix}/lib/perl5/site_perl/5.005/Avalon/
+done
+
+for i in doc/man/*.1 ; do
+  install -m 644 $i $RPM_BUILD_ROOT%{_mandir}/man1/
 done
 
 (
@@ -57,16 +60,12 @@ done
   ln buildtool avbuild
 )
 
-for i in *.1 ; do
-  install -m 644 $i $RPM_BUILD_ROOT%{prefix}/man/man1/
-done
-
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-, root, root)
-%doc README ChangeLog
+%doc README ChangeLog doc/*.txt
 %{prefix}/bin/*
 %{prefix}/lib/*
-%{prefix}/man/*
+%{_mandir}/*

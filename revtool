@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.66 2001/04/26 00:44:28 mej Exp $
+# $Id: revtool,v 1.67 2001/05/01 03:38:40 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -718,7 +718,7 @@ import_vendor_sources
         eprint "Release tag \"$release_tag\" is not valid for module $module\n";
         return AVALON_INVALID_TAG;
     }
-    ($version = $release_tag) =~ s/^[^-]+-//;
+    ($version = $release_tag) =~ s/^.*-([^-]+)$/$1/;
     $version =~ tr/_/./;
     $version =~ tr/[A-Z]/[a-z]/;
     $msg = "Import of $module $version";
@@ -890,7 +890,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.66 $ created on $Date: 2001/04/26 00:44:28 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.67 $ created on $Date: 2001/05/01 03:38:40 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

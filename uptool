@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: uptool,v 1.5 2001/04/26 23:43:11 mej Exp $
+# $Id: uptool,v 1.6 2001/05/01 03:38:40 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -212,6 +212,7 @@ fetch_updates($)
     # Set defaults for stuff.
     ($port, $userid, $passwd) = ("21", "anonymous", "info\@valinux.com");
     undef ($rpkgs, $lpkgs);
+    $pkgcnt = 0;
 
     ### Parse the URL into its components.
 
@@ -263,22 +264,23 @@ fetch_updates($)
     }
 
     foreach my $p (keys %dir) {
-        undef $rpkgs;
-        undef $lpkgs;
+        undef %{$rpkgs};
+        undef %{$lpkgs};
         @rpkgs = &get_remote_listing($session, "$path/$p");
         if (scalar(@rpkgs)) {
             @lpkgs = &get_local_listing($dir{$p});
             &compare_lists($session, $dir{$p});
+        }
+        if (defined(%cmd)) {
+            $pkgcnt += scalar(keys %cmd);
+            &show_cmds();
+            undef %cmd;
         }
     }
 
     print "Closing session...\n";
     $session->quit();
 
-    if (defined(%cmd)) {
-        $pkgcnt = scalar(keys %cmd);
-        &show_cmds();
-    }
     print "Update complete.  Found $pkgcnt out-dated/missing packages.\n";
     return 1;
 }
@@ -303,7 +305,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.5 $ created on $Date: 2001/04/26 23:43:11 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.6 $ created on $Date: 2001/05/01 03:38:40 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.134 2001/04/26 00:44:28 mej Exp $
+# $Id: buildtool,v 1.135 2001/05/01 03:38:40 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1534,14 +1534,14 @@ cleanup
     my $type = $_[0];
     my @dirs;
 
-    if ($type =~ /all/i) {
-        @dirs = ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SRPMS", "$builddir/RPMS", "$builddir/SPECS", $buildroot);
+    if ($type =~ /temp/i) {
+        @dirs = ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SPECS", $buildroot);
     } elsif ($type =~ /rpm/i) {
         @dirs = ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SRPMS", "$builddir/RPMS", "$builddir/SPECS");
     } elsif ($type =~ /(build)?root/) {
         @dirs = ($buildroot);
     } else {
-        @dirs = ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SPECS", $buildroot);
+        @dirs = ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SRPMS", "$builddir/RPMS", "$builddir/SPECS", $buildroot);
     }
     foreach $f (@dirs) {
         nprint "$progname:  Cleaning up $f\n";
@@ -1758,7 +1758,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.134 $ created on $Date: 2001/04/26 00:44:28 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.135 $ created on $Date: 2001/05/01 03:38:40 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
