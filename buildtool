@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.6 2000/05/10 05:38:30 mej Exp $
+# $Id: buildtool,v 1.7 2000/05/11 03:56:57 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -181,7 +181,7 @@ parse_product_def
                 }
             } elsif ($type eq "srpm") {
                 $name =~ s/\.src\.rpm$//;
-                if (! $pkgvars{RELEASE}) {
+                if (!defined $pkgvars{RELEASE}) {
                     if ($name !~ /^\S+-[^-]+-[^-]+$/) {
                         eprint "I wasn't given enough information about the $name package in ${prod}.prod.  For SRPM\n";
                         eprint "packages, the version and release information must be specified as variables or\n";
@@ -193,7 +193,7 @@ parse_product_def
                         $pkgvars{RELEASE} = $tmp;
                     }
                 }
-                if (! $pkgvars{VERSION}) {
+                if (!defined $pkgvars{VERSION}) {
                     if ($name !~ /^\S+-[^-]+$/) {
                         eprint "I wasn't given enough information about the $name package in ${prod}.prod.  For SRPM\n";
                         eprint "packages, the version and release information must be specified as variables or\n";
@@ -205,14 +205,15 @@ parse_product_def
                         $pkgvars{VERSION} = $tmp;
                     }
                 }
-
+                $filename = sprintf("%s$name-$pkgvars{VERSION}-$pkgvars{RELEASE}.src.rpm", ($module ? "$module/" : ""));
             }
             # Now that we've got the name/version/release in their final forms, set up the data structures.
             $pkgs->{$name}{TYPE} = $type;
             $pkgs->{$name}{MODULE} = ($module ? $module : $name);
+            $pkgs->{$name}{FILENAME} = ($filename ? $filename : $module);
             dprint "New package:  $name is a $pkgs->{$name}{TYPE}\n";
             foreach $pkgvar (keys %pkgvars) {
-                if ($pkgvars{$pkgvar}) {
+                if ($pkgvars{$pkgvar} !~ /^$/) {
                     $pkgs->{$name}{$pkgvar} = $pkgvars{$pkgvar};
                     dprint "Added variable $pkgvar to package $name with value \"$pkgs->{$name}{$pkgvar}\"\n";
                 }
@@ -243,6 +244,66 @@ fail_package
     return 0;
 }
 
+sub
+fetch_package
+{
+    my $cmd = $_[0];
+    my $err = 0;
+    my $tries = 0;
+    my $msg = undef;
+
+    for (; (($err == -1) || ($tries == 0)); $tries++) {
+        dprint "About to run $cmd\n";
+        if (!open(REVTOOL, "$cmd 2>&1 |")) {
+            $err = 1;
+            $msg = "Execution of \"$cmd\" failed -- $!";
+            last;
+        }
+        while (<REVTOOL>) {
+            chomp($line = $_);
+            if ($debug) {
+                nprint "From revtool -> $line\n";
+            } else {
+                nprint "$line\n";
+            }
+            next if ($line =~ /^\[debug:/);
+            # Check the output for errors
+            if ($line =~ /^cvs server: cannot find module/) {
+                $err = 1;
+                $msg = "$filename does not seem to exist in the repository";
+            } elsif ($line =~ /^revtool:\s*Error/) {
+                $err = 1;
+                $msg = "$line";
+            } elsif ($line =~ /^cvs server: warning: $filename is not \(any longer\) pertinent/) {
+                $err = 1;
+                $msg = "$filename was removed from the repository.  Please update the product file.";
+            } elsif ($line =~ /^cvs \[checkout aborted\]: connect to \S+ failed: Connection refused/) {
+                if ($tries < 10) {
+                    $err = -1;
+                    qprint "The CVS server seems to be down.  I'll wait a bit and try again.\n";
+                    sleep 3;
+                } else {
+                    $err = 1;
+                    $msg = "The CVS server was unreachable.";
+                }
+            } elsif ($line =~ /^cvs \[checkout aborted\]: received .* signal/) {
+                if ($tries < 10) {
+                    $err = -1;
+                    qprint "The CVS server crashed.  I'll wait a bit and try again.\n";
+                    sleep 3;
+                } else {
+                    $err = 1;
+                    $msg = "The CVS server kept crashing.";
+                }
+            }
+            last if ($err == 1);
+        }
+        close(REVTOOL);
+        dprint "\"$cmd\" returned $?\n";
+    }
+    return ($err, $msg);
+}
+
 #
 # The build process stages
 #
@@ -250,6 +311,8 @@ sub
 do_bootstrap_stage
 {
     my $line;
+    my $err;
+    my $msg;
 
     qprint "$progname:  Entering the bootstrap stage.  (${\(&get_timestamp())})\n";
     if (! -d "$basedir/build") {
@@ -258,22 +321,22 @@ do_bootstrap_stage
             mkdir("$basedir/build/$dir", 0755);
         }
     }
-    if (-f "$ENV{HOME}/.rpmmacros" && -s "$ENV{HOME}/.rpmmacros") {
+    if (-f "$ENV{HOME}/.rpmmacros" && -s _) {
         $rpmmacros = "$ENV{HOME}/.rpmmacros";
     } else {
         $rpmmacros = "$basedir/rpmmacros";
-        if (!(-f "$basedir/rpmmacros" && -s "$basedir/rpmmacros")) {
+        if (!(-f "$basedir/rpmmacros" && -s _)) {
             # Create basic rpmmacros
             open(RPMMACROS, ">$rpmmacros") || die "Cannot create $rpmmacros -- $!\n";
             print RPMMACROS "\%_topdir        $basedir/build\n";
             close(RPMMACROS);
         }
     }
-    if (-f "$ENV{HOME}/.rpmrc" && -s "$ENV{HOME}/.rpmrc") {
+    if (-f "$ENV{HOME}/.rpmrc" && -s _) {
         $rpmrc = "$ENV{HOME}/.rpmrc";
     } else {
         $rpmrc = "$basedir/rpmrc";
-        if (!(-f "$basedir/rpmrc" && -s "$basedir/rpmrc")) {
+        if (!(-f "$basedir/rpmrc" && -s _)) {
             # Create basic rpmrc
             open(RPMRC, ">$rpmrc") || die "Cannot create $rpmrc -- $!\n";
             print RPMRC "optflags:   i386 -O2 -march=pentium\n";
@@ -283,64 +346,37 @@ do_bootstrap_stage
         }
     }
     foreach $pkg (@packages) {
-        $err = 0;
         nprint "$progname:  Starting bootstrap stage for the \"$pkg\" package....\n";
-        $module = $pkgs->{$pkg}{MODULE};
-        if ($pkgs->{$pkg}{TYPE} eq "module") {
-        } elsif ($pkgs->{$pkg}{TYPE} eq "srpm") {
-            $version = $pkgs->{$pkg}{VERSION};
-            $release = $pkgs->{$pkg}{RELEASE};
-            $filename = "$module/$pkg-$version-$release.src.rpm";
-            dprint "Checking for $filename\n";
-            # If it already exists with nonzero size as a plain binary file, go on.
-            next if (-f $filename && -s $filename && -B $filename);
-            if ($pkgs->{$pkg}{CVSROOT}) {
-                $cvsroot = "-D $pkgs->{$pkg}{CVSROOT}";
-            } else {
-                $cvsroot = "";
-            }
-            if ($pkgs->{$pkg}{TAG}) {
-                $tag = "-t $pkgs->{$pkg}{TAG}";
-            } else {
-                $tag = "";
-            }
-            $cmd = "$revtool $cvsroot $tag -g $filename";
-            dprint "About to run $cmd\n";
-            if (!open(REVTOOL, "$cmd 2>&1 |")) {
-                &fail_package($pkg, "bootstrap", "Execution of \"$cmd\" failed -- $!");
-                next;
-            }
-            while (<REVTOOL>) {
-                chomp($line = $_);
-                if ($debug) {
-                    nprint "From revtool -> $line\n";
-                } else {
-                    nprint "$line\n";
-                }
-                next if ($line =~ /^\[debug:/);
-                # Check the output for errors
-                if ($line =~ /^cvs server: cannot find module/) {
-                    $err = 1;
-                    $msg = "$filename does not seem to exist in the repository";
-                } elsif ($line =~ /^revtool:\s*Error/) {
-                    $err = 1;
-                    $msg = "$line";
-                } elsif ($line =~ /^cvs server: warning: $filename is not \(any longer\) pertinent/) {
-                    $err = 1;
-                    $msg = "$filename was removed from the repository.  Please update the product file.";
-                    last;
-                }
-            }
-            close(REVTOOL);
-            if ($err) {
-                &fail_package($pkg, "bootstrap", $msg);
-                next;
-            }
-            if (!(-f $filename && -s $filename && -B $filename)) {
-                # If it's not there, we must've missed the error.
-                &fail_package($pkg, "bootstrap", "Unhandled error condition [$line]");
-                next;
-            }
+        $filename = $pkgs->{$pkg}{FILENAME};
+        if ($pkgs->{$pkg}{CVSROOT}) {
+            $cvsroot = "-D $pkgs->{$pkg}{CVSROOT}";
+        } else {
+            $cvsroot = "";
+        }
+        if ($pkgs->{$pkg}{REVISION}) {
+            $tag = "-t $pkgs->{$pkg}{REVISION}";
+        } else {
+            $tag = "";
+        }
+        dprint "Checking for $filename\n";
+        # If it already exists , go on.
+        if (($pkgs->{$pkg}{TYPE} eq "module" && -d $filename)
+            || ($pkgs->{$pkg}{TYPE} eq "srpm" && -f $filename && -s _)) {
+            nprint "$progname:  $filename already exists.  I'll assume it's the right one.\n";
+            nprint "$progname:  Bootstrap stage for \"$pkg\" is complete.\n";
+            next;
+        }
+        $cmd = "$revtool $cvsroot $tag -g $filename";
+        ($err, $msg) = &fetch_package($cmd);  # Download the package using revtool
+        if ($err == 1) {
+            &fail_package($pkg, "bootstrap", $msg);
+            next;
+        }
+        if (!(($pkgs->{$pkg}{TYPE} eq "module" && -d $filename)
+              || ($pkgs->{$pkg}{TYPE} eq "srpm" && -f $filename && -s _))) {
+            # If it's not there, we must've missed the error.
+            &fail_package($pkg, "bootstrap", "Unhandled error condition");
+            next;
         }
         nprint "$progname:  Bootstrap stage for \"$pkg\" is complete.\n";
     }
@@ -355,6 +391,10 @@ do_compose_stage
     foreach $pkg (grep $pkgs->{$_}{TYPE} ne "srpm", @packages) {
         nprint "$progname:  Starting compose stage for the \"$pkg\" package....\n";
         if ($pkgs->{$pkg}{TYPE} eq "module") {
+            #
+            # Somewhere in here, be sure to reset the {FILENAME} member
+            # to the path and filename of the SRPM rather than the module.
+            #
         }
         nprint "$progname:  Compose stage for \"$pkg\" is complete.\n";
     }
@@ -364,11 +404,74 @@ do_compose_stage
 sub
 do_explode_stage
 {
+    my ($cmd, $err, $msg, $line, $specfile, $rpm) = undef;
+    my @manifest;
+
     qprint "$progname:  Entering the explode stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (@packages) {
+        undef @manifest;
         nprint "$progname:  Starting explode stage for the \"$pkg\" package....\n";
-        if ($pkgs->{$pkg}{TYPE} eq "module") {
-        } elsif ($pkgs->{$pkg}{TYPE} eq "srpm") {
+        $rpm = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
+
+        # Examine the SRPM and figure out everything it contains.
+        $cmd = "$rpm --rcfile $rpmrc -qlp $pkgs->{$pkg}{FILENAME}";
+        dprint "About to run \"$cmd\"\n";
+        if (!open(RPM, "$cmd 2>&1 |")) {
+            &fail_package($pkg, "explode", "Execution of \"$cmd\" failed -- $!");
+            next;
+        }
+        while (<RPM>) {
+            chomp($line = $_);
+            push @manifest, $line;  # Add the file to the manifest
+            if ($line =~ /\.spec(\.in)?$/) {
+                $specfile = $line;
+                dprint "Found spec file as $specfile\n";
+            }
+        }
+        close(RPM);
+        dprint "\"$cmd\" returned $?\n";
+        if (! $specfile) {
+            &fail_package($pkg, "explode", "Unable to locate spec file in SRPM");
+        }
+        # We'll use these later, so they MUST be defined for
+        # any package we plan on actually building later.
+        $pkgs->{$pkg}{SPECFILE} = $specfile;
+        $pkgs->{$pkg}{MANIFEST} = join(" ", @manifest);
+
+        # Check for each of those files.
+        $err = 0;
+        foreach $piece (@manifest) {
+            # FIXME:  Need to handle _topdir for people who did their own rpm* files.
+            if (($piece =~ /\.spec(\.in)?$/ && -f "$basedir/build/SPECS/$piece")
+                || (-f "$basedir/build/SOURCES/$piece")) {
+                next;
+            }
+            $err = 1;  # Something is missing.  We must explode this SRPM.
+            last;
+        }
+        next if (! $err);  # If everything is there, go on.
+
+        # Explode the SRPM into its components
+        $cmd = "rpm --rcfile $rpmrc -U $pkgs->{$pkg}{FILENAME}";
+        dprint "About to run \"$cmd\"\n";
+        if (!open(RPM, "$cmd 2>&1 |")) {
+            &fail_package($pkg, "explode", "Execution of \"$cmd\" failed -- $!");
+            next;
+        }
+        $err = 0;
+        while (<RPM>) {
+            chomp($line = $_);
+            if ($line !~ /^$/) {
+                # Any output from this command is an error.
+                $err = 1;
+                $msg = "$line";
+                last;
+            }
+        }
+        close(RPM);
+        dprint "\"$cmd\" returned $?\n";
+        if ($err) {
+            &fail_package($pkg, "explode", $msg);
         }
         nprint "$progname:  Explode stage for \"$pkg\" is complete.\n";
     }
@@ -445,23 +548,10 @@ summarize_failures
     }
 }
 
-# main() here is basically the same as main() in C
+# This routine does the actual build process
 sub
-main
+build_process
 {
-    if (!$opt_p) {
-        eprint "You didn't tell me what to build, so I'm not quite sure what to do.\n";
-        eprint "If you aren't familiar with how to use $progname, try $progname --help.\n";
-        return;
-    }
-
-    # Parse the product definition files to figure out what the heck we need to build. :)
-    if (! &parse_product_def($opt_p)) {
-        # FIXME:  Eventually this should fall back on treating it like a module
-        eprint "$opt_p does not seem to be a product.  Perhaps you made a typo?\n";
-        return;
-    }
-
     # Perform the build in stages, checking after each one to see if we should stop
     &do_bootstrap_stage();
     return if ($opt_b eq "s");
@@ -484,11 +574,36 @@ main
     &do_cleanup_stage();
 }
 
+# main() here is basically the same as main() in C
+sub
+main
+{
+    if (!$opt_p) {
+        eprint "You didn't tell me what to build, so I'm not quite sure what to do.\n";
+        eprint "If you aren't familiar with how to use $progname, try $progname --help.\n";
+        return;
+    }
+
+    # Parse the product definition files to figure out what the heck we need to build. :)
+    if (! &parse_product_def($opt_p)) {
+        # FIXME:  Eventually this should fall back on treating it like a module
+        eprint "$opt_p does not seem to be a product.  Perhaps you made a typo?\n";
+        return;
+    }
+
+    &build_process();
+    &summarize_failures();
+}
+
 BEGIN {
 
     # Set up the basic variables
     $progname = "buildtool";
     $version = "0.1.0";
+
+    # Synchronize output so it doesn't get all jumbled
+    select STDERR; $| = 1;
+    select STDOUT; $| = 1;
 
     # See the Getopt::Mixed man page for details on the syntax of this line
     $valid_opts = "h help>h v version>v d debug>d b=s build>b p=s product>p package>p"

@@ -85,3 +85,8 @@ Lots of changes here.  The big deal is that buildtool should be able
 to (mostly) bootstrap redhat-6.2 now.  Also, revtool -g works, and I
 added some to revtool to make it more flexible WRT adds and removes.
 ----------------------------------------------------------------------
+Wed May 10 21:04:23 2000                        Michael Jennings (mej)
+
+Fixes to the stuff that happened last night are done, along with the
+explode stage.
+----------------------------------------------------------------------

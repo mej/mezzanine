@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.13 2000/05/10 05:38:30 mej Exp $
+# $Id: revtool,v 1.14 2000/05/11 03:56:57 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -271,6 +271,11 @@ BEGIN {
     $version = "0.1.0";
     $argc = $#ARGV + 2;
     $retval = 0;
+
+    # Synchronize output so it doesn't get all jumbled
+    select STDERR; $| = 1;
+    select STDOUT; $| = 1;
+
     # See the Getopt::Mixed man page for details on the syntax of this line
     $valid_opts = "h help>h v version>v d debug>d g get>g p put>p a add>a r remove>r"
                   . " R recurse>R t=s tag>t i=s import>i k=s D=s dir>D x exclusive>x"
