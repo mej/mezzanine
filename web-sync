@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 28 Sept 2000
 #
-# $Id: web-sync,v 1.12 2001/05/15 21:18:21 mej Exp $
+# $Id: web-sync,v 1.13 2001/05/29 19:23:39 mej Exp $
 #
 
 if [ ! -z "$SUDO_USER" ]; then
@@ -28,8 +28,8 @@ for i in $* ; do
   case $i in
     6.2.*)
       REMOTE_UHOST=mej@grendel
-      REMOTE_DIR=/grendel/scratch/mej/avalon/build
-      LOCAL_DIR=/home/ftp/pub/software/RH-VALE/released
+      REMOTE_DIR=/grendel/scratch/mej/6.2.4/build
+      LOCAL_DIR=/home/ftp/pub/software/RH-VALE/unsupported
       for j in os powertools ; do
         mkdir -p $LOCAL_DIR/$i/$j
         cd $LOCAL_DIR/$i/$j

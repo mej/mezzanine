@@ -5,8 +5,22 @@
 # Michael Jennings <mej@valinux.com>
 # 21 July 2000
 #
-# $Id: redhat-6.x-cdtool,v 1.4 2001/04/11 02:10:34 mej Exp $
+# $Id: redhat-6.x-cdtool,v 1.5 2001/05/29 19:23:39 mej Exp $
 #
+
+if [ "x$1" = "x-i" ]; then
+    IMAGE=1
+    shift
+else
+    IMAGE=0
+fi
+
+if [ "x$1" = "x" ]; then
+    VA_VER=6.2.4
+else
+    VA_VER=$1
+fi
+RH_VER=`echo $VA_VER | awk -F. '{print $1"."$2}'`
 
 trap 'exit -1' 1 2 15
 
@@ -15,62 +29,66 @@ if [ -z "$BASE_DIR" ]; then
 fi
 BUILD_DIR=$BASE_DIR/build
 
-IMAGE=$BUILD_DIR/va-os-rpms
+CD=$BUILD_DIR/va-os-rpms
 TMP_IMAGE=$BUILD_DIR/img.bak
 SYSLINUX_DIR=syslinux-1.45
 
 # Remove kernel-build RPM's
-rm -f $IMAGE/RedHat/RPMS/kernel-build-* $IMAGE/VALinux/RPMS/kernel-build-*
+rm -f $CD/RedHat/RPMS/kernel-build-* $CD/VALinux/RPMS/kernel-build-*
 
-# Make a copy of the ISO image tree
-cd $BUILD_DIR
-[ -d $TMP_IMAGE ] && rm -rf $TMP_IMAGE
-cp -a $IMAGE $TMP_IMAGE
+if [ $IMAGE -eq 1 ]; then
 
-# Build syslinux
-cd $TMP_IMAGE/misc/src/trees/$SYSLINUX_DIR
-make
-cd ..
+    # Make a copy of the ISO image tree
+    cd $BUILD_DIR
+    [ -d $TMP_IMAGE ] && rm -rf $TMP_IMAGE
+    cp -a $CD $TMP_IMAGE
 
-# Update the image trees and initrd files
-make all
+    # Build syslinux
+    cd $TMP_IMAGE/misc/src/trees/$SYSLINUX_DIR
+    make
+    cd ..
 
-# Create the disk images
-# NOTE:  You can safely ignore messages during "do-make" like:
-#    cpio: /tmp/mkimage.mnt-18505/./.cvsignore: Invalid argument
-make do-make
-make clean
-(cd $SYSLINUX_DIR ; make clean ; rm -f bootsect.bin ldlinux.bin ldlinux.sys ldlinux.lst)
+    # Update the image trees and initrd files
+    make all
 
-# Remove the initrd images and image trees.  No longer needed.
-rm -rf *.img cdrom hdstg2 initrd local netstg2 network pcmcia boot/vmlinuz
+    # Create the disk images
+    # NOTE:  You can safely ignore messages during "do-make" like:
+    #    cpio: /tmp/mkimage.mnt-18505/./.cvsignore: Invalid argument
+    make do-make
+    make clean
+    (cd $SYSLINUX_DIR ; make clean ; rm -f bootsect.bin ldlinux.bin ldlinux.sys ldlinux.lst)
 
-# Clean up anaconda
-cd ../anaconda ; make clean
+    # Remove the initrd images and image trees.  No longer needed.
+    rm -rf *.img cdrom hdstg2 initrd local netstg2 network pcmcia boot/vmlinuz
 
-# Generate the diff
-cd $BUILD_DIR
-diff -x CVS -x .cvsignore -ur $IMAGE $TMP_IMAGE > img.patch 2>&1
-${EDITOR:-vi} img.patch
+    # Clean up anaconda
+    cd ../anaconda ; make clean
 
-# Make sure there's nothing new popping up unexpectedly.
-ONLY=`grep '^Only' img.patch | sed 's/: /\//' | awk '{print $3}'`
-if [ -n "$ONLY" ]; then
-  echo "The following files were found only in one tree:"
-  echo $ONLY
-  echo
-  echo "This is probably a problem.  Correct it, then hit Enter to continue."
-  read
+    # Generate the diff
+    cd $BUILD_DIR
+    diff -x CVS -x .cvsignore -ur $CD $TMP_IMAGE > img.patch 2>&1
+    ${EDITOR:-vi} img.patch
+
+    # Make sure there's nothing new popping up unexpectedly.
+    ONLY=`grep '^Only' img.patch | sed 's/: /\//' | awk '{print $3}'`
+    if [ -n "$ONLY" ]; then
+        echo "The following files were found only in one tree:"
+        echo $ONLY
+        echo
+        echo "This is probably a problem.  Correct it, then hit Enter to continue."
+        read
+    fi
+
+    # Copy over all the changed files
+    rm -f img.sh
+    grep '^Binary' img.patch | awk '{print "cp -af "$5" "$3}' > img.sh
+    sh img.sh
+
 fi
 
-# Copy over all the changed files
-rm -f img.sh
-grep '^Binary' img.patch | awk '{print "cp -af "$5" "$3}' > img.sh
-sh img.sh
-
-# Regenerate the package list ($IMAGE/RedHat/base/hdlist) from $IMAGE/RedHat/base/comps
-cd $IMAGE/misc/src/anaconda/utils
-./genhdlist $IMAGE
+# Regenerate the package list ($CD/RedHat/base/hdlist) from $CD/RedHat/base/comps
+cd $CD/misc/src/anaconda/utils
+./genhdlist $CD
 
 # Create ISO files
 cd $BASE_DIR
