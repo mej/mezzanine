@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.6 2001/09/22 13:22:34 mej Exp $
+# $Id: RevCtl.pm,v 1.7 2001/09/22 13:31:00 mej Exp $
 #
 
 package Mezzanine::RevCtl;
@@ -252,11 +252,11 @@ check_tags
     my $module = $_[0];
 
     # The regexp's below enforce the following tag rules:
-    #   1. Branch tags must begin with a branch key, hypen, the package name, hyphen, e.g. VA-KERNEL-
-    #   2. Non-branch tags are the same, but without the branch key at the beginning, e.g. KERNEL-
-    #   3. Tags must contain only uppercase characters, underscores, and hyphens.  Note that this
+    #   1. Tags must begin with the package name and a hyphen, e.g. KERNEL-
+    #   2. Tags must contain only uppercase characters, underscores, and hyphens.  Note that this
     #      rule is more restrictive than CVS's own rules but is enforced for standards compliance.
-    #   4. Product tags are only subject to rule #3.
+    #
+    # Strict tag checking enforces both rules.  The default only enforces rule #2.
 
     dprint &print_args(@_);
 
