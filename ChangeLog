@@ -286,3 +286,7 @@ Tue Jun  6 12:05:15 2000                        Michael Jennings (mej)
 Fixed a buildtool bug with binary RPM packages and changed the entry
 for XFree in the product file.
 ----------------------------------------------------------------------
+Tue Jun  6 12:23:42 2000                        Michael Jennings (mej)
+
+Well now that was just dumb.
+----------------------------------------------------------------------

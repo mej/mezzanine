@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.38 2000/06/06 18:54:23 mej Exp $
+# $Id: buildtool,v 1.39 2000/06/06 19:12:32 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -956,8 +956,8 @@ do_bootstrap_stage
             &fail_package($pkg, "bootstrap", $msg);
             next;
         }
-        if ((($pkgs->{$pkg}{TYPE} eq "module" || $pkgs->{$pkg}{TYPE} eq "image") && -d $filename)
-            || (($pkgs->{$pkg}{TYPE} eq "srpm" || $pkgs->{$pkg}{TYPE} eq "rpm") && -f $filename && -s _)) {
+        if (!((($pkgs->{$pkg}{TYPE} eq "module" || $pkgs->{$pkg}{TYPE} eq "image") && -d $filename)
+            || (($pkgs->{$pkg}{TYPE} eq "srpm" || $pkgs->{$pkg}{TYPE} eq "rpm") && -f $filename && -s _))) {
             # If it's not there, we must've missed the error.
             &fail_package($pkg, "bootstrap", "Unhandled error condition");
             next;
@@ -1592,7 +1592,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.38 $ created on $Date: 2000/06/06 18:54:23 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.39 $ created on $Date: 2000/06/06 19:12:32 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
