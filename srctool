@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.24 2001/06/15 03:27:38 mej Exp $
+# $Id: srctool,v 1.25 2001/07/18 22:47:49 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -34,8 +34,8 @@ use File::Copy ('&cp', '&mv');
 
 # Avalon modules
 use Avalon::Util;
-use Avalon::Srctool;
-use Avalon::Pkgtool;
+use Avalon::Src;
+use Avalon::Pkg;
 
 # Print usage information
 sub
@@ -60,6 +60,7 @@ print_usage_info
     print "    -c --clean                       Clean up a package tree\n";
     print "    -n --name <name>                 Specify the name of a package (-i) or patch (-a)\n";
     print "    -D --dir --cvsroot <cvsroot>     Specify an alternative CVSROOT\n";
+    print "    -T --test                        Test only; do not talk to the master server\n";
     print "\n";
     exit(AVALON_SUCCESS);
 }
@@ -119,16 +120,26 @@ import_package
             eprint "One or more patches could not be moved into place.\n";
             return AVALON_FILE_OP_FAILED;
         }
-        chdir($tmpdir);
+
         $tag = "$pkg-$ver-$rel";
-        $tag =~ tr/a-z/A-Z/;
-        $tag =~ s/\./_/g;
-        ($err, $msg) = &run_av_cmd("revtool", "$cvsroot -xit $tag", "  ");
-        if ($err) {
-            eprint "Import of $pkgfile failed -- $msg\n";
-            return $err;
+        if ($test_only) {
+            chdir($pwd);
+            if (! &mv($tmpdir, "$pwd/$pkg")) {
+                eprint "Unable to move $tmpdir to $tmpdir -- $!\n";
+                return AVALON_FILE_OP_FAILED;
+            }
+            print "You specified the \"test\" (-T) option.  You will need to import the new tree by hand (avimport -n $tag $pkg).\n";
+        } else {
+            chdir($tmpdir);
+            $tag =~ tr/a-z/A-Z/;
+            $tag =~ s/\./_/g;
+            ($err, $msg) = &run_av_cmd("revtool", "$cvsroot -xit $tag", "  ");
+            if ($err) {
+                eprint "Import of $pkgfile failed -- $msg\n";
+                return $err;
+            }
+            chdir($pwd);
         }
-        chdir($pwd);
 	&clean_temp_space();
     } elsif (! $pkgfile || -d $pkgfile) {
 	if (! $name || $name !~ /-/) {
@@ -153,16 +164,21 @@ import_package
 		return AVALON_MISSING_INFO;
 	    }
 	}
-	chdir($pkgfile) if ($pkgfile);
-        if (($err = &generate_symlink_file("")) != AVALON_SUCCESS) {
-            return $err;
-        }
-        ($tag = $name) =~ tr/a-z/A-Z/;
-        $tag =~ s/\./_/g;
-        ($err, $msg) = &run_av_cmd("revtool", "$cvsroot -xit $tag", "  ");
-        if ($err) {
-            eprint "Import of $pkgfile failed -- $msg\n";
-            return $err;
+
+        if ($test_only) {
+            print "You specified the \"test\" (-T) option.  You will need to import the new tree by hand (avimport -n $name).\n";
+        } else {
+            chdir($pkgfile) if ($pkgfile);
+            if (($err = &generate_symlink_file("")) != AVALON_SUCCESS) {
+                return $err;
+            }
+            ($tag = $name) =~ tr/a-z/A-Z/;
+            $tag =~ s/\./_/g;
+            ($err, $msg) = &run_av_cmd("revtool", "$cvsroot -xit $tag", "  ");
+            if ($err) {
+                eprint "Import of $pkgfile failed -- $msg\n";
+                return $err;
+            }
         }
         chdir($pwd);
     }
@@ -256,7 +272,7 @@ gen_patch($$)
     }
 
     # Now diff the two trees and save the output
-    @output = run_cmd("diff", "-Nur $old_wd $new_wd", 0);
+    @output = run_cmd("diff", "-Nur -x '*.orig' -x '*.rej' $old_wd $new_wd", 0);
     if (($err = shift @output) == 2) {
         foreach my $msg (grep(/^diff: /, @output)) {
             eprint "$msg\n";
@@ -300,12 +316,15 @@ gen_patch($$)
     print "Created P/$patch ($line_cnt lines).\n";
 
     # Add the new patch file
-    @output = &run_av_cmd("revtool", "$cvsroot -a P/$patch", 0);
-    if (($err = shift @output) != AVALON_SUCCESS && $err != AVALON_DUPLICATE) {
-        print @output;
-        eprint "Addition of P/$patch failed.\n";
-        return $err;
+    if ($test_only) {
+        print "You specified the \"test\" (-T) option.  You will need to add the new patch by hand (avadd P/$patch).\n";
     } else {
+        @output = &run_av_cmd("revtool", "$cvsroot -a P/$patch", 0);
+        if (($err = shift @output) != AVALON_SUCCESS && $err != AVALON_DUPLICATE) {
+            print @output;
+            eprint "Addition of P/$patch failed.\n";
+            return $err;
+        }
         print "Patch added and ready for commit.\n";
     }
 
@@ -384,14 +403,17 @@ merge_file($$)
         }
 
         # Add the file to be committed later via "srctool -m" or "avmod"
-        @output = &run_av_cmd("revtool", "$cvsroot -a $dest", 0);
-        if (($err = shift @output) != AVALON_SUCCESS) {
-            print @output;
-            eprint "Addition of $dest failed.\n";
-            return $err;
+        if ($test_only) {
+            print "You specified the \"test\" (-T) option.  You will need to add the new file(s) by hand (avadd $dest).\n";
         } else {
-            print "$new_file merged successfully.\n";
+            @output = &run_av_cmd("revtool", "$cvsroot -a $dest", 0);
+            if (($err = shift @output) != AVALON_SUCCESS) {
+                print @output;
+                eprint "Addition of $dest failed.\n";
+                return $err;
+            }
         }
+        print "$new_file merged successfully.\n";
     }
     chdir($pwd) if ($pwd);
     return AVALON_SUCCESS;
@@ -410,6 +432,11 @@ apply_changes($)
             eprint "Unable to chdir to $pkg -- $!\n";
             return AVALON_SYSTEM_ERROR;
         }
+    }
+
+    if ($test_only) {
+        eprint "You specified the \"test\" (-T) option.  I will not be able to upload your changes.\n";
+        return AVALON_SYNTAX_ERROR;
     }
 
     # Commit modifications to the master repository
@@ -441,6 +468,11 @@ clean_package
         }
     } else {
         $pkg = &basename(&getcwd());
+    }
+
+    if ($test_only) {
+        eprint "You specified the \"test\" (-T) option.  I will not be able to clean this module.\n";
+        return AVALON_SYNTAX_ERROR;
     }
 
     print "Cleaning and resyncing $pkg...\n";
@@ -475,7 +507,8 @@ main
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "i|import", "p|prepare", "m|mod|modify",
-                   "M|merge", "r|resync", "a|apply|patch:s", "n|name=s", "c|clean", "D|dir|cvsroot=s");
+                   "M|merge", "r|resync", "a|apply|patch:s", "n|name=s", "c|clean", "D|dir|cvsroot=s",
+                   "T|test");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -483,7 +516,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.24 $ created on $Date: 2001/06/15 03:27:38 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.25 $ created on $Date: 2001/07/18 22:47:49 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -504,6 +537,7 @@ main
 	@flist = @ARGV;
     }
     $cvsroot = ($opt_D ? "-D $opt_D" : "");
+    $test_only = ($opt_T ? 1 : 0);
 
     # Signal handling
     $SIG{HUP} = 'IGNORE';

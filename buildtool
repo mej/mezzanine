@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.143 2001/06/15 03:27:37 mej Exp $
+# $Id: buildtool,v 1.144 2001/07/18 22:47:49 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -31,7 +31,7 @@ require POSIX;
 require Getopt::Long;
 use Cwd;
 use Avalon::Util;
-use Avalon::Srctool;
+use Avalon::Src;
 
 # Print usage information
 sub
@@ -58,6 +58,7 @@ print_usage_info
     print "    -P --parallel [expr]             Parallelize the build process based on the number of CPU's\n";
     print "    -t --target <arch>               Tell rpm to build for a particular target architecture\n";
     print "    -C --cflags <flags>              Specify the \$CFLAGS variable to use for building\n";
+    print "    -U --user <userid>               Specify a userid for the repository (overrides product files)\n";
     print "       --tree <repository>           Specify the repository to use (overrides all product files)\n";
     print "       --tag <tag>                   Specify a tag to use (overrides all product files)\n";
     print "       --nocache                     Do not scan the cache (use with care)\n";
@@ -1062,6 +1063,9 @@ do_bootstrap_stage
         } else {
             $cvsroot = "";
         }
+        if ($global_user) {
+            $cvsroot =~ s/\w+\@/$global_user\@/;
+        }
         if ($global_tag) {
             $tag = "-t $global_tag";
         } elsif ($pkgs->{$pkg}{REVISION}) {
@@ -1775,14 +1779,14 @@ main
     @valid_opts = ("h|help", "v|version", "d|debug", "b|build=s", "p|product|package=s",
                    "q|quiet", "Q|really-quiet|silent", "D|dir=s", "f|force", "l|log=s",
                    "P|parallel:s", "t|target=s", "C|cflags=s", "B|startbuild=s", "tree=s",
-                   "tag=s", "nocache", "clean:s");
+                   "tag=s", "nocache", "clean:s", "U|user=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.143 $ created on $Date: 2001/06/15 03:27:37 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.144 $ created on $Date: 2001/07/18 22:47:49 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1815,6 +1819,7 @@ main
     select STDOUT; $| = 1;
     $verbosity = ($opt_Q ? 0 : ($opt_q ? 1 : 2));
     $target = $opt_t;
+    $global_user = $opt_U;
     $global_tree = $opt_tree;
     $global_tag = $opt_tag;
 
@@ -1901,17 +1906,6 @@ main
 	}
     }
 
-    # If we don't have a products directory, try to download one.
-    if (!defined $proddir) {
-        my ($err, $msg);
-
-        ($err, $msg) = &fetch_package("$revtool -g products");
-        if ($err) {
-            eprint "Unable to find/download products directory -- $msg.\n";
-            eprint "I may not have sufficient information to build $prodname.  This could be bad.\n";
-        }
-    }
-
     # Signal handling
     $SIG{HUP} = 'IGNORE';
     $SIG{INT} = \&handle_signal;
@@ -1928,7 +1922,7 @@ main
 
     # Environment modifications
     $ENV{MAKE} = "make";  # Make sure we don't parallel build, because it doesn't work.
-    $ENV{CFLAGS} = ($opt_C ? $opt_C : "-O2 -march=pentium");
+    $ENV{CFLAGS} = ($opt_C ? $opt_C : "-O2 -march=pentiumpro");
     delete $ENV{LD_RUN_PATH};  # Don't hard code any RPATH's into binaries
     delete $ENV{LD_LIBRARY_PATH};  # Make glibc happy
     $ENV{PATH} = "/usr/build/bin:/usr/local/build/bin:/usr/lib/qt-1.45/bin:/usr/lib/qt-2.1.0/bin"

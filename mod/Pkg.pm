@@ -21,10 +21,10 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.5 2001/06/08 23:40:50 mej Exp $
+# $Id: Pkg.pm,v 1.6 2001/07/18 22:47:49 mej Exp $
 #
 
-package Avalon::Pkgtool;
+package Avalon::Pkg;
 
 BEGIN {
     use Exporter   ();

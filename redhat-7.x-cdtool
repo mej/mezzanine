@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 21 July 2000
 #
-# $Id: redhat-7.x-cdtool,v 1.12 2001/06/15 03:27:37 mej Exp $
+# $Id: redhat-7.x-cdtool,v 1.13 2001/07/18 22:47:49 mej Exp $
 #
 
 umask 022
@@ -60,6 +60,7 @@ if [ $IMAGE -eq 1 ]; then
     # Update the install image, boot images, etc. with the new kernel
     cd $NET.new
     $RH_KERNEL_GOOP `pwd`
+    rm -rf RedHat/instimage image-template
 
     # Generate the diff
     cd $BUILD_DIR
@@ -113,10 +114,13 @@ $RH_PKGLIST_GOOP --fileorder tmp.list --withnumbers $BUILD_DIR/$CD*
 cd $BASE_DIR
 for i in 1 2 3 4 5 6 7 ; do
     test -d $BUILD_DIR/$CD$i || break
-    if [ -f $BUILD_DIR/$CD$i/images/boot.img ]; then
-        mediatool -i $BUILD_DIR/va-redhat-os-${VA_VER}-cd$i.iso -D $BUILD_DIR/va-redhat-${RH_VER}-cd$i --boot images/boot.img
+    if [ -f $BUILD_DIR/$CD$i/dosutils/autoboot/cdboot.img ]; then
+        CDIMG="--boot dosutils/autoboot/cdboot.img"
+    elif [ -f $BUILD_DIR/$CD$i/images/boot.img ]; then
+        CDIMG="--boot images/boot.img"
     else
-        mediatool -i $BUILD_DIR/va-redhat-os-${VA_VER}-cd$i.iso -D $BUILD_DIR/va-redhat-${RH_VER}-cd$i
+        CDIMG=""
     fi
+    mediatool -i $BUILD_DIR/va-redhat-os-${VA_VER}-cd$i.iso -D $BUILD_DIR/va-redhat-${RH_VER}-cd$i $CDIMG
 done
 test -d $BUILD_DIR/va-redhat-${RH_VER}-extras && mediatool -i $BUILD_DIR/va-redhat-extras-${VA_VER}.iso -D $BUILD_DIR/va-redhat-${RH_VER}-extras

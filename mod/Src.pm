@@ -21,10 +21,10 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.5 2001/04/26 23:43:11 mej Exp $
+# $Id: Src.pm,v 1.6 2001/07/18 22:47:49 mej Exp $
 #
 
-package Avalon::Srctool;
+package Avalon::Src;
 
 BEGIN {
     use Exporter   ();

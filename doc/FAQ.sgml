@@ -1,0 +1,26 @@
+<!DOCTYPE BOOK PUBLIC "-//Davenport//DTD DocBook V3.0//EN" [
+<!ENTITY AV_VER "2.0">
+<!ENTITY DOCID "$Id$">
+<!ENTITY  "">
+<!ENTITY  "">
+<!ENTITY  "">
+<!ENTITY  "">
+<!ENTITY  "">
+<!ENTITY  "">
+<!ENTITY  "">
+]>
+<book id="$Id:$">
+<bookinfo>
+  <title>Avalon FAQ</title>
+  <author><firstname>Michael</firstname><surname>Jennings</surname></author>
+  <edition>&DOCID;</edition>
+  <pubdate>2001</pubdate>
+  <copyright><year>2001</year><holder>Michael Jennings and VA Linux Systems, Inc.</holder></copyright>
+</bookinfo>
+
+<title>Avalon FAQ</title>
+  <chapter id="c1-moo">
+    <title></title>
+    <sect1 id="c1s1-moo">
+      <title></title>
+      <para>

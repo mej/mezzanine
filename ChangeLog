@@ -1281,3 +1281,15 @@ Mon Jun 18 10:18:21 2001                        Michael Jennings (mej)
 
 Better handling of commits inside modules.
 ----------------------------------------------------------------------
+Wed Jul 18 15:45:06 2001                        Michael Jennings (mej)
+
+The auto-magical fetching of the products directory, which I'm not
+sure ever actually worked, is now gone.  I also added an option to
+buildtool for specifying an alternative userid (more important for
+myself and the Canadian than anyone else) for get's, and an option to
+srctool for disabling interaction with the repository.  I fixed
+Bug #1318 filed by Jay; srctool (avpatch) now properly ignores *.orig
+and *.rej when generating patch files.  Other minor issues were fixed,
+but nothing that should show up on radar.  Finally, I added the
+beginnings of an Avalon FAQ in SGML format.
+----------------------------------------------------------------------
