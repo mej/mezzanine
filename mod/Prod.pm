@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.13 2001/11/04 13:46:30 mej Exp $
+# $Id: Prod.pm,v 1.14 2002/07/10 02:33:07 mej Exp $
 #
 
 package Mezzanine::Prod;
@@ -508,7 +508,17 @@ parse_prod_file($$$)
         } elsif ($line =~ /^ver(sion)?\s*:\s*(\S+)/i) {
             if (! $prodver) {
                 $prodver = $2;
+                dprint "Deleting bogus product $prod\n";
+                @products = grep($_ ne $prod, @products);
                 $prod = "$prodname-$prodver";
+                push @products, $prod;
+                if ($parent_prod) {
+                    $prods->{$prod}{PRODUCT} = $parent_prod;
+                    dprint "Parent product of $prod is $prods->{$prod}{PRODUCT}.\n";
+                } elsif ($prods->{$prodname}{PRODUCT}) {
+                    $prods->{$prod}{PRODUCT} = $prods->{$prodname}{PRODUCT};
+                    dprint "Parent product of $prod is $prods->{$prod}{PRODUCT}.\n";
+                }
                 next;
             } elsif ($2 eq $prodver) {
                 next;

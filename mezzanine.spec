@@ -1,7 +1,7 @@
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
 Version: 1.4
-Release: 0.2
+Release: 0.4
 Copyright: BSD
 Group: Development/Tools
 Source: %{name}.tar.gz

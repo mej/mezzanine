@@ -122,3 +122,7 @@ Wed Jul 10 00:04:41 2002                        Michael Jennings (mej)
 
 Fix handling of binary-only packages.
 ----------------------------------------------------------------------
+Wed Jul 10 00:11:14 2002                        Michael Jennings (mej)
+
+Fix hierarchical variable fallbacks.
+----------------------------------------------------------------------
