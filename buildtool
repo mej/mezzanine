@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.171 2004/01/26 22:15:24 mej Exp $
+# $Id: buildtool,v 1.172 2004/01/30 23:18:11 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -63,6 +63,7 @@ print_usage_info
     print "    -U --user <userid>               Specify a userid for the repository (overrides product files)\n";
     print "    -T --tag <tag>                   Specify a tag to use (overrides all product files)\n";
     print "    -L --location <location_spec>    Specify where packages should be placed (as in product file)\n";
+    print "    -s --srcdir <dir>                (Re)build all packages under <dir>\n";
     print "    -i --instroot --jail <dir>       Specify chroot jail to build in\n";
     print "    -H --hints <file_or_dir>         Specify location of pre-build hints or hint files\n";
     print "    -u --user <userid>               Build packages as <userid> instead of current user\n";
@@ -670,7 +671,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.171 $ created on $Date: 2004/01/26 22:15:24 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.172 $ created on $Date: 2004/01/30 23:18:11 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -802,7 +803,7 @@ main
         foreach my $srcdir (@opt_s) {
             my @pkg_list;
 
-            @pkg_list = &grepdir(sub {-f $_}, $srcdir);
+            @pkg_list = &grepdir(sub {((-f $_ || -d $_) && (&basename($_) !~ /^\./))}, $srcdir);
             foreach my $pkg (sort(@pkg_list)) {
                 &parse_product_entry($pkg, $prod);
             }

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.16 2004/01/28 16:12:43 mej Exp $
+# $Id: Src.pm,v 1.17 2004/01/30 23:18:11 mej Exp $
 #
 
 package Mezzanine::Src;
@@ -156,6 +156,7 @@ install_spm_files($)
     my (@srcs, @patches, @tmp);
 
     # Find all the sources and patches and the spec file.
+    dprint "Installing SPM files to $dir.\n";
     @srcs = &find_files("S");
     @patches = &find_files("P");
     @tmp = &find_files("F");
@@ -195,6 +196,7 @@ create_temp_space($$)
     my @dirlist;
 
     $dir = "$TMP_DIR/$pkg";
+    dprint "Creating $type temp space in $dir.\n";
     &nuke_tree($dir);
     &mkdirhier($dir) || return "";
     if ($type eq "SPM") {
@@ -217,6 +219,7 @@ create_temp_space($$)
 sub
 clean_temp_space()
 {
+    dprint "Cleaning temp space in $TMP_DIR.\n";
     return &nuke_tree($TMP_DIR);
 }
 

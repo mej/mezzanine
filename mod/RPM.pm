@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.22 2004/01/26 22:15:24 mej Exp $
+# $Id: RPM.pm,v 1.23 2004/01/30 23:18:11 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -479,20 +479,20 @@ rpm_build()
                  || $line =~ /^(error: )?Symlink points to BuildRoot: /) {
             $err = MEZZANINE_SPEC_ERRORS;
             push @spec_errors, $line;
-        } elsif ($line =~ /^Bad exit status from/) {
+        } elsif ($line =~ /^\s*Bad exit status from/) {
             $err = MEZZANINE_BUILD_FAILURE;
-            $line =~ s/^Bad exit status from \S+ \((%\w+)\)/$1/;
+            $line =~ s/^\s*Bad exit status from \S+ \((%\w+)\).*$/$1/;
             $msg = "The RPM $line stage exited abnormally";
         } elsif ($line =~ /^(error: )?(chroot: )?cannot /) {
             $err = MEZZANINE_BUILD_FAILURE;
             $line =~ s/^(error: )?(chroot: )?cannot //;
             $msg = "chroot:  Unable to $line";
-        } elsif ($line =~ /^error: failed build dependencies:/) {
+        } elsif ($line =~ /^error:?\s*failed build dependencies:?\s*$/i) {
             $err = MEZZANINE_DEPENDENCIES;
             while (<CMD>) {
                 chomp($line = $_);
                 last if ($line !~ /is needed by/);
-                $line =~ s/^\s+(\S+)\s+is needed by .*$/$1/;
+                $line =~ s/^\s+(.+)\s+is needed by .*$/$1/;
                 push @failed_deps, $line;
             }
             $msg = "Building this package requires the following:  " . join(" ", @failed_deps);

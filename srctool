@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.36 2004/01/28 16:12:43 mej Exp $
+# $Id: srctool,v 1.37 2004/01/30 23:18:11 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -181,7 +181,7 @@ import_package
 sub
 prepare_tree($$)
 {
-    my ($pkg, $pwd, $pkgdir, $cmd, $err, $msg, $spec, $tmpdir, $rpmcmd, $tmp);
+    my ($pkg, $pwd, $pkgdir, $cmd, $err, $msg, $spec, $tmpdir, $params, $tmp);
     my (@srcs, @patches, @tmp);
 
     # cd into the package directory if one was specified.  If not, use the current directory.
@@ -193,7 +193,7 @@ prepare_tree($$)
         $pkgdir = $pwd;
         $pkg = &pkgvar_filename(&basename($pkgdir));
     }
-    if (!chdir($pkgdir)) {
+    if (!chdir($pkgdir) && ($pkg ne &basename($pwd))) {
         eprint "Unable to cd to $pkgdir -- $!\n";
         return MEZZANINE_INVALID_PACKAGE;
     }
@@ -204,22 +204,36 @@ prepare_tree($$)
         eprint "Unable to create working directory -- $!\n";
         return MEZZANINE_SYSTEM_ERROR;
     }
-    # Create the RPM build tree
-    $tmpdir = &create_temp_space($pkg, "build");
-    if (! $tmpdir) {
-	return MEZZANINE_SYSTEM_ERROR;
-    }
+
     # Copy all the files into their proper places for RPM's use
-    $spec = &install_spm_files($tmpdir);
-    if (! $spec) {
-	return MEZZANINE_SYSTEM_ERROR;
+    if (&pkgvar_type() eq "PDR") {
+        $params = "--define '_topdir $pkgdir' --define '_builddir $pkgdir/$WORK_DIR' "
+            . "--define '_sourcedir $pkgdir' --define '_specdir $pkgdir'";
+        @tmp = &grepdir(sub { $_ =~ /\.spec(\.in)?$/ }, ".");
+        if (scalar(@tmp) != 1) {
+            eprintf("Found %d spec files:  \"%s\".\n", scalar(@tmp),
+                    join("\", \"", @tmp));
+            return MEZZANINE_INVALID_PACKAGE;
+        }
+        $spec = $tmp[0];
+    } else {
+        # Create the RPM build tree
+        $tmpdir = &create_temp_space($pkg, "build");
+        if (! $tmpdir) {
+            return MEZZANINE_SYSTEM_ERROR;
+        }
+        $spec = &install_spm_files($tmpdir);
+        $params = "--define \"_topdir $tmpdir\" --define \"_builddir $pkgdir/$WORK_DIR\"";
     }
+    if (! $spec) {
+        return MEZZANINE_INVALID_PACKAGE;
+    }
+    $params .= " --nodeps -bp $spec";
     print "Creating working directory $pkgdir/$WORK_DIR....\n";
-    $rpmcmd = "--define \"_topdir $tmpdir\" --define \"_builddir $pkgdir/$WORK_DIR\" --nodeps -bp $spec";
-    @tmp = &run_cmd("rpmbuild", $rpmcmd, 0);
+    @tmp = &run_cmd("rpmbuild", $params, 0);
     if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
         eprint "Creation of working directory failed -- $tmp[$#tmp]\n";
-    } elsif ($external) {
+    } else {
         print "You may now chdir to ", ($pkgdir eq $pwd ? $WORK_DIR : "$pkg/$WORK_DIR"), " to make changes.\n";
         print "Use \"mzpatch -n <patch_name>\" to generate a patch when done.\n";
     }
@@ -232,7 +246,7 @@ prepare_tree($$)
 sub
 gen_patch($$)
 {
-    my ($pkg, $patch, $old_wd, $new_wd, $err, $line_cnt, $pwd);
+    my ($pkg, $patch, $old_wd, $new_wd, $err, $line_cnt, $pwd, $patchdir);
     my @output;
     local *PATCH;
 
@@ -243,6 +257,9 @@ gen_patch($$)
             eprint "Unable to chdir to $pkg -- $!\n";
             return MEZZANINE_SYSTEM_ERROR;
         }
+    } else {
+        $pkg = &basename(&getcwd());
+        &pkgvar_filename($pkg);
     }
 
     $patch = &pkgvar_name();
@@ -250,11 +267,17 @@ gen_patch($$)
         # Redo the spec file to comment out
         # the patch we're about to regenerate.
         if (! &pkgvar_instructions()) {
-            my @tmp = &grepdir(sub {$_ =~ /\.spec(\.in)?$/}, "F");
+            my @tmp;
 
+            if (&pkgvar_type() eq "PDR") {
+                @tmp = &grepdir(sub {$_ =~ /\.spec(\.in)?$/}, ".");
+            } else {
+                @tmp = &grepdir(sub {$_ =~ /\.spec(\.in)?$/}, "F");
+            }
             if (scalar(@tmp) != 1) {
-                eprintf("%d spec files?!\n", scalar(@tmp));
-                return MEZZANINE_SPEC_ERRORS;
+                eprintf("Found %d spec files:  \"%s\".\n", scalar(@tmp),
+                        join("\", \"", @tmp));
+                return MEZZANINE_INVALID_PACKAGE;
             }
             &pkgvar_instructions($tmp[0]);
         }
@@ -306,9 +329,10 @@ gen_patch($$)
     }
 
     # If the patch directory doesn't exist, create it.
-    if (! -d "P") {
+    if (!(-d "P") && (-d "F")) {
         my @tmp;
 
+        $patchdir = "P/";
         if (! &mkdirhier("P")) {
             return MEZZANINE_SYSTEM_ERROR;
         }
@@ -321,11 +345,13 @@ gen_patch($$)
                 return $err;
             }
         }
+    } else {
+        $patchdir = "";
     }
 
     # Finally, process the output to save the patch
-    if (!open(PATCH, ">P/$patch")) {
-        eprint "Unable to open P/$patch for writing -- $!\n";
+    if (!open(PATCH, ">$patchdir$patch")) {
+        eprint "Unable to open $patchdir$patch for writing -- $!\n";
         return MEZZANINE_SYSTEM_ERROR;
     }
     foreach my $line (@output) {
@@ -342,7 +368,7 @@ gen_patch($$)
         }
     }
     close(PATCH);
-    print "Created P/$patch ($line_cnt lines).\n";
+    print "Created $patchdir$patch ($line_cnt lines).\n";
 
     # Add the new patch file
     if ($local_mode) {
@@ -631,7 +657,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.36 $ created on $Date: 2004/01/28 16:12:43 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.37 $ created on $Date: 2004/01/30 23:18:11 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -729,9 +755,9 @@ main
         my ($pkg, $patch);
 
         if (! $pkg) {
-            if (-d 'F') {
-                $pkg = "";
-            } else {
+            $pkg = ".";
+            &pkgvar_filename($pkg);
+            if (! &pkgvar_type()) {
                 eprint "No package was specified, and the current directory doesn't look like one.\n";
                 return MEZZANINE_SYNTAX_ERROR;
             }

@@ -297,3 +297,15 @@ Wed Jan 28 11:11:26 2004                        Michael Jennings (mej)
 
 Added support for importing PDR's.
 ----------------------------------------------------------------------
+Fri Jan 30 18:16:20 2004                        Michael Jennings (mej)
+
+Removed some unneeded debugging output.
+
+Fixed package type identification to be more complete.
+
+Fixed parsing of RPM build errors.
+
+Fixed mzprep and mzpatch for PDR's.
+
+Added module inclusion (and --help info) for buildtool's -s option.
+----------------------------------------------------------------------

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.25 2004/01/26 22:15:24 mej Exp $
+# $Id: Util.pm,v 1.26 2004/01/30 23:18:11 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -406,13 +406,13 @@ mkdirhier($$)
     if (!defined($mask)) {
         $mask = 0755;
     }
-    dprint "mkdirhier($dir) called.\n";
+    #dprint "mkdirhier($dir) called.\n";
     foreach $dir (@dirs) {
         $path .= "$dir/";
         if (! -d $path) {
-            dprint "Creating \"$path\"\n";
+            #dprint "Creating \"$path\"\n";
             mkdir($path, $mask) || eprint("Unable to create $path -- $!\n");
-            dprint "chown $mz_uid:$mz_gid $path\n";
+            #dprint "chown $mz_uid:$mz_gid $path\n";
             chown($mz_uid, $mz_gid, $path);
         }
     }
@@ -487,7 +487,7 @@ move_files
         }
 
         # Set permissions on the target file appropriately.
-        dprint "chown $mz_uid:$mz_gid $target\n";
+        #dprint "chown $mz_uid:$mz_gid $target\n";
         chown($mz_uid, $mz_gid, $target) || dprint "chown($mz_uid, $mz_gid, $target) failed -- $!\n";
         chmod($mode, $target) || dprintf("chmod(%05o, $target) failed -- $!\n", $mode);
         $fcnt++;
@@ -532,7 +532,7 @@ copy_files
         }
 
         # Set permissions on the target file appropriately.
-        dprint "chown $mz_uid:$mz_gid $target\n";
+        #dprint "chown $mz_uid:$mz_gid $target\n";
         chown($mz_uid, $mz_gid, $target) || dprint "chown($mz_uid, $mz_gid, $target) failed -- $!\n";
         chmod($mode, $target) || dprintf("chmod(%05o, $target) failed -- $!\n", $mode);
         $fcnt++;

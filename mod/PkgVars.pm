@@ -25,6 +25,7 @@
 #
 
 package Mezzanine::PkgVars;
+use Cwd;
 
 BEGIN {
     use strict;
@@ -265,6 +266,8 @@ identify_package_type
 {
     my $filename = $pkg_vars{"file"};
 
+    $pkg_vars{"type"}{$filename} = $pkg_vars{"subtype"}{$filename} = "";
+
     if (substr($filename, -4, 4) eq ".rpm") {
         $pkg_vars{"type"}{$filename} = "rpm";
         if (substr($filename, -7, 7) eq "src.rpm") {
@@ -281,8 +284,28 @@ identify_package_type
         }
     } elsif ($filename =~ /\.(tar\.|t)?(gz|bz|bz2|Z)$/) {
         $pkg_vars{"type"}{$filename} = $pkg_vars{"subtype"}{$filename} = "tar";
-    } else {
-        $pkg_vars{"type"}{$filename} = $pkg_vars{"subtype"}{$filename} = "";
+    } elsif ((-d $filename) || ($filename eq &basename(&getcwd))) {
+        my @specs;
+
+        if (($filename ne &basename(&getcwd)) && (-d $filename)) {
+            chdir($filename);
+        }
+        if (-s "Makefile.mezz") {
+            $pkg_vars{"type"}{$filename} = "CFST";
+        } else {
+            @specs = &grepdir(sub { $_ =~ /\.spec(\.in)?$/ }, ".");
+            if (scalar(@specs)) {
+                $pkg_vars{"type"}{$filename} = "PDR";
+            } elsif (-d "F") {
+                @specs = &grepdir(sub { $_ =~ /\.spec(\.in)?$/ }, "F");
+                if (scalar(@specs)) {
+                    $pkg_vars{"type"}{$filename} = "SPM";
+                }
+            }
+        }
+        if (! $pkg_vars{"type"}{$filename}) {
+            $pkg_vars{"type"}{$filename} = "FST";
+        }
     }
     dprint "Identified $filename as $pkg_vars{type}{$filename}\n";
 }
