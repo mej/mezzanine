@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.59 2000/06/14 20:56:39 mej Exp $
+# $Id: buildtool,v 1.60 2000/06/15 03:06:06 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -295,7 +295,7 @@ spawn_cmd
                 eprint "Unable to open $logfile -- $!\n";
             } else {
                 $GLOBAL_LOG = \*LOGFILE;
-                system("chattr +S $logfile");  # Try to set sync on the log file, fail silently
+                #system("chattr +S $logfile");  # Try to set sync on the log file, fail silently
                 open(STDERR, ">&LOGFILE");
                 select LOGFILE; $| = 1;
                 select STDOUT; $| = 0;
@@ -593,10 +593,13 @@ parse_product_entry
     undef %pkgvars;
     undef $module;
     undef $type;
-    @inp = split(/\s+/, $line);
+    #@inp = split(/\s+/, $line);
+    @inp = ($line =~ m/\s*((?:\S*(?:\"[^\"]+\")?\S*)+)\s*/g);
+    pop @inp;  # There will always be an empty value at the end.  Get rid of it.
+    dprint "Input is \"", join("\" \"", @inp), "\"\n";
     if ($inp[0] =~ /^(prod|mod|s?rpm|ima?ge?)[^:]*:/) {
         # Line begins with <type>:<name>, like "module:Eterm"
-        ($type, $name) = split(":", shift @inp);
+        ($type, $name) = split(":", $inp[0]);
         $type =~ tr/[A-Z]/[a-z]/;
         dprint "parse_product_entry():  Found type \"$type\" and name \"$name\"\n";
         if ($type =~ /^prod/) {
@@ -617,7 +620,7 @@ parse_product_entry
     if (! $type) {
         # They didn't tell us the type, so let's guess educatedly.
         $type_guess = 1;
-        ($name = shift @inp) =~ s/^\w*://;
+        ($name = $inp[0]) =~ s/^\w*://;
         dprint "Guessing type of \"$name\"\n";
         if ($name =~ /src\.rpm/) {
             # Name ends with src.rpm.  That's an easy one.
@@ -654,6 +657,8 @@ parse_product_entry
         $module = $name;
     }
     # The rest of the line is whitespace-delimited sets of var=value
+    shift @inp;
+    dprint "Input is now \"", join("\" \"", @inp), "\"\n";
     foreach $varval (@inp) {
         ($var, $val) = split("=", $varval);
         $var = &get_var_name($var);
@@ -1770,7 +1775,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.59 $ created on $Date: 2000/06/14 20:56:39 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.60 $ created on $Date: 2000/06/15 03:06:06 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1823,7 +1828,7 @@ main
             eprint "Unable to open $opt_l -- $!\n";
         } else {
             $GLOBAL_LOG = \*LOGFILE;
-            system("chattr +S $opt_l");  # Try to set sync on the log file, fail silently
+            #system("chattr +S $opt_l");  # Try to set sync on the log file, fail silently
             open(STDERR, ">&LOGFILE");
             select LOGFILE; $| = 1;
         }

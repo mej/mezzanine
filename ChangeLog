@@ -412,3 +412,8 @@ Wed Jun 14 14:06:59 2000                        Michael Jennings (mej)
 
 Build translation table files and don't build HFS filesystems.
 ----------------------------------------------------------------------
+Wed Jun 14 20:16:05 2000                        Michael Jennings (mej)
+
+Finally remembered to turn off log file syncing.  Also put in support
+for double-quoted strings in product files.  I hope it works. :-)
+----------------------------------------------------------------------
