@@ -739,3 +739,7 @@ Make command-line --target take precedence over ARCH variables in the
 prod files.  This fixes bug #220.
 http://engr.valinux.com/bugs/?func=detailbug&group_id=16&bug_id=220
 ----------------------------------------------------------------------
+Mon Jul 24 19:32:09 2000                        Michael Jennings (mej)
+
+Fixed two typos.
+----------------------------------------------------------------------

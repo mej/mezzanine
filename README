@@ -4,7 +4,7 @@
 #  Written by:  Michael Jennings
 #               Ted T'so
 #
-#  $Id: README,v 1.12 2000/07/08 03:04:54 mej Exp $
+#  $Id: README,v 1.13 2000/07/25 02:29:06 mej Exp $
 #
 ########################################################################
 
@@ -569,9 +569,9 @@ If something should go wrong during the import, ask for help.
 If you plan to apply patches to this package, or may do so in the
 future, you must now branch the tree.  The "branch tag" is exactly the
 same as the release tag you specified in the import (see above),
-except that it was "VA-" in front of it.
+except that it has "VA-" in front of it.
 
-$ revtool -bt VA-COW-4-2-8 cow
+$ revtool -bT VA-COW-4-2-8 cow
 
 If, on the other hand, this package is maintained by you (and therefore
 the SRPM would not ever contain patches, only new versions), this step
