@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.17 2002/09/17 20:36:16 mej Exp $
+# $Id: RevCtl.pm,v 1.18 2003/06/02 16:28:40 mej Exp $
 #
 
 package Mezzanine::RevCtl;
@@ -496,6 +496,14 @@ update_from_master
             next if ($line !~ / -> /);
             ($link_from, $link_to) = split(" -> ", $line);
             dprint "Creating symlink:  $link_from -> $link_to\n";
+            if (-e "$dirname/$link_from") {
+                if (-l "$dirname/$link_from") {
+                    unlink("$dirname/$link_from");
+                } else {
+                    eprint "Non-link file $link_from exists; can't create symlink to $link_to!\n";
+                    next;
+                }
+            }
             if (!symlink($link_to, "$dirname/$link_from")) {
                 eprint "Unable to symlink $link_from to $link_to -- $!\n";
             }

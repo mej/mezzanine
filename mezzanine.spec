@@ -1,7 +1,7 @@
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
 Version: 1.5
-Release: 0.8
+Release: 0.9
 Copyright: BSD
 Group: Development/Tools
 Source: %{name}.tar.gz
@@ -10,6 +10,7 @@ Packager: Michael Jennings <mej@kainx.org>
 Vendor: KainX.Org (http://www.kainx.org/)
 URL: http://www.kainx.org/mezzanine/
 Requires: perl, perl-libnet
+BuildArch: noarch
 
 %description
 Mezzanine is a collection of tools, written primarily in Perl, which

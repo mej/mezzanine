@@ -162,3 +162,7 @@ Mon May 12 11:05:07 2003                        Michael Jennings (mej)
 
 Fixed retry algorithm.
 ----------------------------------------------------------------------
+Mon Jun  2 14:15:55 2003                        Michael Jennings (mej)
+
+Don't bitch about symlinks that are already there.
+----------------------------------------------------------------------
