@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.53 2004/08/31 16:59:59 mej Exp $
+# $Id: srctool,v 1.54 2004/09/29 20:57:54 mej Exp $
 #
 
 use strict;
@@ -461,6 +461,7 @@ gen_patch($$)
         eprint "Unable to open $patchdir$patch for writing -- $!\n";
         return MEZZANINE_SYSTEM_ERROR;
     }
+    $line_cnt = 0;
     foreach my $line (@output) {
         next if ($line =~ /^diff: /);
         if ($line =~ /^(diff|---|\+\+\+|\*\*\*)/) {
@@ -836,7 +837,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.53 $ created on $Date: 2004/08/31 16:59:59 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.54 $ created on $Date: 2004/09/29 20:57:54 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();

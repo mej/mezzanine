@@ -631,3 +631,10 @@ Fixed timestamp checking.
 Translate perl(Some::Module) to perl-Some-Module for installing build
 deps.
 ----------------------------------------------------------------------
+Wed Sep 29 16:57:17 2004                        Michael Jennings (mej)
+
+Note when packages were skipped rather than just saying they built.
+
+Check for updates to packages that were previously broken before
+refusing to rebuild them.
+----------------------------------------------------------------------

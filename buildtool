@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.198 2004/09/14 22:06:33 mej Exp $
+# $Id: buildtool,v 1.199 2004/09/29 20:57:54 mej Exp $
 #
 
 use strict;
@@ -131,6 +131,16 @@ complete_package
 
     push @completed_pkgs, $pkg;
     nprint "Package build for $pkg completed successfully.  (${\(&get_timestamp())})\n";
+}
+
+# What to do if a package didn't need to be built.
+sub
+skipped_package
+{
+    my $pkg = $_[0];
+
+    push @completed_pkgs, $pkg;
+    nprint "Package build for $pkg was not needed.  (${\(&get_timestamp())})\n";
 }
 
 # What to do if a package fails
@@ -479,11 +489,37 @@ build_package_forked
                 }
             } elsif (-e "$logfile.broken") {
                 if (! $OPTION{"retry"}) {
-                    dprint "Package $pkg failed previously.  Aborting.\n";
-                    exit MEZZANINE_PACKAGE_FAILED;
-                } else {
-                    dprint "Retrying build for failed package $pkg.\n";
+                    my ($pkgfile, $which_one);
+                    my $failed = 0;
+
+                    # It was broken before.  See if it's been updated since then.
+                    $pkgfile = &pkgvar_filename($pkgs->{$pkg}{"MODULE"}, $pkgs->{$pkg}{"FILENAME"});
+                    if ($pkgfile) {
+                        my (@stat1, @stat2);
+
+                        $which_one = &newest_file($pkgfile);
+                        if ($which_one && -e $which_one) {
+                            @stat1 = stat($which_one);
+                        } else {
+                            @stat1 = stat($pkgfile);
+                        }
+                        @stat2 = stat("$logfile.broken");
+                        if ($stat1[9] <= $stat2[9]) {
+                            # The "broken" log is newer than the module/package.  Skip it.
+                            dprint "No updates to $pkg detected since last build failure.\n";
+                            $failed = 1;
+                        } else {
+                            dprint "$pkg has been updated since previous build failure.\n";
+                        }
+                    } else {
+                        wprint "Unable to find package source for $pkg.  Cannot check for updates.\n";
+                    }
+                    if ($failed) {
+                        dprint "Package $pkg failed previously.  Aborting.\n";
+                        exit MEZZANINE_PACKAGE_FAILED;
+                    }
                 }
+                dprint "Retrying build for failed package $pkg.\n";
             }
 
             close $GLOBAL_LOG if ($GLOBAL_LOG);
@@ -825,8 +861,7 @@ parallel_build
 
         # Check to see how it exited
         if ($err == MEZZANINE_BUILD_UNNEEDED) {
-            $err = MEZZANINE_SUCCESS;
-            &complete_package($pkg);
+            &skipped_package($pkg);
         } elsif ($err == MEZZANINE_SUCCESS) {
             # Yay! :-)
             $num_built++;
@@ -1034,7 +1069,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.198 $ created on $Date: 2004/09/14 22:06:33 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.199 $ created on $Date: 2004/09/29 20:57:54 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
