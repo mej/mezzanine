@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.48 2004/10/26 16:26:46 mej Exp $
+# $Id: Util.pm,v 1.49 2004/10/29 20:35:28 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -916,6 +916,9 @@ newest_file(@)
         if (-d $dir) {
             find({ "wanted" => sub {
                                    #dprint "Checking $_\n";
+                                   if (-d $_ || $_ =~ m^/(CVS|SCCS|RCS|BitKeeper|\.svn)/^) {
+                                       return;
+                                   }
                                    $stat_info = stat($_);
                                    #dprintf("Got mtime is %s\n", ($stat_info->mtime || "<undef>"));
                                    if (defined($stat_info->mtime) && ($stat_info->mtime > $newest_time)) {
@@ -925,7 +928,7 @@ newest_file(@)
                                }, "no_chdir" => 1
                  }, $dir);
         } else {
-            dprint "Checking $dir\n";
+            #dprint "Checking $dir\n";
             $stat_info = stat($dir);
             if ($stat_info->mtime > $newest_time) {
                 $newest_name = $dir;

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.54 2004/09/29 20:57:54 mej Exp $
+# $Id: srctool,v 1.55 2004/10/29 20:35:28 mej Exp $
 #
 
 use strict;
@@ -334,7 +334,7 @@ prepare_tree($$)
     @tmp = &run_cmd("rpmbuild", $params, 0);
     if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
         eprint "Creation of working directory failed.  Error context:\n     ";
-        print join("\n     ", splice(@tmp, -5, 5)), "\n";
+        print join("\n     ", ((scalar(@tmp) > 10) ? (splice(@tmp, -10, 10)) : (@tmp))), "\n";
     } elsif ($command eq "prep") {
         print "You may now chdir to ", ($pkgdir eq $pwd ? $WORK_DIR : "$pkg/$WORK_DIR"), " to make changes.\n";
         print "Use \"mzpatch -n <patch_name>\" to generate a patch when done.\n";
@@ -837,7 +837,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.54 $ created on $Date: 2004/09/29 20:57:54 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.55 $ created on $Date: 2004/10/29 20:35:28 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();
