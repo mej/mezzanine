@@ -339,3 +339,10 @@ Fri Jun  9 13:22:37 2000                        Michael Jennings (mej)
 
 Added support for separate buildroot's for each buildtool session.
 ----------------------------------------------------------------------
+Fri Jun  9 20:50:10 2000                        Michael Jennings (mej)
+
+I had to un-parallelize the calling of revtool because CVS does not
+seem to be very "thread-safe" as it were.  I also moved the CVS
+modules and such into the build directory instead of the base
+directory.  This should make things cleaner.
+----------------------------------------------------------------------

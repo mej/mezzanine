@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.47 2000/06/09 20:12:04 mej Exp $
+# $Id: buildtool,v 1.48 2000/06/10 03:40:41 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -83,15 +83,15 @@ print_usage_info
     print "    -h --help                        Show this usage information\n";
     print "    -d --debug                       Turn on debugging\n";
     print "    -v --version                     Show version and copyright\n";
-    print "    -b --build [stage]               Stop building after a particular stage (see below)\n";
-    print "    -p --product --package [name]    Specify the product or package to build\n";
+    print "    -b --build <stage>               Stop building after a particular stage (see below)\n";
+    print "    -p --product --package <name>    Specify the product or package to build\n";
     print "    -q --quiet                       Be somewhat quiet.  Simply gives basic progress info\n";
     print "    -Q --really-quiet --silent       Be very quiet.  Only errors are reported\n";
-    print "    -D --dir [directory]             Specify \"directory\" as the base directory for the build\n";
+    print "    -D --dir <directory>             Specify \"directory\" as the base directory for the build\n";
     print "    -f --force                       Ignore errors, build as much as possible\n";
-    print "    -l --log [logfile]               Specify a log file to send informational output to\n";
+    print "    -l --log <logfile>               Specify a log file to send informational output to\n";
     print "    -P --parallel                    Parallelize the build process based on the number of CPU's\n";
-    print "    -t --target [arch]               Tell rpm to build for a particular target architecture\n";
+    print "    -t --target <arch>               Tell rpm to build for a particular target architecture\n";
     print "\n";
     exit(BUILDTOOL_SUCCESS);
 }
@@ -411,8 +411,10 @@ initial_setup
         if (!mkdir("$builddir", 0755)) {
             &fatal_error("Cannot create $builddir -- $!\n");
         }
-        foreach $dir ("BUILD", "SRPMS", "RPMS", "SPECS", "SOURCES") {
-            mkdir("$builddir/$dir", 0755);
+    }
+    foreach $dir ("BUILD", "SRPMS", "RPMS", "SPECS", "SOURCES") {
+        if (! -d "$builddir/$dir") {
+            mkdir("$builddir/$dir", 0755) || &fatal_error("Cannot create $builddir/$dir -- $!\n");
         }
     }
     if (-d $buildroot) {
@@ -450,6 +452,7 @@ initial_setup
             close(RPMRC);
         }
     }
+    chdir("$builddir");
 }
 
 # Emulate rm -rf
@@ -1677,12 +1680,6 @@ parallel_build
         # End of loop.  Time to spawn the next child.
     }
     qprint "$progname:  Parallel build complete.  (${\(&get_timestamp())})\n";
-
-    # Finish up the non-parallelized stages.
-    if ($opt_b eq "i" || $opt_b eq "a") {
-        &do_iso_stage();
-        &do_cleanup_stage() if ($opt_b eq "a");
-    }
 }
 
 # This routine does the actual build process
@@ -1693,17 +1690,21 @@ build_process
     &do_bootstrap_stage();
     return if ($opt_b eq "s");
 
-    &do_compose_stage();
-    return if ($opt_b eq "c");
+    if ($master) {
+        &parallel_build();
+    } else {
+        &do_compose_stage();
+        return if ($opt_b eq "c");
 
-    &do_explode_stage();
-    return if ($opt_b eq "e" || $opt_b eq "x");
+        &do_explode_stage();
+        return if ($opt_b eq "e" || $opt_b eq "x");
 
-    &do_build_stage();
-    return if ($opt_b eq "b");
+        &do_build_stage();
+        return if ($opt_b eq "b");
 
-    &do_package_stage();
-    return if ($opt_b eq "p");
+        &do_package_stage();
+        return if ($opt_b eq "p");
+    }
 
     &do_iso_stage();
     return if ($opt_b eq "i");
@@ -1728,7 +1729,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.47 $ created on $Date: 2000/06/09 20:12:04 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.48 $ created on $Date: 2000/06/10 03:40:41 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1836,12 +1837,8 @@ main
 
     if ($opt_b ne "Z") {  # -dbZ, a.k.a. How To Debug the Parser :-)
         &initial_setup();
-        if ($master) {
-            &parallel_build();
-            &summarize_failures();
-        } else {
-            &build_process();
-        }
+        &build_process();
+        &summarize_failures();
     }
     close(LOGFILE) if ($GLOBAL_LOG);
     return (defined(@failed_pkgs) && $#failed_pkgs != -1) ? BUILDTOOL_PACKAGE_FAILED : BUILDTOOL_SUCCESS;
