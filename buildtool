@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.21 2000/05/21 21:46:14 mej Exp $
+# $Id: buildtool,v 1.22 2000/05/22 19:37:45 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -341,7 +341,7 @@ parse_product_entry
         $type_guess = 1;
         ($name = shift @inp) =~ s/^[^:]*://;
         dprint "Guessing type of \"$name\"\n";
-        if ($name =~ /\.src\.rpm/) {
+        if ($name =~ /src\.rpm/) {
             # Name ends with .src.rpm.  That's an easy one.
             $type = "srpm";
         } else {
@@ -422,7 +422,7 @@ parse_product_entry
             undef $pkgvars{REVISION};
         }
     } elsif ($type eq "srpm") {
-        $name =~ s/\.src\.rpm$//;
+        $name =~ s/(\.|no)src\.rpm$//;
         if (!defined $pkgvars{RELEASE}) {
             if ($name !~ /^\S+-[^-]+-[^-]+$/) {
                 eprint "I wasn't given enough information about the $name package in $prodfile.  For SRPM\n";
@@ -652,7 +652,7 @@ build_rpms
     while (<RPM>) {
         chomp($line = $_);
         nprint "$line\n";
-        if ($line =~ /^Wrote: .*\.src\.rpm$/) {
+        if ($line =~ /^Wrote: .*src\.rpm$/) {
             ($srpm = $line) =~ s/^Wrote:\s+//;
         } elsif ($line =~ /^line \d+: [^:]+: /
                  || $line =~ /^Failed to find \w+:/
@@ -816,7 +816,7 @@ do_compose_stage
         opendir(DIR, ".");
         @contents = readdir(DIR);
         closedir(DIR);
-        if (grep($_ =~ /\.src\.rpm$/, @contents)) {
+        if (grep($_ =~ /src\.rpm$/, @contents)) {
             # The target SRPM already exists.  Skip this stage.
             nprint "$progname:  The target SRPM for \"$pkg\" already exists in $cwd/$pkgs->{$pkg}{MODULE}.\n";
             nprint "$progname:  I'll assume it's the right one.  Compose stage for \"$pkg\" is complete.\n";
@@ -931,7 +931,7 @@ do_compose_stage
         # Copy it here and assign FILENAME to it.
         system("mv $srpm .");
         $pkgs->{$pkg}{FILENAME} = $srpm;
-        $pkgs->{$pkg}{FILENAME} =~ s/^(\S+)\/([^\/]+\.src\.rpm)$/$2/;
+        $pkgs->{$pkg}{FILENAME} =~ s/^(\S+)\/([^\/]+src\.rpm)$/$2/;
         $pkgs->{$pkg}{FILENAME} = "$basedir/$pkgs->{$pkg}{MODULE}/$pkgs->{$pkg}{FILENAME}";
         dprint "Filename is $pkgs->{$pkg}{FILENAME}\n";
 
@@ -1135,7 +1135,7 @@ do_package_stage
         @contents = readdir(DIR);
         foreach $rpm (@contents) {
             dprint "Checking $builddir/SRPMS/$rpm\n";
-            if ($rpm =~ /^$pkg-\S*$version-$release\.src\.rpm/) {
+            if ($rpm =~ /^\Q$pkg-\E\S*$version-$release(\.|no)src\.rpm/) {
                 dprint "Got output file $rpm\n";
                 push @outfiles, "$builddir/SRPMS/$rpm";
             }

@@ -189,3 +189,9 @@ Sun May 21 14:52:57 2000                        Michael Jennings (mej)
 More tolerances for RPM build errors, plus some corrections for typos
 in the product files.
 ----------------------------------------------------------------------
+Mon May 22 12:44:09 2000                        Michael Jennings (mej)
+
+The "doc++" name was screwing up one of my regexp's because '+' is a
+metacharacter.  Hopefully this will fix it.  We'll find out in about
+16 hours.... =P
+----------------------------------------------------------------------
