@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 28 Sept 2000
 #
-# $Id: web-sync,v 1.3 2000/09/30 08:13:38 mej Exp $
+# $Id: web-sync,v 1.4 2000/10/02 02:09:19 mej Exp $
 #
 
 if [ ! -z "$SUDO_USER" ]; then
@@ -17,7 +17,7 @@ fi
 SCP_CMD="scp -C"
 RSYNC_CMD="rsync -av --exclude=CVS --exclude=.cvsignore --exclude=.buildtool.symlinks --delete --delete-excluded"
 CHOWN_CMD="chown -R $USER:engr"
-CHMOD_CMD="chmod -R g+s,ug+w,a+r"
+CHMOD_CMD="chmod -R ug+w,a+r"
 
 if [ "x$1" = "x" ]; then
   echo "Usage:  `/bin/basename $0` <version> [ <version> ... ]"
@@ -61,7 +61,7 @@ for i in $* ; do
       echo "*** Synchronizing extras ***"
       $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-7.0-extras/ $LOCAL_DIR/$i/extras/image/
       echo "*** Copying ISO images ***"
-      $SCP_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-7.0'*'extras.iso $LOCAL_DIR/$i/extras/iso/
+      $SCP_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-extras-$i.iso $LOCAL_DIR/$i/extras/iso/
       for j in RPMS SRPMS ; do
         echo "*** Synchronizing $j ***"
         $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-7.0-www/$j/ $LOCAL_DIR/$i/$j/
