@@ -488,3 +488,7 @@ Sat Jun 17 11:24:16 2000                        Michael Jennings (mej)
 
 Buglet fix.
 ----------------------------------------------------------------------
+Sat Jun 17 17:48:31 2000                        Michael Jennings (mej)
+
+Support for defining macros in product files.
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.68 2000/06/17 18:14:13 mej Exp $
+# $Id: buildtool,v 1.69 2000/06/18 00:38:31 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -414,6 +414,22 @@ place_file
     return $found;
 }
 
+sub
+setup_macros
+{
+    foreach $pkg (grep(defined($pkgs->{$_}{MACROS}), @packages)) {
+        my @macros = split(",", $pkgs->{$pkg}{MACROS});
+
+        foreach $macro (@macros) {
+            my ($name, $expr) = split(/:/, $macro, 2);
+
+            $name =~ s/^\%?\{?(\w+)\}?$/\%\{$1\}/;
+            dprint "Macro:  $name -> $expr\n";
+            $macros_hash{$name} = $expr;
+        }
+    }
+}
+
 # Do the initial directory/file creation stuff.  Used to be in the
 # bootstrap stage, but it's not parallel-safe.
 sub
@@ -436,39 +452,32 @@ initial_setup
         &nuke_tree($buildroot);
     }
     mkdir($buildroot, 0775);
-    if (-f "$ENV{HOME}/.rpmmacros" && -s _) {
-        $rpmmacros = "$ENV{HOME}/.rpmmacros";
-    } else {
-        $rpmmacros = "$basedir/rpmmacros";
-        if (!(-f "$basedir/rpmmacros" && -s _)) {
-            my $rel_ver = $prodver;
 
-            # Create basic rpmmacros
-            $rel_ver =~ s/\.\d+$//;
-            open(RPMMACROS, ">$rpmmacros") || &fatal_error("Cannot create $rpmmacros -- $!\n");
-            print RPMMACROS "\%_topdir           $builddir\n";
-            print RPMMACROS "\%distribution      $prods->{$prod}{DISTRIBUTION}\n" if ($prods->{$prod}{DISTRIBUTION});
-            print RPMMACROS "\%packager          $prods->{$prod}{PACKAGER}\n" if ($prods->{$prod}{PACKAGER});
-            print RPMMACROS "\%vendor            $prods->{$prod}{VENDOR}\n" if ($prods->{$prod}{VENDOR});
-            print RPMMACROS "\%release_version   $rel_ver\n";
-            close(RPMMACROS);
+    &setup_macros();
+    $rpmmacros = "$basedir/rpmmacros";
+    if (!(-f $rpmmacros && -s _)) {
+        # Create basic rpmmacros
+        open(RPMMACROS, ">$rpmmacros") || &fatal_error("Cannot create $rpmmacros -- $!\n");
+        print RPMMACROS "\%_topdir           $builddir\n";
+        print RPMMACROS "\%distribution      $prods->{$prod}{DISTRIBUTION}\n" if ($prods->{$prod}{DISTRIBUTION});
+        print RPMMACROS "\%packager          $prods->{$prod}{PACKAGER}\n" if ($prods->{$prod}{PACKAGER});
+        print RPMMACROS "\%vendor            $prods->{$prod}{VENDOR}\n" if ($prods->{$prod}{VENDOR});
+        foreach $macro (sort keys %macros_hash) {
+            print RPMMACROS "$macro   $macros_hash{$macro}\n";
         }
+        close(RPMMACROS);
     }
-    if (-f "$ENV{HOME}/.rpmrc" && -s _) {
-        $rpmrc = "$ENV{HOME}/.rpmrc";
-    } else {
-        $rpmrc = "$basedir/rpmrc";
-        if (!(-f "$basedir/rpmrc" && -s _)) {
-            # Create basic rpmrc
-            open(RPMRC, ">$rpmrc") || &fatal_error("Cannot create $rpmrc -- $!\n");
-            print RPMRC "optflags:   i386 $ENV{CFLAGS}\n";
-            print RPMRC "optflags:   i486 $ENV{CFLAGS}\n";
-            print RPMRC "optflags:   i586 $ENV{CFLAGS}\n";
-            print RPMRC "optflags:   i686 $ENV{CFLAGS}\n";
-            print RPMRC "macrofiles: /usr/lib/rpm/macros:/usr/lib/rpm/%{_target}/macros:/etc/rpm/macros.specspo:",
-                         "/etc/rpm/macros:/etc/rpm/%{_target}/macros:~/.rpmmacros:$rpmmacros\n";
-            close(RPMRC);
-        }
+    $rpmrc = "$basedir/rpmrc";
+    if (!(-f "$basedir/rpmrc" && -s _)) {
+        # Create basic rpmrc
+        open(RPMRC, ">$rpmrc") || &fatal_error("Cannot create $rpmrc -- $!\n");
+        print RPMRC "optflags:   i386 $ENV{CFLAGS}\n";
+        print RPMRC "optflags:   i486 $ENV{CFLAGS}\n";
+        print RPMRC "optflags:   i586 $ENV{CFLAGS}\n";
+        print RPMRC "optflags:   i686 $ENV{CFLAGS}\n";
+        print RPMRC "macrofiles: /usr/lib/rpm/macros:/usr/lib/rpm/%{_target}/macros:/etc/rpm/macros.specspo:",
+                    "/etc/rpm/macros:/etc/rpm/%{_target}/macros:~/.rpmmacros:$rpmmacros\n";
+        close(RPMRC);
     }
     chdir("$builddir");
 
@@ -607,9 +616,9 @@ parse_product_entry
     undef %pkgvars;
     undef $module;
     undef $type;
-    #@inp = split(/\s+/, $line);
-    @inp = ($line =~ m/\s*((?:\S*(?:\"[^\"]+\")?\S*)+)\s*/g);
-    pop @inp;  # There will always be an empty value at the end.  Get rid of it.
+    @inp = split(/\s+/, $line);
+    #@inp = ($line =~ m/\s*((?:\S*(?:\"[^\"]+\")?\S*)+)\s*/g);
+    #pop @inp;  # There will always be an empty value at the end.  Get rid of it.
     dprint "Input is \"", join("\" \"", @inp), "\"\n";
     if ($inp[0] =~ /^(prod|mod|s?rpm|ima?ge?)[^:]*:/) {
         # Line begins with <type>:<name>, like "module:Eterm"
@@ -1802,7 +1811,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.68 $ created on $Date: 2000/06/17 18:14:13 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.69 $ created on $Date: 2000/06/18 00:38:31 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
