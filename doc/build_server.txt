@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: build_server.txt,v 1.2 2000/09/13 23:55:09 mej Exp $
+#  $Id: build_server.txt,v 1.3 2001/04/04 02:15:40 mej Exp $
 #
 ########################################################################
 
@@ -29,12 +29,13 @@ complete install takes about 30 minutes on a P3/500 processor system.
 -------------------------------------------------------
 
 If you do not have a copy of the Powertools CD, NFS mount the tree
-from engr (engr:/pub/VALinux/6.2.3/powertools/cd) onto your build
+from engr (engr:/pub/VALinux/6.2.4/powertools/cd) onto your build
 system.  Then cd into Powertools/i386 and run the following command:
 
 rpm -Uvh alien-* sip-* libax25-* lesstif-* R-base-* SDL-* aalib-* \
          ocaml-* libcdaudio-* pccts-* xmake-* OffiX-devel-* lha-* \
-         icqlib-* sane-* fpc-* hfsutils-* mkhybrid-* nasm-*
+         icqlib-* sane-* fpc-* hfsutils-* mkhybrid-* nasm-* \
+         sgml-* jade-* jadetex-* tetex-*
 
 2.  Install the FFTW library and header files
 ---------------------------------------------
@@ -87,7 +88,7 @@ system.
 
 rpm -e pax
 
-If you are using VA Linux 6.2.3, the pax package is on the Powertools
+If you are using VA Linux 6.2.4, the pax package is on the Powertools
 CD and thus will not have been installed.
 
 6.  Download and install Avalon
@@ -168,7 +169,7 @@ adduser postfix
 
 The simplest way to run a build is with the command:
 
-buildtool -p va-redhat-6.2.3
+buildtool -p va-redhat-6.2.4
 
 However, if you are running on a multi-processor machine, you should
 definitely take advantage of Avalon's parallelization support.
@@ -179,7 +180,7 @@ is often not desireable for those doing complete, unattended builds of
 the OS.  Thus, the following is the command usually used to build VA
 Linux:
 
-buildtool -Px2 -fp va-redhat-6.2.3 -l va.log
+buildtool -Px2 -fp va-redhat-6.2.4 -l va.log
 
 There are many other command-line options to buildtool which may
 interest you.  To see a list of all of them, run:

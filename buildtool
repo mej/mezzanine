@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.128 2001/04/02 07:53:39 mej Exp $
+# $Id: buildtool,v 1.129 2001/04/04 02:15:40 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -72,40 +72,32 @@ print_usage_info
 sub
 nprintf
 {
-    if ($GLOBAL_LOG) {
-        printf $GLOBAL_LOG @_;
+    if ($GLOBAL_LOG || $verbosity >= 2) {
+        printf @_;
     }
-    return if ($verbosity < 2);
-    printf @_;
 }
 sub
 nprint
 {
-    if ($GLOBAL_LOG) {
-        print $GLOBAL_LOG @_;
+    if ($GLOBAL_LOG || $verbosity >= 2) {
+        print @_;
     }
-    return if ($verbosity < 2);
-    print @_;
 }
 
 # Quiet print (i.e., print in -q mode but not in -Q mode)
 sub
 qprintf
 {
-    if ($GLOBAL_LOG) {
-        printf $GLOBAL_LOG @_;
+    if ($GLOBAL_LOG || $verbosity >= 1) {
+        printf @_;
     }
-    return if ($verbosity < 1);
-    printf @_;
 }
 sub
 qprint
 {
-    if ($GLOBAL_LOG) {
-        print $GLOBAL_LOG @_;
+    if ($GLOBAL_LOG || $verbosity >= 1) {
+        print @_;
     }
-    return if ($verbosity < 1);
-    print @_;
 }
 
 # Count CPU's for purposes of parallelization
@@ -154,7 +146,6 @@ spawn_cmd
                 #system("chattr +S $logfile");  # Try to set sync on the log file, fail silently
                 open(STDERR, ">&LOGFILE");
                 select LOGFILE; $| = 1;
-                select STDOUT; $| = 0;
             }
 	    # Reduce the package list to just one package.  Then we can proceed
 	    # without having to incur the performance penalty of an exec().
@@ -643,13 +634,13 @@ parse_product_entry
                 $pkgvars{VERSION} = $tmp;
             }
         }
-        $filename = sprintf("%s$name-$pkgvars{VERSION}-$pkgvars{RELEASE}.$arch.rpm", ($module ? "$module/" : ""));
+        $filename = "$name-$pkgvars{VERSION}-$pkgvars{RELEASE}.$arch.rpm";
     }
 
     # Check for duplicate packages.
     if (grep($_ eq $name, @packages)) {
         if ($type eq "rpm" && ($pkgs->{$name}{TYPE} eq "srpm" || $pkgs->{$name}{TYPE} eq "tar")) {
-            push(@{$pkgs->{$name}{BINS}}, $filename);
+            push(@{$pkgs->{$name}{BINS}}, "$module/$filename");
             $pkgs->{$name}{STAGES} =~ s/c//;
         } else {
             eprint "I already have $name as a $pkgs->{$name}{TYPE} package in $pkgs->{$name}{PRODUCT}.\n";
@@ -1029,10 +1020,13 @@ do_bootstrap_stage
 
 	# Create @flist, the list of files we need to download for this package.
 	# Unless it's an SRPM plus binary RPM's, there will only be one file.
-        if (defined($pkgs->{$pkg}{BINS})) {
-            @flist = ($pkgs->{$pkg}{FILENAME}, @{$pkgs->{$pkg}{BINS}});
+        if ($pkgs->{$pkg}{FILENAME} eq $pkgs->{$pkg}{MODULE}) {
+            push(@flist, $pkgs->{$pkg}{MODULE});
         } else {
-            push(@flist, $pkgs->{$pkg}{FILENAME});
+            push(@flist, "$pkgs->{$pkg}{MODULE}/$pkgs->{$pkg}{FILENAME}");
+        }
+        if (defined($pkgs->{$pkg}{BINS})) {
+            push(@flist, @{$pkgs->{$pkg}{BINS}});
         }
 	# Set the proper CVSROOT and tag for the checkout.
         if ($global_tree) {
@@ -1109,19 +1103,19 @@ do_component_stage
         }
         nprint "$progname:  Starting component stage for the \"$pkg\" package....  (${\(&get_timestamp())})\n";
 
-        ### Check to see if we really need to do this stage or not.
+        if (! chdir("$builddir/$pkgs->{$pkg}{MODULE}")) {
+            &fail_package($pkg, "component", "Could not chdir into $builddir/$pkgs->{$pkg}{MODULE} -- $!");
+            next;
+        }
+
         if ($pkgs->{$pkg}{TYPE} eq "module") {
             ### If there's a makefile, skip this stage.
             if (-s "$builddir/$pkgs->{$pkg}{MODULE}/.avalon.makefile") {
                 nprint "$progname:  Avalon makefile exists, skipping component stage.\n";
                 next;
             }
-            ### The first step is to examine the module directory to find
-            ### the names of the vendor source files/directories and the spec file.
-            if (! chdir("$builddir/$pkgs->{$pkg}{MODULE}")) {
-                &fail_package($pkg, "component", "Could not chdir into $builddir/$pkgs->{$pkg}{MODULE} -- $!");
-                next;
-            }
+
+            ### Check to see if we really need to do this stage or not.
             # Find matches to pkg-*-*.src.rpm in the SRPMS directory
             @tmp = &grepdir(sub {/^$pkg-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/}, "$builddir/SRPMS");
             if (scalar(@tmp) > 0) {
@@ -1133,7 +1127,7 @@ do_component_stage
                     nprint "$progname:  Assuming that $srpm is the correct one.\n";
                 }
                 # The target SRPM already exists.  Skip this stage.
-                nprint "$progname:  The target SRPM for \"$pkg\" already exists in $builddir/$pkgs->{$pkg}{MODULE}.\n";
+                nprint "$progname:  The target SRPM for \"$pkg\" already exists ($builddir/SRPMS/$srpm).\n";
                 nprint "$progname:  I'll assume it's the right one.  Component stage for \"$pkg\" is complete.\n";
                 # (?:) means "don't include this as a $<num> variable"
                 $srpm =~ m/^(\S+)-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/;
@@ -1235,10 +1229,9 @@ do_component_stage
                 &fail_package($pkg, "component", "Unable to locate spec file in SRPM");
                 next;
             }
-            # We'll use these later, so they MUST be defined for
-            # any package we plan on actually building later.
+            # We'll use this later, so it MUST be defined for any
+            # package we plan on actually building at some point.
             $pkgs->{$pkg}{SPECFILE} = "$builddir/SPECS/$specfile";
-            $pkgs->{$pkg}{MANIFEST} = join(" ", @manifest);
 
             ### Check to make sure each file in the manifest is in the proper place.
             $err = 0;
@@ -1341,7 +1334,7 @@ do_build_stage
                 $pkgs->{$pkg}{OUTFILES} .= " $bin";
                 dprint "Copying $rpm to $builddir/RPMS/$arch\n";
                 &mkdirhier("$builddir/RPMS/$arch");
-                system("cp $rpm $builddir/RPMS/$arch/");
+                system("cp $builddir/$rpm $builddir/RPMS/$arch/");
             }
         } elsif ($pkgs->{$pkg}{TYPE} eq "rpm") {
             my $arch;
@@ -1364,7 +1357,7 @@ do_build_stage
                 dprint "Filename is $pkgs->{$pkg}{FILENAME}, version is $pkgs->{$pkg}{VERSION}, release is $pkgs->{$pkg}{RELEASE}\n";
             }
         } elsif ($pkgs->{$pkg}{TYPE} eq "module") {
-            ### If there's a makefile, skip this stage.
+            ### If there's a makefile, use special_build() to build it.
             if (-s "$builddir/$pkgs->{$pkg}{MODULE}/.avalon.makefile") {
                 ($err, $msg, $srpm) = &special_build($pkg);
                 dprint "do_build_stage():  special_build($pkg) returned $err, $msg, $srpm\n";
@@ -1743,7 +1736,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.128 $ created on $Date: 2001/04/02 07:53:39 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.129 $ created on $Date: 2001/04/04 02:15:40 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1762,13 +1755,14 @@ main
     $revtool = "revtool" . (&debug_get() ? " --debug" : "");
     $pkgtool = "pkgtool" . (&debug_get() ? " --debug" : "");
     $GLOBAL_LOG = 0;
+    open(STDERR, ">&STDOUT");
     if ($opt_l) {
         if (!open(LOGFILE, ">$opt_l")) {
             eprint "Unable to open $opt_l -- $!\n";
         } else {
             $GLOBAL_LOG = \*LOGFILE;
             #system("chattr +S $opt_l");  # Try to set sync on the log file, fail silently
-            open(STDERR, ">&LOGFILE");
+            open(STDOUT, ">&LOGFILE");
             select LOGFILE; $| = 1;
         }
     }
@@ -1907,18 +1901,16 @@ main
         &initial_setup();
         &build_process();
         &cleanup($opt_clean) if (defined($opt_clean));
-        &summarize_failures();
     } else {
         # This way we can just do cleanup. :-)
         &cleanup($opt_clean) if (defined($opt_clean));
     }
-    close(LOGFILE) if ($GLOBAL_LOG);
     return (defined(@failed_pkgs) && $#failed_pkgs != -1) ? AVALON_PACKAGE_FAILED : AVALON_SUCCESS;
 }
 
 exit &main();
 
 END {
-    &summarize_failures() if ($#failed_pkgs >= 0);
+    &summarize_failures() if (scalar(@failed_pkgs) && ! $slave);
     close($GLOBAL_LOG) if ($GLOBAL_LOG);
 }

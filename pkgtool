@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.35 2001/04/02 07:53:39 mej Exp $
+# $Id: pkgtool,v 1.36 2001/04/04 02:15:40 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -742,7 +742,7 @@ rpm_generate_source_files
             if (-d $fname) {
                 my @tmp;
 
-                @tmp = grep($_ =~ /^\Q$fname\E\.(tgz|tar\.gz|tar\.Z|tar\.bz2|tbz)$/, values %source);
+                @tmp = grep($_ =~ /^\Q$fname\E\.(tgz|tar\.gz|tar\.Z|tar\.bz2|tbz)$/, values %{$specdata->{SOURCE}});
                 if (scalar(@tmp)) {
                     push @srcs, "$fname:$tmp[0]";
                 } else {
@@ -859,7 +859,7 @@ rpm_generate_source_files
                     delete $specdata->{SOURCE}{$num};
                 }
             }
-            @{$specdata->{SOURCES}} = sort {$a <=> $b} keys %source;
+            @{$specdata->{SOURCES}} = sort {$a <=> $b} keys %{$specdata->{SOURCE}};
         }
 
         # Clean the checkout we did.
@@ -964,7 +964,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.35 $ created on $Date: 2001/04/02 07:53:39 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.36 $ created on $Date: 2001/04/04 02:15:40 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
