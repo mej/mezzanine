@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.17 2000/07/14 18:43:41 mej Exp $
+# $Id: pkgtool,v 1.18 2000/07/21 06:41:34 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -295,6 +295,7 @@ parse_spec_file
                 $pkg = $value;
                 @packages = ($pkg);
                 &add_define("PACKAGE_NAME", $value);
+                &add_define("name", $value) if (! $define{"name"});
             } elsif ($var =~ /^source(\d*)$/) {
                 my $key = ($1 ? $1 : "0");
 
@@ -311,8 +312,10 @@ parse_spec_file
                 $header{$var} = $value;
                 if ($var eq "version") {
                     &add_define("PACKAGE_VERSION", $value);
+                    &add_define("version", $value) if (! $define{"version"});
                 } elsif ($var eq "release") {
                     &add_define("PACKAGE_RELEASE", $value);
+                    &add_define("release", $value) if (! $define{"release"});
                 }
             }
         } elsif ($line =~ /^%\s*define\s*(\w+)\s*(.*)$/) {
@@ -1082,7 +1085,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.17 $ created on $Date: 2000/07/14 18:43:41 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.18 $ created on $Date: 2000/07/21 06:41:34 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
