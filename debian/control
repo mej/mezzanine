@@ -1,0 +1,11 @@
+Source: avalon
+Section: devel
+Priority: extra
+Maintainer: Chip Salzenberg <chip@valinux.com>
+Standards-Version: 3.0.0.1
+
+Package: avalon
+Architecture: all
+Depends: ${perl:Depends}
+Description: The VA Software Engineering Build System
+ (this debian package is not official yet)
