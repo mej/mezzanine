@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.12 2002/02/26 19:59:04 mej Exp $
+# $Id: RevCtl.pm,v 1.13 2002/02/26 20:02:31 mej Exp $
 #
 
 package Mezzanine::RevCtl;
@@ -343,10 +343,10 @@ login_to_master
 sub
 find_module_changelog
 {
-    my ($orig_wd, $repo, $rel_dir);
+    my ($pwd, $repo, $rel_dir);
 
-    $orig_wd = &getcwd();
-    $rel_dir = &basename($orig_wd);
+    $pwd = &getcwd();
+    $rel_dir = &basename($pwd);
     $repo = &cat_file("CVS/Repository");
     while ((! -e "ChangeLog") && $repo && ($repo =~ /\//)) {
         chdir("..");
