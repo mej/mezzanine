@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.17 2001/08/21 22:47:40 mej Exp $
+# $Id: Build.pm,v 1.18 2001/08/23 21:35:18 mej Exp $
 #
 
 package Avalon::Build;
@@ -473,6 +473,17 @@ build_spm
         &copy_files(@tmp, "$topdir/SOURCES");
     }
 
+    # Parse the prod file for this SPM if it exists.
+    if (&parse_prod_file()) {
+        my $pkg = &pkgvar_name();
+
+        if ($pkgs->{$pkg}{SRCS}) {
+            &pkgvar_srcs($pkgs->{$pkg}{SRCS});
+        }
+        if ($pkgs->{$pkg}{ARCH}) {
+            &pkgvar_architecture($pkgs->{$pkg}{ARCH});
+        }
+    }
     return &build_topdir();
 }
 
@@ -606,15 +617,18 @@ build_fst
 sub
 build_srpm
 {
-    my $err;
+    my ($pkg, $topdir, $err);
     my (@tmp, @specs);
 
     dprint &print_args(@_);
 
     &prepare_build_tree();
-    @tmp = &rpm_show_contents($pkg);
+    $topdir = &pkgvar_topdir();
+    $pkg = &pkgvar_filename();
+
+    @tmp = &rpm_show_contents();
     if (($err = shift @tmp) != AVALON_SUCCESS) {
-        return (AVALON_NO_SOURCES, "Unable to examine the contents of $pkg ($err)", undef);
+        return (AVALON_NO_SOURCES, "Unable to examine the contents of ${\(&pkgvar_filename())} ($err)", undef);
     }
     foreach my $f (grep(/spec(\.in)?$/, @tmp)) {
         my @fields;
@@ -626,7 +640,7 @@ build_srpm
     if (scalar(@specs) != 1) {
         wprint "Found ${\(scalar(@specs))} spec files in $pkg?!\n";
     }
-    @tmp = &rpm_install($pkg, $topdir);
+    @tmp = &rpm_install();
     if (($err = shift @tmp) != AVALON_SUCCESS) {
         return (AVALON_PACKAGE_FAILED, "Unable to install $pkg ($err)", undef);
     }
@@ -634,7 +648,8 @@ build_srpm
     if (scalar(@specs) != 1) {
         return (AVALON_NO_SOURCES, "Found ${\(scalar(@specs))} spec files in $pkg?!", undef);
     }
-    return &build_topdir("$topdir/SPECS/$specs[0]", $target_format);
+    &pkgvar_instructions("$topdir/SPECS/$specs[0]");
+    return &build_topdir();
 }
 
 # Plain old tarballs can be rebuilt into packages using this function, as long as they
@@ -671,7 +686,7 @@ build_package
     if (-d $pkg) {
         # It's a directory.  That means it's some type of module.
         if (!chdir($pkg)) {
-            return (AVALON_SYSTEM_ERROR, "Unable to chdir into \"$pkg\" -- $!", undef);
+            @ret = (AVALON_SYSTEM_ERROR, "Unable to chdir into \"$pkg\" -- $!", undef);
         }
         if (-d "F") {
             # Okay, there's an F/ directory.  I bet it's an SPM.
@@ -684,8 +699,6 @@ build_package
             # and it better conform to the proper assumptions or provide other instructions.
             @ret = &build_fst();
         }
-        chdir($pwd);
-        return @ret;
     } elsif (-f _ && -s _) {
         # It's a file.  Must be a package file of some type.
         # Split the actual package name from any path information.
@@ -695,24 +708,25 @@ build_package
             $module = &dirname($pkg);
             $pkg = &basename($pkg);
             if (!chdir($module)) {
-                return (AVALON_SYSTEM_ERROR, "Unable to chdir into \"$module\" -- $!", undef);
+                @ret = (AVALON_SYSTEM_ERROR, "Unable to chdir into \"$module\" -- $!", undef);
             }
+            &pkgvar_filename($pkg);
         }
         if ($pkg =~ /src\.rpm$/) {
             @ret = &build_srpm();
         } elsif ($pkg =~ /\.(tar\.|t)(gz|Z|bz2)$/) {
             @ret = &build_tarball();
         } elsif ($pkg =~ /\.rpm$/) {
-            return (AVALON_NO_SOURCES, "Alright...  Who's the wiseguy that told me to recompile \"$pkg,\" a binary RPM? :-P", undef);
+            @ret = (AVALON_NO_SOURCES, "Alright...  Who's the wiseguy that told me to recompile \"$pkg,\" a binary RPM? :-P", undef);
         } else {
-            return (AVALON_NO_SOURCES, "I'm sorry, but I don't know how to build \"$pkg.\"", undef);
+            @ret = (AVALON_NO_SOURCES, "I'm sorry, but I don't know how to build \"$pkg.\"", undef);
         }
-        chdir($pwd);
-        return @ret;
     } else {
         # Okay, it's neither a file nor a directory.  What the hell is it?
-        return (AVALON_NO_SOURCES, "I'm sorry, but I can't figure out what to do with \"$pkg.\"", undef);
+        @ret = (AVALON_NO_SOURCES, "I'm sorry, but I can't figure out what to do with \"$pkg.\"", undef);
     }
+    chdir($pwd);
+    return @ret;
 }
 
 ### Private functions

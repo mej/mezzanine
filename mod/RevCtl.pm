@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.4 2001/08/20 17:34:46 mej Exp $
+# $Id: RevCtl.pm,v 1.5 2001/08/23 21:35:18 mej Exp $
 #
 
 package Avalon::RevCtl;
@@ -694,7 +694,7 @@ talk_to_cvs_server
                 $err = AVALON_CONFLICT_FOUND;
             } elsif ($line =~ /^cvs \[\w+ aborted\]: no such tag/
                      || $line =~ /^cvs \S+: warning: new-born \S+ has disappeared$/) {
-                eprint "$opt_t is not a valid tag for this file/module\n";
+                eprint "$tag is not a valid tag for this file/module\n";
                 $err = AVALON_INVALID_TAG;
             } elsif ($line =~ /^cvs server: (.+) already exists/ || $line =~ /^cvs server: (.+) has already been entered/) {
                 eprint "$1 already exists.  No need to add it.\n";

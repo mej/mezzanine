@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.155 2001/08/21 22:47:40 mej Exp $
+# $Id: buildtool,v 1.156 2001/08/23 21:35:18 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -126,6 +126,7 @@ build_single_package
     my ($pkgfile, $err, $msg, $outfiles);
 
     # Binaries or not, we need to know the full path and name of the source package.
+    &pkgvar_name($pkg);
     if (! ($pkgfile = &pkgvar_filename($pkgs->{$pkg}{MODULE}, $pkgs->{$pkg}{FILENAME}))) {
         &fail_package($pkg, "I don't know what file/module to build from!");
         return AVALON_NO_SOURCES;
@@ -500,7 +501,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.155 $ created on $Date: 2001/08/21 22:47:40 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.156 $ created on $Date: 2001/08/23 21:35:18 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
