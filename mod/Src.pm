@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.3 2001/04/17 03:20:47 mej Exp $
+# $Id: Src.pm,v 1.4 2001/04/17 04:29:12 mej Exp $
 #
 
 package Avalon::Srctool;
@@ -29,6 +29,7 @@ package Avalon::Srctool;
 BEGIN {
     use Exporter   ();
     use File::Copy;
+    use File::Find;
     use Avalon::Util;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
@@ -38,7 +39,8 @@ BEGIN {
     @ISA         = ('Exporter');
     # Exported functions go here
     @EXPORT      = ('$WORK_DIR', '$TMP_DIR', 
-                    '&find_files', '&find_subdirs', '&install_spm_files', '&create_temp_space', '&clean_temp_space',
+                    '&find_files', '&find_subdirs', '&generate_symlink_file',
+                    '&install_spm_files', '&create_temp_space', '&clean_temp_space',
                     '&run_cmd', '&run_av_cmd');
     %EXPORT_TAGS = ( );
 
@@ -60,6 +62,7 @@ $TMP_DIR = "/var/tmp/srctool.$$";
 ### Function prototypes
 sub find_files($);
 sub find_subdirs($);
+sub generate_symlink_file($);
 sub install_spm_files($);
 sub create_temp_space($$);
 sub clean_temp_space();
@@ -106,6 +109,38 @@ find_subdirs($)
         }
     }
     return @subdirs;
+}
+
+# Generate the .avalon.symlinks file automatically from a tree
+sub
+generate_symlink_file($)
+{
+    my $path = $_[0];
+    my $cnt;
+    my %links;
+    local *SYMLINKS;
+
+    $path = '.' if (! $path);
+    &find(sub {-l && ($links{$File::Find::name} = readlink($_));}, $path);
+    if (!open(SYMLINKS, ">$path/.avalon.symlinks")) {
+        eprint "Unable to open $path/.avalon.symlinks for writing -- $!\n";
+        return AVALON_SYSTEM_ERROR;
+    }
+    $cnt = scalar(keys %links);
+    if ($cnt) {
+        dprint "Found $cnt symlinks.\n";
+        foreach my $link (sort keys %links) {
+            my $newlink;
+
+            ($newlink = $link) =~ s/^\.\///;
+            print SYMLINKS "$newlink -> $links{$link}\n";
+            unlink($newlink);
+        }
+        close(SYMLINKS);
+    } else {
+        dprint "No symlinks found.\n";
+    }
+    return AVALON_SUCCESS;
 }
 
 # Copy source files into place

@@ -1,6 +1,6 @@
 %define name     avalon
 %define ver      2.0
-%define rel      0.7
+%define rel      0.8
 %define prefix   /usr
 
 Summary: Avalon -- The VA Software Engineering Build System
