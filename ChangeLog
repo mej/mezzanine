@@ -273,3 +273,7 @@ Fri Jan 23 19:20:23 2004                        Michael Jennings (mej)
 
 Fixes for parallel chrooted builds.
 ----------------------------------------------------------------------
+Sat Jan 24 20:19:01 2004                        Michael Jennings (mej)
+
+Permissions/ownership fixes for installed files.
+----------------------------------------------------------------------

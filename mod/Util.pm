@@ -21,10 +21,12 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.22 2003/12/30 23:02:55 mej Exp $
+# $Id: Util.pm,v 1.23 2004/01/24 23:54:15 mej Exp $
 #
 
 package Mezzanine::Util;
+use strict;
+use English;
 
 BEGIN {
     use strict;
@@ -68,8 +70,8 @@ use vars ('@EXPORT_OK');
 ### Private global variables
 
 ### Initialize exported package variables
-$debug = 0;
-$progname = "Mezzanine";
+my $debug = 0;
+my $progname = "Mezzanine";
 
 ### Initialize private global variables
 
@@ -351,7 +353,7 @@ nuke_tree($)
         opendir(DIR, $path) || return 0;
         @files = readdir(DIR);
         closedir(DIR);
-        foreach $f (@files) {
+        foreach my $f (@files) {
             if ($f ne "." && $f ne "..") {
                 &nuke_tree("$path/$f");
             }
@@ -386,16 +388,37 @@ move_files
     }
     dprint "Moving ", join(' ', @flist), " to $dest.\n";
     foreach my $f (@flist) {
-        my $target;
+        my ($target, $perms, $uid, $gid, $mode);
 
         if ($addname) {
             ($target = $f) =~ s/^(.*\/)?([^\/]+)$/$dest$2/;
         } else {
             $target = $dest;
         }
+
+        # Save permissions of the source file.
+        $perms = stat($f);
+        if (! $perms) {
+            eprint "Unable to stat $f -- $!\n";
+        } else {
+            ($uid, $gid, $mode) = ($perms->uid(), $perms->gid(), $perms->mode());
+            if (($UID == 0) || ($EUID == 0)) {
+                $uid = $gid = 0;
+            }
+            $mode &= 07775;
+        }
+
         if (!&File::Copy::move($f, $target)) {
             eprint "Unable to move $f to $target -- $!\n";
             return $fcnt;
+        }
+
+        # Set permissions on the target file appropriately.
+        if (! chown($uid, $gid, $target)) {
+            wprint "chown($uid, $gid, $target) failed -- $!\n";
+        }
+        if (! chmod($mode, $target)) {
+            wprintf("chmod(%05o, $target) failed -- $!\n", $mode);
         }
         $fcnt++;
     }
@@ -423,16 +446,37 @@ copy_files
     }
     dprint "Copying ", join(' ', @flist), " to $dest.\n";
     foreach my $f (grep(-f $_, @flist)) {
-        my $target;
+        my ($target, $perms, $uid, $gid, $mode);
 
         if ($addname) {
             $target = $dest . &basename($f);
         } else {
             $target = $dest;
         }
+
+        # Save permissions of the source file.
+        $perms = stat($f);
+        if (! $perms) {
+            eprint "Unable to stat $f -- $!\n";
+        } else {
+            ($uid, $gid, $mode) = ($perms->uid(), $perms->gid(), $perms->mode());
+            if (($UID == 0) || ($EUID == 0)) {
+                $uid = $gid = 0;
+            }
+            $mode &= 07775;
+        }
+
         if (!&File::Copy::copy($f, $target)) {
             eprint "Unable to copy $f to $target -- $!.  Copied $fcnt files.\n";
             return $fcnt;
+        }
+
+        # Set permissions on the target file appropriately.
+        if (! chown($uid, $gid, $target)) {
+            wprint "chown($uid, $gid, $target) failed -- $!\n";
+        }
+        if (! chmod($mode, $target)) {
+            wprintf("chmod(%05o, $target) failed -- $!\n", $mode);
         }
         $fcnt++;
     }
@@ -464,7 +508,7 @@ copy_tree($$)
 
         # Create the destination directory.
         dprint "Creating target directory $new_path for $old_path.\n";
-        if (! mkdir($new_path, $file_stats->mode & 07777)) {
+        if (! mkdir($new_path, $file_stats->mode & 07775)) {
             eprint "Unable to create directory $new_path -- $!\n";
             return 0;
         }
@@ -552,7 +596,7 @@ xpush(\@; @)
     my $parray = shift;
     my @items = @_;
 
-    foreach $item (@items) {
+    foreach my $item (@items) {
         push @{$parray}, $item if (!grep($_ eq $item, @{$parray}));
     }
 }
