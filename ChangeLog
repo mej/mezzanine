@@ -108,3 +108,7 @@ have the ISO stage, the cleanup stage, and the compose stage to go,
 but it should be to the point where the RedHat 6.2 packages can be
 rebuilt and congregated.  Time to test that theory....
 ----------------------------------------------------------------------
+Sat May 13 01:03:53 2000                        Michael Jennings (mej)
+
+Miscellaneous bug fixes to buildtool.  Getting closer....
+----------------------------------------------------------------------
