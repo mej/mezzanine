@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.39 2004/06/22 23:10:07 mej Exp $
+# $Id: Util.pm,v 1.40 2004/07/28 21:40:21 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -93,6 +93,7 @@ $mz_uid = $UID;
 %OPTION = ();
 
 ### Initialize private global variables
+my $CMD_TIMEOUT = 0;
 
 ### Function prototypes
 sub mezz_init($$@);
@@ -133,6 +134,7 @@ sub cat_file($);
 sub parse_rpm_name($);
 sub should_ignore($);
 sub touch_file($);
+sub handle_alarm_for_subcommand(@);
 
 ### Module cleanup
 END {
@@ -888,18 +890,47 @@ touch_file($)
 sub
 run_cmd($$$)
 {
-    my ($prog, $params, $show_output) = @_;
+    my ($prog, $params, $show_output, $timeout) = @_;
     my ($err, $msg, $line, $cmd) = undef;
     my @output;
     local *CMD;
 
-    $cmd = "$prog $params";
+    if (!defined($timeout)) {
+        # Wait 5 minutes by default.
+        $timeout = 300;
+    }
+    if (ref($params)) {
+        my $tmp = "";
+
+        foreach my $param (@{$params}) {
+            if ($param =~ /\'/) {
+                $param =~ s,\',\'\"\'\"\',g;
+            }
+            $tmp .= "\'$param\' ";
+        }
+        $cmd = "$prog $tmp";
+    } else {
+        $cmd = "$prog $params";
+    }
 
     dprint "About to run $cmd\n";
     if (!open(CMD, "$cmd 2>&1 |")) {
         return (-1, "Execution of \"$cmd\" failed -- $!");
     }
+
+    # Allow only $timeout seconds between lines of output.
+    if ($timeout) {
+        $SIG{"ALRM"} = \&handle_alarm_for_subcommand;
+        alarm($timeout);
+    }
+
     while (<CMD>) {
+        if ($CMD_TIMEOUT) {
+            eprint "Command TIMED OUT after $timeout seconds.\n";
+            $CMD_TIMEOUT = 0;
+            $SIG{"ALRM"} = "IGNORE";
+            last;
+        }
         chomp($line = $_);
         $line =~ s/^.*\r//g;
         push @output, $line;
@@ -908,11 +939,23 @@ run_cmd($$$)
         } else {
             dprint "From $prog -> $line\n";
         }
+        if ($timeout) {
+            alarm($timeout);
+        }
     }
     close(CMD);
+
+    # It won't hurt to always reset.
+    alarm(0);
+    $SIG{"ALRM"} = "IGNORE";
+
     $err = $? >> 8;
     dprint "\"$cmd\" returned $err\n";
-    return ($err, @output);
+    if (wantarray()) {
+        return ($err, @output);
+    } else {
+        return $err;
+    }
 }
 
 # Wrapper for Mezzanine commands specifically
@@ -934,7 +977,19 @@ run_mz_cmd($$$)
             $msg = $tmp[$#tmp];
         }
     }
-    return ($err, ($show_output ? $msg : @output));
+    if (wantarray()) {
+        return ($err, ($show_output ? $msg : @output));
+    } else {
+        return $err;
+    }
+}
+
+### Private functions
+
+sub
+handle_alarm_for_subcommand(@)
+{
+    $CMD_TIMEOUT = 1;
 }
 
 1;

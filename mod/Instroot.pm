@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Instroot.pm,v 1.2 2004/06/04 17:16:40 mej Exp $
+# $Id: Instroot.pm,v 1.3 2004/07/28 21:40:21 mej Exp $
 #
 
 package Mezzanine::Instroot;
@@ -116,7 +116,7 @@ init
     }
 
     dprint "Initializing chroot jail:  $self->{INIT} $self->{PATH}\n";
-    @output = &run_cmd($self->{"INIT"}, $self->{"PATH"}, "instroot-init:  ");
+    @output = &run_cmd($self->{"INIT"}, $self->{"PATH"}, "instroot-init:  ", 1800);
     if ($output[0] != MEZZANINE_SUCCESS) {
         return 0;
     }
@@ -135,7 +135,7 @@ reset
     }
 
     dprint "Resetting chroot jail:  $self->{RESET} $self->{PATH}\n";
-    @output = &run_cmd($self->{"RESET"}, $self->{"PATH"}, "instroot-reset:  ");
+    @output = &run_cmd($self->{"RESET"}, $self->{"PATH"}, "instroot-reset:  ", 900);
     if ($output[0] != MEZZANINE_SUCCESS) {
         return 0;
     }

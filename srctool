@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.49 2004/07/26 19:34:40 mej Exp $
+# $Id: srctool,v 1.50 2004/07/28 21:40:21 mej Exp $
 #
 
 use strict;
@@ -807,7 +807,7 @@ main
     my $err;
     my @flist;
 
-    &mezz_init("srctool", "3.0", "help|h", "version|v", "debug|d",
+    &mezz_init("srctool", "3.0", "help|h", "version|v", "debug|d!",
                "import|i", "prepare|p", "merge|m", "resync|r",
                "patch|apply|a", "move|mv", "name|n=s", "clean|c",
                "repository|dir|D=s", "local|L", "flat|pdr|f",
@@ -815,7 +815,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.49 $ created on $Date: 2004/07/26 19:34:40 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.50 $ created on $Date: 2004/07/28 21:40:21 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();
@@ -826,7 +826,11 @@ main
         $OPTION{"savecfg"} = 1;
     }
 
-    &debug_set($config->set("DEBUG", $OPTION{"debug"} || $config->get("DEBUG") || 0));
+    if (defined($OPTION{"debug"}) && !($OPTION{"debug"})) {
+        &debug_set($config->set("DEBUG", 0));
+    } else {
+        &debug_set($config->set("DEBUG", $OPTION{"debug"} || $config->get("DEBUG") || 0));
+    }
     &pkgvar_name($OPTION{"name"});
     if (scalar(@ARGV)) {
         @flist = @ARGV;

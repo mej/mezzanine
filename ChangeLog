@@ -562,3 +562,22 @@ Mon Jul 26 15:33:03 2004                        Michael Jennings (mej)
 
 Maybe if I *don't* say it's fixed this time, it'll actually work.
 ----------------------------------------------------------------------
+Wed Jul 28 17:33:28 2004                        Michael Jennings (mej)
+
+Changed "hint installer" to "dep installer" since that's more
+accurate.  You'll have to change your configs or run --savecfg,
+though, sorry.
+
+Added some debugging to try and figure out why some packages keep
+building unnecessarily.
+
+Added ability to specify --nodebug.
+
+Removed -march=pentium from default CFLAGS value (closes bug#645).
+
+Fixed error where buildtool required a hints path to use the dep
+installer properly.
+
+Added timeout for subcommands so that hung processes don't plug up the
+pipes for too long.  Also allow passing of arrayref for params.
+----------------------------------------------------------------------

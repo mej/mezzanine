@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.192 2004/07/22 02:12:59 mej Exp $
+# $Id: buildtool,v 1.193 2004/07/28 21:40:21 mej Exp $
 #
 
 use strict;
@@ -63,7 +63,7 @@ my ($CFG_RPMCACHE_NAME, $CFG_RPMCACHE_PATH, $CFG_RPMCACHE_MTIME, $CFG_RPMCACHE_S
 # Configuration data.
 my $config;
 my @config_vars = ("DEBUG", "VERBOSITY", "TARGET", "BUILDTREE_LAYOUT",
-                   "CLEAN", "LOGFILE", "HINTS", "HINT_INSTALLER",
+                   "CLEAN", "LOGFILE", "HINTS", "DEP_INSTALLER",
                    "PARALLELIZE", "LOCATIONS", "BUILDUSER",
                    "INSTROOT", "INSTROOT_INIT", "INSTROOT_COPY",
                    "INSTROOT_RESET", "INSTROOT_SOURCE_RSYNC",
@@ -98,11 +98,11 @@ print_usage_info
     print "    -T --tag <tag>                   Specify a tag to use (overrides all product files)\n";
     print "    -L --location <location_spec>    Specify where packages should be placed (as in product file)\n";
     print "    -s --srcdir <dir>                (Re)build all packages under <dir>\n";
-    print "    -i --instroot --jail <dir>       Specify chroot jail to build in\n";
+    print "    -i --instroot --jail <dir>       Specify chroot jail to build in (or copy from, if parallel)\n";
     print "    -H --hints <file_or_dir>         Specify location of pre-build hints or hint files\n";
     print "    -u --user <userid>               Build packages as <userid> instead of current user\n";
     print "    -b --buildtree <style>           Use the specified layout for the build tree\n";
-    print "       --hi --hint-installer <prog>  Specify the mechanism used to install the hints\n";
+    print "       --di --dep-installer <prog>   Specify the mechanism used to install build dependencies\n";
     print "       --ii --instroot-init <cmd>    Command used to initialize chroot jail\n";
     print "       --ir --instroot-reset <cmd>   Command used to reset chroot jail\n";
     print "       --ic --instroot-copy <cmd>    Command used to copy chroot jail\n";
@@ -175,6 +175,7 @@ is_build_needed
     my @srpm_matches;
 
     if ($config->get("REBUILD")) {
+        dprint "Rebuild forced by configuration.\n";
         return 1;
     } else {
         foreach my $key ($config->keys()) {
@@ -202,7 +203,10 @@ is_build_needed
 
     # If there is no SRPMS directory, then there are surely no SRPMS to be checked.
     $srpm_dir = &pkgvar_topdir() . "/SRPMS";
-    return 1 if (! -d $srpm_dir);
+    if (! -d $srpm_dir) {
+        dprint "SRPM directory $srpm_dir does not exist.\n";
+        return 1;
+    }
 
     # For each SRPM that matches the package name, see if it's newer than the directory.
     # If so, we do not need to build that package.
@@ -219,12 +223,17 @@ is_build_needed
         @stat2 = stat($srpm);
         if ($stat2[9] >= $stat1[9]) {
             # SRPM is newer than (or the same age as) the file/module.  Skip it.
-            dprint "$srpm is newer than $pkgfile; no need to build.\n";
+            dprint "$srpm is newer than $pkgfile; no need to build $pkg.\n";
             &pkgvar_filename($srpm);
             return 0;
+        } else {
+            dprintf("$srpm is older than $pkgfile:  %s < %s.\n",
+                    POSIX::strftime("%Y-%m-%d %H:%M:%S", $stat2[9]),
+                    POSIX::strftime("%Y-%m-%d %H:%M:%S", $stat1[9]));
         }
     }
     # Doh, gotta build this one.
+    dprint "No matching SRPM's found which are newer than $pkgfile.  Must build $pkg.\n";
     return 1;
 }
 
@@ -989,20 +998,20 @@ main
     my ($srcdir, $ret);
     my @orig_argv = @ARGV;
 
-    &mezz_init("buildtool", "3.0", "help|h", "version|v", "debug|d",
+    &mezz_init("buildtool", "3.0", "help|h", "version|v", "debug|d!",
                "quiet|q", "silent|really-quiet|Q", "srcdir|s=s@",
                "prod|p|prodfile|product=s", "dir|D|tree=s", "log|l=s",
                "parallel|P:s", "target|t=s", "cflags|C=s", "tag|T=s",
                "nocache", "clean:s", "repuser|U=s", "location|L=s",
                "instroot|i|jail=s", "hints|H=s",
-               "hintinstaller|hint-installer|hi=s",
+               "depinstaller|dep-installer|hint-installer|hi|di=s",
                "instroot-init|ii=s", "instroot-reset|ir=s",
                "instroot-copy|ic=s", "user|u=s", "buildtree|b=s",
                "builddir=s", "retry", "rebuild", "savecfg!");
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.192 $ created on $Date: 2004/07/22 02:12:59 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.193 $ created on $Date: 2004/07/28 21:40:21 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
@@ -1015,7 +1024,11 @@ main
     }
 
     # Set basic options
-    &debug_set($config->set("DEBUG", $OPTION{"debug"} || $config->get("DEBUG") || 0));
+    if (defined($OPTION{"debug"}) && !($OPTION{"debug"})) {
+        &debug_set($config->set("DEBUG", 0));
+    } else {
+        &debug_set($config->set("DEBUG", $OPTION{"debug"} || $config->get("DEBUG") || 0));
+    }
     $verbosity = $config->get("VERBOSITY") || 2;
     if ($OPTION{"silent"}) {
         $verbosity = 0;
@@ -1077,13 +1090,15 @@ main
 
     # Handle hint file/directory specification
     $config->set("HINTS", $OPTION{"hints"} || $config->get("HINTS") || $ENV{"MEZZANINE_HINTS"} || "");
-    $config->set("HINT_INSTALLER", $OPTION{"hintinstaller"} || $config->get("HINT_INSTALLER") || "");
+    $config->set("DEP_INSTALLER", $OPTION{"depinstaller"} || $config->get("DEP_INSTALLER") || "false");
     if ($config->get("HINTS")) {
-        if ($config->get("HINT_INSTALLER")) {
-            &set_hints_info(sprintf("%s%%%s", $config->get("HINT_INSTALLER"), $config->get("HINTS")));
+        if ($config->get("DEP_INSTALLER")) {
+            &set_hints_info(sprintf("%s%%%s", $config->get("DEP_INSTALLER"), $config->get("HINTS")));
         } else {
             &set_hints_info($config->get("HINTS"));
         }
+    } elsif ($config->get("DEP_INSTALLER")) {
+        &set_hints_info($config->get("DEP_INSTALLER") . '%');
     }
 
     # Figure out parallelization stuff
@@ -1232,7 +1247,7 @@ main
     &pkgvar_buildroot($config->set("BUILDROOT", $config->get("BUILDROOT") || $ENV{"MEZZANINE_BUILDROOT"}));
 
     $ENV{"MAKE"} = $config->set("MAKE", $config->get("MAKE") || $ENV{"MEZZANINE_MAKE"} || "make");
-    $ENV{"CFLAGS"} = $config->set("CFLAGS", $OPTION{"cflags"} || $config->get("CFLAGS") || $ENV{"MEZZANINE_CFLAGS"} || "-O2 -march=pentium");
+    $ENV{"CFLAGS"} = $config->set("CFLAGS", $OPTION{"cflags"} || $config->get("CFLAGS") || $ENV{"MEZZANINE_CFLAGS"} || "-O2");
     $ENV{"PATH"} = $config->set("PATH", $config->get("PATH") || $ENV{"MEZZANINE_PATH"}
                                 || "/usr/build/bin:/usr/local/build/bin:/usr/lib/qt-1.45/bin:/usr/lib/qt-2.1.0/bin"
                                 . ":/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/X11R6/bin:/usr/kerberos/sbin"

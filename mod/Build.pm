@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.40 2004/06/04 17:16:40 mej Exp $
+# $Id: Build.pm,v 1.41 2004/07/28 21:40:21 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -117,26 +117,24 @@ count_cpus
     return ($cpus >= 1 ? $cpus : 1);
 }
 
-# Set up hint directory and installer.
+# Set up hint directory and builddep installer.
 sub
 set_hints_info($)
 {
-    my $hint = $_[0];
-    my $installer;
+    my ($hint, $installer) = @_;
 
-    if ($hint) {
-        if (index($hint, '%') >= 0) {
-            ($installer, $hint) = split('%', $hint);
-            if (! $hint) {
-                $hint = &pkgvar_get("hints");
-            }
-        } else {
-            $installer = &pkgvar_get("hint_installer");
-        }
-        &pkgvar_set("hints", $hint);
-        &pkgvar_set("hint_installer", $installer);
+    if ($hint && index($hint, '%') >= 0) {
+        ($installer, $hint) = split('%', $hint);
     }
-    return (&pkgvar_get("hints"), &pkgvar_get("hint_installer"));
+    if (! $hint) {
+        $hint = &pkgvar_get("hints");
+    }
+    if (! $installer) {
+        $installer = &pkgvar_get("dep_installer");
+    }
+    &pkgvar_set("hints", $hint);
+    &pkgvar_set("dep_installer", $installer);
+    return (&pkgvar_get("hints"), &pkgvar_get("dep_installer"));
 }
 
 # Set up instroot info
@@ -314,7 +312,7 @@ install_deps($)
     } else {
         $inst = "";
     }
-    $inst .= &pkgvar_get("hint_installer");
+    $inst .= &pkgvar_get("dep_installer");
     @tmp = &run_cmd($inst, $deps, "pkg-installer:  ");
     if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
         return "Unable to install $deps ($err)";

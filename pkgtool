@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.64 2004/06/04 17:16:40 mej Exp $
+# $Id: pkgtool,v 1.65 2004/07/28 21:40:21 mej Exp $
 #
 
 use strict;
@@ -42,7 +42,7 @@ use Mezzanine::Build;
 # Configuration data.
 my $config;
 my @config_vars = ("DEBUG", "TARGET", "CLEAN", "LOGFILE", "HINTS",
-                   "HINT_INSTALLER", "LOCATIONS", "BUILDUSER",
+                   "DEP_INSTALLER", "LOCATIONS", "BUILDUSER",
                    "INSTROOT", "BUILDROOT", "TMPDIR", "MAKE",
                    "MFLAGS", "CFLAGS", "PATH");
 
@@ -79,7 +79,7 @@ print_usage_info
     print "    -r --root <dir>                  Specify the build/install root (depending on mode)\n";
     print "    -H --hints <file_or_dir>         Specify location of pre-build hints or hint files\n";
     print "    -u --user <userid>               Build as <userid> rather than the current user\n";
-    print "       --hi --hint-installer <prog>  Specify the mechanism used to install the hints\n";
+    print "       --di --dep-installer <prog>   Specify the mechanism used to install build dependencies\n";
     print "       --tar <tarcmd>                Use <tarcmd> as the \"tar\" command\n";
     print "       --zip <zipcmd>                Use <zipcmd> as the compression program\n";
     print "\n";
@@ -92,18 +92,19 @@ main
 {
     my ($err, $msg, $outfiles, $pkg_file, $mode, $query_type, $pkg_name);
 
-    &mezz_init("pkgtool", "2.2", "help|h", "version|v", "debug|d", "build|b",
-               "install|i", "contents|c", "query|q=s",
-               "sources|o:s", "package|p=s",
-               "specfile|s|scripts=s", "module|m=s", "target|t=s",
-               "arch|a=s", "program|P=s", "rcfile|R=s", "tar=s",
-               "zip=s", "destdir|D=s", "root|r=s", "hints|H=s",
-               "hintinstaller|hi|hint-installer=s", "user|u=s",
-               "savecfg|save-config");
+    &mezz_init("pkgtool", "2.2", "help|h", "version|v", "debug|d!",
+               "build|b", "install|i", "contents|c", "query|q=s",
+               "sources|o:s", "package|p=s", "specfile|s|scripts=s",
+               "module|m=s", "target|t=s", "arch|a=s", "program|P=s",
+               "rcfile|R=s", "tar=s", "zip=s", "destdir|D=s",
+               "root|r=s", "hints|H=s",
+               "depinstaller|dep-installer|hint-installer|hi|di=s",
+               "user|u=s", "savecfg|save-config");
+
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.64 $ created on $Date: 2004/06/04 17:16:40 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.65 $ created on $Date: 2004/07/28 21:40:21 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || (!scalar(@ARGV) && !scalar(%OPTION) && &basename($0) !~ /^mz/)) {
         &print_usage_info();
     }
@@ -112,7 +113,12 @@ main
         $OPTION{"savecfg"} = 1;
     }
 
-    &debug_set($config->set("DEBUG", $OPTION{"debug"} || $config->get("DEBUG") || 0));
+    if (defined($OPTION{"debug"}) && !($OPTION{"debug"})) {
+        &debug_set($config->set("DEBUG", 0));
+    } else {
+        &debug_set($config->set("DEBUG", $OPTION{"debug"} || $config->get("DEBUG") || 0));
+    }
+
     &pkgvar_srcs($OPTION{"sources"});
     $pkg_name = &pkgvar_filename($OPTION{"package"});
     &pkgvar_command($OPTION{"program"});
@@ -164,19 +170,19 @@ main
 
     # Handle hint file/directory specification
     $config->set("HINTS", $OPTION{"hints"} || $config->get("HINTS") || $ENV{"MEZZANINE_HINTS"} || "");
-    $config->set("HINT_INSTALLER", $OPTION{"hintinstaller"} || $config->get("HINT_INSTALLER") || "");
+    $config->set("DEP_INSTALLER", $OPTION{"depinstaller"} || $config->get("DEP_INSTALLER") || "false");
     if ($config->get("HINTS")) {
-        if ($config->get("HINT_INSTALLER")) {
-            &set_hints_info(sprintf("%s%%%s", $config->get("HINT_INSTALLER"), $config->get("HINTS")));
+        if ($config->get("DEP_INSTALLER")) {
+            &set_hints_info(sprintf("%s%%%s", $config->get("DEP_INSTALLER"), $config->get("HINTS")));
         } else {
             &set_hints_info($config->get("HINTS"));
         }
-    } elsif ($config->get("HINT_INSTALLER")) {
-        &set_hints_info($config->get("HINT_INSTALLER") . '%');
+    } elsif ($config->get("DEP_INSTALLER")) {
+        &set_hints_info($config->get("DEP_INSTALLER") . '%');
     }
 
     $ENV{"MAKE"} = $config->set("MAKE", $config->get("MAKE") || $ENV{"MEZZANINE_MAKE"} || "make");
-    $ENV{"CFLAGS"} = $config->set("CFLAGS", $OPTION{"cflags"} || $config->get("CFLAGS") || $ENV{"MEZZANINE_CFLAGS"} || "-O2 -march=pentium");
+    $ENV{"CFLAGS"} = $config->set("CFLAGS", $OPTION{"cflags"} || $config->get("CFLAGS") || $ENV{"MEZZANINE_CFLAGS"} || "-O2");
     $ENV{"PATH"} = $config->set("PATH", $config->get("PATH") || $ENV{"MEZZANINE_PATH"}
                                 || "/usr/build/bin:/usr/local/build/bin:/usr/lib/qt-1.45/bin:/usr/lib/qt-2.1.0/bin"
                                 . ":/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/X11R6/bin:/usr/kerberos/sbin"

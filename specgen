@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: specgen,v 1.5 2004/07/13 19:59:42 mej Exp $
+# $Id: specgen,v 1.6 2004/07/28 21:40:21 mej Exp $
 #
 
 use strict;
@@ -365,15 +365,19 @@ main
     my $errors = 0;
     my %package;
 
-    &mezz_init("specgen", "0.1", "help|h", "version|v", "debug|d", "template|t=s", "interactive|i");
+    &mezz_init("specgen", "0.1", "help|h", "version|v", "debug|d!", "template|t=s", "interactive|i");
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.5 $ created on $Date: 2004/07/13 19:59:42 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.6 $ created on $Date: 2004/07/28 21:40:21 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || !scalar(@ARGV)) {
 	&print_usage_info();
     }
-    &debug_set($OPTION{"debug"});
+    if (defined($OPTION{"debug"}) && !($OPTION{"debug"})) {
+        &debug_set(0);
+    } else {
+        &debug_set($OPTION{"debug"} || 0);
+    }
     $interactive = (($OPTION{"interactive"}) ? (1) : (0));
 
     foreach my $pkg (@ARGV) {

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.26 2004/06/04 17:16:40 mej Exp $
+# $Id: Prod.pm,v 1.27 2004/07/28 21:40:21 mej Exp $
 #
 
 package Mezzanine::Prod;
@@ -426,7 +426,7 @@ parse_product_entry
     $pkgs->{$name}{"FILENAME"} = ($filename ? $filename : $module);
     $pkgs->{$name}{"INSTROOT"} = &pkgvar_get("instroot");
     $pkgs->{$name}{"HINTS"} = &pkgvar_get("hints");
-    $pkgs->{$name}{"HINT_INSTALLER"} = &pkgvar_get("hint_installer");
+    $pkgs->{$name}{"DEP_INSTALLER"} = &pkgvar_get("dep_installer");
     dprint "New package:  $name (module $pkgs->{$name}{MODULE}, "
         . "filename $pkgs->{$name}{FILENAME}) is a(n) $pkgs->{$name}{TYPE}\n";
     foreach my $pkgvar (keys %pkgvars) {
