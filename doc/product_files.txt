@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: product_files.txt,v 1.2 2001/02/07 22:04:49 mej Exp $
+#  $Id: product_files.txt,v 1.3 2001/03/06 03:51:54 mej Exp $
 #
 ########################################################################
 
@@ -193,7 +193,7 @@ customization of packages and their attributes.  This section will
 outline each of the variables which are presently supported by Avalon
 along with their syntax, shortcuts, and proper usage.
 
-2.1.  Specifying build targets:  ARCH
+2.1.  Specifying Build Targets:  ARCH
 -------------------------------------
 
 The ARCH variable allows the passing of a comma-separated list of
@@ -202,7 +202,17 @@ built for each platform in the list.
 
 Example:  arch=i386,i586,i686
 
-2.2.  El Torito Boot Images:  BOOTIMG
+2.2.  Using Pre-Built Sources and Binaries:  BINS
+-------------------------------------------------
+
+If you want to supply source and binaries for a particular package
+which you don't want rebuilt, you can specify the binary package file
+names with the BINS variable.  This is a comma-seperated list of
+module/file names.
+
+Example:  bins=bin-rh/foo-1.0-1.i386.rpm,bin-rh/foo-server-1.0-1.i386.rpm
+
+2.3.  El Torito Boot Images:  BOOTIMG
 -------------------------------------
 
 The BOOTIMG variable specifies a relative path within an image module
@@ -212,7 +222,7 @@ disk image specified.
 
 Example:  bootimg=images/bootcd.img
 
-2.3.  Compilation Flags:  CFLAGS
+2.4.  Compilation Flags:  CFLAGS
 --------------------------------
 
 Some packages require compilation flags which differ from the norm,
@@ -223,7 +233,7 @@ between compiler options should be replaced with ampersands.
 
 Example:  cflags=-O2&-D_GNU_SOURCE
 
-2.4.  Repository Path:  CVSROOT
+2.5.  Repository Path:  CVSROOT
 -------------------------------
 
 Almost every product should provide a default repository path with an
@@ -232,7 +242,7 @@ is almost always done as a product-level variable.
 
 Example:  cvsroot:  :pserver:anonymous@cvs.engr.valinux.com:/cvs/valinux
 
-2.5.  Product Information:  DESCRIPTION
+2.6.  Product Information:  DESCRIPTION
 ---------------------------------------
 
 The DESCRIPTION variable serves as a brief product summary.  It also
@@ -244,7 +254,7 @@ Aliases:  DESC
 
 Example:  description:  RedHat Linux with VA Linux Enhancements
 
-2.6.  Making CD's from Images:  ISO
+2.7.  Making CD's from Images:  ISO
 -----------------------------------
 
 Image modules for which you want CD's created must specify the
@@ -252,7 +262,7 @@ filename for the ISO image to create using the ISO variable.
 
 Example:  iso=vana-2.0.iso
 
-2.7.  Labelling CD's:  LABEL
+2.8.  Labelling CD's:  LABEL
 ----------------------------
 
 The default label for CD images is the product name and version.  If
@@ -260,7 +270,7 @@ you wish to specify your own, use the LABEL variable.
 
 Example:  label=RH/VALE
 
-2.8.  Placing Packages into Image Trees:  LOCATIONS
+2.9.  Placing Packages into Image Trees:  LOCATIONS
 ---------------------------------------------------
 
 The LOCATIONS variable is probably the most complicated of all
@@ -298,7 +308,7 @@ Example:  locations:/src\.rpm$/:va-os-srpms/VALinux/SRPMS,
                     /\.rpm$/:va-os-rpms/VALinux/RPMS,
                     /\.rpm$/:va-os-rpms/RedHat/RPMS
 
-2.9.  Forcing RPM into Submission:  MACROS
+2.10.  Forcing RPM into Submission:  MACROS
 ------------------------------------------
 
 The MACROS variable is much like the CFLAGS variable, in that it is
@@ -312,7 +322,18 @@ Aliases:  MACRO
 
 Example:  macros=release_version:6.2,release_name:Piglet
 
-2.10.  The Round-About Way, Part 1:  MODULE
+2.11.  Building Oddball Packages:  MAKE
+--------------------------------------
+
+For packages which simply cannot conform to any standard build
+mechanism, maintainers may supply a ".avalon.makefile" which contains
+make instructions for creating source and binary package files.  The
+MAKE variable allows for customization of which make is used and how
+it is called.  As with CFLAGS, use ampersands for separators.
+
+Example:  make=gmake
+
+2.12.  The Round-About Way, Part 1:  MODULE
 -------------------------------------------
 
 Section 1.2 describes how to specify the module name for a component
@@ -323,7 +344,7 @@ discouraged.
 
 Example:  module=oldkernel
 
-2.11.  The Round-About Way, Part 2:  RELEASE
+2.13.  The Round-About Way, Part 2:  RELEASE
 --------------------------------------------
 
 As with the MODULE variable, the RELEASE variable can be used to force
@@ -334,7 +355,7 @@ Aliases:  REL
 
 Example:  release=4
 
-2.12.  Getting What You Want:  REVISION
+2.14.  Getting What You Want:  REVISION
 ---------------------------------------
 
 Often a particular tag or revision is required for a product, not just
@@ -348,7 +369,7 @@ Aliases:  REV, TAG
 
 Example:  revision=VA-REDHAT-6-2-3
 
-2.13.  Calling Syntax, Part 1:  RPMCMD
+2.15.  Calling Syntax, Part 1:  RPMCMD
 --------------------------------------
 
 The RPMCMD variable alters the command used when running "rpm" to
@@ -358,7 +379,7 @@ you don't grok the code that refers to it.
 
 Example:  rpmcmd=rpm4
 
-2.14.  Defining Source Files:  SRCS
+2.16.  Defining Source Files:  SRCS
 -----------------------------------
 
 Avalon has certain default rules when building a package from a full
@@ -386,7 +407,7 @@ Aliases:  SOURCE, SOURCES
 
 Example:  srcs=etc&usr&README:VAmoo_cow-1.0.0.tar.bz2,moo_cow.init&*.1
 
-2.15.  Build Stage Participation:  STAGES
+2.17.  Build Stage Participation:  STAGES
 -----------------------------------------
 
 The STAGES variable determines in which of the build stages a package
@@ -397,7 +418,7 @@ which represents one of the stages:  scebpia.
 
 Example:  stages=scpa
 
-2.16.  Generating Patches from Tags:  TAGFILE
+2.18.  Generating Patches from Tags:  TAGFILE
 ---------------------------------------------
 
 By default, Avalon looks at the spec file when obtaining a list of
@@ -407,7 +428,7 @@ have all tags present.
 
 Example:  tagfile=ChangeLog
 
-2.17.  Calling Syntax, Part 2:  TAR
+2.19.  Calling Syntax, Part 2:  TAR
 -----------------------------------
 
 The TAR variable alters the command used for creating tarballs.
@@ -419,7 +440,7 @@ use it at all unless you really need to.
 
 Example:  tar:  gtar -zcvf %t %f
 
-2.18.  The Round-About Way, Part 3:  VERSION
+2.20.  The Round-About Way, Part 3:  VERSION
 --------------------------------------------
 
 The VERSION variable specifies the version of a package or product.
@@ -430,7 +451,7 @@ Aliases:  VER
 
 Example:  version=1.0.1
 
-2.19.  Calling Syntax, Part 3:  ZIP
+2.21.  Calling Syntax, Part 3:  ZIP
 -----------------------------------
 
 The ZIP variable specifies the compression program to use.  It must

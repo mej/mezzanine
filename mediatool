@@ -1,0 +1,330 @@
+#!/usr/bin/perl -w
+#
+# mediatool -- Tool for generating disk images, CD's, etc.
+# 
+# Copyright (C) 2001, Michael Jennings
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies of the Software, its documentation and marketing & publicity
+# materials, and acknowledgment shall be given in the documentation, materials
+# and software packages that this Software was used.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+# $Id: mediatool,v 1.1 2001/03/06 03:51:54 mej Exp $
+#
+
+# Include the Perl Modules we need
+require POSIX;
+require Getopt::Long;
+
+# Constants
+#
+# Return codes for pkgtool
+sub PKGTOOL_SUCCESS()           {0;}
+sub PKGTOOL_FATAL_ERROR()       {1;}
+sub PKGTOOL_SYNTAX_ERROR()      {2;}
+sub PKGTOOL_COMMAND_FAILED()    {3;}
+
+sub PKGTOOL_MISSING_FILES()     {10;}
+sub PKGTOOL_SPEC_ERRORS()       {11;}
+sub PKGTOOL_DEPENDENCIES()      {12;}
+sub PKGTOOL_ARCH_MISMATCH()     {13;}
+sub PKGTOOL_BUILD_FAILURE()     {14;}
+sub PKGTOOL_BAD_MODULE()        {15;}
+
+sub PKGTOOL_TERMINATED()        {50;}
+sub PKGTOOL_CRASHED()           {60;}
+sub PKGTOOL_UNSPECIFIED_ERROR   {127;}
+
+# Return codes for mediatool
+sub MEDIATOOL_SUCCESS()         {0;}
+sub MEDIATOOL_FATAL_ERROR()     {1;}
+sub MEDIATOOL_SYNTAX_ERROR()    {2;}
+sub MEDIATOOL_COMMAND_FAILED()  {3;}
+                                
+sub MEDIATOOL_TERMINATED()      {50;}
+sub MEDIATOOL_CRASHED()         {60;}
+sub MEDIATOOL_UNSPECIFIED_ERROR {127;}
+
+# Print usage information
+sub
+print_usage_info
+{
+    print "\n";
+    $leader = "$progname $version Usage Information";
+    $underbar = $leader;
+    $underbar =~ s/./-/g;
+    print "$leader\n$underbar\n";
+    print "\n";
+    print "  Syntax:   mediatool [ options ]\n";
+    print "\n";
+    print "    -h --help                        Show this usage information\n";
+    print "    -d --debug                       Turn on debugging\n";
+    print "    -v --version                     Show version and copyright\n";
+    print "    -i --iso <filename>              Create an ISO file by this name\n";
+    print "    -D --dir --directory <dir>       Specify the source directory\n";
+    print "    -t --tar --tarball <tarball>     Create a tarball by this name\n";
+    print "    -x --exclude --ignore <file>     Exclude a file/wildcard\n";
+    print "    -c --cmd --command <command>     Specify an alternative command\n";
+    print "       --boot <image>                Specify a boot image (for an ISO)\n";
+    print "\n";
+    exit(MEDIATOOL_SUCCESS);
+}
+
+# Generate timestamp for debugging/log file
+sub
+get_timestamp
+{
+    return POSIX::strftime("%A, %d %B %Y %H:%M:%S %Z", localtime);
+}
+
+# Report a fatal error
+sub
+fatal_error
+{
+    my $msg = "$progname:  FATAL:  $_[0]";
+
+    print STDERR $msg;
+    exit(MEDIATOOL_FATAL_ERROR);
+}
+
+# Debugging output
+sub
+dprintf
+{
+    return if (! $debug);
+    print "[debug:$progname] ";
+    printf @_;
+}
+sub
+dprint
+{
+    my @dbg;
+    my ($f, $l, $s);
+
+    return if (! $debug);
+    @dbg = caller(1);
+    ($f, $l, $s) = @dbg[1, 2, 3];
+    $f =~ s/^.*\/([^\/]+)$/$1/;
+    print "[$f/$l/$s()] ", @_;
+}
+
+# Print an error
+sub
+eprintf
+{
+    print "$progname:  Error:  ";
+    printf @_;
+}
+sub
+eprint
+{
+    print "$progname:  Error:  ", @_;
+}
+
+# Handle a terminate signal
+sub
+handle_signal
+{
+    my $sig = $_[0];
+
+    eprint "Someone sent me a SIG$sig asking me to exit, so I shall.\n";
+    close($GLOBAL_LOG) if ($GLOBAL_LOG);
+    exit MEDIATOOL_TERMINATED;
+}
+
+# Handle a fatal signal
+sub
+handle_fatal_signal
+{
+    my $sig = $_[0];
+
+    eprint "Caught fatal signal SIG$sig.  Cleaning up and aborting...\n";
+    close($GLOBAL_LOG) if ($GLOBAL_LOG);
+    exit MEDIATOOL_CRASHED;
+}
+
+# Handle a perl warning
+sub
+handle_warning
+{
+    dprint @_;
+}
+
+# Make a directory hierarchy
+sub
+mkdirhier
+{
+    my $dir = $_[0];
+    my @dirs = split("/", $dir);
+    my $path = "";
+
+    dprint "mkdirhier($dir) called.\n";
+    foreach $dir (@dirs) {
+        $path .= "$dir/";
+        if (! -d $path) {
+            dprint "mkdirhier() creating \"$path\"\n";
+            mkdir($path, 0755) || eprint("Unable to create $path -- $!\n");
+        }
+    }
+    dprint "Something went wrong in mkdirhier()!\n" if (! -d $_[0]);
+}
+
+# Emulate rm -rf
+sub
+nuke_tree
+{
+    my $path = $_[0];
+    my @files;
+    local *DIR;
+
+    if ((-d $path) && !(-l $path)) {
+        opendir(DIR, $path) || return 0;
+        @files = readdir(DIR);
+        closedir(DIR);
+        foreach $f (@files) {
+            if ($f ne "." && $f ne "..") {
+                &nuke_tree("$path/$f");
+            }
+        }
+        dprint "Removing directory $path\n";
+        rmdir $path || return 0;
+    } else {
+        dprint "Unlinking $path\n";
+        unlink($path) || return 0;
+    }
+    return 1;
+}
+
+# Create a tarball from a directory
+sub
+create_tarball
+{
+    my ($tarball, $imagedir) = @_;
+    my ($line, $cmd, $prog, $cwd);
+    local *CMD;
+
+    chomp($cwd = `pwd`);
+    chdir($imagedir);
+    if ($tarball =~ /\.(tar\.|t)(gz|Z)$/) {
+        $cmd = "tar --numeric-owner --use-compress-program=gzip -Pcf $tarball .";
+    } elsif ($tarball =~ /\.(tar\.|t)\.bz2?$/) {
+        $cmd = "tar --numeric-owner --use-compress-program=bzip2 -Pcf $tarball .";
+    }
+
+    open(CMD, "$cmd 2>&1 |") || &fatal_error("Unable to execute \"$cmd\" -- $!\n");
+    print "Creating tarball $tarball from $imagedir....\n";
+    dprint "$cmd\n";
+    while (<CMD>) {
+        chomp($line = $_);
+        if ($line =~ /^tar:/) {
+            eprint "$line\n";
+        }
+    }
+    close(CMD);
+    chdir($cwd);
+    if ($?) {
+        &fatal_error("Creation of archive file failed.\n");
+    }
+}
+
+# Create an ISO file from a directory
+sub
+create_iso
+{
+    my ($iso, $imagedir) = @_;
+    my ($cmd, $ignore, $bootimg, $line, $err);
+    local *MKHYBRID;
+
+    $bootimg = ($opt_boot ? "-b $opt_boot -c boot.cat" : "");
+    $ignore = "-m CVS -m RCS -m BitKeeper -m SCCS -m .cvsignore -m '.avalon.*'";
+    $cmd = "mkhybrid -o $iso -a $ignore $bootimg -T -r -J -v $imagedir";
+    dprint "About to run \"$cmd\"\n";
+    if (!open(MKHYBRID, "$cmd </dev/null 2>&1 |")) {
+        &fatal_error("Execution of \"$cmd\" failed -- $!");
+    }
+    $err = 0;
+    while (<MKHYBRID>) {
+        chomp($line = $_);
+        dprint "$line\n";
+    }
+    close(MKHYBRID);
+    dprint "\"$cmd\" returned $?\n";
+    if ($? != 0 && $err == 0) {
+        &fatal_error("mkhybrid failed");
+    }
+}
+
+# main() here is basically the same as main() in C
+sub
+main
+{
+    # Set up the basic variables
+    $progname = "mediatool";
+    $version = "1.0";
+
+    # See the Getopt::Long man page for details on the syntax of this line
+    @valid_opts = ("h|help", "v|version", "d|debug", "i|iso=s@", "t|tar|tarball=s@",
+                   "x|exclude|ignore=s@", "boot=s", "c|cmd|command=s", "D|dir|directory=s@");
+    Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
+    Getopt::Long::GetOptions(@valid_opts);
+
+    # Post-parse the options stuff
+    select STDOUT; $| = 1;
+    if ($opt_v) {
+        # Do not edit this variable.  It is updated automatically by CVS when you commit
+        my $rcs_info = 'CVS Revision $Revision: 1.1 $ created on $Date: 2001/03/06 03:51:54 $ by $Author: mej $ ';
+
+        $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
+        $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
+        $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
+        print "\n";
+	print "$progname $version by Michael Jennings <mej\@eterm.org>\n";
+        print "Copyright (c) 2001, Michael Jennings and VA Linux Systems, Inc.\n";
+        print "  ($rcs_info)\n";
+        print "\n";
+	return MEDIATOOL_SUCCESS;
+    } elsif ($opt_h) {
+	&print_usage_info();   # Never returns
+        # This is a really silly way to shut up the "used only once" warnings.
+        $opt_h = $opt_v = 0;
+    }
+
+    $debug = ($opt_d ? $opt_d : 0);
+    
+    if (scalar(@opt_i) + scalar(@opt_t) != scalar(@opt_D)) {
+        &fatal_error("Each media name must have exactly one source directory.\n");
+    }
+
+    # Signal handling
+    $SIG{HUP} = 'IGNORE';
+    $SIG{INT} = \&handle_signal;
+    $SIG{TERM} = \&handle_signal;
+    $SIG{QUIT} = \&handle_fatal_signal;
+    $SIG{ILL} = \&handle_fatal_signal;
+    $SIG{ABRT} = \&handle_fatal_signal;
+    $SIG{FPE} = \&handle_fatal_signal;
+    $SIG{SEGV} = \&handle_fatal_signal;
+    $SIG{BUS} = \&handle_fatal_signal;
+    $SIG{TSTP} = \&handle_fatal_signal;
+    $SIG{TTIN} = \&handle_fatal_signal;
+    $SIG{TTOU} = \&handle_fatal_signal;
+    $SIG{__WARN__} = \&handle_warning;
+
+    return MEDIATOOL_SUCCESS;
+}
+
+exit &main();

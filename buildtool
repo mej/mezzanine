@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.119 2001/03/02 00:22:51 mej Exp $
+# $Id: buildtool,v 1.120 2001/03/06 03:51:54 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -116,9 +116,10 @@ print_usage_info
     print "       --tree <repository>           Specify the repository to use (overrides all product files)\n";
     print "       --tag <tag>                   Specify a tag to use (overrides all product files)\n";
     print "       --nocache                     Do not scan the cache (use with care)\n";
+    print "       --clean                       Clean up RPM and buildroot directories when done\n";
     print "\n";
     print "The stages and their abbreviations (for use with the -b option) are:\n";
-    print "  bootstrap (s), compose (c), explode (e), build (b), package accumulation (p), ISO image (i), cleanup (a)\n\n";
+    print "  bootstrap (s), component (c), build (b), package accumulation (p)\n\n";
     print "The default is \"-bp\" if you do not specify otherwise.\n\n";
     exit(BUILDTOOL_SUCCESS);
 }
@@ -272,6 +273,21 @@ count_cpus
     return ($cpus >= 1 ? $cpus : 1);
 }
 
+# Grep a directory for files matching a particular expression
+sub grepdir(&$);
+sub
+grepdir(&$)
+{
+    my ($func, $dir) = @_;
+    my @files;
+    local *DIR;
+
+    opendir(DIR, $dir) || return 0;
+    @files = grep(&$func($_), readdir(DIR));
+    closedir(DIR);
+    return @files;
+}
+
 # Make a directory hierarchy
 sub
 mkdirhier
@@ -377,17 +393,17 @@ get_package_stages
     my $type = $_[0];
 
     if ($type eq "srpm") {
-        return "sebpa";
+        return "scbp";
     } elsif ($type eq "tar") {
-        return "sbpa";
+        return "sbp";
     } elsif ($type eq "rpm") {
-        return "sbpa";
+        return "sbp";
     } elsif ($type eq "module") {
-        return "scpa";
+        return "scp";
     } elsif ($type eq "image") {
-        return "sia";
+        return "s";
     } else {
-        return "scebpia";
+        return "scbp";
     }
 }
 
@@ -502,7 +518,7 @@ initial_setup
     chdir("$builddir");
 
     # Pre-scan all the binary RPM's for future use in possibly parallel processes.
-    if ((! $opt_nocache) && ("scexbp" =~ /$start_stage/) && ("pia" =~ /$end_stage/)) {
+    if (! $opt_nocache) {
         nprint "Updating state information....\n";
         dprint "Scanning binary RPM's in $builddir/RPMS for their corresponding SRPM's.\n";
         @contents = glob("$builddir/RPMS/*/*.rpm");
@@ -522,13 +538,8 @@ nuke_tree
     local *DIR;
 
     if ((-d $path) && !(-l $path)) {
-        opendir(DIR, $path) || return 0;
-        @files = readdir(DIR);
-        closedir(DIR);
-        foreach $f (@files) {
-            if ($f ne "." && $f ne "..") {
-                &nuke_tree("$path/$f");
-            }
+        foreach $f (&grepdir(sub {$_ !~ /^\.\.?$/}, $path)) {
+            &nuke_tree("$path/$f");
         }
         dprint "Removing directory $path\n";
         rmdir $path || return 0;
@@ -594,10 +605,7 @@ find_product_file
 
     # Well, rats.  We've eliminated the simple cases.  Time to get creative.
     # Find all the product files and search for one that matches
-    opendir(DIR, "$proddir");
-    @contents = sort(grep($_ =~ /\.prod$/, readdir(DIR)));
-    closedir(DIR);
-    foreach $prodfile (@contents) {
+    foreach $prodfile (sort(&grepdir(sub {/\.prod$/}, $proddir))) {
         my (@lines, @names, @versions);
 
         dprint "find_product_file():  Searching product file $prodfile for a match...\n";
@@ -689,11 +697,7 @@ parse_product_entry
             my @contents = ();
 
             # Check to see if there is a product file for it
-            if (opendir(DIR, "$proddir")) {
-                @contents = readdir(DIR);
-                closedir(DIR);
-            }
-            @contents = grep($_ =~ /^$name-?/ && $_ =~ /\.prod$/, @contents);
+            @contents = &grepdir(sub {/^$name-?.*\.prod$/}, $proddir);
             # Product files win over modules because they contain more detail
             # about the package and are more likely to succeed.
             if ($#contents >= 0) {
@@ -802,55 +806,54 @@ parse_product_entry
     if (grep($_ eq $name, @packages)) {
         if ($type eq "rpm" && ($pkgs->{$name}{TYPE} eq "srpm" || $pkgs->{$name}{TYPE} eq "tar")) {
             push(@{$pkgs->{$name}{BINS}}, $filename);
-            $pkgs->{$name}{STAGES} =~ s/e//;
+            $pkgs->{$name}{STAGES} =~ s/c//;
         } else {
             eprint "I already have $name as a $pkgs->{$name}{TYPE} package in $pkgs->{$name}{PRODUCT}.\n";
             eprint "I will ignore the duplicate entry found in $prodname $prodver\n";
-            return 0;
         }
-    } else {
-        # Now that we've got the name/version/release in their final forms, set up the data structures.
-        $pkgs->{$name}{TYPE} = $type;
-        $pkgs->{$name}{MODULE} = $module;
-        $pkgs->{$name}{FILENAME} = ($filename ? $filename : $module);
-        dprint "parse_product_entry():  New package:  $name (module $pkgs->{$name}{MODULE}, "
-            . "filename $pkgs->{$name}{FILENAME}) is a $pkgs->{$name}{TYPE}\n";
-        foreach $pkgvar (keys %pkgvars) {
-            if ($pkgvars{$pkgvar} !~ /^$/) {
-                $pkgs->{$name}{$pkgvar} = $pkgvars{$pkgvar};
-                dprint "parse_product_entry():  Added variable $pkgvar to package $name with value \"$pkgs->{$name}{$pkgvar}\"\n";
-            }
+        return 0;
+    }
+    # Now that we've got the name/version/release in their final forms, set up the data structures.
+    $pkgs->{$name}{TYPE} = $type;
+    $pkgs->{$name}{MODULE} = $module;
+    $pkgs->{$name}{FILENAME} = ($filename ? $filename : $module);
+    dprint "parse_product_entry():  New package:  $name (module $pkgs->{$name}{MODULE}, "
+        . "filename $pkgs->{$name}{FILENAME}) is a $pkgs->{$name}{TYPE}\n";
+    foreach $pkgvar (keys %pkgvars) {
+        if ($pkgvars{$pkgvar} !~ /^$/) {
+            $pkgs->{$name}{$pkgvar} = $pkgvars{$pkgvar};
+            dprint "parse_product_entry():  Added variable $pkgvar to package $name with value \"$pkgs->{$name}{$pkgvar}\"\n";
         }
-        # Go through each propogated variable.  If there is no assigned value for that
-        # variable for the current package, see if it has a value for the parent product
-        # of that package.  If not, try the parent product of that product, and continue
-        # going back through the product hierarchy until we find a value or run out.
-        #
-        # FIXME:  Perhaps these shouldn't be hard-coded.  Perhaps we should keep a list of
-        #         all package/product variables we've encountered thus far and iterate
-        #         through those only, since we're guaranteed no others will have a fallback.
-        foreach $pkgvar ("REVISION", "LOCATIONS", "RPMCMD", "TAR", "ZIP", "STAGES", "CVSROOT", "ARCH", "MACROS") {
-            if (! $pkgs->{$name}{$pkgvar}) {
-                my ($pkg, $val) = undef;
+    }
+    # Go through each propogated variable.  If there is no assigned value for that
+    # variable for the current package, see if it has a value for the parent product
+    # of that package.  If not, try the parent product of that product, and continue
+    # going back through the product hierarchy until we find a value or run out.
+    #
+    # FIXME:  Perhaps these shouldn't be hard-coded.  Perhaps we should keep a list of
+    #         all package/product variables we've encountered thus far and iterate
+    #         through those only, since we're guaranteed no others will have a fallback.
+    foreach $pkgvar ("REVISION", "LOCATIONS", "RPMCMD", "TAR", "ZIP", "STAGES", "CVSROOT", "ARCH", "MACROS") {
+        if (! $pkgs->{$name}{$pkgvar}) {
+            my ($pkg, $val) = undef;
 
-                dprint "parse_product_entry():  No value for the variable $pkgvar for $name.\n";
-                for ($pkg = $prod; $pkg; $pkg = $prods->{$pkg}{PRODUCT}) {
-                    dprint "parse_product_entry():  Checking $pkg for $pkgvar\n";
-                    if ($prods->{$pkg}{$pkgvar}) {
-                        $val = $prods->{$pkg}{$pkgvar};
-                        dprint "parse_product_entry():  Found fallback value $val in product $pkg\n";
-                        last;
-                    }
-                }
-                if ($val) {
-                    $pkgs->{$name}{$pkgvar} = $val;
+            dprint "parse_product_entry():  No value for the variable $pkgvar for $name.\n";
+            for ($pkg = $prod; $pkg; $pkg = $prods->{$pkg}{PRODUCT}) {
+                dprint "parse_product_entry():  Checking $pkg for $pkgvar\n";
+                if ($prods->{$pkg}{$pkgvar}) {
+                    $val = $prods->{$pkg}{$pkgvar};
+                    dprint "parse_product_entry():  Found fallback value $val in product $pkg\n";
+                    last;
                 }
             }
+            if ($val) {
+                $pkgs->{$name}{$pkgvar} = $val;
+            }
         }
-        if (defined($pkgs->{$name}{REVISION}) && $pkgs->{$name}{REVISION} =~ /^head$/i) {
-            # This goes here to avoid the fallback mechanism above.
-            undef $pkgs->{$name}{REVISION};
-        }
+    }
+    if (defined($pkgs->{$name}{REVISION}) && $pkgs->{$name}{REVISION} =~ /^head$/i) {
+        # This goes here to avoid the fallback mechanism above.
+        undef $pkgs->{$name}{REVISION};
     }
     if (!defined $pkgs->{$name}{STAGES}) {
         $pkgs->{$name}{STAGES} = &get_package_stages($type);
@@ -1240,121 +1243,13 @@ do_bootstrap_stage
 }
 
 sub
-do_compose_stage
+do_component_stage
 {
-    my ($specfile, $target, $pn, $dir, $line, $src, $tarball, $cwd);
+    my ($specfile, $target, $pn, $dir, $line, $src, $tarball, $rpm);
     my ($err, $msg, $srpm) = (0, 0, 0);
-    my (@contents, @tmp, @dirs, @sfiles, @srcs);
+    my (@contents, @tmp, @dirs, @sfiles, @srcs, @manifest);
     my @p;
     local *DIR;
-
-    if ($#_ >= 0) {
-        @p = @_;
-    } else {
-        @p = @packages;
-    }
-
-    qprint "$progname:  Entering the compose stage.  (${\(&get_timestamp())})\n";
-    chomp($cwd = `pwd`);
-
-    foreach $pkg (@p) {
-        if ($pkgs->{$pkg}{STAGES} !~ /c/) {
-            nprint "$progname:  Skipping compose stage for the \"$pkg\" package.\n";
-            next;
-        }
-        nprint "$progname:  Starting compose stage for the \"$pkg\" package....  (${\(&get_timestamp())})\n";
-
-        # The first step is to examine the module directory to find
-        # the names of the vendor source files/directories and the spec file.
-        if (! chdir("$cwd/$pkgs->{$pkg}{MODULE}")) {
-            &fail_package($pkg, "compose", "Could not chdir into $cwd/$pkgs->{$pkg}{MODULE} -- $!");
-            next;
-        }
-        opendir(DIR, "$builddir/SRPMS");
-        @contents = readdir(DIR);
-        closedir(DIR);
-        @tmp = grep($_ =~ /^$pkg-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/, @contents);
-        if ($#tmp >= 0) {
-            $srpm = $tmp[0];
-            if ($#tmp > 0) {
-                nprint "$progname:  Warning:  Multiple target SRPM's found in $pkgs->{$pkg}{MODULE}.\n";
-                nprint "$progname:  Assuming that $srpm is the correct one.\n";
-            }
-        } else {
-            $srpm = 0;
-        }
-        if ($srpm) {
-            # The target SRPM already exists.  Skip this stage.
-            nprint "$progname:  The target SRPM for \"$pkg\" already exists in $cwd/$pkgs->{$pkg}{MODULE}.\n";
-            nprint "$progname:  I'll assume it's the right one.  Compose stage for \"$pkg\" is complete.\n";
-            # (?:) means "don't include this as a $<num> variable"
-            $srpm =~ m/^(\S+)-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/;
-            ($pkgs->{$pkg}{VERSION}, $pkgs->{$pkg}{RELEASE}) = ($2, $3);
-            $pkgs->{$pkg}{FILENAME} = "$builddir/SRPMS/$srpm";
-            next;
-        }
-
-        opendir(DIR, ".");
-        @contents = readdir(DIR);
-        closedir(DIR);
-        if ($pkgs->{$pkg}{SPECFILE} && -f $pkgs->{$pkg}{SPECFILE}) {
-            # If they gave us the spec file and it exists, use that.
-            $specfile = $pkgs->{$pkg}{SPECFILE};
-            dprint "User specified a spec file:  $specfile\n";
-        } else {
-            # First choice:  Exactly one file named <pkg>-<distro>.spec
-            ($pn = $prodname) =~ s/^va-//;
-            @tmp = grep($_ =~ /^($pkg-)?(va-)?$pn\.spec/, @contents);
-            if ($#tmp != 0) {
-                # Second choice:  Exactly one file named <pkg>.spec
-                @tmp = grep($_ =~ /^$pkg\.spec/, @contents);
-                if ($#tmp != 0) {
-                    # Third choice:  The first match to *.spec*
-                    @tmp = grep($_ =~ /\.spec/, @contents);
-                }
-            }
-            $specfile = $tmp[0];
-            if (!defined $specfile || $specfile =~ /^$/) {
-                # Our attempt to guess failed.  They need to specify the spec file in the .prod file.
-                &fail_package($pkg, "compose", "No spec file could be located in $pkgs->{$pkg}{MODULE}");
-                next;
-            }
-        }
-
-        ($err, $msg) = &gen_sources($pkg, $specfile);
-        if ($err) {
-            &fail_package($pkg, "compose", "Creation of vendor sources failed -- $msg");
-            next;
-        }
-
-        # Now build the new SRPM from the new vendor source tarball and the spec file.
-        ($err, $msg, $srpm) = &build_pkgs($pkg, $specfile);
-        dprint "do_compose_stage():  build_pkgs($pkg, $specfile) returned $err, $msg, $srpm\n";
-        if ($err) {
-            &fail_package($pkg, "compose", $msg);
-            next;
-        }
-        dprint "Module apparently just built its SRPM as $srpm\n";
-
-        # Update the values for FILENAME, VERSION, and RELEASE
-        $pkgs->{$pkg}{FILENAME} = $srpm;
-        $srpm =~ s/^(\S+)\/([^\/]+src\.rpm)$/$2/;
-        $srpm =~ m/^(\S+)-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/;
-        ($pkgs->{$pkg}{VERSION}, $pkgs->{$pkg}{RELEASE}) = ($2, $3);
-        dprint "Filename is $pkgs->{$pkg}{FILENAME}, version is $pkgs->{$pkg}{VERSION}, release is $pkgs->{$pkg}{RELEASE}\n";
-
-        nprint "$progname:  Compose stage for \"$pkg\" is complete.  (${\(&get_timestamp())})\n";
-    }
-    chdir($cwd);
-    qprint "$progname:  Compose stage is now complete.  (${\(&get_timestamp())})\n";
-}
-
-sub
-do_explode_stage
-{
-    my ($cmd, $err, $msg, $line, $specfile, $rpm) = undef;
-    my @manifest;
-    my @p;
     local *PKGTOOL;
 
     if ($#_ >= 0) {
@@ -1363,112 +1258,187 @@ do_explode_stage
         @p = @packages;
     }
 
-    qprint "$progname:  Entering the explode stage.  (${\(&get_timestamp())})\n";
+    qprint "$progname:  Entering the component stage.  (${\(&get_timestamp())})\n";
 
     foreach $pkg (@p) {
-        my $rpmrc = "$buildroot/$pkg-rpmrc";
-
-        undef @manifest;
-        if ($pkgs->{$pkg}{STAGES} !~ /e/ && $pkgs->{$pkg}{STAGES} !~ /x/) {
-            nprint "$progname:  Skipping explode stage for the \"$pkg\" package.\n";
+        if ($pkgs->{$pkg}{STAGES} !~ /c/) {
+            nprint "$progname:  Skipping component stage for the \"$pkg\" package.\n";
             next;
         }
-        nprint "$progname:  Starting explode stage for the \"$pkg\" package....\n";
-        $rpm = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
+        nprint "$progname:  Starting component stage for the \"$pkg\" package....  (${\(&get_timestamp())})\n";
 
-        # Examine the SRPM and figure out everything it contains.
-        $cmd = "$pkgtool -P \"$rpm\" -R $rpmrc -cp $pkgs->{$pkg}{FILENAME}";
-        dprint "About to run \"$cmd\"\n";
-        if (!open(PKGTOOL, "$cmd 2>&1 |")) {
-            &fail_package($pkg, "explode", "Execution of \"$cmd\" failed -- $!");
-            next;
-        }
-        if (defined $pkgs->{$pkg}{SPECFILE}) {
-            $specfile = $pkgs->{$pkg}{SPECFILE};
-        } else {
-            undef $specfile;
-        }
-        while (<PKGTOOL>) {
-            chomp($line = $_);
-            next if ($line =~ /^\[pkgtool\//);
-            dprint "RPM contents -> $line\n";
-            push @manifest, $line;  # Add the file to the manifest
-            if ($line =~ /\.spec(\.in)?$/) {
-                if (!defined $specfile) {
-                    $specfile = $line;
-                    dprint "Found spec file as $specfile\n";
-                } elsif ($specfile eq $line) {
-                    dprint "Found spec file $specfile as predicted.\n";
-                } else {
-                    qprint "$progname:  Warning:  $pkgs->{$pkg}{FILENAME} contains the spec file $line\n";
-                    qprint "$progname:  which is different from the one I was told to expect ($specfile).\n";
-                    qprint "$progname:  I will ignore the auto-detected one as requested, but this may be a problem.\n";
-                }
-            }
-        }
-        close(PKGTOOL);
-        dprint "\"$cmd\" returned $?\n";
-        if ($? != 0) {
-            # FIXME:  What to do here?
-        }
-        if (! $specfile) {
-            &fail_package($pkg, "explode", "Unable to locate spec file in SRPM");
-            next;
-        }
-        # We'll use these later, so they MUST be defined for
-        # any package we plan on actually building later.
-        $pkgs->{$pkg}{SPECFILE} = "$builddir/SPECS/$specfile";
-        $pkgs->{$pkg}{MANIFEST} = join(" ", @manifest);
-
-        # Check for each of those files.
-        $err = 0;
-        foreach $piece (@manifest) {
-            # FIXME:  Need to handle _topdir for people who did their own rpm* files.
-            if (($piece =~ /\.spec(\.in)?$/ && -f "$builddir/SPECS/$piece")
-                || (-f "$builddir/SOURCES/$piece")) {
+        ### Check to see if we really need to do this stage or not.
+        if ($pkgs->{$pkg}{TYPE} eq "module") {
+            ### If there's a makefile, skip this stage.
+            if (-s "$builddir/$pkgs->{$pkg}{MODULE}/.avalon.makefile") {
+                nprint "$progname:  Avalon makefile exists, skipping component stage.\n";
                 next;
             }
-            $err = 1;  # Something is missing.  We must explode this SRPM.
-            last;
-        }
-        # If everything is there, go on.
-        if (! $err) {
-            nprint "$progname:  SRPM has already been completely exploded.\n";
-            nprint "$progname:  Explode stage for \"$pkg\" is complete.\n";
-            next;
-        }
+            ### The first step is to examine the module directory to find
+            ### the names of the vendor source files/directories and the spec file.
+            if (! chdir("$builddir/$pkgs->{$pkg}{MODULE}")) {
+                &fail_package($pkg, "component", "Could not chdir into $builddir/$pkgs->{$pkg}{MODULE} -- $!");
+                next;
+            }
+            # Find matches to pkg-*-*.src.rpm in the SRPMS directory
+            @tmp = &grepdir(/^$pkg-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/, "$builddir/SRPMS");
+            if (scalar(@tmp) > 0) {
+                # Keep the first one
+                $srpm = $tmp[0];
+                # If there are more, ignore them, but warn the user
+                if ($#tmp > 0) {
+                    nprint "$progname:  Warning:  Multiple target SRPM's found in $pkgs->{$pkg}{MODULE}.\n";
+                    nprint "$progname:  Assuming that $srpm is the correct one.\n";
+                }
+                # The target SRPM already exists.  Skip this stage.
+                nprint "$progname:  The target SRPM for \"$pkg\" already exists in $builddir/$pkgs->{$pkg}{MODULE}.\n";
+                nprint "$progname:  I'll assume it's the right one.  Component stage for \"$pkg\" is complete.\n";
+                # (?:) means "don't include this as a $<num> variable"
+                $srpm =~ m/^(\S+)-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/;
+                ($pkgs->{$pkg}{VERSION}, $pkgs->{$pkg}{RELEASE}) = ($2, $3);
+                $pkgs->{$pkg}{FILENAME} = "$builddir/SRPMS/$srpm";
+                $pkgs->{$pkg}{STAGES} =~ s/b//;  # Don't do build stage either.
+                next;
+            }
 
-        # Explode the SRPM into its components
-        $cmd = "$pkgtool -P \"$rpm\" -R $rpmrc -ip $pkgs->{$pkg}{FILENAME}";
-        dprint "About to run \"$cmd\"\n";
-        if (!open(PKGTOOL, "$cmd 2>&1 |")) {
-            &fail_package($pkg, "explode", "Execution of \"$cmd\" failed -- $!");
-            next;
-        }
-        $err = 0;
-        while (<PKGTOOL>) {
-            chomp($line = $_);
-            next if ($line =~ /^\[pkgtool\//);
-            nprint "$line\n";
-            if ($line !~ /successfully installed\.?$/) {
-                # Any otheroutput from this command is an error.
-                $err = 1;
-                ($msg = $line) =~ s/^pkgtool:\s+Error:\s+//;;
+            ### The next step is to find the spec file.  If it's an oddball
+            ### case, they better have told us what it's actually called....
+            opendir(DIR, ".");
+            @contents = readdir(DIR);
+            closedir(DIR);
+            if ($pkgs->{$pkg}{SPECFILE} && -f $pkgs->{$pkg}{SPECFILE}) {
+                # If they gave us the spec file and it exists, use that.
+                $specfile = $pkgs->{$pkg}{SPECFILE};
+                dprint "User specified a spec file:  $specfile\n";
+            } else {
+                # First choice:  Exactly one file named <pkg>-<distro>.spec
+                ($pn = $prodname) =~ s/^va-//;
+                @tmp = grep($_ =~ /^($pkg-)?(va-)?$pn\.spec/, @contents);
+                if ($#tmp != 0) {
+                    # Second choice:  Exactly one file named <pkg>.spec
+                    @tmp = grep($_ =~ /^$pkg\.spec/, @contents);
+                    if ($#tmp != 0) {
+                        # Third choice:  The first match to *.spec*
+                        @tmp = grep($_ =~ /\.spec/, @contents);
+                    }
+                }
+                $pkgs->{$pkg}{SPECFILE} = $specfile = $tmp[0];
+                if (!defined $specfile || $specfile =~ /^$/) {
+                    # Our attempt to guess failed.  They need to specify the spec file in the .prod file.
+                    &fail_package($pkg, "component", "No spec file could be located in $pkgs->{$pkg}{MODULE}");
+                    next;
+                }
+            }
+
+            ### Next, generate the source files
+            ($err, $msg) = &gen_sources($pkg, $specfile);
+            if ($err) {
+                &fail_package($pkg, "component", "Creation of vendor sources failed -- $msg");
+                next;
+            }
+        } elsif ($pkgs->{$pkg}{TYPE} eq "srpm") {
+            my $rpmrc = "$buildroot/$pkg-rpmrc";
+
+            undef @manifest;
+            $rpm = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
+
+            ### Examine the SRPM and figure out everything it contains.
+            $cmd = "$pkgtool -P \"$rpm\" -R $rpmrc -cp $pkgs->{$pkg}{FILENAME}";
+            dprint "About to run \"$cmd\"\n";
+            if (!open(PKGTOOL, "$cmd 2>&1 |")) {
+                &fail_package($pkg, "component", "Execution of \"$cmd\" failed -- $!");
+                next;
+            }
+            if (defined $pkgs->{$pkg}{SPECFILE}) {
+                $specfile = $pkgs->{$pkg}{SPECFILE};
+            } else {
+                undef $specfile;
+            }
+            while (<PKGTOOL>) {
+                chomp($line = $_);
+                next if ($line =~ /^\[pkgtool\//);
+                dprint "RPM contents -> $line\n";
+                # Add the file to the manifest
+                push @manifest, $line;
+                if ($line =~ /\.spec(\.in)?$/) {
+                    if (!defined $specfile) {
+                        $specfile = $line;
+                        dprint "Found spec file as $specfile\n";
+                    } elsif ($specfile eq $line) {
+                        dprint "Found spec file $specfile as predicted.\n";
+                    } else {
+                        qprint "$progname:  Warning:  $pkgs->{$pkg}{FILENAME} contains the spec file $line\n";
+                        qprint "$progname:  which is different from the one I was told to expect ($specfile).\n";
+                        qprint "$progname:  I will ignore the auto-detected one as requested, but this may be a problem.\n";
+                    }
+                }
+            }
+            close(PKGTOOL);
+            dprint "\"$cmd\" returned $?\n";
+            if ($? != 0) {
+                # FIXME:  What to do here?
+            }
+            if (! $specfile) {
+                &fail_package($pkg, "component", "Unable to locate spec file in SRPM");
+                next;
+            }
+            # We'll use these later, so they MUST be defined for
+            # any package we plan on actually building later.
+            $pkgs->{$pkg}{SPECFILE} = "$builddir/SPECS/$specfile";
+            $pkgs->{$pkg}{MANIFEST} = join(" ", @manifest);
+
+            ### Check to make sure each file in the manifest is in the proper place.
+            $err = 0;
+            foreach $piece (@manifest) {
+                # FIXME:  Need to handle _topdir for people who did their own rpm* files.
+                if (($piece =~ /\.spec(\.in)?$/ && -f "$builddir/SPECS/$piece")
+                    || (-f "$builddir/SOURCES/$piece")) {
+                    next;
+                }
+                $err = 1;  # Something is missing.  We must explode this SRPM.
                 last;
             }
+            ### If everything is there, skip this stage for this package.
+            if (! $err) {
+                nprint "$progname:  SRPM has already been completely exploded.\n";
+                nprint "$progname:  Explode stage for \"$pkg\" is complete.\n";
+                next;
+            }
+
+            ### Explode the SRPM into its components
+            $cmd = "$pkgtool -P \"$rpm\" -R $rpmrc -ip $pkgs->{$pkg}{FILENAME}";
+            dprint "About to run \"$cmd\"\n";
+            if (!open(PKGTOOL, "$cmd 2>&1 |")) {
+                &fail_package($pkg, "component", "Execution of \"$cmd\" failed -- $!");
+                next;
+            }
+            $err = 0;
+            while (<PKGTOOL>) {
+                chomp($line = $_);
+                next if ($line =~ /^\[pkgtool\//);
+                nprint "$line\n";
+                if ($line !~ /successfully installed\.?$/) {
+                    # Any otheroutput from this command is an error.
+                    $err = 1;
+                    ($msg = $line) =~ s/^pkgtool:\s+Error:\s+//;;
+                    last;
+                }
+            }
+            close(PKGTOOL);
+            dprint "pkgtool returned $?\n";
+            if ($? != 0) {
+                # FIXME:  What to do here?
+            }
+            if ($err) {
+                &fail_package($pkg, "component", $msg);
+                next;
+            }
         }
-        close(PKGTOOL);
-        dprint "pkgtool returned $?\n";
-        if ($? != 0) {
-            # FIXME:  What to do here?
-        }
-        if ($err) {
-            &fail_package($pkg, "explode", $msg);
-            next;
-        }
-        nprint "$progname:  Explode stage for \"$pkg\" is complete.\n";
+
+        nprint "$progname:  Component stage for \"$pkg\" is complete.  (${\(&get_timestamp())})\n";
     }
-    qprint "$progname:  Explode stage is now complete.  (${\(&get_timestamp())})\n";
+    chdir($builddir);
+    qprint "$progname:  Component stage is now complete.  (${\(&get_timestamp())})\n";
 }
 
 sub
@@ -1535,6 +1505,27 @@ do_build_stage
                 ($pkgs->{$pkg}{VERSION}, $pkgs->{$pkg}{RELEASE}) = ($2, $3);
                 dprint "Filename is $pkgs->{$pkg}{FILENAME}, version is $pkgs->{$pkg}{VERSION}, release is $pkgs->{$pkg}{RELEASE}\n";
             }
+        } elsif ($pkgs->{$pkg}{TYPE} eq "module") {
+            ### If there's a makefile, skip this stage.
+            if (-s "$builddir/$pkgs->{$pkg}{MODULE}/.avalon.makefile") {
+                ($err, $msg, $srpm) = &special_build($pkg);
+                dprint "do_build_stage():  special_build($pkg) returned $err, $msg, $srpm\n";
+            } else {
+                # Build the module into an SRPM
+                $specfile = $pkgs->{$pkg}{SPECFILE};
+                ($err, $msg, $srpm) = &build_pkgs($pkg, $specfile);
+                dprint "do_build_stage():  build_pkgs($pkg, $specfile) returned $err, $msg, $srpm\n";
+            }
+            if ($err) {
+                &fail_package($pkg, "build", $msg);
+            }
+
+            # Update the values for FILENAME, VERSION, and RELEASE
+            $pkgs->{$pkg}{FILENAME} = $srpm;
+            $srpm =~ s/^(\S+)\/([^\/]+src\.rpm)$/$2/;
+            $srpm =~ m/^(\S+)-([^-]+)-([^-]+)\.(?:no)?src\.rpm$/;
+            ($pkgs->{$pkg}{VERSION}, $pkgs->{$pkg}{RELEASE}) = ($2, $3);
+            dprint "Filename is $pkgs->{$pkg}{FILENAME}, version is $pkgs->{$pkg}{VERSION}, release is $pkgs->{$pkg}{RELEASE}\n";
         } else {  # SRPM
             # Check for a target SRPM that is newer than the original SRPM and the
             # spec file.  If such an SRPM exists, skip the build stage for this package.
@@ -1603,15 +1594,10 @@ do_package_stage
             if ($type eq "srpm" || $type eq "module" || $type eq "tar") {
                 # Find all the RPM's installed by this package
                 dprint "Opening directory $builddir/SRPMS to scan for output files.\n";
-                opendir(DIR, "$builddir/SRPMS") || &fatal_error("Cannot open directory $builddir/SRPMS -- $!\n");
-                @contents = readdir(DIR);
-                foreach $rpm (@contents) {
-                    if ($rpm =~ /^\Q$pkg-\E\S*\Q$version-$release\E\.(?:no)?src\.rpm$/) {
-                        dprint "Got output file $rpm\n";
-                        push @outfiles, "$builddir/SRPMS/$rpm";
-                    }
+                foreach $rpm (&grepdir(sub {/^\Q$pkg-\E\S*\Q$version-$release\E\.(?:no)?src\.rpm$/}, "$builddir/SRPMS")) {
+                    dprint "Got output file $rpm\n";
+                    push @outfiles, "$builddir/SRPMS/$rpm";
                 }
-                closedir(DIR);
 
                 dprint "Opening directory $builddir/RPMS to scan for output files.\n";
                 @contents = glob("$builddir/RPMS/*/*.rpm");
@@ -1666,91 +1652,12 @@ do_package_stage
 }
 
 sub
-do_iso_stage
+cleanup
 {
-    my @p;
-    my ($cmd, $desc, $label, $iso, $bootimg, $ignore, $prod, $line, $err);
-    local *MKHYBRID;
-
-    if ($#_ >= 0) {
-        @p = @_;
-    } else {
-        @p = @packages;
-    }
-
-    qprint "$progname:  Entering the ISO image stage.  (${\(&get_timestamp())})\n";
-    foreach $pkg (@p) {
-        if ($pkgs->{$pkg}{STAGES} !~ /i/) {
-            nprint "$progname:  Skipping ISO image stage for the \"$pkg\" package.\n";
-            next;
-        }
-        nprint "$progname:  Starting ISO image stage for the \"$pkg\" package....\n";
-
-        $prod = $pkgs->{$pkg}{PRODUCT};
-        if ($pkgs->{$pkg}{DESCRIPTION}) {
-            $desc = $pkgs->{$pkg}{DESCRIPTION};
-        } else {
-            $desc = $prod;
-        }
-        if ($pkgs->{$pkg}{LABEL}) {
-            $label = $pkgs->{$pkg}{LABEL};
-        } else {
-            ($label = $prod) =~ s/-/_/g;
-        }
-        if ($pkgs->{$pkg}{ISO}) {
-            $iso = $pkgs->{$pkg}{ISO};
-        } else {
-            my $ver;
-
-            $ver = ($pkgs->{$pkg}{VERSION} ? "-$pkgs->{$pkg}{VERSION}" : "");
-            $iso = "$pkg$ver.iso";
-        }
-        $bootimg = ($pkgs->{$pkg}{BOOTIMG} ? "-b $pkgs->{$pkg}{BOOTIMG} -c boot.cat" : "");
-        $ignore = "-m CVS -m RCS -m BitKeeper -m SCCS -m .cvsignore -m '.buildtool.*'";
-        $cmd = "mkhybrid -o $iso -a -A \"$desc\" -V \"$label\" $ignore $bootimg -T -r -J -v $pkg";
-        dprint "About to run \"$cmd\"\n";
-        if (!open(MKHYBRID, "$cmd </dev/null 2>&1 |")) {
-            &fail_package($pkg, "iso", "Execution of \"$cmd\" failed -- $!");
-            next;
-        }
-        $err = 0;
-        while (<MKHYBRID>) {
-            chomp($line = $_);
-            nprint "$line\n";
-        }
-        close(MKHYBRID);
-        dprint "\"$cmd\" returned $?\n";
-        if ($? != 0 && $err == 0) {
-            &fail_package($pkg, "iso", "Unhandled error from mkhybrid");
-        }
-
-        nprint "$progname:  ISO image stage for \"$pkg\" is complete.\n";
-    }
-    qprint "$progname:  ISO image stage is now complete.  (${\(&get_timestamp())})\n";
-}
-
-sub
-do_cleanup_stage
-{
-    qprint "$progname:  Entering the cleanup stage.  (${\(&get_timestamp())})\n";
-    foreach $pkg (@packages) {
-        if ($pkgs->{$pkg}{STAGES} !~ /a/) {
-            nprint "$progname:  Skipping cleanup stage for the \"$pkg\" package.\n";
-            next;
-        }
-        nprint "$progname:  Starting cleanup stage for the \"$pkg\" package....\n";
-
-        # Cleanup time.  First the module directory if it still exists.
-        if (-d $pkgs->{$pkg}{MODULE}) {
-            &nuke_tree($pkgs->{$pkg}{MODULE}) || qprint "Warning:  Cleanup of $pkg failed -- $!\n";
-        }
-        nprint "$progname:  Cleanup stage for \"$pkg\" is complete.\n";
-    }
     foreach $f ("$builddir/BUILD", "$builddir/SOURCES", "$builddir/SPECS", $buildroot) {
+        nprint "$progname:  Cleaning up $f\n";
         &nuke_tree($f) || qprint "Warning:  Removal of $f failed -- $!\n";
     }
-
-    qprint "$progname:  Cleanup stage is now complete.  (${\(&get_timestamp())})\n";
 }
 
 # Once we're all done, summarize any failures at the very end
@@ -1782,6 +1689,55 @@ summarize_failures
             eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage.\n";
         }
     }
+}
+
+# Build a package that has its own buildtool makefile
+sub
+special_build
+{
+    my $pkg = $_[0];
+    my ($err, $msg, $srpm, $cmd, $make, $out_files);
+    local *MAKE;
+
+    if (! chdir("$builddir/$pkgs->{$pkg}{MODULE}")) {
+        return (BUILDTOOL_PACKAGE_FAILED, "Could not chdir into $builddir/$pkgs->{$pkg}{MODULE} -- $!", 0);
+    }
+
+    $make = ($pkgs->{$pkg}{MAKE} ? $pkgs->{$pkg}{MAKE} : "make");
+    $cmd = "$make BASE_DIR=$basedir BUILD_DIR=$builddir BUILD_ROOT=$buildroot RPMRC=$buildroot/$pkg-rpmrc";
+
+    dprint "About to run \"$cmd\"\n";
+    if (!open(MAKE, "$cmd </dev/null 2>&1 |")) {
+        return (1, "Execution of \"$cmd\" failed -- $!", undef);
+    }
+    $err = 0;
+    while (<MAKE>) {
+        chomp($line = $_);
+        nprint "$line\n";
+        if ($line =~ /^make[^:]*:\s+\*\*\*\s+(.*)$/ && ! $msg) {
+            $msg = $1;
+        } elsif ($line =~ /^Package files generated:\s+(.*)$/) {
+            $out_files = $1;
+        }
+    }
+    close(MAKE);
+    dprint "make returned $?\n";
+    if ($? != 0 && $err == 0) {
+        $err = $?;
+        $msg = "Unhandled make error" if (! $msg);
+    }
+
+    if ($out_files) {
+        $pkgs->{$pkg}{OUTFILES} = $out_files;
+        if ($out_files =~ /src\.rpm/) {
+            ($srpm = $out_files) =~ s/^(.*\s+)?(\S+src\.rpm)(\s+.*)?$/$2/;
+        }
+    } else {
+        $err = BUILDTOOL_PACKAGE_FAILED;
+        $msg = "No output files reported by make";
+    }
+    chdir($builddir);
+    return ($err, $msg, $srpm);
 }
 
 # This routine handles the role of "master buildtool"
@@ -1875,26 +1831,17 @@ build_process
     return if ($end_stage eq "s" || $#packages == -1);
 
     if ($master) {
-        &parallel_build() if ("scexbp" =~ /$start_stage/);
-        return if ($end_stage eq "p");
+        &parallel_build();
     } else {
-        &do_compose_stage() if ("sc" =~ /$start_stage/);
+        &do_component_stage() if ("sc" =~ /$start_stage/);
         return if ($end_stage eq "c");
 
-        &do_explode_stage() if ("scex" =~ /$start_stage/);
-        return if ($end_stage eq "e" || $end_stage eq "x");
-
-        &do_build_stage() if ("scexb" =~ /$start_stage/);
+        &do_build_stage() if ("scb" =~ /$start_stage/);
         return if ($end_stage eq "b");
 
-        &do_package_stage() if ("scexbp" =~ /$start_stage/);
-        return if ($end_stage eq "p");
+        &do_package_stage();
     }
-
-    &do_iso_stage() if ("scexbpi" =~ /$start_stage/);
-    return if ($end_stage eq "i");
-
-    &do_cleanup_stage();
+    &do_cleanup_stage() if ($opt_clean);
 }
 
 # main() here is basically the same as main() in C
@@ -1912,14 +1859,14 @@ main
     @valid_opts = ("h|help", "v|version", "d|debug", "b|build=s", "p|product|package=s",
                    "q|quiet", "Q|really-quiet|silent", "D|dir=s", "f|force", "l|log=s",
                    "P|parallel:s", "t|target=s", "C|cflags=s", "B|startbuild=s", "tree=s",
-                   "tag=s", "nocache");
+                   "tag=s", "nocache", "clean");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.119 $ created on $Date: 2001/03/02 00:22:51 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.120 $ created on $Date: 2001/03/06 03:51:54 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1956,17 +1903,16 @@ main
     $global_tree = ($opt_tree ? $opt_tree : undef);
     $global_tag = ($opt_tag ? $opt_tag : undef);
     $start_stage = ($opt_B ? $opt_B : "s");
-    if (index("Zscexbpia", $start_stage) == -1) {
+    if (index("Zscbp", $start_stage) == -1) {
         eprint "Bad start stage \"$start_stage\".  Assuming \"s\".\n";
         $start_stage = "s";
     }
     $end_stage = ($opt_b ? $opt_b : "p");
     if ($end_stage ne "Z") {
-        if (index("scexbpia", $end_stage) == -1) {
+        if (index("scbp", $end_stage) == -1) {
             eprint "Bad end stage \"$end_stage\".  Assuming \"p\".\n";
             $end_stage = "p";
-        } elsif (index("scexbpia", $start_stage) > index("scexbpia", $end_stage)) {
-            # FIXME:  This means people couldn't use, say, -Bx -be.  Oh well.
+        } elsif (index("scbp", $start_stage) > index("scbp", $end_stage)) {
             eprint "End stage \"$end_stage\" comes before start stage \"$start_stage\".\n";
             $start_stage = "s";
             $end_stage = "p";
