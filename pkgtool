@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.16 2000/07/14 18:32:49 mej Exp $
+# $Id: pkgtool,v 1.17 2000/07/14 18:43:41 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -964,7 +964,7 @@ rpm_generate_source_files
             next if ($#tmp < 0);
             dprint "\@tmp contains $#tmp + 1 elements:  ", join(" ", @tmp), "\n";
             $src_files = join(" ", @tmp);
-            if (&check_for_sources($src_files, $tarball, $destdir)) {
+            if (&check_for_source_files($src_files, $tarball, $destdir)) {
                 dprint "Not creating ", ($tarball ? $tarball : "\"$src_files\""), " -- Already exists.\n";
             } else {
                 $err = &create_source_file($src_files, $tarball, $destdir, $tar, $zip);
@@ -1004,7 +1004,7 @@ rpm_generate_source_files
                 &touch_file("$destdir$source");
                 next;
             }
-            if (&check_for_sources($source, 0, $destdir)) {
+            if (&check_for_source_files($source, 0, $destdir)) {
                 dprint "Not creating $source -- Already exists.\n";
                 next;
             }
@@ -1032,7 +1032,7 @@ rpm_generate_source_files
                 &touch_file("$destdir$patch{$num}");
                 next;
             }
-            if (&check_for_sources($patch, 0, $destdir)) {
+            if (&check_for_source_files($patch, 0, $destdir)) {
                 dprint "Not creating $patch -- Already exists.\n";
                 next;
             }
@@ -1047,7 +1047,7 @@ rpm_generate_source_files
         foreach $src (@srcs) {
             ($src_files, $tarball) = split(":", $src);
             $src_files =~ s/\&/ /g;
-            if (&check_for_sources($src_files, $tarball, $destdir)) {
+            if (&check_for_source_files($src_files, $tarball, $destdir)) {
                 dprint "Not creating ", ($tarball ? $tarball : "\"$src_files\""), " -- Already exists.\n";
             } else {
                 $err = &create_source_file($src_files, $tarball, $destdir, $tar, $zip);
@@ -1082,7 +1082,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.16 $ created on $Date: 2000/07/14 18:32:49 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.17 $ created on $Date: 2000/07/14 18:43:41 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
