@@ -990,3 +990,7 @@ Wed Jan 24 10:09:41 2001                        Michael Jennings (mej)
 The big stuff is done, just needs some fleshing out.  That can wait
 until we figure out what we want. :)
 ----------------------------------------------------------------------
+Wed Jan 24 16:18:05 2001                        Michael Jennings (mej)
+
+Support site version being different from official version.
+----------------------------------------------------------------------

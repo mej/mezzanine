@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 28 Sept 2000
 #
-# $Id: web-sync,v 1.6 2000/12/12 22:56:05 mej Exp $
+# $Id: web-sync,v 1.7 2001/01/25 00:18:23 mej Exp $
 #
 
 if [ ! -z "$SUDO_USER" ]; then
@@ -31,15 +31,20 @@ for i in $* ; do
       REMOTE_DIR=/md/6.2/home/mej/avalon/build
       LOCAL_DIR=/home/ftp/pub/VALinux
       for j in os powertools ; do
+        mkdir -p $LOCAL_DIR/$i/$j
         cd $LOCAL_DIR/$i/$j
         echo "*** Synchronizing $j ***"
+        mkdir -p $LOCAL_DIR/$i/$j/cd
         $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-$j-rpms/ $LOCAL_DIR/$i/$j/cd/
         echo "*** Copying ISO images ***"
-        $SCP_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-$j-'*'-$i.iso $LOCAL_DIR/$i/$j/iso/
+        mkdir -p $LOCAL_DIR/$i/$j/iso
+        $SCP_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-$j-'*'.iso $LOCAL_DIR/$i/$j/iso/
         echo "*** Creating RPMS directory ***"
+        mkdir -p $LOCAL_DIR/$i/$j/RPMS
         rm -f RPMS/*.rpm
         (cd cd ; find . \( -name '*.rpm' -a ! -name '*src.rpm' \) -exec cp -a {} ../RPMS/ \;)
         echo "*** Creating SRPMS directory ***"
+        mkdir -p $LOCAL_DIR/$i/$j/SRPMS
         if [ "$j" = "os" ]; then
             $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-$j-srpms/SRPMS/ $LOCAL_DIR/$i/$j/SRPMS/
         else
@@ -56,17 +61,23 @@ for i in $* ; do
       REMOTE_UHOST=mej@grendel
       REMOTE_DIR=/md/7.0/home/mej/avalon/build
       LOCAL_DIR=/home/ftp/pub/VALinux
+      mkdir -p $LOCAL_DIR/$i
       cd $LOCAL_DIR/$i
       echo "*** Synchronizing network install image ***"
+      mkdir -p $LOCAL_DIR/$i/os/image
       $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-7.0-net/ $LOCAL_DIR/$i/os/image/
       echo "*** Copying ISO images ***"
-      $SCP_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-os-$i'*'.iso $LOCAL_DIR/$i/os/iso/
+      mkdir -p $LOCAL_DIR/$i/os/iso
+      $SCP_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-os-'*'.iso $LOCAL_DIR/$i/os/iso/
       echo "*** Synchronizing extras ***"
+      mkdir -p $LOCAL_DIR/$i/extras/image
       $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-7.0-extras/ $LOCAL_DIR/$i/extras/image/
       echo "*** Copying ISO images ***"
-      $SCP_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-extras-$i.iso $LOCAL_DIR/$i/extras/iso/
+      mkdir -p $LOCAL_DIR/$i/extras/iso
+      $SCP_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-extras-'*'.iso $LOCAL_DIR/$i/extras/iso/
       for j in RPMS SRPMS ; do
         echo "*** Synchronizing $j ***"
+        mkdir -p $LOCAL_DIR/$i/$j
         $RSYNC_CMD $REMOTE_UHOST:$REMOTE_DIR/va-redhat-7.0-www/$j/ $LOCAL_DIR/$i/$j/
       done
       echo "*** Fixing ownerships and permissions ***"
