@@ -818,3 +818,7 @@ Wed Sep 20 12:06:25 2000                        Michael Jennings (mej)
 Added a cache, faster dependency checking, and handling for multi-
 level circular dependencies.
 ----------------------------------------------------------------------
+Sat Sep 23 14:46:29 2000                        Michael Jennings (mej)
+
+The beginnings of the 7.x cdtool.  Also fixes to pkgsort caching.
+----------------------------------------------------------------------

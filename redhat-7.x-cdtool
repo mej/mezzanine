@@ -1,0 +1,71 @@
+#!/bin/sh -x
+#
+# cdtool - The behind-the-scenes magic glue that happens before a CD is made
+#
+# Michael Jennings <mej@valinux.com>
+# 21 July 2000
+#
+# $Id: redhat-7.x-cdtool,v 1.1 2000/09/23 21:27:39 mej Exp $
+#
+
+trap 'exit -1' 1 2 15
+
+if [ -z "$BASE_DIR" ]; then
+  BASE_DIR=`pwd`
+fi
+BUILD_DIR=$BASE_DIR/build
+CD1=va-redhat-7.0-cd1
+CD2=va-redhat-7.0-cd2
+EXTRAS=va-redhat-7.0-extras
+NET=va-redhat-7.0-net
+RH_GOOP_DIR=/usr/lib/anaconda-runtime
+RH_KERNEL_GOOP=$RH_GOOP_DIR/buildinstall
+RH_PKGLIST_GOOP=$RH_GOOP_DIR/genhdlist
+
+# Make sure we have the anaconda goop
+if [ ! -d $RH_GOOP_DIR ]; then
+  echo "You must have the Anaconda runtime package installed!"
+  exit -1
+fi
+
+# The "net" image is a combination of all 3 other images
+cd $BUILD_DIR
+[ -d $NET ] && mv $NET $NET.bak
+mkdir $NET
+for i in $EXTRAS $CD2 $CD1 ; do
+  (cd $i ; tar -cf - .) | (cd $NET ; tar -xf -)
+done
+
+# Generate the hdlist for network-based installs
+cd $NET
+$RH_PKGLIST_GOOP `pwd`
+cp -a RedHat/base/hdlist RedHat/base/hdlist.net
+
+# Update the install image, boot images, etc. with the new kernel
+$RH_KERNEL_GOOP `pwd`
+
+# Generate the diff
+cd $BUILD_DIR
+diff -x CVS -x .cvsignore -ur $NET.bak $NET >$NET.patch 2>&1
+${EDITOR:-vi} $NET.patch
+
+# Make sure there's nothing new popping up unexpectedly.
+ONLY=`grep '^Only' $NET.patch | sed 's/: /\//' | awk '{print $3}'`
+if [ -n "$ONLY" ]; then
+  echo "The following files were found only in one tree:"
+  echo $ONLY
+  echo
+  echo "This is probably a problem.  Correct it, then hit Enter to continue."
+  read
+fi
+
+# Copy over all the changed files
+rm -f $NET.sh
+grep '^Binary' $NET.patch | awk '{print "cp -a "$5" "$3}' > $NET.sh
+sh $NET.sh
+
+# Regenerate the package list ($CD1/RedHat/base/hdlist) from $CD1/RedHat/base/comps
+cd $BUILD_DIR
+$RH_PKGLIST_GOOP $CD1 $CD2
+
+echo "Don't forget to commit using revtool -xp"

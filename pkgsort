@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgsort,v 1.6 2000/09/20 18:47:28 mej Exp $
+# $Id: pkgsort,v 1.7 2000/09/23 21:27:39 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -80,6 +80,7 @@ print_usage_info
     print "    -v --version                     Show version and copyright\n";
     print "    -s --sort <flag(s)>              Specify which criterion to sort on\n";
     print "    -f --format <type>               Specify the output format (names, files, prod)\n";
+    print "    -F --force                       Ignore missing dependencies and file conflicts\n";
     print "    -D --dir <directory>             Specify one or more directories from which to take packages\n";
     print "    -l --list <file>                 Take the input package list from \"file\" instead of the command line\n";
     print "    -o --outfile <file>              Output the resulting package list to \"file\" instead of stdout\n";
@@ -254,7 +255,7 @@ sub
 find_packages
 {
     my @pkgs = @_;
-    my (@contents, @rpms);
+    my (@contents, @rpms, @new_pkgs);
     my $i;
     local *DIR;
 
@@ -273,18 +274,22 @@ find_packages
     foreach $rpm (@contents) {
         my ($srpm, $spkg, $pkg, $ver, $rel);
 
-        next if ($have_cache{"$path{$rpm}/$rpm"});
         $rpm =~ m/^([^\/]+)-([^-\/]+)-([^-\/]+)\.\w+\.rpm$/;
         $pkg = $1;
+        if ($have_cache{"$path{$rpm}/$rpm"}) {
+            if (grep($_ eq $pkg || $_ eq $src_rpm{$src_package{$pkg}} || $_ eq $rpm, @pkgs)) {
+                xpush @new_pkgs, $pkg;
+            }
+            next;
+        }
         $srpm = &get_srpm_for_rpm($rpm);
         $srpm =~ m/^([^\/]+)-([^-\/]+)-([^-\/]+)\.\w+\.rpm$/;
         ($spkg, $ver, $rel) = ($1, $2, $3);
         dprint "Package $pkg from $spkg $ver-$rel ($srpm)\n";
         if (scalar(@_)) {
-            next if (!grep($_ eq $pkg || $_ eq $spkg, @pkgs));
-        } else {
-            push @pkgs, $pkg;
+            next if (!grep($_ eq $pkg || $_ eq $spkg || $_ eq $rpm, @pkgs));
         }
+        xpush @new_pkgs, $pkg;
         xpush @{$bin_packages{$spkg}}, $pkg;
         if (defined($src_version{$spkg})) {
             if ($src_version{$spkg} ne $ver || $src_release{$spkg} ne $rel) {
@@ -314,7 +319,7 @@ find_packages
         $src_rpm{$spkg} = $srpm;
         xpush @{$rpm_list{$pkg}}, $rpm;
     }
-    return @pkgs;
+    return @new_pkgs;
 }
 
 # Simplify package dependency queries and operations
@@ -402,6 +407,9 @@ query_packages
         }
         dprint "Package $pkg:  ", join(", ", @{$rpm_list{$pkg}}), "\n";
         @{$provides{$pkg}} = ($pkg);
+        if ($pkg ne $src_package{$pkg}) {
+            &pkg_add_dep($pkg, $src_package{$pkg});
+        }
         foreach $rpm (@{$rpm_list{$pkg}}) {
             $cmd = "pkgtool -qd -p $path{$rpm}/$rpm";
 
@@ -443,12 +451,8 @@ query_packages
             my $file = $provides{$pkg}[$i];
             my $found = 0;
 
-            if (scalar(@{$what_requires{$file}})) {
+            if (defined($what_requires{$file})) {
                 dprint "Found package $what_requires{$file}[0] which requires $file\n";
-                $found = 1;
-                last;
-            }
-            if ($found) {
                 $i++;  # Keep this one and go on to the next one.
             } else {
                 # Nothing requires this.  Junk it.
@@ -463,6 +467,16 @@ query_packages
     }
 }
 
+# Check for unresolved dependencies and conflicting files/capabilities
+sub
+consistency_check
+{
+    my @pkgs = @_;
+
+    foreach $pkg (@pkgs) {
+    }
+}
+
 sub
 write_cache
 {
@@ -471,14 +485,14 @@ write_cache
 
     open(CACHE, ">$ENV{HOME}/.pkgsort.cache") || return;
     foreach $pkg (@pkgs) {
-        print CACHE "S:$pkg/$src_package{$pkg}/$src_rpm{$src_package{$pkg}}/$src_version{$pkg}/$src_release{$pkg}\n";
+        print CACHE "S:$pkg|$src_package{$pkg}|$src_rpm{$src_package{$pkg}}|$src_version{$pkg}|$src_release{$pkg}\n";
         foreach $rpm (@{$rpm_list{$pkg}}) {
             @s = stat("$path{$rpm}/$rpm");
 
             print CACHE "F:$pkg:$path{$rpm}/$rpm:$s[9]\n";
         }
-        print "P:$pkg/", join("/", @{$provides{$pkg}}), "\n";
-        print "R:$pkg/", join("/", @{$requires{$pkg}}), "\n";
+        print CACHE "P:$pkg|", join("|", @{$provides{$pkg}}), "\n" if (defined($provides{$pkg}));
+        print CACHE "R:$pkg|", join("|", @{$requires{$pkg}}), "\n" if (defined($requires{$pkg}));
     }
     close(CACHE);
 }
@@ -495,10 +509,10 @@ read_cache
     while (<CACHE>) {
         chomp($line = $_);
         next if ($skip && $line !~ /^S/);
-        if ($line =~ /^S:([^\/]+)\//) {
+        if ($line =~ /^S:([^\|]+)\|/) {
             $skip = 0;
             $pkg = $1;
-            @inp = split("/", $line);
+            @inp = split("\Q|", $line);
             dprint "Found cache data for $pkg\n";
             $src_package{$pkg} = $inp[1];
             $src_rpm{$inp[1]} = $inp[2];
@@ -506,6 +520,8 @@ read_cache
             $src_release{$pkg} = $inp[4];
             xpush @{$bin_packages{$inp[1]}}, $pkg;
         } elsif ($line =~ /^F:/) {
+            my $path;
+
             @inp = split(":", $line);
             $pkg = $inp[1];
             if (!(@fstat = stat($inp[2])) || ($fstat[9] > $inp[3])) {
@@ -516,21 +532,21 @@ read_cache
             } else {
                 $have_cache{$inp[2]} = 1;
             }
-            $inp[1] =~ m/^(.*)\/([^\/]+)$/;
-            $rpm = $2;
-            ($path{$2}, $rpm) = ($1, $2);
+            $inp[2] =~ m/^(.*)\/([^\/]+)$/;
+            ($path, $rpm) = ($1, $2);
+            $path{$rpm} = $path;
             xpush @{$rpm_list{$pkg}}, $rpm;
-        } elsif ($line =~ /^P:([^\/]+)\//) {
+        } elsif ($line =~ /^P:([^\|]+)\|/) {
             $pkg = $1;
-            @inp = split("/", $line);
+            @inp = split("\Q|", $line);
             shift @inp;
             dprint "Package $pkg provides:  ", join(", ", @inp), "\n";
             foreach $dep (@inp) {
                 &pkg_add_cap($pkg, $dep);
             }
-        } elsif ($line =~ /^R:([^\/]+)\//) {
+        } elsif ($line =~ /^R:([^\|]+)\|/) {
             $pkg = $1;
-            @inp = split("/", $line);
+            @inp = split("\Q|", $line);
             shift @inp;
             dprint "Package $pkg requires:  ", join(", ", @inp), "\n";
             foreach $dep (@inp) {
@@ -678,11 +694,10 @@ verify_list
                 my $tmp;
 
                 dprint "Dependency order error:  $pkgs[$i] ($i) depends on $pkgs[$j] ($j)\n";
-                if (defined($dep_error{"$pkgs[$i]/$pkgs[$j]"})) {
+                if ((++$dep_error{"$pkgs[$i]/$pkgs[$j]"}) >= 10) {
                     eprint "Multi-level circular dependency detected.  Crap.\n";
                     return (0, @pkgs);
                 }
-                $dep_error{"$pkgs[$i]/$pkgs[$j]"} = 1;
                 $changes++;
                 $tmp = splice(@pkgs, $j, 1);
                 splice(@pkgs, $i, 0, $tmp);
@@ -758,7 +773,7 @@ main
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "D|dir=s", "l|list=s",
-                   "o|outfile=s", "f|format=s", "s|sort=s");
+                   "o|outfile=s", "f|format=s", "s|sort=s", "F|force");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -766,7 +781,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.6 $ created on $Date: 2000/09/20 18:47:28 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.7 $ created on $Date: 2000/09/23 21:27:39 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -780,11 +795,12 @@ main
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
         # This is a really silly way to shut up the "used only once" warnings.
-        $opt_h = $opt_v = $opt_d;
+        $opt_h = $opt_v = $opt_d = $opt_F = 0;
     }
 
     $debug = $opt_d;
     $outfile = ($opt_o ? $opt_o : "-");
+    $force = $opt_F;
     if ($opt_f) {
         if ($opt_f eq substr("names", 0, length($opt_f))) {
             $output_format = "names";
