@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.89 2000/07/14 00:04:41 mej Exp $
+# $Id: buildtool,v 1.90 2000/07/14 19:03:08 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -874,7 +874,7 @@ parse_product_entry
 sub
 parse_prod_file
 {
-    my ($prodname, $prodver) = @_;
+    my ($prodname, $prodver, $parent_prod) = @_;
     my ($prodfile, $skip_to_name, $skip_to_next_ver, $found, $line);
     my $prod = $prodname;
     local *PROD;
@@ -922,6 +922,11 @@ parse_prod_file
                 $prod = "$prodname-$prodver";
                 ($found, $skip_to_next_ver) = (1, 0);
                 push @products, $prod;
+                if ($parent_prod) {
+                    $prods->{$name}{PRODUCT} = $parent_prod;
+                } elsif ($prods->{$prodname}{PRODUCT}) {
+                    $prods->{$name}{PRODUCT} = $prods->{$prodname}{PRODUCT};
+                }
                 next;
             } else {
                 # New version.  Time to quit.
@@ -1833,7 +1838,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.89 $ created on $Date: 2000/07/14 00:04:41 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.90 $ created on $Date: 2000/07/14 19:03:08 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
