@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.53 2000/06/13 18:32:37 mej Exp $
+# $Id: buildtool,v 1.54 2000/06/13 18:40:48 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -399,9 +399,12 @@ place_file
             ($tmp = $file) =~ s/^.*\/([^\/]+)$/$1/;
             $dest = "$dest/$tmp";
         }
+        if (-e $dest) {
+            &nuke_tree($dest);
+        }
         dprint "Linking $dest to $file\n";
         if (!link($file, $dest)) {
-            &fail_package($pkg, "package accumulation", "Unable to hard-link to $file from $dest -- $!\n");
+            &fail_package($pkg, "package accumulation", "Unable to hard-link to $file from $dest -- $!");
             return $found;
         }
         $found++;
@@ -1761,7 +1764,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.53 $ created on $Date: 2000/06/13 18:32:37 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.54 $ created on $Date: 2000/06/13 18:40:48 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -379,3 +379,7 @@ Fixed the compose stage so it should leave SRPM's in the right place.
 stages.)  Also redirected /dev/null to stdin and added ignore options
 for the revision-control stuff to the mkhybrid command line.
 ----------------------------------------------------------------------
+Tue Jun 13 11:51:19 2000                        Michael Jennings (mej)
+
+Don't freak out if the link already exists. =P
+----------------------------------------------------------------------
