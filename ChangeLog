@@ -1159,3 +1159,7 @@ Mon Apr 16 21:28:58 2001                        Michael Jennings (mej)
 
 Create symlinks file automatically when using avimport.
 ----------------------------------------------------------------------
+Mon Apr 16 21:37:01 2001                        Michael Jennings (mej)
+
+Flesh out the avmod/-m portion.
+----------------------------------------------------------------------
