@@ -592,3 +592,8 @@ remaining issue is that some moron decided it would be a good idea to
 stick a gzipped patch into an SRPM.  So I've got to add support for
 that.  But it's almost there.
 ----------------------------------------------------------------------
+Wed Jul  5 17:04:48 2000                        Michael Jennings (mej)
+
+Converted buildtool to use pkgtool instead of rpm directly.  Still
+need to switch over the source generation, but I'll do that next.
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.78 2000/06/29 23:38:21 mej Exp $
+# $Id: buildtool,v 1.79 2000/07/05 23:56:43 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -58,6 +58,24 @@ sub REVTOOL_NEED_UPDATE()         {61;}
 
 # 127 is a catch-all
 sub REVTOOL_UNSPECIFIED_ERROR()   {127;}
+
+
+# Return codes for pkgtool
+sub PKGTOOL_SUCCESS()             {0;}
+sub PKGTOOL_FATAL_ERROR()         {1;}
+sub PKGTOOL_SYNTAX_ERROR()        {2;}
+sub PKGTOOL_COMMAND_FAILED()      {3;}
+
+sub PKGTOOL_MISSING_FILES()       {10;}
+sub PKGTOOL_SPEC_ERRORS()         {11;}
+sub PKGTOOL_DEPENDENCIES()        {12;}
+sub PKGTOOL_ARCH_MISMATCH()       {13;}
+sub PKGTOOL_BUILD_FAILURE()       {14;}
+sub PKGTOOL_BAD_MODULE()          {15;}
+
+sub PKGTOOL_TERMINATED()          {50;}
+sub PKGTOOL_CRASHED()             {60;}
+sub PKGTOOL_UNSPECIFIED_ERROR     {127;}
 
 
 # Return codes for buildtool
@@ -948,83 +966,47 @@ fetch_package
     return ($err >> 8, $msg);
 }
 
-# Build RPMS from the spec file
+# Build package files
 sub
-build_rpms
+build_pkgs
 {
     my ($pkg, $specfile) = @_;
-    my ($cmd, $rpm, $line, $target);
+    my ($cmd, $prog, $line, $target, $out_files);
     my ($err, $msg, $srpm) = (0, 0, 0);
-    my (@failed_deps, @not_found, @spec_errors, @out_files);
-    local *RPM;
+    local *PKGTOOL;
 
-    $rpm = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
-    $target = ($pkgs->{$pkg}{ARCH} ? "--target=$pkgs->{$pkg}{ARCH}" : ($main::target ? $main::target : ""));
-    $cmd = "$rpm --rcfile \"/usr/lib/rpm/rpmrc:$rpmrc\" --buildroot=\"$buildroot/$pkg-root\" $target -ba $specfile";
+    $prog = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
+    $target = ($pkgs->{$pkg}{ARCH} ? " --target=$pkgs->{$pkg}{ARCH}" : ($main::target ? $main::target : ""));
+    $prog = "-P '$prog$target'";
+    $cmd = "pkgtool $prog -b -R \"/usr/lib/rpm/rpmrc:$rpmrc\" --root \"$buildroot/$pkg-root\" -s $specfile";
     dprint "About to run \"$cmd\"\n";
-    if (!open(RPM, "$cmd </dev/null 2>&1 |")) {
+    if (!open(PKGTOOL, "$cmd </dev/null 2>&1 |")) {
         return (1, "Execution of \"$cmd\" failed -- $!", undef);
     }
     $err = 0;
-    while (<RPM>) {
+    while (<PKGTOOL>) {
         chomp($line = $_);
         nprint "$line\n";
-        if ($line =~ /^Wrote:\s+(\S+\.\w+\.rpm)$/) {
-            push @out_files, $1;
-            if ($line =~ /src\.rpm$/) {
-                ($srpm = $line) =~ s/^Wrote:\s+//;
-            }
-        } elsif ($line =~ /^line \d+: [^:]+: /
-                 || $line =~ /^Failed to find \w+:/
-                 || $line =~ /^Symlink points to BuildRoot: /) {
-            $err = 1;
-            push @spec_errors, $line;
-        } elsif ($line =~ /^Bad exit status from/) {
-            $err = 1;
-            $line =~ s/^Bad exit status from \S+ \((%\w+)\)/$1/;
-            $msg = "The RPM $line stage exited abnormally";
-            last;
-        } elsif ($line =~ /^error: failed build dependencies:/) {
-            $err = 1;
-            while (<RPM>) {
-                chomp($line = $_);
-                last if ($line !~ /is needed by/);
-                $line =~ s/^\s+(\S+)\s+is needed by .*$/$1/;
-                push @failed_deps, $line;
-            }
-            $msg = sprintf("Building this SRPM requires the following packages:  %s", join(" ", @failed_deps));
-            last;
-        } elsif ($line =~ /^Architecture is not included:/) {
-            $err = 1;
-            $line =~ s/^Architecture is not included:\s+//;
-            $msg = "This SRPM does not build on the $line architecture";
-        } elsif ($line =~ /^File (.*): No such file or directory$/
-                 || $line =~ /^Bad file: (.*): No such file or directory$/
-                 || $line =~ /^File is not a regular file: (.*)$/
-                 || $line =~ /^Unable to open icon (\S+):$/
-                 || $line =~ /^No (patch number \d+)$/
-                 || $line =~ /^Could not open \%files file (\S+): No such file or directory$/
-                 || $line =~ /^File not found(?: by glob)?: (.*)$/) {
-            $err = 1;
-            push @not_found, $1;
+        if ($line =~ /^pkgtool:\s+Error:\s+(.*)$/) {
+            $msg = $1;
+        } elsif ($line =~ /^Package files generated:\s+(.*)$/) {
+            $out_files = $1;
         }
     }
-    close(RPM);
-    dprint "\"$cmd\" returned $?\n";
+    close(PKGTOOL);
+    dprint "pkgtool returned $?\n";
     if ($? != 0 && $err == 0) {
-        $err = 1;
-        $msg = "Unhandled RPM build error";
-    } elsif ($#not_found != -1) {
-        $msg = sprintf("The following were expected by rpm, but no matching files were found:  \"%s\"",
-                       join("\", \"", @not_found));
-    } elsif ($#spec_errors != -1) {
-        $msg = sprintf("The spec file contains the following errors:  \"%s\"", join("\", \"", @spec_errors));
+        $err = $?;
+        $msg = "Unhandled RPM build error" if (! $msg);
     }
 
-    if ($#out_files >= 0) {
-        $pkgs->{$pkg}{OUTFILES} = join(" ", @out_files);
+    if ($out_files) {
+        $pkgs->{$pkg}{OUTFILES} = $out_files;
+        if ($out_files =~ /src\.rpm/) {
+            ($srpm = $out_files) =~ s/^(.*\s+)?(\S+src\.rpm)(\s+.*)?$/$2/;
+        }
     }
-    dprint "build_rpms():  Returning $err, $msg, $srpm\n";
+    dprint "build_pkgs():  Returning $err, $msg, $srpm\n";
     return ($err, $msg, $srpm);
 }
 
@@ -1269,8 +1251,8 @@ do_compose_stage
         }
 
         # Now build the new SRPM from the new vendor source tarball and the spec file.
-        ($err, $msg, $srpm) = &build_rpms($pkg, $specfile);
-        dprint "do_compose_stage():  build_rpms($pkg, $specfile) returned $err, $msg, $srpm\n";
+        ($err, $msg, $srpm) = &build_pkgs($pkg, $specfile);
+        dprint "do_compose_stage():  build_pkgs($pkg, $specfile) returned $err, $msg, $srpm\n";
         if ($err) {
             &fail_package($pkg, "compose", $msg);
             next;
@@ -1296,7 +1278,7 @@ do_explode_stage
     my ($cmd, $err, $msg, $line, $specfile, $rpm) = undef;
     my @manifest;
     my @p;
-    local *RPM;
+    local *PKGTOOL;
 
     if ($#_ >= 0) {
         @p = @_;
@@ -1316,9 +1298,9 @@ do_explode_stage
         $rpm = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
 
         # Examine the SRPM and figure out everything it contains.
-        $cmd = "$rpm --rcfile $rpmrc -qlp $pkgs->{$pkg}{FILENAME}";
+        $cmd = "pkgtool -P \"$rpm\" -R $rpmrc -cp $pkgs->{$pkg}{FILENAME}";
         dprint "About to run \"$cmd\"\n";
-        if (!open(RPM, "$cmd 2>&1 |")) {
+        if (!open(PKGTOOL, "$cmd 2>&1 |")) {
             &fail_package($pkg, "explode", "Execution of \"$cmd\" failed -- $!");
             next;
         }
@@ -1327,7 +1309,7 @@ do_explode_stage
         } else {
             undef $specfile;
         }
-        while (<RPM>) {
+        while (<PKGTOOL>) {
             chomp($line = $_);
             dprint "RPM contents -> $line\n";
             push @manifest, $line;  # Add the file to the manifest
@@ -1344,7 +1326,7 @@ do_explode_stage
                 }
             }
         }
-        close(RPM);
+        close(PKGTOOL);
         dprint "\"$cmd\" returned $?\n";
         if ($? != 0) {
             # FIXME:  What to do here?
@@ -1377,25 +1359,25 @@ do_explode_stage
         }
 
         # Explode the SRPM into its components
-        $cmd = "rpm --rcfile $rpmrc -U $pkgs->{$pkg}{FILENAME}";
+        $cmd = "pkgtool -P \"$rpm\" -R $rpmrc -ip $pkgs->{$pkg}{FILENAME}";
         dprint "About to run \"$cmd\"\n";
-        if (!open(RPM, "$cmd 2>&1 |")) {
+        if (!open(PKGTOOL, "$cmd 2>&1 |")) {
             &fail_package($pkg, "explode", "Execution of \"$cmd\" failed -- $!");
             next;
         }
         $err = 0;
-        while (<RPM>) {
+        while (<PKGTOOL>) {
             chomp($line = $_);
             nprint "$line\n";
-            if ($line !~ /^$/) {
-                # Any output from this command is an error.
+            if ($line !~ /successfully installed\.?$/) {
+                # Any otheroutput from this command is an error.
                 $err = 1;
-                $msg = "$line";
+                ($msg = $line) =~ s/^pkgtool:\s+Error:\s+//;;
                 last;
             }
         }
-        close(RPM);
-        dprint "\"$cmd\" returned $?\n";
+        close(PKGTOOL);
+        dprint "pkgtool returned $?\n";
         if ($? != 0) {
             # FIXME:  What to do here?
         }
@@ -1461,8 +1443,8 @@ do_build_stage
             }
 
             # Rebuild from the spec file
-            ($err, $msg, $srpm) = &build_rpms($pkg, $specfile);
-            dprint "do_build_stage():  build_rpms($pkg, $specfile) returned $err, $msg, $srpm\n";
+            ($err, $msg, $srpm) = &build_pkgs($pkg, $specfile);
+            dprint "do_build_stage():  build_pkgs($pkg, $specfile) returned $err, $msg, $srpm\n";
             if ($err) {
                 &fail_package($pkg, "build", $msg);
             }
@@ -1823,7 +1805,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.78 $ created on $Date: 2000/06/29 23:38:21 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.79 $ created on $Date: 2000/07/05 23:56:43 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

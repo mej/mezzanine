@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.8 2000/07/01 02:19:04 mej Exp $
+# $Id: pkgtool,v 1.9 2000/07/05 23:56:43 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -104,7 +104,7 @@ print_usage_info
     print "    -P --program <cmd>               Specify the package management program to be used\n";
     print "    -R --rcfile <rcfile>             Specify an alternate rpmrc file\n";
     print "    -D --dir <directory>             Specify \"directory\" as the full path to the module\n";
-    print "    -l --log <logfile>               Specify a log file to send informational output to\n";
+    print "       --root <dir>                  Specify the build/install root (depending on mode)\n";
     print "       --tar <tarcmd>                Use <tarcmd> as the \"tar\" command\n";
     print "       --zip <zipcmd>                Use <zipcmd> as the compression program\n";
     print "\n";
@@ -608,7 +608,7 @@ rpm_install
 
     $rpm = ($pkg_prog ? $pkg_prog : "rpm");
     $rc = ($rcfile ? "--rcfile '/usr/lib/rpm/rpmrc:$rcfile'" : "");
-    $cmd = "$rpm $rc -U $pkg_file";
+    $cmd = "$rpm $rc" . ($rootdir ? " --root $rootdir " : " ") . "-U $pkg_file";
     dprint "About to run \"$cmd\"\n";
     if (!open(RPM, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
@@ -733,6 +733,9 @@ rpm_build
     local *RPM;
 
     $rpm = ($pkg_prog ? $pkg_prog : "rpm") . ($rcfile ? " --rcfile '/usr/lib/rpm/rpmrc:$rcfile'" : "");
+    if ($rootdir) {
+        $rpm .= " --buildroot=\"$rootdir\"";
+    }
     if ($_[0] =~ /src\.rpm$/) {
         $cmd = "$rpm --rcfile \"/usr/lib/rpm/rpmrc:$rpmrc\" --rebuild $_[0]";
     } else {
@@ -1018,7 +1021,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.8 $ created on $Date: 2000/07/01 02:19:04 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.9 $ created on $Date: 2000/07/05 23:56:43 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1047,8 +1050,6 @@ main
         &fatal_error("Nothing to do!\n");
     }
 
-    print "\n\n*** Warning:  $progname is under heavy development.  Unless you are the developer, don't use it.\n\n";
-
     $debug = ($opt_d ? $opt_d : 0);
     $srcs = ($opt_o ? $opt_o : 0);
     $pkg_file = ($opt_p ? $opt_p : 0);
@@ -1062,6 +1063,7 @@ main
     $zip = ($opt_zip ? $opt_zip : 0);
     $tagfile = ($opt_tagfile ? $opt_tagfile : ($specfile ? $specfile : 0));
     $destdir = ($opt_D ? $opt_D : "");
+    $rootdir = ($opt_root ? $opt_root : "");
 
     # Signal handling
     $SIG{HUP} = 'IGNORE';
