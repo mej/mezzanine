@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.2 2001/03/20 03:45:36 mej Exp $
+# $Id: srctool,v 1.3 2001/03/21 01:02:05 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -79,6 +79,7 @@ sub SRCTOOL_COMMAND_FAILED()  {3;}
                                 
 sub SRCTOOL_INVALID_PACKAGE() {10;}
 sub SRCTOOL_FILE_OP_FAILED()  {11;}
+sub SRCTOOL_MISSING_INFO()    {12;}
 
 sub SRCTOOL_TERMINATED()      {50;}
 sub SRCTOOL_CRASHED()         {60;}
@@ -311,7 +312,7 @@ import_package
 
     chomp($pwd = `/bin/pwd`);
 
-    if (-f $pkgfile) {
+    if ($pkgfile && -f $pkgfile) {
         # If it's a file, make sure it's an SRPM
         if ($pkgfile =~ /^(?:.*\/)?([^\/]+)-([^-]+)-([^-]+)\.(no)?src\.rpm$/) {
             ($pkg, $ver, $rel) = ($1, $2, $3);
@@ -375,7 +376,38 @@ import_package
         chdir($pwd);
         $tmpdir =~ s/\/$pkg//;
         &nuke_tree($tmpdir);
-    } elsif (-d $pkgfile) {
+    } elsif (! $pkgfile || -d $pkgfile) {
+	if (! $name || $name !~ /-/) {
+	    if (-t STDIN) {
+		my ($pname, $pver);
+
+		print "Missing -n option.  Please supply the following information:\n";
+		print "Package name:  ";
+		$pname = <STDIN>;
+		while (! $pver) {
+		    print "Package version:  ";
+		    $pver = <STDIN>;
+		    if ($pver =~ /-/) {
+			eprint "Package versions cannot contain hyphens.  Please try again.\n";
+			undef $pver;
+		    }
+		}
+		$name = "$pname-$pver";
+		print "For future reference, you can specify this information on the command line like this:  -n $name\n";
+	    } else {
+		eprint "No package name/version supplied for FST import\n";
+		return SRCTOOL_MISSING_INFO;
+	    }
+	}
+	chdir($pkgfile) if ($pkgfile);
+        ($tag = $name) =~ tr/a-z/A-Z/;
+        $tag =~ s/\./_/g;
+        ($err, $msg) = &run_cmd("revtool", "-xit $tag", "  ");
+        if ($err) {
+            eprint "Import of $pkgfile failed -- $msg\n";
+            return $err;
+        }
+        chdir($pwd);
     }
     return SRCTOOL_SUCCESS;
 }
@@ -404,7 +436,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.2 $ created on $Date: 2001/03/20 03:45:36 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.3 $ created on $Date: 2001/03/21 01:02:05 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -423,7 +455,9 @@ main
 
     $debug = ($opt_d ? $opt_d : 0);
     $pkgname = ($opt_n ? $opt_n : "");
-    @flist = @ARGV;
+    if (scalar(@ARGV)) {
+	@flist = @ARGV;
+    }
 
     # Signal handling
     $SIG{HUP} = 'IGNORE';
@@ -441,12 +475,16 @@ main
     $SIG{__WARN__} = \&handle_warning;
 
     if ($0 =~ /avimport$/ || $opt_i) {
-        foreach $f (@flist) {
-            my $err;
+	if (scalar(@flist)) {
+	    foreach $f (@flist) {
+		my $err;
 
-            $err = &import_package($f, $pkgname);
-            return $err if ($err);
-        }
+		$err = &import_package($f, $pkgname);
+		return $err if ($err);
+	    }
+	} else {
+	    return &import_package("", $pkgname);
+	}
     } elsif ($0 =~ /avprep$/ || $opt_p) {
         &prepare_tree(@flist);
     } elsif ($0 =~ /avmod$/ || $opt_m) {

@@ -1,6 +1,6 @@
 %define name     avalon
 %define ver      2.0
-%define rel      1
+%define rel      0.1
 %define prefix   /usr
 
 Summary: Avalon -- The VA Software Engineering Build System
@@ -18,6 +18,9 @@ URL: http://www.valinux.com/
 Requires: perl
 
 %description
+Avalon is a collection of tools, written primarily in Perl, which
+automate and simplify many of the tasks associated with maintaining,
+building, and releasing software products.
 
 %changelog
 
@@ -34,11 +37,16 @@ for i in *tool ; do
 done
 (
   cd $RPM_BUILD_ROOT%{prefix}/bin
-  for i in get co put ci import info add new rm purge rtag tag reset login ; do
+  for i in get co put ci info add new rm purge rtag tag reset login ; do
     ln revtool av$i
   done
+  for i in import prep mod ; do
+    ln srctool av$i
+  done
+  for i in rpm pkg ; do
+    ln pkgtool av$i
+  done
   ln buildtool avbuild
-  ln pkgtool avrpm
 )
 
 for i in *.1 ; do
