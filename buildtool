@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.95 2000/07/19 04:40:15 mej Exp $
+# $Id: buildtool,v 1.96 2000/07/21 19:18:45 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1828,7 +1828,7 @@ main
 {
     # Set up the basic variables
     $progname = "buildtool";
-    $version = "1.1";
+    $version = "1.2";
 
     # No input.
     open(STDIN, "</dev/null");
@@ -1843,7 +1843,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.95 $ created on $Date: 2000/07/19 04:40:15 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.96 $ created on $Date: 2000/07/21 19:18:45 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

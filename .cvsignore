@@ -2,3 +2,5 @@ build
 logs
 *.list
 *.log
+rpmrc
+rpmmacros
