@@ -1,0 +1,191 @@
+How to import a new src.rpm
+---------------------------
+
+So you just downloaded foo.src.rpm and need to add it to the repository.
+The steps you would follow are:
+  
+  1) set CVSROOT
+  2) use avimport (srctool -i) on the src.rpm
+
+Example:
+$ export CVSROOT=:pserver:shaleh@cvs.engr:/cvs/Cujo
+$ avimport ctcs-1.2.15-1.src.rpm 
+Importing ctcs-1.2.15-1.src.rpm into ctcs tree....
+
+  cvs server: Importing /cvs/Cujo/ctcs/S
+  N ctcs/S/ctcs-1.2.15.tar.gz
+  cvs server: Importing /cvs/Cujo/ctcs/F
+  N ctcs/F/ctcs.spec
+  
+  No conflicts created by this import
+
+As you can see, this results in /path/to/cvsroot/foo/name/{S,F}. S is the
+source tarball, F is where the spec file goes.  name is taken from the name
+of the src.rpm you imported: in this case 'ctcs'.
+
+How to fix a bug (or add features) to a project
+-----------------------------------------------
+
+  1) use avget (revtool -g) to retrieve the new module
+  2) use avprep (srctool -p) in the module directory to give you a working
+     directory to hack in
+  3) use avpatch (srctool -a) to apply your changes from the working directory
+  4) use avput (revtool -i) to commit your changes
+
+Example:
+$ avget ctcs
+cvs server: Updating ctcs
+cvs server: Updating ctcs/F
+U ctcs/F/ctcs.spec
+cvs server: Updating ctcs/S
+U ctcs/S/ctcs-1.2.15.tar.gz
+$ cd ctcs 
+$ avprep
+Creating working directory /home/shaleh/va/ctcs/work....
+You may now chdir to ctcs/work to make changes.
+Use "avpatch -n <patch_name>" to generate a patch when done.
+$ cd work
+$ ls
+ctcs-1.2.15
+$ cd ctcs-1.2.15/
+<hack hack hack>
+$ cd ../.. # must be in the base directory for avpatch to work
+$ avpatch -n function.patch # the patch name must be the full filename
+Created P/function.patch (21 lines).
+Patch added and ready for commit.
+$ edit F/ctcs.spec # add the new patch, the avalon tools read this
+$ avput
+? work
+cvs server: Updating .
+cvs server: Updating F
+cvs server: Updating P
+A P/function.patch
+cvs server: Updating S
+WARNING:  You have no ChangeLog here.  I have created one for you.
+cvs server: scheduling file `ChangeLog' for addition
+cvs server: use 'cvs commit' to add this file permanently
+Please edit your commit message now...
+cvs commit: Examining .
+cvs commit: Examining F
+cvs commit: Examining P
+cvs commit: Examining S
+? work
+RCS file: /cvs/Cujo/ctcs/ChangeLog,v
+done
+Checking in ChangeLog;
+/cvs/Cujo/ctcs/ChangeLog,v  <--  ChangeLog
+initial revision: 1.1
+done
+RCS file: /cvs/Cujo/ctcs/P/function.patch,v
+done
+Checking in P/function.patch;
+/cvs/Cujo/ctcs/P/function.patch,v  <--  function.patch
+initial revision: 1.1
+done
+$ ls
+CVS  ChangeLog  F  P  S  work
+$ cat ChangeLog 
+Wed Apr 25 13:36:39 2001                                 Sean (shaleh)
+removed all instances of the keyword 'function'
+----------------------------------------------------------------------
+
+NOTE: the '? work' message is safe to ignore, that is cvs telling you it
+knows nothing about the directory 'work' which is ok since we do not want it
+to.
+
+As you can see, a 'P' directory now exists.  This directory will contain all
+of the patches against the source.
+
+A warning: the avalon tools will overwrite the file named on the command line.
+So if there had been a function.patch, it would have been removed.  If this
+happens to you, simply rename the patch you just created and do:
+avget P/foo.patch.  Of course if you had committed your work you will have to
+jump through more hoops.
+
+
+How to make a new tarball for use in Buffy or elsewhere
+-------------------------------------------------------
+
+You want to make a minitiature filesystem with packages installed into it for
+use by Buffy or for chroot testing.
+
+  1) make a packages file
+  2) use imgtool
+
+A packages file is simply a list of packages to install.  The order is
+important -- the list must be in dependency order.
+
+A sample of the (somewhat long) file looks like this:
+setup
+filesystem
+basesystem
+ldconfig
+glibc
+mktemp
+termcap
+libtermcap --nodeps
+bash
+rootfiles
+
+note the libtermcap entry, you are allowed to pass packaging options.
+
+Example:
+$ imgtool -i bob -D /mnt/cdrom/RedHat/RPMS/:/usr/src/redhat/RPMS/i386 -a bob.tgz -l bob.list
+
+This results in a bob.tgz file which can be uncompressed and chrooted into
+or given to the Buffy people for loading on our machines.  The -D takes a
+UNIX path style colon separated list.
+
+Eventually, pkgsort will work and you will be able to let it figure out the
+depends info.
+
+*NOTE* this creates a directory where you specify and installs the entire
+list of packages there.  So, make sure you have the hard drive space.  Also
+depending on the speed of you system (I/O and CPU) this could take 10 minutes
+to an hour.
+
+How to make a layered product with product files
+-------------------------------------------------
+
+Its the buzzword du jour and your boss wants it yesterday, here's how.
+
+  1) make a product file -- see the avalon docs for the deep gory details
+  2) use buildtool
+  3) (optional) use mediatool to create an ISO
+
+As an example, I will use the Red Hat product.
+
+# Product Definition for VA Linux 7.1.1
+name:       va-redhat
+version:    7.1.1
+arch:       i386
+cvsroot:    :pserver:anonymous@cvs.engr.valinux.com:/cvs/rh-vale
+
+product:va-redhat-os-7.1.1
+
+Comments are supported as in the first line.  The 'name' entry is the actual
+name of the product.  'cvsroot' is used to check the product out to build
+it.
+
+The interesting things happen after this header.  'product' is a keyword which
+pulls in another product.  In this case it is 'va-redhat-os-7.1.1'.
+
+Skimming the va-redhat-os-7.1.1 file we see lines like this:
+
+product:kernel ver=2.4.3-srpm
+module:lilo tag=head
+
+the kernel line uses the 'ver' option which specifies what version of the
+product kernel to use.
+
+the module line explains how to check the item out of the revision control
+system.
+
+Now this:
+contrib-rh-7.1/anacron-2.3-16.src.rpm bins=bin-rh-7.1/anacron
+
+is another form of the module line above.  It says check the anacron srpm out
+of the contrib-rh-7.1 repositiry, but use the compiled rpm (the bins line) if
+one is available.  Without the bins line the srpm would be checked out and
+compiled with the resulting rpm used in the product.
+
