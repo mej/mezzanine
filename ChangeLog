@@ -643,3 +643,7 @@ Wed Jul 12 16:50:15 2000                        Michael Jennings (mej)
 Doh!  Stupid omission on my part.  This should work much better for
 recursive product parsing.
 ----------------------------------------------------------------------
+Thu Jul 13 12:57:55 2000                        Michael Jennings (mej)
+
+Smarter tag assumptions.
+----------------------------------------------------------------------

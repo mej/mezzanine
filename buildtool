@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.87 2000/07/12 23:42:47 mej Exp $
+# $Id: buildtool,v 1.88 2000/07/13 19:50:12 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -379,6 +379,37 @@ get_package_stages
     } else {
         return "scebpia";
     }
+}
+
+# Supply the branch tag prefix
+sub
+branch_tag_prefix
+{
+    return "VA-";
+}
+
+# Convert a package name/version to a release tag
+sub
+pkg_to_release_tag
+{
+    my ($pkg_name, $pkg_version) = @_;
+    my $tag;
+
+    $tag = "$pkg_name-$pkg_version";
+    $tag =~ tr/[a-z]/[A-Z]/;
+    $tag =~ s/[^-A-Z0-9]/-/g;
+    return $tag;
+}
+
+# Convert a package name/version to a branch tag
+sub
+pkg_to_branch_tag
+{
+    my ($pkg_name, $pkg_version) = @_;
+    my $tag;
+
+    $tag = &branch_tag_prefix() . &pkg_to_release_tag($pkg_name, $pkg_version);
+    return $tag;
 }
 
 # Find the proper location within the image for an output file
@@ -1038,11 +1069,16 @@ gen_sources
         $zip = "--zip '$pkgs->{$pkg}{ZIP}'";
     }
     if ($pkgs->{$pkg}{REVISION}) {
+        my $btp = &branch_tag_prefix();
+
         ($rtag, $htag) = split(":", $pkgs->{$pkg}{REVISION});
+        if (! $htag && $rtag =~ /^$btp/) {
+            $htag = $rtag;
+            undef $rtag;
+        }
     } elsif ($pkgs->{$pkg}{VERSION}) {
-        $htag = "";
-        ($rtag = "$pkg-$pkgs->{$pkg}{VERSION}") =~ tr/[a-z]/[A-Z]/;
-        $rtag =~ s/[^-A-Z0-9]/-/g;
+        $rtag = &pkg_to_release_tag($pkg, $pkgs->{$pkg}{VERSION});
+        $htag = &pkg_to_branch_tag($pkg, $pkgs->{$pkg}{VERSION});
     }
     $rtag = ($rtag ? "-r $rtag" : "");
     $htag = ($htag ? "-t $htag" : "");
@@ -1101,7 +1137,7 @@ do_bootstrap_stage
             $cvsroot = "";
         }
         if ($pkgs->{$pkg}{REVISION}) {
-            ($tag = $pkgs->{$pkg}{REVISION}) =~ s/^([^:]+):.*$/$1/;
+            ($tag = $pkgs->{$pkg}{REVISION}) =~ s/^([^:]+):([^:]+)$/$2/;
             $tag = "-t $tag";
         } else {
             $tag = "";
@@ -1797,7 +1833,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.87 $ created on $Date: 2000/07/12 23:42:47 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.88 $ created on $Date: 2000/07/13 19:50:12 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
