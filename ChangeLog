@@ -229,3 +229,8 @@ Thu May 25 11:43:59 2000                        Michael Jennings (mej)
 A few bugs in parallelization fixed.  It works now, but it still needs
 some speed improvements.
 ----------------------------------------------------------------------
+Thu May 25 14:14:07 2000                        Michael Jennings (mej)
+
+By removing the need to exec itself, buildtool's speed seems to have
+just increased by a factor of 6.  Time to try a full build. :-)
+----------------------------------------------------------------------

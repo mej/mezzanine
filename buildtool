@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.28 2000/05/25 18:31:56 mej Exp $
+# $Id: buildtool,v 1.29 2000/05/25 21:02:07 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -269,19 +269,37 @@ mkdirhier
 sub
 spawn_cmd
 {
-    my $cmd = join(" ", @_);
+    my ($pkg, $logfile) = @_;
     my $pid;
 
-    dprint "spawn_cmd($cmd)...\n";
     do {
         if ($pid = fork()) {
             # Parent
-            dprint "Child process is $pid\n";
+            nprint "Spawned child process $pid to build $pkg (log file is $logfile)\n";
             return $pid;
         } elsif (defined $pid) {
             # Child
-            exec $cmd;
-            exit BUILDTOOL_CHILD_EXEC_FAILED;
+            $opt_f = 0;
+            $verbosity = 0;
+            $slave = 1;
+            $master = 0;
+            $opt_master = 0;
+            close $GLOBAL_LOG if ($GLOBAL_LOG);
+            open(STDOUT, ">/dev/null");
+            open(STDIN, "</dev/null");
+            if (!open(LOGFILE, ">$logfile")) {
+                eprint "Unable to open $logfile -- $!\n";
+            } else {
+                $GLOBAL_LOG = \*LOGFILE;
+                open(STDERR, ">&LOGFILE");
+                select LOGFILE; $| = 1;
+                select STDOUT; $| = 0;
+            }
+            @packages = ($pkg);
+            @failed_pkgs = ();
+            &build_process();
+            close(LOGFILE) if ($GLOBAL_LOG);
+            exit (BUILDTOOL_SUCCESS);
         } elsif ($! !~ /No more processes/ && $! !~ /Resource temporarily unavailable/) {
             &fatal_error("fork() failed -- $!\n");
         }
@@ -937,7 +955,7 @@ do_compose_stage
         @contents = readdir(DIR);
         closedir(DIR);
         @tmp = grep($_ =~ /src\.rpm$/, @contents);
-        if ($#tmp > 0) {
+        if ($#tmp >= 0) {
             $srpm = $tmp[0];
             if ($#tmp > 0) {
                 nprint "$progname:  Warning:  Multiple target SRPM's found in $pkgs->{$pkg}{MODULE}.\n";
@@ -1401,7 +1419,7 @@ summarize_failures
 sub
 parallel_build
 {
-    my ($pid, $err, $idx, $pkg, $cmd, $var_string, $pname, $line, $nprocs);
+    my ($pid, $err, $idx, $pkg, $logfile, $line, $nprocs, $done, $left);
     my (@children, @vars);
     my %child_pkg;
     local *ERRLOG;
@@ -1419,31 +1437,37 @@ parallel_build
         for (; $idx <= $#packages && $#children < $nprocs; $idx++) {
             # Spawn a buildtool child process to handle the next package
             $pkg = $packages[$idx];
-            $pname = "$pkgs->{$pkg}{TYPE}:$pkgs->{$pkg}{FILENAME}";
-            $var_string = "";
-            foreach $var (keys %{$pkgs->{$pkg}}) {
-                next if ($var eq "TYPE");
-                $var_string .= "$var=$pkgs->{$pkg}{$var} ";
-            }
-            $cmd = "$buildtool --master $master_pid -Ql $basedir/logs/$pkg.log -p \"$pname $var_string\" </dev/null >/dev/null 2>&1";
-            $pid = &spawn_cmd($cmd);
+            $logfile = "$basedir/logs/$pkg.log";
+            $pid = &spawn_cmd($pkg, $logfile);
             push @children, $pid;
             $child_pkg{$pid} = $pkg;
         }
 
-        # Out of space for children for now.  Wait till one dies.
+        # Out of space for children for now.
+        $line = "";
+        foreach $pid (@children) {
+            $line .= "$child_pkg{$pid} ($pid)    ";
+        }
+        nprint "$progname:  Currently building:  $line\n";
+        $done = $idx - $#children - 1;
+        $left = $#packages + 1 - $done;
+        nprint "$progname:  $done packages completed, $left to go.\n";
+
+        # Wait for a child to die
         $pid = waitpid(-1, 0);
         next if (! $child_pkg{$pid});
         $pkg = $child_pkg{$pid};
         $err = $? >> 8;
-        dprint "Child process $pid returned code $err\n";
         if ($pid == -1) {
             # This should never happen.
             eprint "Ummm, waitpid() returned -1.  That wasn't very nice.  I'm offended.\n";
             next;
         }
         @children = grep($_ != $pid, @children);
-        if ($err != BUILDTOOL_SUCCESS) {
+        if ($err == BUILDTOOL_SUCCESS) {
+            nprint "Child process $pid for package $pkg completed successfully.  (${\(&get_timestamp())})\n";
+        } else {
+            dprint "Child process $pid for package $pkg failed, returning $err.\n";
             if ($err == BUILDTOOL_CHILD_EXEC_FAILED) {
                 &fail_package($pkg, "pre-build", "exec() of child failed");
             } else {
@@ -1507,7 +1531,7 @@ main
     # See the Getopt::Mixed man page for details on the syntax of this line
     $valid_opts = "h help>h v version>v d debug>d b=s build>b p=s product>p package>p"
                    . " q quiet>q Q really-quiet>Q silent>Q D=s dir>D f force>f l=s log>l"
-                   . " P parallel>P t=s target>t master=i";
+                   . " P parallel>P t=s target>t";
     Getopt::Mixed::getOptions($valid_opts);
 
     # Post-parse the options stuff
@@ -1524,12 +1548,10 @@ main
     $target = ($opt_t ? $opt_t : 0);
     $opt_b = "p" if (! $opt_b);
     if ($opt_master) {
-        $master_pid = $opt_master;
         $slave = 1;
         $master = 0;
     } elsif ($opt_P) {
         $master = 1;
-        $master_pid = $$;
         $slave = 0;
         $num_cpus = &count_cpus();
     } else {
@@ -1558,7 +1580,6 @@ main
     $builddir = ($ENV{BUILD_DIR} ? $ENV{BUILD_DIR} : "$basedir/build");
     $proddir = ($ENV{PROD_DIR} ? $ENV{PROD_DIR} : "$basedir/products");
     $revtool = sprintf("revtool%s", ($opt_d ? " --debug" : ""));
-    $buildtool = sprintf("$progname%s", ($opt_d ? " --debug" : ""));
 
     # Signal handling
     $SIG{HUP} = 'IGNORE';
