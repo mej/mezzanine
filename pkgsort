@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgsort,v 1.7 2000/09/23 21:27:39 mej Exp $
+# $Id: pkgsort,v 1.8 2000/09/25 18:22:43 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -392,6 +392,74 @@ add_implicit_dependency
     }
 }
 
+# Check for unresolved dependencies and conflicting files/capabilities
+sub
+consistency_check
+{
+    my @pkgs = @_;
+    my $oops = 0;
+
+    # Look for unresolved dependencies
+    foreach $pkg (keys %requires) {
+        foreach $dep (@{$requires{$pkg}}) {
+            if (!defined($what_provides{$dep})) {
+                xpush @{$unresolved_deps{$dep}}, $pkg;
+                $oops = 1;
+            }
+        }
+    }
+
+    # Make sure no two packages provide the same thing
+    foreach $cap (keys %what_provides) {
+        if (scalar(@{$what_provides{$cap}}) > 1) {
+            @{$conflicts{$cap}} = @{$what_provides{$cap}};
+            $oops = 1;
+        }
+    }
+
+    if ($oops) {
+        if (scalar(%unresolved_deps)) {
+            eprint "The following dependencies are unresolved:\n";
+            foreach $dep (keys %unresolved_deps) {
+                eprint "    $unresolved_deps{$dep} requires $dep\n";
+            }
+        }
+        if (scalar(%conflicts)) {
+            eprint "The following file/provision conflicts were found:\n";
+            foreach $cap (keys %conflicts) {
+                eprint "    $cap is provided by ", join(", ", @{$conflicts{$cap}}), "\n";
+            }
+        }
+        if (! $force) {
+            &fatal_error("Consistency check failed.  Aborting.\n");
+        } else {
+            print "Consistency check failed.  Resulting package set will not function properly.\n";
+        }
+    }
+
+    # Go through the provides info and throw out any files/capabilities not required by other packages
+    foreach $pkg (keys %provides) {
+        dprint "Checking provides for $pkg\n";
+        for ($i = 0; $i < scalar(@{$provides{$pkg}}); ) {
+            my $file = $provides{$pkg}[$i];
+            my $found = 0;
+
+            if (defined($what_requires{$file})) {
+                dprint "Found package $what_requires{$file}[0] which requires $file\n";
+                $i++;  # Keep this one and go on to the next one.
+            } else {
+                # Nothing requires this.  Junk it.
+                splice(@{$provides{$pkg}}, $i, 1);
+                delete $what_provides{$file};
+            }
+        }
+        if (!scalar(@{$provides{$pkg}})) {
+            # Package contains no files/capabilities needed by other packages.
+            delete $provides{$pkg};
+        }
+    }
+}
+
 sub
 query_packages
 {
@@ -443,38 +511,6 @@ query_packages
         }
     }
     print "\nQuery complete.\n";
-
-    # Go through the provides info and throw out any files/capabilities not required by other packages
-    foreach $pkg (keys %provides) {
-        dprint "Checking provides for $pkg\n";
-        for ($i = 0; $i < scalar(@{$provides{$pkg}}); ) {
-            my $file = $provides{$pkg}[$i];
-            my $found = 0;
-
-            if (defined($what_requires{$file})) {
-                dprint "Found package $what_requires{$file}[0] which requires $file\n";
-                $i++;  # Keep this one and go on to the next one.
-            } else {
-                # Nothing requires this.  Junk it.
-                splice(@{$provides{$pkg}}, $i, 1);
-                delete $what_provides{$file};
-            }
-        }
-        if (!scalar(@{$provides{$pkg}})) {
-            # Package contains no files/capabilities needed by other packages.
-            delete $provides{$pkg};
-        }
-    }
-}
-
-# Check for unresolved dependencies and conflicting files/capabilities
-sub
-consistency_check
-{
-    my @pkgs = @_;
-
-    foreach $pkg (@pkgs) {
-    }
 }
 
 sub
@@ -485,12 +521,13 @@ write_cache
 
     open(CACHE, ">$ENV{HOME}/.pkgsort.cache") || return;
     foreach $pkg (@pkgs) {
-        print CACHE "S:$pkg|$src_package{$pkg}|$src_rpm{$src_package{$pkg}}|$src_version{$pkg}|$src_release{$pkg}\n";
+        print CACHE "N:$pkg\n";
         foreach $rpm (@{$rpm_list{$pkg}}) {
             @s = stat("$path{$rpm}/$rpm");
 
-            print CACHE "F:$pkg:$path{$rpm}/$rpm:$s[9]\n";
+            print CACHE "F:$path{$rpm}/$rpm:$s[9]\n";
         }
+        print CACHE "S:$pkg|$src_package{$pkg}|$src_rpm{$src_package{$pkg}}|$src_version{$pkg}|$src_release{$pkg}\n";
         print CACHE "P:$pkg|", join("|", @{$provides{$pkg}}), "\n" if (defined($provides{$pkg}));
         print CACHE "R:$pkg|", join("|", @{$requires{$pkg}}), "\n" if (defined($requires{$pkg}));
     }
@@ -781,7 +818,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.7 $ created on $Date: 2000/09/23 21:27:39 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.8 $ created on $Date: 2000/09/25 18:22:43 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -864,6 +901,7 @@ main
     @pkgs = &find_packages(@pkgs);
     if ($sort_method eq "p" || $sort_method eq "d") {
         &query_packages(@pkgs);
+        &consistency_check(@pkgs);
     }
     @pkgs = &sort_packages(@pkgs);
     &write_cache(@pkgs);

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.24 2000/09/13 23:55:09 mej Exp $
+# $Id: pkgtool,v 1.25 2000/09/25 18:22:43 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -601,6 +601,7 @@ gen_diff
                 dprint "Now diffing $fname\n";
                 $ignore = 0;
             }
+            next;
         } elsif ($line =~ /^(diff|---|\+\+\+|\*\*\*)/) {
             $line =~ s/\Q$module\/$fname\E/$fname/g;
         }
@@ -772,7 +773,7 @@ rpm_query
     }
     $rpm = ($pkg_prog ? $pkg_prog : "rpm");
     $rc = ($rcfile ? "--rcfile '/usr/lib/rpm/rpmrc:$rcfile'" : "");
-    $cmd = "$rpm $rc $rpm_opt " . ($pkg_file ? "-p $pkg_file" : "");
+    $cmd = "$rpm $rc $rpm_opt " . ($pkg_file ? "-p $pkg_file" : "-a");
     dprint "About to run \"$cmd\"\n";
     if (!open(RPM, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
@@ -1165,7 +1166,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.24 $ created on $Date: 2000/09/13 23:55:09 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.25 $ created on $Date: 2000/09/25 18:22:43 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

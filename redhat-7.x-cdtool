@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 21 July 2000
 #
-# $Id: redhat-7.x-cdtool,v 1.1 2000/09/23 21:27:39 mej Exp $
+# $Id: redhat-7.x-cdtool,v 1.2 2000/09/25 18:22:43 mej Exp $
 #
 
 trap 'exit -1' 1 2 15
@@ -30,14 +30,15 @@ fi
 
 # The "net" image is a combination of all 3 other images
 cd $BUILD_DIR
-[ -d $NET ] && mv $NET $NET.bak
-mkdir $NET
-for i in $EXTRAS $CD2 $CD1 ; do
-  (cd $i ; tar -cf - .) | (cd $NET ; tar -xf -)
+[ -d $NET.new ] && rm -rf $NET.new
+mkdir $NET.new
+for i in $CD2 $CD1 ; do
+  (cd $i ; tar --exclude CVS -cf - .) | (cd $NET.new ; tar -xf -)
 done
+rm $NET.new/.disc*
 
 # Generate the hdlist for network-based installs
-cd $NET
+cd $NET.new
 $RH_PKGLIST_GOOP `pwd`
 cp -a RedHat/base/hdlist RedHat/base/hdlist.net
 
@@ -46,7 +47,7 @@ $RH_KERNEL_GOOP `pwd`
 
 # Generate the diff
 cd $BUILD_DIR
-diff -x CVS -x .cvsignore -ur $NET.bak $NET >$NET.patch 2>&1
+diff -x CVS -x .cvsignore -x '*.rpm' -ur $NET $NET.new >$NET.patch 2>&1
 ${EDITOR:-vi} $NET.patch
 
 # Make sure there's nothing new popping up unexpectedly.
@@ -64,8 +65,16 @@ rm -f $NET.sh
 grep '^Binary' $NET.patch | awk '{print "cp -a "$5" "$3}' > $NET.sh
 sh $NET.sh
 
+# Re-create CD images from the altered net image
+for i in RedHat/base dosutils images ; do
+  (cd $NET ; tar --exclude CVS -cf - $i) | (cd $CD1 ; tar -xf -)
+done
+for i in RedHat/instimage ; do
+  (cd $NET ; tar --exclude CVS -cf - $i) | (cd $CD2 ; tar -xf -)
+done
+
 # Regenerate the package list ($CD1/RedHat/base/hdlist) from $CD1/RedHat/base/comps
 cd $BUILD_DIR
-$RH_PKGLIST_GOOP $CD1 $CD2
+$RH_PKGLIST_GOOP $BUILD_DIR/$CD1 $BUILD_DIR/$CD2
 
 echo "Don't forget to commit using revtool -xp"
