@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.163 2004/01/05 19:48:57 mej Exp $
+# $Id: buildtool,v 1.164 2004/01/06 20:53:05 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -226,14 +226,14 @@ build_single_package
             if (! -e $pkgs->{$pkg}{"INSTROOT"} && $pkgs->{$pkg}{"INSTROOT_INIT"}) {
                 my @output;
 
-                @output = &run_cmd($pkgs->{$pkg}{"INSTROOT_INIT"}, $instroot, 1);
+                @output = &run_cmd($pkgs->{$pkg}{"INSTROOT_INIT"}, $instroot, "instroot-init:  ");
                 if ($output[0] != MEZZANINE_SUCCESS) {
                     wprint "Initialization of install root failed.\n";
                 }
             } elsif (-e $pkgs->{$pkg}{"INSTROOT"} && $pkgs->{$pkg}{"INSTROOT_RESET"}) {
                 my @output;
 
-                @output = &run_cmd($pkgs->{$pkg}{"INSTROOT_RESET"}, $instroot, 1);
+                @output = &run_cmd($pkgs->{$pkg}{"INSTROOT_RESET"}, $instroot, "instroot-reset:  ");
                 if ($output[0] != MEZZANINE_SUCCESS) {
                     wprint "Reset of install root failed.\n";
                 }
@@ -302,7 +302,7 @@ build_package_forked
                     my @output;
 
                     @output = &run_cmd($pkgs->{$pkg}{"INSTROOT_COPY"},
-                                       "$pkgs->{$pkg}{INSTROOT} " . &pkgvar_instroot(), 1);
+                                       "$pkgs->{$pkg}{INSTROOT} " . &pkgvar_instroot(), "instroot-copy:  ");
                     if ($output[0] != MEZZANINE_SUCCESS) {
                         wprint "Copy of install root failed.\n";
                         &pkgvar_instroot($pkgs->{$pkg}{"INSTROOT"});
@@ -643,7 +643,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.163 $ created on $Date: 2004/01/05 19:48:57 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.164 $ created on $Date: 2004/01/06 20:53:05 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -680,50 +680,44 @@ main
     &pkgvar_target($opt_t);
 
     if ($opt_i) {
-        my ($instroot, $instroot_init, $instroot_reset, $instroot_copy);
+        my ($instroot, $instroot_init, $instroot_reset, $instroot_copy) = ($opt_i, $opt_ii, $opt_ir, $opt_ic);
 
-        $instroot = $opt_i;
-        $instroot_init = $opt_ii;
-        $instroot_reset = $opt_ir;
-        $instroot_copy = $opt_ic;
+        # If we have $MEZZANINE_INSTROOT_SOURCE_RSYNC and we don't have the options,
+        # automagically fill the commands in appropriately.  If needed, authentication
+        # info and other flags can be added to $MEZZANINE_INSTROOT_SOURCE_RSYNC.
+        if ($ENV{"MEZZANINE_INSTROOT_SOURCE_RSYNC"}) {
+            if (! $instroot_init) {
+                $instroot_init = "rsync -PHavz --delete --delete-after $ENV{MEZZANINE_INSTROOT_SOURCE_RSYNC}";
+            }
+            if (! $instroot_reset) {
+                $instroot_reset = "rsync -PHavz --delete --delete-after $ENV{MEZZANINE_INSTROOT_SOURCE_RSYNC}";
+            }
+            if (! $instroot_copy) {
+                $instroot_copy = "rsync -PHav --delete --delete-after";
+            }
+        }
 
+        # Now set all the variables using fallbacks.
+        ($instroot, $instroot_init, $instroot_reset, $instroot_copy)
+            = &set_instroot_info($instroot, $instroot_init, $instroot_reset, $instroot_copy);
         &pkgvar_instroot($instroot);
 
-        # Set INSTROOT_* using fallbacks.
+        # If we have $instroot_init, the other two are guaranteed to be set by fallbacks.
         if ($instroot_init) {
             &assign_product_variable($prod, "INSTROOT_INIT", $instroot_init);
-        }
-        if ($instroot_reset) {
             &assign_product_variable($prod, "INSTROOT_RESET", $instroot_reset);
-        } elsif ($instroot_init) {
-            &assign_product_variable($prod, "INSTROOT_RESET", $instroot_init);
-        }
-        if ($instroot_copy) {
             &assign_product_variable($prod, "INSTROOT_COPY", $instroot_copy);
-        } elsif ($instroot_init) {
-            &assign_product_variable($prod, "INSTROOT_COPY", $instroot_init);
         }
     }
 
     # Handle hint file/directory specification
     if ($opt_H) {
-        $ENV{"MEZZANINE_HINTDIR"} = $opt_H;
+        $ENV{"MEZZANINE_HINTS"} = $opt_H;
     }
-    if ($ENV{"MEZZANINE_HINTDIR"}) {
-        my ($installer, $hints) = split('%', $ENV{"MEZZANINE_HINTDIR"});
-
-        if (! $hints) {
-            # If we only have 1 thing, assume it's the hints, not the installer.
-            &pkgvar_hints($installer);
-        } else {
-            # We have both.
-            &pkgvar_hint_installer($installer);
-            &pkgvar_hints($hints);
-        }
-    }
+    &set_hints_info($ENV{"MEZZANINE_HINTS"});
     if ($opt_hi) {
         # Override installer from command line.
-        &pkgvar_hint_installer($opt_hi);
+        &set_hints_info("$opt_hi\%");
     }
 
     # Figure out parallelization stuff

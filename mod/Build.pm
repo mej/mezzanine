@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.27 2004/01/05 18:05:23 mej Exp $
+# $Id: Build.pm,v 1.28 2004/01/06 20:53:05 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -34,6 +34,7 @@ BEGIN {
     use Mezzanine::Util;
     use Mezzanine::PkgVars;
     use Mezzanine::Pkg;
+    use Mezzanine::Src;
     use Mezzanine::RPM;
     use Mezzanine::Deb;
     use Mezzanine::Tar;
@@ -45,7 +46,8 @@ BEGIN {
 
     @ISA         = ('Exporter');
 
-    @EXPORT = ('&count_cpus', '&prepare_build_tree', '&install_hints',
+    @EXPORT = ('&count_cpus', '&set_hints_info', '&set_instroot_info',
+               '&prepare_build_tree', '&install_hints',
                '&get_source_list', '&create_source_file',
                '&create_source_files', '&cleanup_build_tree',
                '&build_rpms_from_tarball', '&build_debs_from_tarball',
@@ -70,6 +72,8 @@ use vars ('@EXPORT_OK');
 
 ### Function prototypes
 sub count_cpus();
+sub set_hints_info($);
+sub set_instroot_info($$$$);
 sub prepare_build_tree($$$);
 sub install_hints();
 sub get_source_list($$$$);
@@ -111,6 +115,50 @@ count_cpus
     $cpus = $#lines + 1;
     dprint "Found $cpus processors.\n";
     return ($cpus >= 1 ? $cpus : 1);
+}
+
+# Set up hint directory and installer.
+sub
+set_hints_info($)
+{
+    my $hint = $_[0];
+    my $installer;
+
+    if ($hint) {
+        if (index($hint, '%') >= 0) {
+            ($installer, $hint) = split('%', $hint);
+            if (! $hint) {
+                $hint = &pkgvar_get("hints");
+            }
+        } else {
+            $installer = &pkgvar_get("hint_installer");
+        }
+        &pkgvar_set("hints", $hint);
+        &pkgvar_set("hint_installer", $installer);
+    }
+    return (&pkgvar_get("hints"), &pkgvar_get("hint_installer"));
+}
+
+# Set up instroot info
+sub
+set_instroot_info($$$$)
+{
+    my ($instroot, $instroot_init, $instroot_reset, $instroot_copy) = @_;
+
+    if (! $instroot) {
+        return ("", "", "", "");
+    }
+
+    &pkgvar_instroot($instroot);
+
+    # Set INSTROOT_* using fallbacks.
+    if (! $instroot_reset && $instroot_init) {
+        $instroot_reset = $instroot_init;
+    }
+    if (! $instroot_copy && $instroot_init) {
+        $instroot_copy = $instroot_init;
+    }
+    return ($instroot, $instroot_init, $instroot_reset, $instroot_copy);
 }
 
 # Create the RPM build directories, the buildroot, and the RPM config files
@@ -204,7 +252,8 @@ prepare_build_tree
 sub
 install_hints($)
 {
-    my $hints = $_[0] || &pkgvar_hints();
+    my $hints = $_[0] || &pkgvar_get("hints");
+    my $inst;
     my @hint_packages;
     local *HINTFILE;
 
@@ -227,27 +276,16 @@ install_hints($)
     }
     close(HINTFILE);
 
-    foreach my $pkg (@hint_packages) {
-        my %preserve_pkg_vars;
-        my @tmp;
-        my $err;
-
-        # Save current set of package variables.
-        %preserve_pkg_vars = &pkgvar_get_all();
-
-        # Install hint.
-        &pkgvar_name($pkg);
-        if (! &pkgvar_filename() || ! -e &pkgvar_filename()) {
-            &pkgvar_filename($pkg);
-        }
-        &pkgvar_command(&pkgvar_hint_installer());
-        @tmp = &rpm_install();
-        if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
-            return "Unable to install $pkg ($err)";
-        }
-
-        # Restore previous package variables.
-        &pkgvar_reset(%preserve_pkg_vars);
+    # Install hints.
+    if (&pkgvar_instroot()) {
+        $inst = "chroot " . &pkgvar_instroot() . ' ';
+    } else {
+        $inst = "";
+    }
+    $inst .= &pkgvar_get("hint_installer");
+    @tmp = &run_cmd($inst, join(' ', @hint_packages), "hint-installer:  ");
+    if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
+        return "Unable to install $pkg ($err)";
     }
 
     return "";

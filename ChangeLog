@@ -252,3 +252,7 @@ Mon Jan  5 16:16:49 2004                        Michael Jennings (mej)
 
 Update help screens.
 ----------------------------------------------------------------------
+Tue Jan  6 17:20:29 2004                        Michael Jennings (mej)
+
+Added support for setting hints/hint installer from environment.
+----------------------------------------------------------------------

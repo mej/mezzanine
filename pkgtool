@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.55 2004/01/05 19:48:57 mej Exp $
+# $Id: pkgtool,v 1.56 2004/01/06 20:53:05 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -102,7 +102,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.55 $ created on $Date: 2004/01/05 19:48:57 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.56 $ created on $Date: 2004/01/06 20:53:05 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -167,23 +167,12 @@ main
 
     # Handle hint file/directory specification
     if ($opt_H) {
-        $ENV{"MEZZANINE_HINTDIR"} = $opt_H;
+        $ENV{"MEZZANINE_HINTS"} = $opt_H;
     }
-    if ($ENV{"MEZZANINE_HINTDIR"}) {
-        my ($installer, $hints) = split('%', $ENV{"MEZZANINE_HINTDIR"});
-
-        if (! $hints) {
-            # If we only have 1 thing, assume it's the hints, not the installer.
-            &pkgvar_hints($installer);
-        } else {
-            # We have both.
-            &pkgvar_hint_installer($installer);
-            &pkgvar_hints($hints);
-        }
-    }
+    &set_hints_info($ENV{"MEZZANINE_HINTS"});
     if ($opt_hi) {
         # Override installer from command line.
-        &pkgvar_hint_installer($opt_hi);
+        &set_hints_info("$opt_hi\%");
     }
 
     $ENV{"LANG"} = "C" if (! $ENV{"LANG"});
