@@ -798,3 +798,14 @@ I fixed the dependency checking problems.  The resulting list still
 doesn't result in a successful base image install because RedHat's
 dependency info is incomplete.  *sigh*
 ----------------------------------------------------------------------
+Mon Sep 11 20:11:35 2000                        Michael Jennings (mej)
+
+This pkgsort will generate a package list that imgtool can install.
+So that at least is good.
+
+I also renamed cdtool to redhat-6.x-cdtool to resolve a name conflict
+on Debian.
+
+Also here is the step-by-step documentation for building a build
+server from the ground up.
+----------------------------------------------------------------------

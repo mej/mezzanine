@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 21 July 2000
 #
-# $Id: cdtool,v 1.1 2000/07/21 22:46:01 mej Exp $
+# $Id: redhat-6.x-cdtool,v 1.1 2000/09/12 03:14:19 mej Exp $
 #
 
 trap 'exit -1' 1 2 15
