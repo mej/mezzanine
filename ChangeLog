@@ -557,3 +557,7 @@ Fri Jun 23 10:20:14 2000                        Michael Jennings (mej)
 *sigh*  We have to allow stripping or else the OS CD is too big.  So
 just don't strip anything without a path pointing into /tmp.
 ----------------------------------------------------------------------
+Fri Jun 23 13:09:38 2000                        Michael Jennings (mej)
+
+Up version in spec file to 1.0.
+----------------------------------------------------------------------

@@ -1,5 +1,5 @@
 %define name     avalon
-%define ver      0.1
+%define ver      1.0
 %define rel      1
 %define prefix   /usr
 
