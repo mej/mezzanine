@@ -23,12 +23,39 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.11 2000/05/16 02:58:27 mej Exp $
+# $Id: buildtool,v 1.12 2000/05/17 00:14:18 mej Exp $
 #
 
 # Include the Perl Modules we need
 use POSIX;
 use Getopt::Mixed;
+
+# Constants
+#
+# Keep these in sync with the ones in revtool, or
+# talk perl into using headers and #define's.
+#
+# 1-20 are generic errors
+sub REVTOOL_NO_SERVER()           {1;}
+sub REVTOOL_SERVER_CRASH()        {2;}
+sub REVTOOL_BAD_LOGIN()           {3;}
+sub REVTOOL_COMMAND_FAILED()      {4;}
+sub REVTOOL_ACCESS_DENIED()       {5;}
+
+# 21-40 are retrieval/update errors
+sub REVTOOL_FILE_NOT_FOUND()      {21;}
+sub REVTOOL_FILE_REMOVED()        {22;}
+sub REVTOOL_CONFLICT_FOUND()      {23;}
+
+# 41-60 are add/remove errors
+sub REVTOOL_BAD_ADDITION()        {41;}
+sub REVTOOL_BAD_REMOVAL()         {42;}
+
+# 61-80 are commit errors
+sub REVTOOL_NEED_UPDATE()         {61;}
+
+# 127 is a catch-all
+sub REVTOOL_UNSPECIFIED_ERROR()   {127;}
 
 # Print usage information
 sub
@@ -339,7 +366,7 @@ build_rpms
     $cmd = "$rpm --rcfile $rpmrc -ba $specfile";
     dprint "About to run \"$cmd\"\n";
     if (!open(RPM, "$cmd </dev/null 2>&1 |")) {
-        return (1, "Execution of \"$cmd\" failed -- $!");
+        return (1, "Execution of \"$cmd\" failed -- $!", undef);
     }
     $err = 0;
     while (<RPM>) {
@@ -550,7 +577,7 @@ do_compose_stage
         dprint "Module apparently just built its SRPM as $srpm\n";
 
         # Copy it here and assign FILENAME to it.
-        system("cp $srpm .");
+        system("mv $srpm .");
         $pkgs->{$pkg}{FILENAME} = $srpm;
         $pkgs->{$pkg}{FILENAME} =~ s/^(\S+)\/([^\/]+\.src\.rpm)$/$2/;
         $pkgs->{$pkg}{FILENAME} = "$pkgs->{$pkg}{MODULE}/$pkgs->{$pkg}{FILENAME}";
