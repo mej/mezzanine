@@ -1,0 +1,82 @@
+.TH BUILDTOOL "1" "April 2001" "buildtool " VA
+.SH NAME
+buildtool, avbuild \- Product Build Management Tool
+.SH SYNOPSIS
+\fBbuildtool\fR [ -hdvbpqQDflPtC ]
+.br
+\fBavbuild\fR [ -hdvbpqQDflPtC ]
+.SH DESCRIPTION
+buildtool takes product description files ("prod files") and
+creates products from their component packages based on the
+information in those files.  It will utilize some of the other Avalon
+components to perform this task.
+.SH OPTIONS
+.TP
+\fB\-h\fR \fB\-\-help\fR
+Show usage information, then exit
+.TP
+\fB\-d\fR \fB\-\-debug\fR
+Turn on debugging
+.TP
+\fB\-v\fR \fB\-\-version\fR
+Show version and copyright, then exit
+.TP
+\fB\-b\fR \fB\-\-build\fR <stage>
+Stop building after a particular stage (see below)
+.TP
+\fB\-p\fR \fB\-\-product\fR \fB\-\-package\fR <name>
+Specify the product or package to build
+.TP
+\fB\-q\fR \fB\-\-quiet\fR
+Be somewhat quiet.  Simply gives basic progress info
+.TP
+\fB\-Q\fR \fB\-\-really\-quiet\fR \fB\-\-silent\fR
+Be very quiet.  Only errors are reported
+.TP
+\fB\-D\fR \fB\-\-dir\fR <directory>
+Specify "directory" as the base directory for the build
+.TP
+\fB\-f\fR \fB\-\-force\fR
+Ignore errors, build as much as possible
+.TP
+\fB\-l\fR \fB\-\-log\fR <logfile>
+Specify a log file to send informational output to
+.TP
+\fB\-P\fR \fB\-\-parallel\fR [expr]
+Parallelize the build process based on the number of CPU's
+.TP
+\fB\-t\fR \fB\-\-target\fR <arch>
+Tell rpm to build for a particular target architecture
+.TP
+\fB\-C\fR \fB\-\-cflags\fR <flags>
+Specify the $CFLAGS variable to use for building
+.TP
+\fB\-\-tree\fR <repository>
+Specify the repository to use (overrides all product files)
+.TP
+\fB\-\-tag\fR <tag>
+Specify a tag to use (overrides all product files)
+.TP
+\fB\-\-nocache\fR
+Do not scan the cache (use with care)
+.TP
+\fB\-\-clean\fR
+Clean up RPM and buildroot directories when done
+.SH BUILD OPTIONS
+The stages and their abbreviations (for use with the -b option) are:
+.TP
+bootstrap (\fBs\fR)
+.TP
+component (\fBc\fR)
+.TP
+build (\fBb\fR)
+.TP
+package accumulation (\fBp\fR)
+.PP
+The default is -bp if you do not specify otherwise.
+.SH SEE ALSO
+revtool(1), pkgtool(1)
+.SH AUTHORS
+Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.
+.br
+This man page initially written by Sean 'Shaleh' Perry <shaleh@valinux.com>.

@@ -1,0 +1,113 @@
+.TH REVTOOL "1" "April 2001" "revtool" VA
+.SH NAME
+revtool \- Source Code Revision Control Tool
+.SH SYNOPSIS
+revtool [ -hdvgparqiTtblRkDxP ] [ files ]
+.SH DESCRIPTION
+revtool exists to encapsulate the user from the revision control system.  With
+the actual implementation hidden, the revision control system can be switched
+for another one without the user noticing.
+.br
+The following tasks can be accomplished via revtool:
+.TP
+ \- retrieving data from the master repository
+.TP
+ \- committing changes to the master repository
+.TP
+ \- generating diffs by querying the master repository.
+.TP
+ \- tagging particular changes or changesets
+.SH OPTIONS
+.TP
+\fB\-h\fR \fB\-\-help\fR
+Show this usage information
+.TP
+\fB\-d\fR \fB\-\-debug\fR
+Turn on debugging
+.TP
+\fB\-v\fR \fB\-\-version\fR
+Show version and copyright
+.TP
+\fB\-g\fR \fB\-\-get\fR
+Download and/or merge the current sources from the master tree
+.br
+Shortcuts: \fBavget\fR, \fBavco\fR
+.TP
+\fB\-p\fR \fB\-\-put\fR
+Upload new changes to the master tree
+.br
+Shortcuts: \fBavput\fR, \fBavci\fR
+.TP
+\fB\-a\fR \fB\-\-add\fR
+Mark new files for addition into the master tree
+.br
+Shortcut: \fBavadd\fR and \fBavnew\fR
+.TP
+\fB\-r\fR \fB\-\-remove\fR
+Delete files and mark them for deletion in the master tree
+.br
+Shortcut: \fBavremove\fR, \fBavrm\fR, \fBavkill\fR, \fBavnuke\fR, \fBavpurge\fR
+.TP
+\fB\-q\fR \fB\-\-query\fR <type>
+Query for a particular type of information
+.br
+Shortcut: \fBavquery\fR, \fBavask\fR, \fBavinfo\fR
+.TP
+\fB\-i\fR \fB\-\-import\fR
+Import a new set of sources, or update the vendor branch for a package
+.br
+Shortcut: \fBavimport\fR
+.TP
+\fB\-T\fR \fB\-\-rtag\fR <tag>
+Tag one or more complete modules directly
+.br
+Shortcut: \fBavrtag\fR
+.TP
+\fB\-t\fR \fB\-\-tag\fR <tag>
+Specify a symbolic tag for an operation, or tag local sources
+.br
+Shortcut: \fBavtag\fR, \fBavlabel\fR, \fBavmark\fR
+.TP
+\fB\-\-ptag\fR
+Specified tag is a product tag (overrides tag checking; use with care)
+.TP
+\fB\-b\fR \fB\-\-branch\fR
+When performing a tag, make it a branch tag
+.TP
+\fB\-l\fR \fB\-\-login\fR
+Perform a login to the repository
+.br
+Shortcut: \fBavlogin\fR
+.TP
+\fB\-R\fR \fB\-\-recurse\fR
+Operate recursively (this is the default for some commands)
+.TP
+\fB\-k\fR [code]
+Specify keyword handling when adding files (use \fB\-kb\fR to add binary files)
+.TP
+\fB\-D\fR \fB\-\-dir\fR
+Specify an alternative repository (\fB$CVSROOT\fR)
+.TP
+\fB\-x\fR \fB\-\-exclusive\fR
+Only commit the specified files
+.TP
+\fB\-\-addlist\fR "files"
+Specify which files to add so that adds and removes can coincide
+.TP
+\fB\-\-remlist\fR "files"
+Specify which files to remove so that adds and removes can coincide
+.TP
+\fB\-\-reset\fR
+Reset sticky tags, dates, etc. in the current module
+.br
+Shortcut: \fBavreset\fR
+.TP
+\fB\-\-blind\fR
+Do not update before committing (may result in conflicts, use carefully)
+.TP
+\fB\-P\fR \fB\-\-protocol\fR <proto>
+Specify which protocol to use (cvs or bk)
+.SH AUTHORS
+Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.
+.br
+Man page initially written by Sean 'Shaleh' Perry <shaleh@valinux.com>

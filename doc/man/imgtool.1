@@ -1,0 +1,75 @@
+.TH IMGTOOL "1" "April 2001" "imgtool" VA
+.SH NAME
+imgtool \- Tool for generating disk images from package lists
+.SH SYNOPSIS
+imgtool [ -hdviDaltk ]
+.SH DESCRIPTION
+imgtool creates a chroot and installs the packages from the list specified on
+the command line.  The resulting tarball is suitable for use by buffy or for
+package testing in a chroot.
+.SH OPTIONS
+.TP
+\fB\-h\fR \fB\-\-help\fR
+Show this usage information
+.TP
+\fB\-d\fR \fB\-\-debug\fR
+Turn on debugging
+.TP
+\fB\-v\fR \fB\-\-version\fR
+Show version and copyright
+.TP
+\fB\-i\fR \fB\-\-image\fR
+Specify the image directory
+.TP
+\fB\-D\fR \fB\-\-dir\fR <directory>
+Specify one or more directories from which to take packages
+.TP
+\fB\-a\fR \fB\-\-archive\fR <file>
+Create an archive (tarball) of the image when finished
+.TP
+\fB\-l\fR \fB\-\-list\fR <file>
+Take the package list from "file" instead of the command line
+.TP
+\fB\-t\fR \fB\-\-test\fR
+Test dependencies but do not install packages
+.TP
+\fB\-k\fR \fB\-\-keep\fR
+Keep the existing root image and add to it
+.SH PACKAGE LIST FORMAT
+The format for the package list is quite simple.  The file consists of
+package names, one to a line.  The names used are the actual package names
+like 'XFree86', not the file names.  A '#' may be used for comments.
+.br
+In addition, if any parameters need to be passed to the package installer
+they can be listed on the line following the package name, separated by an
+initial space.
+.br
+\fBExample:\fR
+.br
+setup
+.br
+filesystem
+.br
+basesystem
+.br
+ldconfig
+.br
+glibc
+.br
+mktemp
+.br
+termcap
+.br
+# libtermcap has messed up Requires
+.br
+libtermcap --nodeps
+.br
+bash
+.br
+rootfiles
+.br
+ncurses
+.SH AUTHORS
+Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.
+.br
+Initial man page written by Sean 'Shaleh' Perry <shaleh@valinux.com>

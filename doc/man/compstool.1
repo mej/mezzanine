@@ -1,0 +1,28 @@
+.TH COMPSTOOL "1" "April 2001" "compstool" VA
+.SH NAME
+compstool \- Tool for verifying the integrity of comps files
+.SH SYNOPSIS
+\fBcompstool\fR [ -hdvDa ]
+.SH DESCRIPTION
+comps files are used by the RH install system to display packages for
+installation.  This tool ensures that the comps file is in a sane format.
+.SH OPTIONS
+.TP
+\fB\-h\fR \fB\-\-help\fR
+Show this usage information
+.TP
+\fB\-d\fR \fB\-\-debug\fR
+Turn on debugging
+.TP
+\fB\-v\fR \fB\-\-version\fR
+Show version and copyright
+.TP
+\fB\-D\fR \fB\-\-dir\fR <directory>
+Specify "directory" as the full path to the CD image
+.TP
+\fB\-a\fR \fB\-\-arch\fR <architecture>
+Specify the architecture to check
+.SH AUTHORS
+Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.
+.br
+This man page initially written by Sean 'Shaleh' Perry <shaleh@valinux.com>

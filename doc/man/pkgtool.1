@@ -1,0 +1,81 @@
+.TH PKGTOOL "1" "April 2001" "pkgtool" VA
+.SH NAME
+pkgtool \- Tool for generating source/patch files from a source code repository
+.SH SYNOPSIS
+pkgtool [ -hdvbicqopsmrtPRD ]
+avpkg [ -hdvbicqopsmrtPRD ]
+avrpm [ -hdvbicqopsmrtPRD ]
+.SH DESCRIPTION
+The following tasks can be accomplished via pkgtool:
+.TP
+ - building binary packages from a source package or equivalent
+.TP
+ - install packages, with or without a virtual root
+.TP
+ - examine the contents of a package
+.TP
+ - identify dependencies of a package
+.TP
+ - generate source package from a repository module
+.SH OPTIONS
+.TP
+\fB\-h\fR \fB\-\-help\fR
+Show this usage information
+.TP
+\fB\-d\fR \fB\-\-debug\fR
+Turn on debugging
+.TP
+\fB\-v\fR \fB\-\-version\fR
+Show version and copyright
+.TP
+\fB\-b\fR \fB\-\-build\fR
+Build a package
+.TP
+\fB\-i\fR \fB\-\-install\fR
+Install (unarchive) a package
+.TP
+\fB\-c\fR \fB\-\-contents\fR
+Check the contents of a package
+.TP
+\fB\-q\fR \fB\-\-query\fR <type>
+Query attributes of a package
+.TP
+\fB\-o\fR \fB\-\-sources\fR [srcs]
+Specify the sources to generate
+.TP
+\fB\-p\fR \fB\-\-package\fR <file>
+Specify the package filename
+.TP
+\fB\-s\fR \fB\-\-specfile\fR \fB\-\-scripts\fR <path>
+Specify the spec file (or debian script directory) to use
+.TP
+\fB\-m\fR \fB\-\-module\fR <name>
+Specify the module name
+.TP
+\fB\-r\fR \fB\-\-release\-tag\fR <tag>
+Operate on the revisions starting at <tag>
+.TP
+\fB\-t\fR \fB\-\-head\-tag\fR <tag>
+Operate on the revisions up to and including <tag>
+.TP
+\fB\-P\fR \fB\-\-program\fR <cmd>
+Specify the package management program to be used
+.TP
+\fB\-R\fR \fB\-\-rcfile\fR <rcfile>
+Specify an alternate rpmrc file
+.TP
+\fB\-D\fR \fB\-\-dir\fR <directory>
+Specify "directory" as the full path to the module
+.TP
+\fB\-\-root\fR <dir>
+Specify the build/install root (depending on mode)
+.TP
+\fB\-\-tar\fR <tarcmd>
+Use <tarcmd> as the "tar" command
+.TP
+\fB\-\-zip\fR <zipcmd>
+Use <zipcmd> as the compression program
+.SH AUTHORS
+Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.
+.br
+Man page initially written by Sean 'Shaleh' Perry <shaleh@valinux.com>

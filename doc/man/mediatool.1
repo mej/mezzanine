@@ -1,0 +1,42 @@
+.TH MEDIATOOL "1" "April 2001" "mediatool" VA
+.SH NAME
+mediatool \- Tool for generating disk images, CD's, etc.
+.SH SYNOPSIS
+\fBmediatool\fR [ options ]
+.SH DESCRIPTION
+mediatool supplies a simple interfaces to create iso9660 images.  The directory
+used could be created with imgtool, or possibly by hand or other tools.
+.SH OPTIONS
+.TP
+\fB\-h\fR \fB\-\-help\fR
+Show this usage information
+.TP
+\fB\-d\fR \fB\-\-debug\fR
+Turn on debugging
+.TP
+\fB\-v\fR \fB\-\-version\fR
+Show version and copyright
+.TP
+\fB\-i\fR \fB\-\-iso\fR <filename>
+Create an ISO file by this name
+.TP
+\fB\-D\fR \fB\-\-dir\fR \fB\-\-directory\fR <dir>
+Specify the source directory
+.TP
+\fB\-t\fR \fB\-\-tar\fR \fB\-\-tarball\fR <tarball>
+Create a tarball by this name
+.TP
+\fB\-x\fR \fB\-\-exclude\fR \fB\-\-ignore\fR <file>
+Exclude a file/wildcard
+.TP
+\fB\-c\fR \fB\-\-cmd\fR \fB\-\-command\fR <command>
+Specify an alternative command
+.TP
+\fB\-\-boot\fR <image>
+Specify a boot image (for an ISO)
+.SH AUTHORS
+Copyright (c) 2001, Michael Jennings and VA Linux Systems, Inc.
+.br
+Man page initially written by Sean 'Shaleh' Perry <shaleh@valinux.com>
+.SH SEE ALSO
+imgtool(1), mkisofs(8), cdrecord(1)

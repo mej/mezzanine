@@ -1,0 +1,60 @@
+.TH PKGSORT "1" "April 2001" "pkgsort" VA
+.SH NAME
+pkgsort \- Tool for sorting package lists
+.SH SYNOPSIS
+\fBpkgsort\fR [ -hdvsfFDlom ]
+.SH DESCRIPTION
+pkgsort takes an ascii file containing a list of packages and outputs a sorted
+list based on the criteria chosen.  The resulting file is then usable by
+imgtool or for some other use.
+.br
+For the file format, see the manpage for imgtool(1).
+.SH OPTIONS
+.TP
+\fB\-h\fR \fB\-\-help\fR
+Show this usage information
+.TP
+\fB\-d\fR \fB\-\-debug\fR
+Turn on debugging
+.TP
+\fB\-v\fR \fB\-\-version\fR
+Show version and copyright
+.TP
+\fB\-s\fR \fB\-\-sort\fR <flag(s)>
+Specify which criterion to sort on
+.br
+Valid sort flags are:
+.br
+\fBa\fR for alphabetical by binary package
+.br
+\fBd\fR for dependency
+.br
+\fBp\fR for provisions
+.br
+\fBs\fR for alphabetical by source package
+.br
+\fBr\fR to reverse the sort order (in addition to one of the above flags)
+.TP
+\fB\-f\fR \fB\-\-format\fR <type>
+Specify the output format (names, files, prod)
+.TP
+\fB\-F\fR \fB\-\-force\fR
+Ignore missing dependencies and file conflicts
+.TP
+\fB\-D\fR \fB\-\-dir\fR <directory>
+Specify one or more directories from which to take packages
+.TP
+\fB\-l\fR \fB\-\-list\fR <file>
+Take the input package list from "file" instead of the command line
+.TP
+\fB\-o\fR \fB\-\-outfile\fR <file>
+Output the resulting package list to "file" instead of stdout
+.TP
+\fB\-m\fR \fB\-\-mode\fR <mode>
+Specify either "source" or "binary" package resolution
+.SH AUTHORS
+Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.
+.br
+Man page initially written by Sean 'Shaleh' Perry <shaleh@valinux.com>
+.SH SEE ALSO
+imgtool(1)
