@@ -155,3 +155,7 @@ Thu May 18 22:05:11 2000                        Michael Jennings (mej)
 
 I think this way will be better.
 ----------------------------------------------------------------------
+Thu May 18 22:37:09 2000                        Michael Jennings (mej)
+
+Exclude dotfiles from additional sources too.
+----------------------------------------------------------------------

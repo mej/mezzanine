@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.16 2000/05/19 04:57:57 mej Exp $
+# $Id: buildtool,v 1.17 2000/05/19 05:29:55 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -621,7 +621,7 @@ do_compose_stage
         if ($pkgs->{$pkg}{SFILES}) {
             @sfiles = split(",", $pkgs->{$pkg}{SFILES});
         } else {
-            @sfiles = grep($_ !~ /\.spec(\.in)?$/ && -f $_, @contents);
+            @sfiles = grep($_ !~ /\.spec(\.in)?$/ && $_ !~ /^\./ && -f $_, @contents);
         }
         dprint "Additional source files:  ", join(" ", @sfiles), "\n" if ($#sfiles >= 0);
 
