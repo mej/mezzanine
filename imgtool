@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: imgtool,v 1.11 2001/06/09 00:14:14 mej Exp $
+# $Id: imgtool,v 1.12 2001/06/15 03:27:37 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -263,6 +263,7 @@ main
     $progname = "imgtool";
     $version = "1.0";
     &print_usage_info() if (!scalar(@ARGV));
+    umask 022;
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "i|image=s", "D|dir=s", "a|archive=s",
@@ -274,7 +275,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.11 $ created on $Date: 2001/06/09 00:14:14 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.12 $ created on $Date: 2001/06/15 03:27:37 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -5,8 +5,10 @@
 # Michael Jennings <mej@valinux.com>
 # 28 Sept 2000
 #
-# $Id: web-sync,v 1.14 2001/06/14 19:48:08 mej Exp $
+# $Id: web-sync,v 1.15 2001/06/15 03:27:38 mej Exp $
 #
+
+umask 022
 
 if [ ! -z "$SUDO_USER" ]; then
   USER=$SUDO_USER

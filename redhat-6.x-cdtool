@@ -5,8 +5,10 @@
 # Michael Jennings <mej@valinux.com>
 # 21 July 2000
 #
-# $Id: redhat-6.x-cdtool,v 1.5 2001/05/29 19:23:39 mej Exp $
+# $Id: redhat-6.x-cdtool,v 1.6 2001/06/15 03:27:37 mej Exp $
 #
+
+umask 022
 
 if [ "x$1" = "x-i" ]; then
     IMAGE=1

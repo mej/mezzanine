@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: uptool,v 1.8 2001/06/14 19:48:08 mej Exp $
+# $Id: uptool,v 1.9 2001/06/15 03:27:38 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -322,6 +322,7 @@ main
     $progname = "uptool";
     $version = "2.0";
     &print_usage_info() if (!scalar(@ARGV));
+    umask 022;
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "D|dir=s@", "m|match|regexp=s", "H|hash:s");
@@ -332,7 +333,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.8 $ created on $Date: 2001/06/14 19:48:08 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.9 $ created on $Date: 2001/06/15 03:27:38 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

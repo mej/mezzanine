@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.23 2001/06/09 00:14:14 mej Exp $
+# $Id: srctool,v 1.24 2001/06/15 03:27:38 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -471,6 +471,7 @@ main
     # Set up the basic variables
     $progname = "srctool";
     $version = "1.0";
+    umask 022;
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "i|import", "p|prepare", "m|mod|modify",
@@ -482,7 +483,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.23 $ created on $Date: 2001/06/09 00:14:14 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.24 $ created on $Date: 2001/06/15 03:27:38 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

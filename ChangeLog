@@ -1272,3 +1272,8 @@ packages we plan to build will be completely exploded no matter what.
 Doing it the other way wasted far too much time and was designed for
 a purpose for which no one ever uses it.
 ----------------------------------------------------------------------
+Thu Jun 14 20:23:56 2001                        Michael Jennings (mej)
+
+For the sake of paranoia, Avalon tools will now enforce a umask of
+0022.
+----------------------------------------------------------------------
