@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.136 2001/05/02 21:56:10 mej Exp $
+# $Id: buildtool,v 1.137 2001/05/03 18:26:15 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1790,7 +1790,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.136 $ created on $Date: 2001/05/02 21:56:10 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.137 $ created on $Date: 2001/05/03 18:26:15 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1950,6 +1950,15 @@ main
         }
     }
     dprint "Products to be built:  ", join(" ", @products), "\n";
+
+    if (! $opt_clean) {
+        if (scalar(@packages) > 1) {
+            $opt_clean = "root";
+        } else {
+            $opt_clean = "all";
+        }
+    }
+    dprint "Cleaning:  $opt_clean\n";
 
     if ($end_stage ne "Z") {  # -dbZ, a.k.a. How To Debug the Parser :-)
         &initial_setup();
