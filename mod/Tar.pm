@@ -21,12 +21,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Tar.pm,v 1.2 2001/09/22 13:22:34 mej Exp $
+# $Id: Tar.pm,v 1.3 2003/12/30 23:02:55 mej Exp $
 #
 
 package Mezzanine::Tar;
 
 BEGIN {
+    use strict;
     use Exporter   ();
     use Mezzanine::Util;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');

@@ -21,13 +21,15 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.16 2003/12/04 20:53:24 mej Exp $
+# $Id: RPM.pm,v 1.17 2003/12/30 23:02:55 mej Exp $
 #
 
 package Mezzanine::RPM;
 
 BEGIN {
+    use strict;
     use Exporter   ();
+    #use POSIX ('&geteuid');
     use Mezzanine::Util;
     use Mezzanine::PkgVars;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
@@ -36,11 +38,12 @@ BEGIN {
     $VERSION     = 2.1;
 
     @ISA         = ('Exporter');
-    # Exported functions go here
-    @EXPORT      = ('$specdata', '&rpm_form_command', '&parse_spec_file',
-                    '&disable_patch', '&enable_patch',
-                    '&rpm_install', '&rpm_show_contents', '&rpm_query',
-                    '&rpm_build', '&rpm_compare_versions');
+
+    @EXPORT = ('$specdata', '&rpm_form_command', '&parse_spec_file',
+               '&disable_patch', '&enable_patch', '&rpm_install',
+               '&rpm_show_contents', '&rpm_query', '&rpm_build',
+               '&rpm_compare_versions');
+
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -65,7 +68,7 @@ sub enable_patch($);
 sub rpm_install();
 sub rpm_show_contents();
 sub rpm_query($);
-sub rpm_build($);
+sub rpm_build();
 sub rpm_compare_versions($$);
 
 # Private functions
@@ -86,9 +89,19 @@ rpm_form_command
     $type = "" if (!defined($type));
 
     if ($type eq "build") {
-        &pkgvar_command("/usr/bin/rpmbuild");
+        if (! &pkgvar_command()) {
+            if (&pkgvar_instroot()) {
+                &pkgvar_command("chroot " . &pkgvar_instroot() . " /usr/bin/rpmbuild");
+            } else {
+                &pkgvar_command("/usr/bin/rpmbuild");
+            }
+        } elsif (&pkgvar_instroot()) {
+            &pkgvar_command("chroot " . &pkgvar_instroot() . " " . &pkgvar_command());
+        }
     } else {
-        &pkgvar_command("/bin/rpm");
+        if (! &pkgvar_command()) {
+            &pkgvar_command("/bin/rpm");
+        }
     }
     $cmd = &pkgvar_command();
     if (&pkgvar_rcfile()) {
@@ -106,13 +119,47 @@ rpm_form_command
             $cmd .= " --target=\"" . &pkgvar_architecture() . "\"";
         }
     } elsif ($type eq "install") {
-        if (&pkgvar_instroot() && !(&pkgvar_topdir())) {
+        if (&pkgvar_instroot()) {
             $cmd .= " --root=\"" . &pkgvar_instroot() . "\"";
         }
     }
     if (&pkgvar_parameters()) {
         $cmd .= " " . &pkgvar_parameters();
     }
+
+    # Add final cleanups
+    if ($type eq "build") {
+        if (&pkgvar_instructions()) {
+            $cmd .= " -ba " . &pkgvar_instructions();
+        } elsif (&pkgvar_filename()) {
+            if (&pkgvar_type() eq "srpm") {
+                $cmd .= " --rebuild " . &pkgvar_filename();
+            } elsif (&pkgvar_type() eq "tar") {
+                $cmd .= " -ta " . &pkgvar_filename();
+            } else {
+                &show_backtrace();
+                &fatal_error("Bad call to rpm_form_command(\"build\")!\n");
+            }
+        } else {
+            &show_backtrace();
+            &fatal_error("Bad call to rpm_form_command(\"build\")!\n");
+        }
+    } elsif ($type eq "contents") {
+        $cmd .= " -qlv -p " . &pkgvar_filename();
+    } elsif ($type eq "install") {
+        if (&pkgvar_command() =~ /^(.*\/)?rpm$/) {
+            $cmd .= " -U " . &pkgvar_filename();
+        } else {
+            $cmd .= ' ' . &pkgvar_filename();
+        }
+    } elsif ($type eq "query") {
+        if (&pkgvar_filename()) {
+            $cmd .= " -p " . &pkgvar_filename();
+        } else {
+            $cmd .= " -a";
+        }
+    }
+
     dprint "Command:  $cmd\n";
     return $cmd;
 }
@@ -299,7 +346,7 @@ rpm_install
     if (! &pkgvar_filename()) {
         return (MEZZANINE_SYNTAX_ERROR, "No package specified for install");
     }
-    $cmd = &rpm_form_command("install") . " -U " . &pkgvar_filename();
+    $cmd = &rpm_form_command("install");
     if (!open(RPM, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }
@@ -341,7 +388,7 @@ rpm_show_contents
     my @results;
     local *RPM;
 
-    $cmd = &rpm_form_command("contents") . " -qlv -p " . &pkgvar_filename();
+    $cmd = &rpm_form_command("contents");
     if (!open(RPM, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }
@@ -359,20 +406,16 @@ rpm_query
     my (@results);
     local *RPM;
 
-    $cmd = &rpm_form_command("query");
     if ($query_type eq "d") {
-        $cmd .= " -q --qf '[Contains:  %{FILENAMES}\n][Provides:  %{PROVIDES}\n]"
-            . "[Requires:  %{REQUIRENAME} %{REQUIREFLAGS:depflags} %{REQUIREVERSION}\n]'";
+        &pkgvar_parameters("-q --qf '[Contains:  %{FILENAMES}\n][Provides:  %{PROVIDES}\n]"
+                           . "[Requires:  %{REQUIRENAME} %{REQUIREFLAGS:depflags} %{REQUIREVERSION}\n]'");
     } elsif ($query_type eq "s") {
-        $cmd .= " -q --qf 'Source:  %{SOURCERPM}\n'";
+        &pkgvar_parameters("-q --qf 'Source:  %{SOURCERPM}\n'");
     } else {
         return (MEZZANINE_SYNTAX_ERROR, "Unrecognized query type \"$query_type\"\n");
     }
-    if (&pkgvar_filename()) {
-        $cmd .= " -p " . &pkgvar_filename();
-    } else {
-        $cmd .= " -a";
-    }
+
+    $cmd = &rpm_form_command("query");
     if (!open(RPM, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }
@@ -383,13 +426,13 @@ rpm_query
 }
 
 sub
-rpm_build
+rpm_build()
 {
-    my $cmd = $_[0];
-    my ($line, $err, $msg);
+    my ($cmd, $line, $err, $msg);
     my (@failed_deps, @not_found, @spec_errors, @out_files);
     local *CMD;
 
+    $cmd = &rpm_form_command("build");
     $err = $msg = 0;
     if (!open(CMD, "$cmd </dev/null 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
@@ -413,6 +456,10 @@ rpm_build
             $err = MEZZANINE_BUILD_FAILURE;
             $line =~ s/^Bad exit status from \S+ \((%\w+)\)/$1/;
             $msg = "The RPM $line stage exited abnormally";
+        } elsif ($line =~ /^(error: )?(chroot: )?cannot /) {
+            $err = MEZZANINE_BUILD_FAILURE;
+            $line =~ s/^(error: )?(chroot: )?cannot //;
+            $msg = "chroot:  Unable to $line";
         } elsif ($line =~ /^error: failed build dependencies:/) {
             $err = MEZZANINE_DEPENDENCIES;
             while (<CMD>) {

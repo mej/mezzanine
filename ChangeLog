@@ -228,3 +228,7 @@ Sat Dec 13 13:01:48 2003                        Michael Jennings (mej)
 
 Fix dependencies.
 ----------------------------------------------------------------------
+Tue Dec 30 19:31:00 2003                        Michael Jennings (mej)
+
+Support building packages inside a chroot jail.
+----------------------------------------------------------------------

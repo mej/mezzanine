@@ -21,12 +21,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.21 2003/11/30 16:40:28 mej Exp $
+# $Id: Util.pm,v 1.22 2003/12/30 23:02:55 mej Exp $
 #
 
 package Mezzanine::Util;
 
 BEGIN {
+    use strict;
     use Exporter   ();
     use File::Copy;
     use File::stat;
@@ -86,7 +87,7 @@ sub handle_fatal_signal(@);
 sub handle_warning(@);
 sub show_backtrace();
 sub print_args(@);
-sub mkdirhier($);
+sub mkdirhier($$);
 sub nuke_tree($);
 sub move_files(@);
 sub copy_files(@);
@@ -313,12 +314,15 @@ print_args
 
 # Make a directory hierarchy
 sub
-mkdirhier($)
+mkdirhier($$)
 {
-    my $dir = $_[0];
+    my ($dir, $mask) = @_;
     my @dirs = split("/", $dir);
     my $path = "";
 
+    if (!defined($mask)) {
+        $mask = 0755;
+    }
     dprint "mkdirhier($dir) called.\n";
     foreach $dir (@dirs) {
         $path .= "$dir/";

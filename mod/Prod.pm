@@ -21,12 +21,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.14 2002/07/10 02:33:07 mej Exp $
+# $Id: Prod.pm,v 1.15 2003/12/30 23:02:55 mej Exp $
 #
 
 package Mezzanine::Prod;
 
 BEGIN {
+    use strict;
     use Exporter   ();
     use Cwd;
     use Mezzanine::Util;
@@ -146,6 +147,9 @@ get_var_name
         $var = "ARCH";
     } elsif ($var =~ /^CVS(DIR|ROOT)/) {
         $var = "REPOSITORY";
+    } elsif ($var =~ /^((CH|INST)ROOT|JAIL)([_A-Z]*)$/) {
+        # This one case covers CHROOT, CHROOT_INIT, CHROOT_RESET, et al.
+        $var = "INSTROOT$3";
     }
     return $var;
 }
@@ -408,9 +412,10 @@ parse_product_entry
         return 0;
     }
     # Now that we've got the name/version/release in their final forms, set up the data structures.
-    $pkgs->{$name}{TYPE} = $type;
-    $pkgs->{$name}{MODULE} = $module;
-    $pkgs->{$name}{FILENAME} = ($filename ? $filename : $module);
+    $pkgs->{$name}{"TYPE"} = $type;
+    $pkgs->{$name}{"MODULE"} = $module;
+    $pkgs->{$name}{"FILENAME"} = ($filename ? $filename : $module);
+    $pkgs->{$name}{"INSTROOT"} = &pkgvar_instroot();
     dprint "New package:  $name (module $pkgs->{$name}{MODULE}, "
         . "filename $pkgs->{$name}{FILENAME}) is a $pkgs->{$name}{TYPE}\n";
     foreach $pkgvar (keys %pkgvars) {

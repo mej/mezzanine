@@ -21,12 +21,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.19 2003/06/02 17:06:11 mej Exp $
+# $Id: Pkg.pm,v 1.20 2003/12/30 23:02:55 mej Exp $
 #
 
 package Mezzanine::Pkg;
 
 BEGIN {
+    use strict;
     use Exporter   ();
     use Mezzanine::Util;
     use Mezzanine::RevCtl;

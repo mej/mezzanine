@@ -21,12 +21,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.23 2003/12/02 20:47:43 mej Exp $
+# $Id: Build.pm,v 1.24 2003/12/30 23:02:55 mej Exp $
 #
 
 package Mezzanine::Build;
 
 BEGIN {
+    use strict;
     use Exporter   ();
     use Cwd;
     use File::Copy;
@@ -43,8 +44,16 @@ BEGIN {
     $VERSION     = 2.1;
 
     @ISA         = ('Exporter');
-    # Exported functions go here
-    @EXPORT      = ('&count_cpus', '&prepare_build_tree', '&get_source_list', '&create_source_file', '&create_source_files', '&cleanup_build_tree', '&build_rpms_from_tarball', '&build_debs_from_tarball', '&build_rpms_from_topdir', '&build_debs_from_topdir', '&build_topdir', '&build_spm', '&build_cfst', '&build_fst', '&build_srpm', '&build_tarball', '&build_package');
+
+    @EXPORT = ('&count_cpus', '&prepare_build_tree', '&install_hints',
+               '&get_source_list', '&create_source_file',
+               '&create_source_files', '&cleanup_build_tree',
+               '&build_rpms_from_tarball', '&build_debs_from_tarball',
+               '&build_rpms_from_topdir', '&build_debs_from_topdir',
+               '&build_topdir', '&build_spm', '&build_cfst',
+               '&build_fst', '&build_srpm', '&build_tarball',
+               '&build_package');
+
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -62,6 +71,7 @@ use vars ('@EXPORT_OK');
 ### Function prototypes
 sub count_cpus();
 sub prepare_build_tree($$$);
+sub install_hints();
 sub get_source_list($$$$);
 sub create_source_file($$$$$);
 sub create_source_files($$$\@);
@@ -107,13 +117,15 @@ count_cpus
 sub
 prepare_build_tree
 {
-    my ($name, $topdir, $buildroot, $rpmmacros, $rpmrc);
+    my ($name, $topdir, $buildroot, $instroot, $instructions, $rpmmacros, $rpmrc);
     local *RPMMACROS;
     local *RPMRC;
 
     $name = &pkgvar_name();
     $topdir = &pkgvar_topdir();
     $buildroot = &pkgvar_buildroot();
+    $instroot = &pkgvar_instroot();
+    $instructions = &pkgvar_instructions();
     if (! $name) {
         $name = &basename(&getcwd());
     }
@@ -123,17 +135,33 @@ prepare_build_tree
     if (! $buildroot) {
         $buildroot = "/var/tmp/mezzanine-buildroot.$$/$name";
     }
-    dprint "$name | $topdir | $buildroot\n";
+
+    dprint "$name | $topdir | $buildroot | $instroot | $instructions\n";
     &pkgvar_name($name);
     &pkgvar_topdir($topdir);
     &pkgvar_buildroot($buildroot);
 
     # If the topdir doesn't exist, create it.
-    if (! -d "$topdir") {
-        if (!mkdir("$topdir", 0755)) {
+    if (! -d $topdir) {
+        if (!mkdir($topdir, 0755)) {
             &fatal_error("Cannot create $topdir -- $!\n");
         }
+        dprint "Created $topdir.\n";
         xpush @my_dirs, $topdir;
+    }
+    if ($instroot && ! -d "$instroot$topdir") {
+        if (! -d $instroot) {
+            xpush @my_dirs, $instroot;
+        }
+        dprint "Creating $instroot$topdir with mkdirhier().\n";
+        if (! &mkdirhier("$instroot$topdir", 0755)) {
+            &fatal_error("Cannot create $instroot$topdir -- $!\n");
+        }
+        xpush @my_dirs, "$instroot$topdir";
+    }
+    if ($instroot && $instructions && -e $instructions) {
+        &pkgvar_instructions("$topdir/$instructions");
+        &copy_files($instructions, $instroot . &pkgvar_instructions());
     }
 
     # Create the RPM directories also.  Same deal as above.
@@ -145,6 +173,14 @@ prepare_build_tree
             }
             mkdir("$topdir/$dir", 0755) || &fatal_error("Cannot create $topdir/$dir -- $!\n");
             xpush @my_dirs, "$topdir/$dir";
+        }
+        if ($instroot && ! -d "$instroot$topdir/$dir") {
+            if (-f "$instroot$topdir/$dir") {
+                # It's a bogus file.  Nuke it.
+                &nuke_tree("$instroot$topdir/$dir");
+            }
+            mkdir("$instroot$topdir/$dir", 0755) || &fatal_error("Cannot create $instroot$topdir/$dir -- $!\n");
+            xpush @my_dirs, "$instroot$topdir/$dir";
         }
     }
 
@@ -159,6 +195,59 @@ prepare_build_tree
     return ($name, $topdir, $buildroot);
 }
 
+# Install hint packages into buildroot if needed.
+sub
+install_hints($)
+{
+    my $hints = $_[0] || &pkgvar_hints();
+    my @hint_packages;
+    local *HINTFILE;
+
+    if (! $hints) {
+        return "";
+    }
+
+    if (-d $hints) {
+        $hints = "$hints/" . &pkgvar_name();
+    }
+
+    if (!open(HINTFILE, $hints)) {
+        return "Unable to open hint file $hints -- $!";
+    }
+    while (<HINTFILE>) {
+        my $line;
+
+        chomp($line = $_);
+        xpush @hint_packages, $line;
+    }
+    close(HINTFILE);
+
+    foreach my $pkg (@hint_packages) {
+        my %preserve_pkg_vars;
+        my @tmp;
+        my $err;
+
+        # Save current set of package variables.
+        %preserve_pkg_vars = &pkgvar_get_all();
+
+        # Install hint.
+        &pkgvar_name($pkg);
+        if (! &pkgvar_filename() || ! -e &pkgvar_filename()) {
+            &pkgvar_filename($pkg);
+        }
+        &pkgvar_command(&pkgvar_hint_installer());
+        @tmp = &rpm_install();
+        if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
+            return "Unable to install $pkg ($err)";
+        }
+
+        # Restore previous package variables.
+        &pkgvar_reset(%preserve_pkg_vars);
+    }
+
+    return "";
+}
+
 sub
 get_source_list
 {
@@ -170,7 +259,7 @@ get_source_list
         my $fname;
 
         wprint "No SRCS variable found.  Proceeding with default assumptions.  If the assumptions don't work,\n";
-        wprint "you will need to create an mezzanine.srcs file for this package.\n";
+        wprint "you will need to create a prod.mezz file for this package.\n";
 
         &parse_spec_file();
 
@@ -277,30 +366,37 @@ create_source_files($)
 sub
 cleanup_build_tree
 {
-    my ($topdir, $buildroot, $type);
+    my ($topdir, $buildroot, $instroot, $type);
     my @dirs;
 
     $topdir = &pkgvar_topdir();
     $buildroot = &pkgvar_buildroot();
+    $instroot = &pkgvar_instroot();
     $type = &pkgvar_cleanup();
 
-    dprint "$topdir | $buildroot | $type\n";
+    dprint "$topdir | $buildroot | $instroot | $type\n";
     dprint "Only allowing cleaning in:  ", join(" ", @my_dirs), "\n";
 
     if ($type =~ /no(ne)?/i) {
         return;
     } elsif ($type =~ /temp/i) {
         push(@dirs, "$topdir/BUILD", "$topdir/SOURCES", "$topdir/SPECS") if ($topdir);
+        push(@dirs, "$instroot$topdir/BUILD", "$instroot$topdir/SOURCES", "$instroot$topdir/SPECS") if ("$instroot$topdir");
         push(@dirs, $buildroot) if ($buildroot);
     } elsif ($type =~ /rpm/i) {
         push(@dirs, "$topdir/BUILD", "$topdir/SOURCES", "$topdir/SRPMS", "$topdir/RPMS", "$topdir/SPECS") if ($topdir);
+        push(@dirs, "$instroot$topdir/BUILD", "$instroot$topdir/SOURCES", "$instroot$topdir/SRPMS",
+             "$instroot$topdir/RPMS", "$instroot$topdir/SPECS") if ("$instroot$topdir");
     } elsif ($type =~ /(build)?root/) {
         push(@dirs, $buildroot) if ($buildroot);
     } elsif ($type =~ /build/) {
         push(@dirs, "$topdir/BUILD", "$topdir/SOURCES", "$topdir/SRPMS", "$topdir/RPMS", "$topdir/SPECS") if ($topdir);
+        push(@dirs, "$instroot$topdir/BUILD", "$instroot$topdir/SOURCES", "$instroot$topdir/SRPMS",
+             "$instroot$topdir/RPMS", "$instroot$topdir/SPECS") if ("$instroot$topdir");
         push(@dirs, $buildroot) if ($buildroot);
     } elsif ($type =~ /all/) {
         push(@dirs, $topdir) if ($topdir);
+        push(@dirs, $instroot) if ($instroot);
         push(@dirs, $buildroot) if ($buildroot);
     } else {
         dprint "Unknown cleaning type \"$type\"\n";
@@ -327,16 +423,7 @@ cleanup_build_tree
 sub
 build_rpms_from_tarball
 {
-    my $cmd;
-
-    $cmd = &rpm_form_command("build");
-    if (&pkgvar_filename()) {
-        $cmd .= " -ta " . &pkgvar_filename();
-    } else {
-        &show_backtrace();
-        &fatal_error("No filename?!\n");
-    }
-    return &rpm_build($cmd);
+    return &rpm_build();
 }
 
 # Builds DEB files from a tarball
@@ -363,19 +450,7 @@ build_debs_from_tarball
 sub
 build_rpms_from_topdir
 {
-    my $cmd;
-
-    $cmd = &rpm_form_command("build");
-    if (&pkgvar_instructions()) {
-        $cmd .= " -ba " . &pkgvar_instructions();
-    } elsif (&pkgvar_filename()) {
-        # Paranoia
-        $cmd .= " --rebuild " . &pkgvar_filename();
-    } else {
-        &show_backtrace();
-        &fatal_error("Bad call to build_rpms_from_topdir()!\n");
-    }
-    return &rpm_build($cmd);
+    return &rpm_build();
 }
 
 # Builds DEB files from an RPM-style topdir
@@ -438,7 +513,11 @@ build_spm
         &fatal_error("Call to build_spm() in non-SPM module.\n");
     }
     &prepare_build_tree();
-    $topdir = &pkgvar_topdir();
+    if (&pkgvar_instroot()) {
+        $topdir = &pkgvar_instroot() . '/' . &pkgvar_topdir();
+    } else {
+        $topdir = &pkgvar_topdir();
+    }
 
     @tmp = &grepdir(sub {-f $_ && -s _}, "F");
     if (!scalar(@tmp)) {
@@ -495,7 +574,14 @@ build_cfst
     $target_format = &pkgvar_target();
     $pkgdir = "$topdir/RPMS";
 
-    if (&pkgvar_command()) {
+    if (&pkgvar_instroot()) {
+        $pkgdir = &pkgvar_instroot() . $pkgdir;
+        if (&pkgvar_command()) {
+            $cmd = sprintf("chroot %s %s", &pkgvar_instroot(), &pkgvar_command());
+        } else {
+            $cmd = sprintf("chroot %s make -f Makefile.mezz", &pkgvar_instroot());
+        }
+    } elsif (&pkgvar_command()) {
         $cmd = &pkgvar_command();
     } else {
         $cmd = "make -f Makefile.mezz";
@@ -547,7 +633,7 @@ build_cfst
 sub
 build_fst
 {
-    my ($specfile, $cmd, $ret, $topdir, $buildroot, $target_format);
+    my ($specfile, $cmd, $ret, $topdir, $buildroot, $instroot, $target_format);
     my (@srcs, @tmp);
 
     dprint &print_args(@_);
@@ -555,9 +641,10 @@ build_fst
     &prepare_build_tree();
     $topdir = &pkgvar_topdir();
     $buildroot = &pkgvar_buildroot();
+    $instroot = &pkgvar_instroot();
     $target_format = &pkgvar_target();
     $specfile = &pkgvar_instructions();
-    $pkgdir = "$topdir/RPMS";
+    $pkgdir = "$instroot$topdir/RPMS";
 
     # Look for the build instructions (spec file, debian/ directory, etc.)
     if (! $specfile) {
@@ -575,9 +662,12 @@ build_fst
         $specfile = &pkgvar_instructions($tmp[0]);
     }
 
-    if (! &copy($specfile, "$topdir/SPECS/")) {
-        return (MEZZANINE_SYSTEM_ERROR, "Unable to copy $specfile to $topdir/SPECS/ -- $!\n", undef);
+    if (! &copy($specfile, "$instroot$topdir/SPECS/")) {
+        return (MEZZANINE_SYSTEM_ERROR, "Unable to copy $specfile to $instroot$topdir/SPECS/ -- $!\n", undef);
+    } else {
+        &pkgvar_instructions("$topdir/SPECS/" . &basename($specfile));
     }
+
     # Get ready to build, figure out what sources we need, and create them all.
     if (&parse_prod_file()) {
         my $pkg = &pkgvar_name();
@@ -591,7 +681,7 @@ build_fst
     }
 
     &get_source_list();
-    $ret = &create_source_files("$topdir/SOURCES");
+    $ret = &create_source_files("$instroot$topdir/SOURCES");
     if ($ret != MEZZANINE_SUCCESS) {
         return ($ret, "Creation of source files failed", undef);
     }
@@ -604,7 +694,7 @@ build_fst
 sub
 build_srpm
 {
-    my ($pkg, $topdir, $err);
+    my ($pkg, $topdir, $instroot, $err);
     my (@tmp, @specs);
 
     dprint &print_args(@_);
@@ -612,6 +702,7 @@ build_srpm
     &prepare_build_tree();
     $topdir = &pkgvar_topdir();
     $pkg = &pkgvar_filename();
+    $instroot = &pkgvar_instroot();
 
     @tmp = &rpm_show_contents();
     if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
@@ -631,7 +722,7 @@ build_srpm
     if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
         return (MEZZANINE_PACKAGE_FAILED, "Unable to install $pkg ($err)", undef);
     }
-    @specs = grep(-f "$topdir/SPECS/$_" && -s _, @specs);
+    @specs = grep(-f "$instroot$topdir/SPECS/$_" && -s _, @specs);
     if (scalar(@specs) != 1) {
         return (MEZZANINE_NO_SOURCES, "Found ${\(scalar(@specs))} spec files in $pkg?!", undef);
     }

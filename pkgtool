@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.52 2001/10/10 15:12:25 mej Exp $
+# $Id: pkgtool,v 1.53 2003/12/30 23:02:55 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -85,10 +85,14 @@ main
     &print_usage_info() if (!scalar(@ARGV) && &basename($0) !~ /^mz/);
     umask 022;
 
-    # See the Getopt::Long man page for details on the syntax of this line
-    @valid_opts = ("h|help", "v|version", "d|debug", "b|build", "i|install", "c|contents", "q|query=s",
-                   "o|sources:s", "p|package=s", "s|specfile|scripts=s", "m|module=s", "t|target=s",
-                   "a|arch=s", "P|program=s", "R|rcfile=s", "tar=s", "zip=s", "D|destdir=s", "r|root=s");
+    @valid_opts = ("h|help", "v|version", "d|debug", "b|build",
+                   "i|install", "c|contents", "q|query=s",
+                   "o|sources:s", "p|package=s",
+                   "s|specfile|scripts=s", "m|module=s", "t|target=s",
+                   "a|arch=s", "P|program=s", "R|rcfile=s", "tar=s",
+                   "zip=s", "D|destdir=s", "r|root=s", "H|hints=s",
+                   "hi|hint-installer=s");
+
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -96,7 +100,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.52 $ created on $Date: 2001/10/10 15:12:25 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.53 $ created on $Date: 2003/12/30 23:02:55 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -159,6 +163,27 @@ main
         }
     }
 
+    # Handle hint file/directory specification
+    if ($opt_H) {
+        $ENV{"MEZZANINE_HINTDIR"} = $opt_H;
+    }
+    if ($ENV{"MEZZANINE_HINTDIR"}) {
+        my ($installer, $hints) = split('%', $ENV{"MEZZANINE_HINTDIR"});
+
+        if (! $hints) {
+            # If we only have 1 thing, assume it's the hints, not the installer.
+            &pkgvar_hints($installer);
+        } else {
+            # We have both.
+            &pkgvar_hint_installer($installer);
+            &pkgvar_hints($hints);
+        }
+    }
+    if ($opt_hi) {
+        # Override installer from command line.
+        &pkgvar_hint_installer($opt_hi);
+    }
+
     # Signal handling
     $SIG{HUP} = 'IGNORE';
     $SIG{INT} = \&handle_signal;
@@ -177,7 +202,7 @@ main
         my ($pkg, $topdir, $buildroot);
 
         &pkgvar_cleanup("all");
-        &pkgvar_instroot(&getcwd()) if (! &pkgvar_instroot());
+        #&pkgvar_instroot(&getcwd()) if (! &pkgvar_instroot());
         if ((-e &pkgvar_instructions()) && (! &pkgvar_filename())) {
             &prepare_build_tree();
             ($err, $msg, $outfiles) = &build_topdir();
@@ -190,7 +215,7 @@ main
         }
         print "Package build succeeded.  Output files are:\n\n";
         foreach my $f (split(' ', $outfiles)) {
-            if (&copy_files($f, &pkgvar_instroot())) {
+            if (&copy_files($f, ".")) {
                 print &basename($f);
             } else {
                 print $f;

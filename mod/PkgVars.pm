@@ -27,7 +27,8 @@
 package Mezzanine::PkgVars;
 
 BEGIN {
-    use Exporter   ();
+    use strict;
+    use Exporter();
     use Mezzanine::Util;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
@@ -35,8 +36,18 @@ BEGIN {
     $VERSION     = 2.1;
 
     @ISA         = ('Exporter');
-    # Exported functions go here
-    @EXPORT      = ('&pkgvar_reset', '&pkgvar_name', '&pkgvar_type', '&pkgvar_subtype', '&pkgvar_filename', '&pkgvar_target', '&pkgvar_srcs', '&pkgvar_instructions', '&pkgvar_topdir', '&pkgvar_instroot', '&pkgvar_buildroot', '&pkgvar_architecture', '&pkgvar_parameters', '&pkgvar_command', '&pkgvar_rcfile', '&pkgvar_tar', '&pkgvar_zip', '&pkgvar_cleanup', '&get_package_path', '&identify_package_type');
+
+    @EXPORT = ('&pkgvar_get', '&pkgvar_get_all', '&pkgvar_set',
+               '&pkgvar_reset', '&pkgvar_name', '&pkgvar_type',
+               '&pkgvar_subtype', '&pkgvar_filename',
+               '&pkgvar_target', '&pkgvar_srcs', '&pkgvar_hints',
+               '&pkgvar_instructions', '&pkgvar_topdir',
+               '&pkgvar_instroot', '&pkgvar_buildroot',
+               '&pkgvar_architecture', '&pkgvar_parameters',
+               '&pkgvar_command', '&pkgvar_rcfile', '&pkgvar_tar',
+               '&pkgvar_zip', '&pkgvar_cleanup', '&get_package_path',
+               '&identify_package_type');
+
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -49,32 +60,41 @@ use vars ('@EXPORT_OK');
 ### Initialize exported package variables
 
 ### Initialize private global variables
-$pkg_name = "";
-$pkg_file = "";
-$pkg_target = "rpms";
-$pkg_srcs = "";
-$pkg_inst = "";
-$pkg_topdir = "";
-$pkg_instroot = "";
-$pkg_buildroot = "/var/tmp/mezzanine-buildroot.$$";
-$pkg_arch = "i386";
-$pkg_params = "";
-$pkg_cmd = "";
-$pkg_rcfile = "";
-$pkg_tar = "";
-$pkg_zip = "";
-$pkg_cleanup = "none";
-%pkg_type = ();
-%pkg_subtype = ();
+my %orig_pkg_vars = ();
+$orig_pkg_vars{"name"} = "";
+$orig_pkg_vars{"file"} = "";
+$orig_pkg_vars{"target"} = "rpms";
+$orig_pkg_vars{"srcs"} = "";
+$orig_pkg_vars{"hints"} = "";
+$orig_pkg_vars{"hint_installer"} = "";
+$orig_pkg_vars{"instructions"} = "";
+$orig_pkg_vars{"topdir"} = "";
+$orig_pkg_vars{"instroot"} = "";
+$orig_pkg_vars{"buildroot"} = "/var/tmp/mezzanine-buildroot.$$";
+$orig_pkg_vars{"arch"} = "i386";
+$orig_pkg_vars{"params"} = "";
+$orig_pkg_vars{"cmd"} = "";
+$orig_pkg_vars{"rcfile"} = "";
+$orig_pkg_vars{"tar"} = "";
+$orig_pkg_vars{"zip"} = "";
+$orig_pkg_vars{"cleanup"} = "none";
+%{$orig_pkg_vars{"type"}} = ();
+%{$orig_pkg_vars{"subtype"}} = ();
+
+my %pkg_vars = %orig_pkg_vars;
 
 ### Function prototypes
-sub pkgvar_reset();
+sub pkgvar_get($);
+sub pkgvar_get_all();
+sub pkgvar_set(%);
+sub pkgvar_reset(%);
 sub pkgvar_name($);
 sub pkgvar_type($);
 sub pkgvar_subtype($);
 sub pkgvar_filename($);
 sub pkgvar_target($);
 sub pkgvar_srcs(@);
+sub pkgvar_hints($);
 sub pkgvar_instructions($);
 sub pkgvar_topdir($);
 sub pkgvar_instroot($);
@@ -98,241 +118,73 @@ END {
 ### Function definitions
 
 sub
-pkgvar_reset
+pkgvar_get($)
 {
-    &pkgvar_name("");
-    &pkgvar_type("");
-    &pkgvar_filename("");
-    &pkgvar_target("");
-    &pkgvar_srcs("");
-    &pkgvar_instructions("");
-    &pkgvar_topdir("");
-    &pkgvar_instroot("");
-    &pkgvar_buildroot("");
-    &pkgvar_architecture("");
-    &pkgvar_parameters("");
-    &pkgvar_command("");
-    &pkgvar_rcfile("");
-    &pkgvar_tar("");
-    &pkgvar_zip("");
-    &pkgvar_cleanup("");
+    return $pkg_vars{$_[0]};
 }
 
 sub
-pkgvar_name
+pkgvar_get_all()
 {
-    my $param = $_[0];
+    return %pkg_vars;
+}
 
-    if (defined($param)) {
-        $pkg_name = ($param ?  $param : "");
+sub
+pkgvar_set(%)
+{
+    my %new_pkg_vars;
+    my $ret;
+
+    if (ref($_[0]) eq "HASH") {
+        %new_pkg_vars = %{$_[0]};
+    } elsif (scalar(@_) % 2 == 0) {
+        %new_pkg_vars = @_;
+    } elsif (defined($pkg_vars{$_[0]})) {
+        return $pkg_vars{$_[0]};
+    } else {
+        return undef;
     }
-    dprint "$pkg_name\n";
-    return $pkg_name;
-}
 
-sub
-pkgvar_type
-{
-    my $param = $_[0];
+    foreach $var (keys(%new_pkg_vars)) {
+        my $param = $new_pkg_vars{$var};
 
-    if (defined($param)) {
-        if ($param) {
-            $pkg_type{$pkg_file} = $param;
-        } else {
-            &identify_package_type();
+        if (defined($param)) {
+            $pkg_vars{$var} = ($param ?  $param : $orig_pkg_vars{$var});
         }
+        $ret = $pkg_vars{$var};
     }
-    dprint "$pkg_type{$pkg_file}\n";
-    return $pkg_type{$pkg_file};
+    return $ret;
 }
 
 sub
-pkgvar_subtype
+pkgvar_reset(%)
 {
-    my $param = $_[0];
-
-    if (defined($param)) {
-        if ($param) {
-            $pkg_subtype{$pkg_file} = $param;
-        } else {
-            &identify_package_type();
-        }
+    if (ref($_[0]) eq "HASH") {
+        %pkg_vars = %{$_[0]};
+    } elsif (scalar(@_)) {
+        %pkg_vars = @_;
+    } else {
+        %pkg_vars = %orig_pkg_vars;
     }
-    dprint "$pkg_subtype{$pkg_file}\n";
-    return $pkg_subtype{$pkg_file};
 }
 
-sub
-pkgvar_filename
-{
-    my $param = $_[0];
-
-    if (defined($param)) {
-        if (defined($_[1])) {
-            $param = &get_package_path(@_);
-        }
-        $pkg_file = ($param ?  $param : "");
-    }
-    &identify_package_type() if ($pkg_file && !$pkg_type{$pkg_file});
-    dprint "$pkg_file\n";
-    return $pkg_file;
-}
-
-sub
-pkgvar_target
-{
-    my $param = $_[0];
-
-    if (defined($param)) {
-        $pkg_target = ($param ? $param : "rpms");
-    }
-    dprint "$pkg_target\n";
-    return $pkg_target;
-}
-
-sub
-pkgvar_srcs
-{
-    my $param = $_[0];
-
-    if (defined($param)) {
-        $pkg_srcs = ($param ? $param : "");
-    }
-    dprint "$pkg_srcs\n";
-    return $pkg_srcs;
-}
-
-sub
-pkgvar_instructions
-{
-    my $param = $_[0];
-
-    if (defined($param)) {
-        $pkg_inst = ($param ?  $param : "");
-    }
-    dprint "$pkg_inst\n";
-    return $pkg_inst;
-}
-
-sub
-pkgvar_topdir
-{
-    my $param = $_[0];
-
-    if (defined($param)) {
-        $pkg_topdir = ($param ? $param : "");
-    }
-    dprint "$pkg_topdir\n";
-    return $pkg_topdir;
-}
-
-sub
-pkgvar_instroot
-{
-    my $param = $_[0];
-
-    if (defined($param)) {
-        $pkg_instroot = ($param ? $param : "");
-    }
-    dprint "$pkg_instroot\n";
-    return $pkg_instroot;
-}
-
-sub
-pkgvar_buildroot
-{
-    my $param = $_[0];
-
-    if (defined($param)) {
-        $pkg_buildroot = ($param ? $param : "/var/tmp/mezzanine-buildroot.$$");
-    }
-    dprint "$pkg_buildroot\n";
-    return $pkg_buildroot;
-}
-
-sub
-pkgvar_architecture
-{
-    my $param = $_[0];
-
-    if (defined($param)) {
-        $pkg_arch = ($param ? $param : "i386");
-    }
-    dprint "$pkg_arch\n";
-    return $pkg_arch;
-}
-
-sub
-pkgvar_parameters
-{
-    my $param = $_[0];
-
-    if (defined($param)) {
-        $pkg_params = ($param ? $param : "");
-    }
-    dprint "$pkg_params\n";
-    return $pkg_params;
-}
-
-sub
-pkgvar_command
-{
-    my $param = $_[0];
-
-    if (defined($param)) {
-        $pkg_cmd = ($param ? $param : "");
-    }
-    dprint "$pkg_cmd\n";
-    return $pkg_cmd;
-}
-
-sub
-pkgvar_rcfile
-{
-    my $param = $_[0];
-
-    if (defined($param)) {
-        $pkg_rcfile = ($param ? $param : "");
-    }
-    dprint "$pkg_rcfile\n";
-    return $pkg_rcfile;
-}
-
-sub
-pkgvar_tar
-{
-    my $param = $_[0];
-
-    if (defined($param)) {
-        $pkg_tar = ($param ? $param : "");
-    }
-    dprint "$pkg_tar\n";
-    return $pkg_tar;
-}
-
-sub
-pkgvar_zip
-{
-    my $param = $_[0];
-
-    if (defined($param)) {
-        $pkg_zip = ($param ? $param : "");
-    }
-    dprint "$pkg_zip\n";
-    return $pkg_zip;
-}
-
-sub
-pkgvar_cleanup
-{
-    my $param = $_[0];
-
-    if (defined($param)) {
-        $pkg_cleanup = ($param ? $param : "none");
-    }
-    dprint "$pkg_cleanup\n";
-    return $pkg_cleanup;
-}
+# Default set routines for backward compatability.
+sub pkgvar_name($) {&pkgvar_set("name", @_);}
+sub pkgvar_target($) {&pkgvar_set("target", @_);}
+sub pkgvar_srcs($) {&pkgvar_set("srcs", @_);}
+sub pkgvar_hints($) {&pkgvar_set("hints", @_);}
+sub pkgvar_hint_installer($) {&pkgvar_set("hint_installer", @_);}
+sub pkgvar_instructions($) {&pkgvar_set("instructions", @_);}
+sub pkgvar_topdir($) {&pkgvar_set("topdir", @_);}
+sub pkgvar_instroot($) {&pkgvar_set("instroot", @_);}
+sub pkgvar_buildroot($) {&pkgvar_set("buildroot", @_);}
+sub pkgvar_architecture($) {&pkgvar_set("architecture", @_);}
+sub pkgvar_parameters($) {&pkgvar_set("parameters", @_);}
+sub pkgvar_command($) {&pkgvar_set("command", @_);}
+sub pkgvar_rcfile($) {&pkgvar_set("rcfile", @_);}
+sub pkgvar_tar($) {&pkgvar_set("tar", @_);}
+sub pkgvar_zip($) {&pkgvar_set("zip", @_);}
+sub pkgvar_cleanup($) {&pkgvar_set("cleanup", @_);}
 
 # Convert a module and a filename to a full path
 sub
@@ -353,30 +205,82 @@ get_package_path
     }
 }
 
+sub
+pkgvar_type
+{
+    my $param = $_[0];
+    my $filename = $pkg_vars{"file"};
+
+    if (defined($param)) {
+        if ($param) {
+            $pkg_vars{"type"}{$filename} = $param;
+        } else {
+            &identify_package_type();
+        }
+    }
+    dprint "$pkg_vars{type}{$filename}\n";
+    return $pkg_vars{"type"}{$filename};
+}
+
+sub
+pkgvar_subtype
+{
+    my $param = $_[0];
+    my $filename = $pkg_vars{"file"};
+
+    if (defined($param)) {
+        if ($param) {
+            $pkg_vars{"subtype"}{$filename} = $param;
+        } else {
+            &identify_package_type();
+        }
+    }
+    dprint "$pkg_vars{subtype}{$filename}\n";
+    return $pkg_vars{"subtype"}{$filename};
+}
+
+sub
+pkgvar_filename
+{
+    my $param = $_[0];
+
+    if (defined($param)) {
+        if (defined($_[1])) {
+            $param = &get_package_path(@_);
+        }
+        $pkg_vars{"file"} = ($param ?  $param : "");
+    }
+    &identify_package_type() if ($pkg_vars{"file"} && !$pkg_vars{"type"}{$pkg_vars{"file"}});
+    dprint "$pkg_vars{file}\n";
+    return $pkg_vars{"file"};
+}
+
 # Figure out the type of a particular package file
 sub
 identify_package_type
 {
-    if (substr($pkg_file, -4, 4) eq ".rpm") {
-        $pkg_type{$pkg_file} = "rpm";
-        if (substr($pkg_file, -7, 7) eq "src.rpm") {
-            $pkg_subtype{$pkg_file} = "srpm";
+    my $filename = $pkg_vars{"file"};
+
+    if (substr($filename, -4, 4) eq ".rpm") {
+        $pkg_vars{"type"}{$filename} = "rpm";
+        if (substr($filename, -7, 7) eq "src.rpm") {
+            $pkg_vars{"subtype"}{$filename} = "srpm";
         } else {
-            $pkg_subtype{$pkg_file} = "rpm";
+            $pkg_vars{"subtype"}{$filename} = "rpm";
         }
-    } elsif (substr($pkg_file, -4, 4) eq ".deb") {
-        $pkg_type{$pkg_file} = "deb";
-        if (substr($pkg_file, -7, 7) eq "src.deb") {
-            $pkg_subtype{$pkg_file} = "sdeb";
+    } elsif (substr($filename, -4, 4) eq ".deb") {
+        $pkg_vars{"type"}{$filename} = "deb";
+        if (substr($filename, -7, 7) eq "src.deb") {
+            $pkg_vars{"subtype"}{$filename} = "sdeb";
         } else {
-            $pkg_subtype{$pkg_file} = "deb";
+            $pkg_vars{"subtype"}{$filename} = "deb";
         }
-    } elsif ($pkg_file =~ /\.(tar\.|t)?(gz|bz|bz2|Z)$/) {
-        $pkg_type{$pkg_file} = $pkg_subtype{$pkg_file} = "tar";
+    } elsif ($filename =~ /\.(tar\.|t)?(gz|bz|bz2|Z)$/) {
+        $pkg_vars{"type"}{$filename} = $pkg_vars{"subtype"}{$filename} = "tar";
     } else {
-        $pkg_type{$pkg_file} = $pkg_subtype{$pkg_file} = "";
+        $pkg_vars{"type"}{$filename} = $pkg_vars{"subtype"}{$filename} = "";
     }
-    dprint "Identified $pkg_file as $pkg_type{$pkg_file}\n";
+    dprint "Identified $filename as $pkg_vars{type}{$filename}\n";
 }
 
 ### Private functions

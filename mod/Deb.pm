@@ -21,12 +21,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Deb.pm,v 1.4 2002/02/18 18:48:53 mej Exp $
+# $Id: Deb.pm,v 1.5 2003/12/30 23:02:55 mej Exp $
 #
 
 package Mezzanine::Deb;
 
 BEGIN {
+    use strict;
     use Exporter   ();
     use Mezzanine::Util;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');

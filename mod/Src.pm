@@ -21,12 +21,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.13 2003/11/30 16:40:28 mej Exp $
+# $Id: Src.pm,v 1.14 2003/12/30 23:02:55 mej Exp $
 #
 
 package Mezzanine::Src;
 
 BEGIN {
+    use strict;
     use Exporter   ();
     use File::Copy;
     use File::Find;

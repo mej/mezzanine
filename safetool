@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: safetool,v 1.6 2001/06/15 03:27:38 mej Exp $
+# $Id: safetool,v 1.7 2003/12/30 23:02:55 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -129,6 +129,10 @@ sub
 main
 {
     my @args;
+
+    if ($0 =~ /safetool$/) {
+        return 0;
+    }
 
     # Set up the basic variables
     $progname = "safetool";

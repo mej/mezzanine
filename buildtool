@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.159 2002/07/10 02:29:50 mej Exp $
+# $Id: buildtool,v 1.160 2003/12/30 23:02:55 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -214,6 +214,11 @@ build_single_package
     } elsif (&is_build_needed()) {
         # Build the source
         &pkgvar_target($target);
+        if ($pkgs->{$pkg}{"INSTROOT"}) {
+            &pkgvar_instroot($pkgs->{$pkg}{"INSTROOT"});
+        } else {
+            &pkgvar_instroot("");
+        }
         ($err, $msg, $outfiles) = &build_package();
         if ($err != MEZZANINE_SUCCESS) {
             &fail_package($pkg, $msg);
@@ -266,6 +271,10 @@ build_package_forked
                 &pkgvar_buildroot("$buildroot/$pkg.$$");
             } else {
                 &pkgvar_buildroot("/var/tmp/mezzanine-buildroot.$$");
+            }
+            if ($pkgs->{$pkg}{"INSTROOT"}) {
+                # This package build is chrooted.
+
             }
             $err = &build_single_package($pkg);
             close(LOGFILE) if ($GLOBAL_LOG);
@@ -413,8 +422,9 @@ parallel_build
     my %child_pkg;
 
     # Create the directories for building this product
-    &pkgvar_topdir(&make_build_dir(&getcwd()));
+    $builddir = &make_build_dir(&getcwd());
     $logdir = &make_log_dir($builddir);
+    &pkgvar_topdir($builddir);
     # Need to do this here for parallel builds because it's not parallel-safe.  Race condition. :(
     &prepare_build_tree();
 
@@ -506,10 +516,9 @@ build_product
     my @packages = @_;
     my $builddir;
 
-    &pkgvar_topdir(&make_build_dir(&getcwd()));
-    if (!chdir($builddir)) {
-        &fatal_error("Unable to chdir to build directory -- $!\n");
-    }
+    $builddir = &make_build_dir(&getcwd());
+    $logdir = &make_log_dir($builddir);
+    &pkgvar_topdir($builddir);
 
     if (! $opt_nocache) {
         &scan_rpm_dirs();
@@ -573,17 +582,21 @@ main
 {
     # Set up the basic variables
     $progname = "buildtool";
-    $version = "2.1";
+    $version = "3.0";
     umask 022;
     $ret = MEZZANINE_SUCCESS;
 
     # No input.
     open(STDIN, "</dev/null");
 
-    # See the Getopt::Long man page for details on the syntax of this line
-    @valid_opts = ("h|help", "v|version", "d|debug", "q|quiet", "Q|really-quiet|silent", "D|dir|tree=s",
-                   "l|log=s", "P|parallel:s", "t|target=s", "p|prod|product|prodfile=s", "C|cflags=s",
-                   "T|tag=s", "nocache", "clean:s", "U|user=s");
+    @valid_opts = ("h|help", "v|version", "d|debug", "q|quiet",
+                   "Q|really-quiet|silent", "D|dir|tree=s", "l|log=s",
+                   "P|parallel:s", "t|target=s",
+                   "p|prod|product|prodfile=s", "C|cflags=s",
+                   "T|tag=s", "nocache", "clean:s", "U|user=s",
+                   "i|instroot|jail=s", "H|hints=s",
+                   "hi|hint-installer=s");
+
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -592,7 +605,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.159 $ created on $Date: 2002/07/10 02:29:50 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.160 $ created on $Date: 2003/12/30 23:02:55 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -627,6 +640,28 @@ main
     $global_tag = $opt_T;
     &pkgvar_cleanup($opt_clean);
     &pkgvar_target($opt_t);
+    &pkgvar_instroot($opt_i);
+
+    # Handle hint file/directory specification
+    if ($opt_H) {
+        $ENV{"MEZZANINE_HINTDIR"} = $opt_H;
+    }
+    if ($ENV{"MEZZANINE_HINTDIR"}) {
+        my ($installer, $hints) = split('%', $ENV{"MEZZANINE_HINTDIR"});
+
+        if (! $hints) {
+            # If we only have 1 thing, assume it's the hints, not the installer.
+            &pkgvar_hints($installer);
+        } else {
+            # We have both.
+            &pkgvar_hint_installer($installer);
+            &pkgvar_hints($hints);
+        }
+    }
+    if ($opt_hi) {
+        # Override installer from command line.
+        &pkgvar_hint_installer($opt_hi);
+    }
 
     # Figure out parallelization stuff
     if (defined($opt_P)) {
