@@ -21,12 +21,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: CVS.pm,v 1.5 2004/06/24 23:31:43 mej Exp $
+# $Id: CVS.pm,v 1.6 2004/06/28 16:59:17 mej Exp $
 #
 
 package Mezzanine::SCM::CVS;
 use Exporter;
 use POSIX;
+use File::Find;
 use Cwd 'abs_path';
 use Mezzanine::Util;
 use Mezzanine::SCM::Global;
@@ -68,6 +69,8 @@ my %DEFAULT_VALUES = (
                       # Branching/tagging
                       "source_branch" => "",
                       "target_branch" => "",
+                      "source_revision" => "",
+                      "target_revision" => "",
                       "source_tag" => "",
                       "target_tag" => "",
                       "source_date" => "",
@@ -105,6 +108,9 @@ can_handle($)
 
     dprint "CVS::can_handle():  $proto $class $path\n";
 
+    if (($path eq "Mezzanine::SCM") || ($path eq $class)) {
+        $path = ".";
+    }
     if (! $path) {
         dprint "$path is false.\n";
         return MZSCM_CANNOT_HANDLE;
@@ -355,9 +361,7 @@ get(@)
     if ($self->{"reset"}) {
         push @params, "-A";
     }
-    if ($self->{"source_tag"} && (lc($self->{"source_tag"}) ne "head")) {
-        push @params, "-r", $self->{"source_tag"};
-    }
+    push @params, $self->get_standard_tag_params(0);
     push @params, (($self->{"recursion"}) ? ("-R") : ("-l"));
 
     if (scalar(@checkout)) {
@@ -370,34 +374,7 @@ get(@)
         }
         $err = $self->talk_to_server("get", "update", @params, @files);
     }
-
-    # Note:  The following exists solely because CVS is too lame to handle symlinks.
-    foreach my $dirname (grep(-d $_, @files)) {
-        my $linkfile = "$dirname/.mezz.symlinks";
-        local *SL;
-
-        next if (!(-f $linkfile && -s _ && open(SL, $linkfile)));
-        while (<SL>) {
-            my ($link_from, $link_to, $line);
-
-            chomp($line = $_);
-            next if ($line !~ / -> /);
-            ($link_from, $link_to) = split(" -> ", $line);
-            dprint "Creating symlink:  $link_from -> $link_to\n";
-            if (-e "$dirname/$link_from") {
-                if (-l "$dirname/$link_from") {
-                    unlink("$dirname/$link_from");
-                } else {
-                    eprint "Non-link file $link_from exists; can't create symlink to $link_to!\n";
-                    next;
-                }
-            }
-            if (!symlink($link_to, "$dirname/$link_from")) {
-                eprint "Unable to symlink $link_from to $link_to -- $!\n";
-            }
-        }
-    }
-    close(SL);
+    $self->parse_symlink_file(@files);
     return $err;
 }
 
@@ -443,9 +420,7 @@ put($@)
     }
     push @params, "-m", $entry;
 
-    if ($self->{"source_tag"} && (lc($self->{"source_tag"}) ne "head")) {
-        push @params, "-r", $self->{"source_tag"};
-    }
+    push @params, $self->get_standard_tag_params(0);
     push @params, (($self->{"recursion"}) ? ("-R") : ("-l"));
     return $self->talk_to_server("put", @params, @files);
 }
@@ -488,13 +463,10 @@ sub
 diff(@)
 {
     my ($self, @files) = @_;
-    my @params = ("diff", "-NRu");
+    my @params = ("diff", "-Nu");
 
     dprint &print_args(@_);
-
-    if ($self->{"source_tag"}) {
-        # FIXME:  Need to support tags/revisions/dates
-    }
+    push @params, $self->get_standard_tag_params(0);
     push @params, (($self->{"recursion"}) ? ("-R") : ("-l"));
     return $self->talk_to_server("diff", @params, @files);
 }
@@ -507,9 +479,7 @@ annotate(@)
 
     dprint &print_args(@_);
 
-    if ($self->{"source_tag"} && (lc($self->{"source_tag"}) ne "head")) {
-        push @params, "-r", $self->{"source_tag"}, "-f";
-    }
+    push @params, "-f", $self->get_standard_tag_params(0);
     push @params, (($self->{"recursion"}) ? ("-R") : ("-l"));
     return $self->talk_to_server("annotate", @params, @files);
 }
@@ -545,9 +515,33 @@ log(@)
     dprint &print_args(@_);
 
     if ($self->{"source_tag"}) {
-        # FIXME:  Need to support tags/revisions/dates
+        my $tag = $self->{"source_tag"};
+
+        if ($self->{"target_tag"}) {
+            $tag .= ':' . $self->{"target_tag"};
+        }
+        push @params, "-r", $tag;
+    } elsif ($self->{"source_branch"}) {
+        push @params, "-r", $self->{"source_branch"};
+    } elsif ($self->{"source_revision"}) {
+        my $revision = $self->{"source_revision"};
+
+        if ($self->{"target_revision"}) {
+            $revision .= ':' . $self->{"target_revision"};
+        }
+        push @params, "-r", $revision;
+    } elsif ($self->{"source_date"}) {
+        my $date = $self->{"source_date"};
+
+        if ($self->{"target_date"}) {
+            $date .= '<' . $self->{"target_date"};
+        }
+        push @params, "-d", $date;
     }
-    push @params, (($self->{"recursion"}) ? ("-R") : ("-l"));
+
+    if (! $self->{"recursion"}) {
+        push @params, "-l";
+    }
     return $self->talk_to_server("log", @params, @files);
 }
 
@@ -562,7 +556,7 @@ tag()
     if (! $self->{"source_tag"}) {
         return MEZZANINE_INVALID_TAG;
     }
-    push @params, "-F", $self->{"source_tag"}, (($self->{"recursion"}) ? ("-R") : ("-l"));
+    push @params, (($self->{"recursion"}) ? ("-R") : ("-l")), "-F", $self->{"source_tag"};
     return $self->talk_to_server("tag", @params, @files);
 }
 
@@ -576,7 +570,18 @@ branch()
 sub
 merge()
 {
+    my ($self, @files) = @_;
+    my @params;
 
+    dprint &print_args(@_);
+
+    if (!scalar(@files)) {
+        push @files, '.';
+    }
+
+    push @params, $self->get_standard_tag_params(1);
+    push @params, (($self->{"recursion"}) ? ("-R") : ("-l"));
+    return $self->talk_to_server("get", "update", @params, @files);
 }
 
 sub
@@ -625,6 +630,7 @@ imprt()
         $release_tag =~ tr/[a-z]/[A-Z]/;
         $release_tag =~ s/[^-_A-Z0-9]/_/g;
 
+        $self->create_symlink_file();
         #return MEZZANINE_INVALID_TAG if (! &check_tags($module));
 
         if ($self->{"keyword_expansion"} && ($self->{"keyword_expansion"} ne "auto")) {
@@ -650,7 +656,32 @@ imprt()
 sub
 create_symlink_file(@)
 {
+    my $path = $_[0];
+    my $cnt;
+    my %links;
+    local *SYMLINKS;
 
+    $path = '.' if (! $path);
+    &find(sub {-l && ($links{$File::Find::name} = readlink($_));}, $path);
+    $cnt = scalar(keys %links);
+    if ($cnt) {
+        dprint "Found $cnt symlinks.\n";
+        if (!open(SYMLINKS, ">$path/.mezz.symlinks")) {
+            eprint "Unable to open $path/.mezz.symlinks for writing -- $!\n";
+            return MEZZANINE_SYSTEM_ERROR;
+        }
+        foreach my $link (sort keys %links) {
+            my $newlink;
+
+            ($newlink = $link) =~ s/^\.\///;
+            print SYMLINKS "$newlink -> $links{$link}\n";
+            unlink($newlink);
+        }
+        close(SYMLINKS);
+    } else {
+        dprint "No symlinks found.\n";
+    }
+    return MEZZANINE_SUCCESS;
 }
 
 # Parse the symlink file and create needed symlinks.
@@ -733,6 +764,57 @@ rewrite_relative_paths()
     return @new_args;
 }
 
+# Separate tags from revisions and dates.
+sub
+get_standard_tag_params()
+{
+    my ($self, $merge) = @_;
+    my $option = "-r";
+    my @params;
+
+    if ($merge) {
+        $option = "-j";
+    }
+
+    foreach my $type ("branch", "revision", "tag", "date") {
+        if (uc($self->propget("source_$type")) eq "HEAD") {
+            $self->propset("source_$type", "");
+        }
+        if (uc($self->propget("target_$type")) eq "HEAD") {
+            $self->propset("target_$type", "");
+        }
+        if (($self->propget("target_$type")) && !($self->propget("source_$type"))) {
+            $self->propset(
+                           "source_$type" => $self->propget("target_$type"),
+                           "target_$type" => ""
+                          );
+        }
+    }
+
+    if ($self->{"source_tag"}) {
+        push @params, $option, $self->{"source_tag"};
+        if ($self->{"target_tag"}) {
+            push @params, $option, $self->{"target_tag"};
+        }
+    } elsif ($self->{"source_branch"}) {
+        push @params, $option, $self->{"source_branch"};
+        if ($self->{"target_branch"}) {
+            push @params, $option, $self->{"target_branch"};
+        }
+    } elsif ($self->{"source_revision"}) {
+        push @params, $option, $self->{"source_revision"};
+        if ($self->{"target_revision"}) {
+            push @params, $option, $self->{"target_revision"};
+        }
+    } elsif ($self->{"source_date"}) {
+        push @params, "-D", $self->{"source_date"};
+        if ($self->{"target_date"}) {
+            push @params, "-D", $self->{"target_date"};
+        }
+    }
+    return @params;
+}
+
 # Print or store errors.
 sub
 my_print
@@ -792,6 +874,7 @@ talk_to_server($@)
         local *CMD;
 
         $err = 0;
+        dprintf("Executing:  '%s'\n", join("' '", @params));
         $pid = open(CMD, '-|');
         if (!defined($pid)) {
             my_print($self, "Execution of \"$cmd\" failed -- $!\n");

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.85 2004/06/24 22:33:10 mej Exp $
+# $Id: revtool,v 1.86 2004/06/28 16:59:17 mej Exp $
 #
 
 use strict;
@@ -56,18 +56,27 @@ print_usage_info
     print "    -p --put                 Upload new changes to the master tree\n";
     print "    -a --add                 Mark new files for addition into the master tree\n";
     print "    -r --remove              Delete files and mark them for deletion in the master tree\n";
-    print "    -q --query <type>        Query for a particular type of information\n";
+    print "    -R --recurse             Operate recursively (this is the default for some commands)\n";
     print "    -i --import              Import a new set of sources, or update the vendor branch for a package\n";
     print "    -t --tag <tag>           Specify a symbolic tag for an operation, or tag local sources\n";
-    print "    -T --rtag <tag>          Tag one or more complete modules directly\n";
+    print "    -T --ttag <tag>          Specify the target tag for a diff/merge\n";
+    print "    -I --info --query        Obtain information about file(s) in SCM.\n";
+    print "       --diff                Generate a diff (diff -Nu format) between files/revisions/dates\n";
+    print "       --stat --status       Display working copy status information\n";
+    print "       --log                 Display SCM log\n";
+    print "       --annotate --blame    Display annotated source code\n";
+    print "       --init                Initialize the SCM repository\n";
     print "    -b --branch              When performing a tag, make it a branch tag\n";
+    print "       --merge               Merge specified revisions/branches/dates during \"get\"\n";
     print "    -l --login               Perform a login to the repository\n";
-    print "    -R --recurse             Operate recursively (this is the default for some commands)\n";
-    print "    -k [code]                Specify keyword handling when adding files (use -kb to add binary files)\n";
     print "    -D --dir                 Specify an alternative repository (\$REPOSITORY)\n";
-    print "    -x --exclusive           Only commit the specified files\n";
+    print "    -P --protocol <scm>      Force use of the specified SCM mechanism (e.g., CVS)\n";
+    print "    -m --message             Provide a ChangeLog message (will not prompt for edit)\n";
+    print "    -k --keyword <type>      Specify the type of keyword expansion to use (e.g., \"source\")\n";
+    print "    -x --exclusive           Only commit specified file(s) (or, with no args, don't append ChangeLog)\n";
     print "       --reset               Reset sticky tags, dates, etc. in the current module\n";
     print "       --blind               Do not update before committing (may result in conflicts, use carefully)\n";
+    print "       --savecfg             Save configuration settings for future use\n";
     print "\n";
     exit(0);
 }
@@ -79,17 +88,17 @@ main
     my ($scm, $mode, $retval);
 
     &mezz_init("revtool", "3.0", "help|h", "version|v", "debug|d",
-               "get|g", "put|p", "add|a", "remove|r", "query|q=s",
-               "recurse|R!", "tag|source-tag|t=s", "import|i",
-               "info|query|I", "diff", "stat|status", "log",
-               "annotate|ann|blame", "keyword|k=s", "dir|D=s",
-               "exclusive|x!", "init", "ttag|target-tag|T=s",
-               "login|l!", "branch|b!", "reset!", "blind!",
-               "message|m=s", "protocol|P=s", "init", "savecfg!");
+               "get|g", "put|p", "add|a", "remove|r", "recurse|R!",
+               "tag|source-tag|t=s", "import|i", "info|query|I",
+               "diff", "stat|status", "log", "annotate|ann|blame",
+               "keyword|k=s", "dir|D=s", "exclusive|x!", "init",
+               "ttag|target-tag|T=s", "login|l!", "branch|b!",
+               "reset!", "blind!", "merge", "message|m=s",
+               "protocol|P=s", "init", "savecfg!");
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.85 $ created on $Date: 2004/06/24 22:33:10 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.86 $ created on $Date: 2004/06/28 16:59:17 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
@@ -231,8 +240,12 @@ main
                 @ARGV = ();
             }
         }
-        if (($mode eq "get") || ($scm->propget("reset"))) {
-            $retval = $scm->get(@ARGV);
+        if (($mode eq "get") || ($mode eq "merge") || ($scm->propget("reset"))) {
+            if ($OPTION{"merge"}) {
+                $retval = $scm->merge(@ARGV);
+            } else {
+                $retval = $scm->get(@ARGV);
+            }
         } elsif ($mode eq "put") {
             if (! $OPTION{"blind"}) {
                 $retval = $scm->get(@ARGV);

@@ -21,14 +21,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.20 2004/06/04 17:16:40 mej Exp $
+# $Id: Src.pm,v 1.21 2004/06/28 16:59:17 mej Exp $
 #
 
 package Mezzanine::Src;
 use Exporter;
 use POSIX;
 use File::Copy;
-use File::Find;
 use Mezzanine::Util;
 use Mezzanine::PkgVars;
 use Mezzanine::Pkg;
@@ -44,9 +43,9 @@ BEGIN {
     @ISA         = ('Exporter');
 
     @EXPORT = ('$WORK_DIR', '&find_files', '&find_subdirs',
-               '&generate_symlink_file', '&install_spm_files',
-               '&create_temp_space', '&clean_temp_space',
-               '&convert_srpm_to_spm', '&convert_srpm_to_pdr');
+               '&install_spm_files', '&create_temp_space',
+               '&clean_temp_space', '&convert_srpm_to_spm',
+               '&convert_srpm_to_pdr');
 
     %EXPORT_TAGS = ( );
 
@@ -67,7 +66,6 @@ $WORK_DIR = "work";
 ### Function prototypes
 sub find_files($);
 sub find_subdirs($);
-sub generate_symlink_file($);
 sub install_spm_files($);
 sub convert_srpm_to_spm($$);
 sub convert_srpm_to_pdr($$);
@@ -107,38 +105,6 @@ find_subdirs($)
         }
     }
     return @subdirs;
-}
-
-# Generate the .mezz.symlinks file automatically from a tree
-sub
-generate_symlink_file($)
-{
-    my $path = $_[0];
-    my $cnt;
-    my %links;
-    local *SYMLINKS;
-
-    $path = '.' if (! $path);
-    &find(sub {-l && ($links{$File::Find::name} = readlink($_));}, $path);
-    $cnt = scalar(keys %links);
-    if ($cnt) {
-        dprint "Found $cnt symlinks.\n";
-        if (!open(SYMLINKS, ">$path/.mezz.symlinks")) {
-            eprint "Unable to open $path/.mezz.symlinks for writing -- $!\n";
-            return MEZZANINE_SYSTEM_ERROR;
-        }
-        foreach my $link (sort keys %links) {
-            my $newlink;
-
-            ($newlink = $link) =~ s/^\.\///;
-            print SYMLINKS "$newlink -> $links{$link}\n";
-            unlink($newlink);
-        }
-        close(SYMLINKS);
-    } else {
-        dprint "No symlinks found.\n";
-    }
-    return MEZZANINE_SUCCESS;
 }
 
 # Copy source files into place
