@@ -1,0 +1,156 @@
+#!/usr/bin/perl
+#
+# buildtool -- Product Build Management Tool
+# 
+# Copyright (C) 2000, Michael Jennings
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies of the Software, its documentation and marketing & publicity
+# materials, and acknowledgment shall be given in the documentation, materials
+# and software packages that this Software was used.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+# $Id: buildtool,v 1.1 2000/05/09 01:14:09 mej Exp $
+#
+
+# Include the Perl Modules we need
+use POSIX;
+use Getopt::Mixed;
+
+# Print usage information
+sub
+print_usage_info {
+
+    print "\n";
+    $leader = "$progname $version Usage Information";
+    $underbar = $leader;
+    $underbar =~ s/./-/g;
+    print "$leader\n$underbar\n";
+    print "\n";
+    print "  Syntax:   buildtool [ options ]\n";
+    print "\n";
+    print "    -h --help         Show this usage information\n";
+    print "    -d --debug        Turn on debugging\n";
+    print "    -v --version      Show version and copyright\n";
+    print "\n";
+    exit(0);
+}
+
+# Generate timestamp for debugging/log file
+sub
+get_time_stamp {
+
+    $ts = POSIX::strftime("[%A, %e %B %Y %H:%M:%S %Z]", localtime);
+    return $ts;
+}
+
+# Debugging output
+sub
+dprintf {
+
+    my @args = @_;
+    if ($debug) {  # Don't print any of this stuff if we're not debugging
+	$args[0] = "[debug] " . $args[0];  # Prefix "[debug]" to the format string
+	return (printf @args);  # Pass all args to printf()
+    }
+}
+sub
+dprint {
+
+    my @args = @_;
+    if ($debug) {  # Don't print any of this stuff if we're not debugging
+	$args[0] = "[debug] " . $args[0];  # Prefix "[debug]" to the format string
+	return (print @args);  # Pass all args to print()
+    }
+}
+
+# Print an error
+sub
+eprintf {
+
+    my @args = @_;
+    print STDERR "$progname:  Error:  ";
+    return (printf STDERR @args);
+}
+sub
+eprint {
+
+    my @args = @_;
+    print STDERR "$progname:  Error:  ";
+    return (print @args);
+}
+
+# Parse product definition files recursively to establish
+# all the products we need to work with and what packages or
+# other products compose them.
+sub
+parse_product_def {
+
+    my $prod = $_[0];
+
+    if (!(open(PROD, "$ENV{PROD_DIR}/${prod}.prod") || open(PROD, "${prod}.prod"))) {
+#        print STDERR "$progname:  I'm sorry, but I can't seem to find a product definition for $prod.\n";
+#        print STDERR "$progname:  I looked in ", ($ENV{"PROD_DIR"} ? "$ENV{PROD_DIR} and" : ""), "the current directory.\n";
+#        print STDERR "$progname:  I'll try to just ignore it and go on, but things could break.\n";
+        return 0;
+    }
+    while (<PROD>) {
+        chomp;
+    }
+    close(PROD);
+    return 1;
+}
+
+# main() here is basically the same as main() in C
+sub
+main {
+
+    if (!$opt_p) {
+        eprint "You didn't tell me what to build, so I'm not quite sure what to do.\n";
+        eprint "If you aren't familiar with how to use $progname, try $progname --help.\n";
+        return;
+    }
+
+    # Parse the product definition files to figure out what the heck we need to build. :)
+    &parse_product_def($opt_p);
+}
+
+BEGIN {
+
+    # Set up the basic variables
+    $progname = "buildtool";
+    $version = "0.1.0";
+
+    # See the Getopt::Mixed man page for details on the syntax of this line
+    $valid_opts = "h help>h v version>v d debug>d b build>b p product>p package>p";
+
+    Getopt::Mixed::getOptions($valid_opts);
+    $debug = $opt_d;
+    if ($opt_v) {
+	print "$progname $version by Michael Jennings\n";
+        print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
+	exit(0);
+    }
+    if ($opt_h) {
+	&print_usage_info();   # Never returns
+    }
+}
+
+&main();
+
+END {
+
+}

@@ -33,3 +33,12 @@ Sat May  6 00:06:05 2000                        Michael Jennings (mej)
 revtool will automatically add the ChangeLog to the repository if it
 has to create it.
 ----------------------------------------------------------------------
+Mon May  8 18:12:05 2000                        Michael Jennings (mej)
+
+Fixed a couple small issues with revtool, and added a fallback in case
+the user forgets to specify which files to add or remove.  (I did.)
+It will now prompt the user to enter a series of filenames or
+wildcards, glob them, and pass them on to the add command.  I also am
+committing buildtool as it stands thus far (which isn't too far, but
+hey...).
+----------------------------------------------------------------------

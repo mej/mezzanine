@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.10 2000/05/06 07:06:30 mej Exp $
+# $Id: revtool,v 1.11 2000/05/09 01:14:09 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -40,11 +40,19 @@ print_usage_info {
     $underbar =~ s/./-/g;
     print "$leader\n$underbar\n";
     print "\n";
-    print "  Syntax:   revtool [ options ]\n";
+    print "  Syntax:   $progname [ options ]\n";
     print "\n";
     print "    -h --help         Show this usage information\n";
     print "    -d --debug        Turn on debugging\n";
     print "    -v --version      Show version and copyright\n";
+    print "    -g --get          Download and/or merge the current sources from the master tree\n";
+    print "    -p --put          Upload new changes to the master tree\n";
+    print "    -a --add          Mark new files for addition into the master tree\n";
+    print "    -r --remove       Delete files and mark them for deletion in the master tree\n";
+    print "    -R --recurse      Operate recursively (this is the default for some commands)\n";
+    print "    -t --tag          Specify a symbolic tag\n";
+    print "    -i --import       Import a new set of sources, or update the vendor branch for a package\n";
+    print "    -k [code]         Specify keyword handling when adding files (use -kb to add binary files)\n";
     print "\n";
     exit(0);
 }
@@ -57,26 +65,36 @@ get_time_stamp {
     return $ts;
 }
 
-# Debugging printf
+# Debugging output
 sub
 dprintf {
-
     my @args = @_;
     if ($debug) {  # Don't print any of this stuff if we're not debugging
 	$args[0] = "[debug] " . $args[0];  # Prefix "[debug]" to the format string
 	return (printf @args);  # Pass all args to printf()
     }
 }
-
-# Debugging print
 sub
 dprint {
-
     my @args = @_;
     if ($debug) {  # Don't print any of this stuff if we're not debugging
 	$args[0] = "[debug] " . $args[0];  # Prefix "[debug]" to the format string
 	return (print @args);  # Pass all args to print()
     }
+}
+
+# Print an error
+sub
+eprintf {
+    my @args = @_;
+    print STDERR "$progname:  Error:  ";
+    return (printf STDERR @args);
+}
+sub
+eprint {
+    my @args = @_;
+    print STDERR "$progname:  Error:  ";
+    return (print @args);
 }
 
 # Commit changes to the master repository
@@ -108,7 +126,7 @@ commit_to_master {
     print CL "----------------------------------------------------------------------\n";
     close(CL);
     close(LOGFILE);
-    $command = sprintf("/bin/sh -c \"cvs commit %s -F $logfile\"", ($opt_r ? "-r $opt_r" : ""));
+    $command = sprintf("/bin/sh -c \"cvs commit %s -F $logfile\"", ($opt_t ? "-r $opt_t" : ""));
     $rc = system($command) >> 8;
     unlink $logfile;
     return ($rc);
@@ -126,6 +144,12 @@ add_new_files {
     my @files = @_;
     my ($file_list, $command, $rc);
 
+    if ($#files == -1) {
+        print "You've asked me to add files, but you didn't tell me what files to add.\n";
+        print "Please enter a whitespace-separated list of files or wildcards:\n";
+        $file_list = <STDIN>;
+        @files = glob($file_list);
+    }
     $file_list = join(" ", @files);
     $command = sprintf("/bin/sh -c \"cvs add %s $file_list\"", ($opt_k ? "-k$opt_k" : ""));
     $rc = system($command) >> 8;
@@ -138,6 +162,12 @@ delete_old_files {
     my @files = @_;
     my ($file_list, $command, $rc);
 
+    if ($#files == -1) {
+        print "You've asked me to remove files, but you didn't tell me what files to remove.\n";
+        print "Please enter a whitespace-separated list of files or wildcards:\n";
+        $file_list = <STDIN>;
+        @files = glob($file_list);
+    }
     $file_list = join(" ", @files);
     $command = sprintf("/bin/sh -c \"cvs remove -f %s $file_list\"", ($opt_R ? "-R" : ""));
     $rc = system($command) >> 8;
@@ -182,20 +212,23 @@ main {
 BEGIN {
 
     # Set up the basic variables
-    $progname = "RevTool";
+    $progname = "revtool";
     $version = "0.1.0";
+    $argc = $#ARGV + 2;
 
     # See the Getopt::Mixed man page for details on the syntax of this line
-    $valid_opts = "h help>h v version>v d debug>d g p a r R t=s i=s k=s";
+    $valid_opts = "h help>h v version>v d debug>d g get>g p put>p a add>a r remove>r"
+                  . " R recurse>R t=s tag>t i=s import>i k=s";
 
     Getopt::Mixed::getOptions($valid_opts);
     $debug = $opt_d;
+    $binary = $opt_b;
     if ($opt_v) {
 	print "$progname $version by Michael Jennings\n";
         print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
 	exit(0);
     }
-    if ($opt_h) {
+    if ($opt_h || $argc == 1) {
 	&print_usage_info();   # Never returns
     }
 }
