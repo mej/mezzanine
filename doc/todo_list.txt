@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: todo_list.txt,v 1.5 2001/02/28 05:00:02 mej Exp $
+#  $Id: todo_list.txt,v 1.6 2001/03/02 00:22:51 mej Exp $
 #
 ########################################################################
 
@@ -31,7 +31,7 @@ buildtool Changes [13/21]
 -------------------------
  + Move symlink support to revtool [1/1]
  + Support for tarballs as packages [1/2]
- - Support for multiple binary RPM's (and an SRPM) for a single package [2/4]
+ + Support for multiple binary RPM's (and an SRPM) for a single package [2/4]
  - Merge compose and explode/build stages [1/3]
  - Split off ISO stage and cleanup stage [1/2]
  - Break out parallelizer [1/2]

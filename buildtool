@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.118 2001/02/28 05:00:02 mej Exp $
+# $Id: buildtool,v 1.119 2001/03/02 00:22:51 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -379,7 +379,7 @@ get_package_stages
     if ($type eq "srpm") {
         return "sebpa";
     } elsif ($type eq "tar") {
-        return "sebpa";
+        return "sbpa";
     } elsif ($type eq "rpm") {
         return "sbpa";
     } elsif ($type eq "module") {
@@ -800,51 +800,57 @@ parse_product_entry
 
     # Check for duplicates
     if (grep($_ eq $name, @packages)) {
-        eprint "I already have $name as a $pkgs->{$name}{TYPE} package in $pkgs->{$name}{PRODUCT}.\n";
-        eprint "I will ignore the duplicate entry found in $prodname $prodver\n";
-        return 0;
-    }
-    # Now that we've got the name/version/release in their final forms, set up the data structures.
-    $pkgs->{$name}{TYPE} = $type;
-    $pkgs->{$name}{MODULE} = $module;
-    $pkgs->{$name}{FILENAME} = ($filename ? $filename : $module);
-    dprint "parse_product_entry():  New package:  $name (module $pkgs->{$name}{MODULE}, "
-            . "filename $pkgs->{$name}{FILENAME}) is a $pkgs->{$name}{TYPE}\n";
-    foreach $pkgvar (keys %pkgvars) {
-        if ($pkgvars{$pkgvar} !~ /^$/) {
-            $pkgs->{$name}{$pkgvar} = $pkgvars{$pkgvar};
-            dprint "parse_product_entry():  Added variable $pkgvar to package $name with value \"$pkgs->{$name}{$pkgvar}\"\n";
+        if ($type eq "rpm" && ($pkgs->{$name}{TYPE} eq "srpm" || $pkgs->{$name}{TYPE} eq "tar")) {
+            push(@{$pkgs->{$name}{BINS}}, $filename);
+            $pkgs->{$name}{STAGES} =~ s/e//;
+        } else {
+            eprint "I already have $name as a $pkgs->{$name}{TYPE} package in $pkgs->{$name}{PRODUCT}.\n";
+            eprint "I will ignore the duplicate entry found in $prodname $prodver\n";
+            return 0;
         }
-    }
-    # Go through each propogated variable.  If there is no assigned value for that
-    # variable for the current package, see if it has a value for the parent product
-    # of that package.  If not, try the parent product of that product, and continue
-    # going back through the product hierarchy until we find a value or run out.
-    #
-    # FIXME:  Perhaps these shouldn't be hard-coded.  Perhaps we should keep a list of
-    #         all package/product variables we've encountered thus far and iterate
-    #         through those only, since we're guaranteed no others will have a fallback.
-    foreach $pkgvar ("REVISION", "LOCATIONS", "RPMCMD", "TAR", "ZIP", "STAGES", "CVSROOT", "ARCH", "MACROS") {
-        if (! $pkgs->{$name}{$pkgvar}) {
-            my ($pkg, $val) = undef;
+    } else {
+        # Now that we've got the name/version/release in their final forms, set up the data structures.
+        $pkgs->{$name}{TYPE} = $type;
+        $pkgs->{$name}{MODULE} = $module;
+        $pkgs->{$name}{FILENAME} = ($filename ? $filename : $module);
+        dprint "parse_product_entry():  New package:  $name (module $pkgs->{$name}{MODULE}, "
+            . "filename $pkgs->{$name}{FILENAME}) is a $pkgs->{$name}{TYPE}\n";
+        foreach $pkgvar (keys %pkgvars) {
+            if ($pkgvars{$pkgvar} !~ /^$/) {
+                $pkgs->{$name}{$pkgvar} = $pkgvars{$pkgvar};
+                dprint "parse_product_entry():  Added variable $pkgvar to package $name with value \"$pkgs->{$name}{$pkgvar}\"\n";
+            }
+        }
+        # Go through each propogated variable.  If there is no assigned value for that
+        # variable for the current package, see if it has a value for the parent product
+        # of that package.  If not, try the parent product of that product, and continue
+        # going back through the product hierarchy until we find a value or run out.
+        #
+        # FIXME:  Perhaps these shouldn't be hard-coded.  Perhaps we should keep a list of
+        #         all package/product variables we've encountered thus far and iterate
+        #         through those only, since we're guaranteed no others will have a fallback.
+        foreach $pkgvar ("REVISION", "LOCATIONS", "RPMCMD", "TAR", "ZIP", "STAGES", "CVSROOT", "ARCH", "MACROS") {
+            if (! $pkgs->{$name}{$pkgvar}) {
+                my ($pkg, $val) = undef;
 
-            dprint "parse_product_entry():  No value for the variable $pkgvar for $name.\n";
-            for ($pkg = $prod; $pkg; $pkg = $prods->{$pkg}{PRODUCT}) {
-                dprint "parse_product_entry():  Checking $pkg for $pkgvar\n";
-                if ($prods->{$pkg}{$pkgvar}) {
-                    $val = $prods->{$pkg}{$pkgvar};
-                    dprint "parse_product_entry():  Found fallback value $val in product $pkg\n";
-                    last;
+                dprint "parse_product_entry():  No value for the variable $pkgvar for $name.\n";
+                for ($pkg = $prod; $pkg; $pkg = $prods->{$pkg}{PRODUCT}) {
+                    dprint "parse_product_entry():  Checking $pkg for $pkgvar\n";
+                    if ($prods->{$pkg}{$pkgvar}) {
+                        $val = $prods->{$pkg}{$pkgvar};
+                        dprint "parse_product_entry():  Found fallback value $val in product $pkg\n";
+                        last;
+                    }
+                }
+                if ($val) {
+                    $pkgs->{$name}{$pkgvar} = $val;
                 }
             }
-            if ($val) {
-                $pkgs->{$name}{$pkgvar} = $val;
-            }
         }
-    }
-    if (defined($pkgs->{$name}{REVISION}) && $pkgs->{$name}{REVISION} =~ /^head$/i) {
-        # This goes here to avoid the fallback mechanism above.
-        undef $pkgs->{$name}{REVISION};
+        if (defined($pkgs->{$name}{REVISION}) && $pkgs->{$name}{REVISION} =~ /^head$/i) {
+            # This goes here to avoid the fallback mechanism above.
+            undef $pkgs->{$name}{REVISION};
+        }
     }
     if (!defined $pkgs->{$name}{STAGES}) {
         $pkgs->{$name}{STAGES} = &get_package_stages($type);
@@ -1003,7 +1009,7 @@ fetch_package
 sub
 build_pkgs
 {
-    my ($pkg, $specfile) = @_;
+    my ($pkg, $filename) = @_;
     my ($cmd, $prog, $line, $target, $out_files, $rpmrc);
     my ($err, $msg, $srpm) = (0, 0, 0);
     local *PKGTOOL;
@@ -1023,7 +1029,12 @@ build_pkgs
     &create_rpm_files($pkg) if (! -s $rpmrc);
     $target = ($main::target ? " --target=$main::target" : ($pkgs->{$pkg}{ARCH} ? " --target=$pkgs->{$pkg}{ARCH}" : ""));
     $prog = "-P '$prog$target'";
-    $cmd = "$pkgtool $prog -b -R \"/usr/lib/rpm/rpmrc:$rpmrc\" --root \"$buildroot/$pkg-root\" -s $specfile";
+    $cmd = "$pkgtool $prog -b -R \"/usr/lib/rpm/rpmrc:$rpmrc\" --root \"$buildroot/$pkg-root\" ";
+    if ($pkgs->{$pkg}{TYPE} eq "tar") {
+        $cmd .= "-p $filename";
+    } else {
+        $cmd .= "-s $filename";
+    }
     if ($pkgs->{$pkg}{TAGFILE}) {
         $cmd .= " --tagfile $pkgs->{$pkg}{TAGFILE}";
     }
@@ -1170,13 +1181,20 @@ do_bootstrap_stage
 
     qprint "$progname:  Entering the bootstrap stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (@p) {
+        my @flist;
+
+        $err = 0;
         &create_rpm_files($pkg);
         if ($pkgs->{$pkg}{STAGES} !~ /s/) {
             nprint "$progname:  Skipping bootstrap stage for the \"$pkg\" package.\n";
             next;
         }
         nprint "$progname:  Starting bootstrap stage for the \"$pkg\" package....\n";
-        $filename = $pkgs->{$pkg}{FILENAME};
+        if (defined($pkgs->{$pkg}{BINS})) {
+            @flist = ($pkgs->{$pkg}{FILENAME}, @{$pkgs->{$pkg}{BINS}});
+        } else {
+            push(@flist, $pkgs->{$pkg}{FILENAME});
+        }
         if ($global_tree) {
             $cvsroot = "-D $global_tree";
         } elsif ($pkgs->{$pkg}{CVSROOT}) {
@@ -1192,25 +1210,28 @@ do_bootstrap_stage
         } else {
             $tag = "";
         }
-        dprint "Checking for $filename\n";
-        # If it already exists , go on.
-        if ((($pkgs->{$pkg}{TYPE} eq "module" || $pkgs->{$pkg}{TYPE} eq "image") && -d $filename)
-            || (($pkgs->{$pkg}{TYPE} eq "srpm" || $pkgs->{$pkg}{TYPE} eq "rpm" || $pkgs->{$pkg}{TYPE} eq "tar") && -f $filename && -s _)) {
-            nprint "$progname:  $filename already exists.  I'll assume it's the right one.\n";
-            nprint "$progname:  Bootstrap stage for \"$pkg\" is complete.\n";
-            next;
-        }
-        $cmd = "$revtool -l $cvsroot $tag -g $filename";
-        ($err, $msg) = &fetch_package($cmd);  # Download the package using revtool
-        if ($err) {
-            &fail_package($pkg, "bootstrap", $msg);
-            next;
-        }
-        if (!((($pkgs->{$pkg}{TYPE} eq "module" || $pkgs->{$pkg}{TYPE} eq "image") && -d $filename)
-            || (($pkgs->{$pkg}{TYPE} eq "srpm" || $pkgs->{$pkg}{TYPE} eq "rpm" || $pkgs->{$pkg}{TYPE} eq "tar") && -f $filename && -s _))) {
-            # If it's not there, we must've missed the error.
-            &fail_package($pkg, "bootstrap", "Unhandled error condition");
-            next;
+        foreach $filename (@flist) {
+            last if ($err);
+            dprint "Checking for $filename\n";
+            # If it already exists , go on.
+            if ((($pkgs->{$pkg}{TYPE} eq "module" || $pkgs->{$pkg}{TYPE} eq "image") && -d $filename)
+                || (($pkgs->{$pkg}{TYPE} eq "srpm" || $pkgs->{$pkg}{TYPE} eq "rpm" || $pkgs->{$pkg}{TYPE} eq "tar") && -f $filename && -s _)) {
+                nprint "$progname:  $filename already exists.  I'll assume it's the right one.\n";
+                next;
+            }
+            $cmd = "$revtool -l $cvsroot $tag -g $filename";
+            ($err, $msg) = &fetch_package($cmd);  # Download the package using revtool
+            if ($err) {
+                &fail_package($pkg, "bootstrap", $msg);
+                next;
+            }
+            if (!((($pkgs->{$pkg}{TYPE} eq "module" || $pkgs->{$pkg}{TYPE} eq "image") && -d $filename)
+                  || (($pkgs->{$pkg}{TYPE} eq "srpm" || $pkgs->{$pkg}{TYPE} eq "rpm" || $pkgs->{$pkg}{TYPE} eq "tar") && -f $filename && -s _))) {
+                # If it's not there, we must've missed the error.
+                $err = BUILDTOOL_PACKAGE_FAILED;
+                &fail_package($pkg, "bootstrap", "Unhandled error condition");
+                next;
+            }
         }
 
         nprint "$progname:  Bootstrap stage for \"$pkg\" is complete.\n";
@@ -1473,7 +1494,28 @@ do_build_stage
         }
         nprint "$progname:  Starting build stage for the \"$pkg\" package....  (${\(&get_timestamp())})\n";
 
-        if ($pkgs->{$pkg}{TYPE} eq "rpm") {
+        if (defined($pkgs->{$pkg}{BINS})) {
+            my ($arch, $rpm);
+
+            # Source and binaries.
+            dprint "Copying $pkgs->{$pkg}{FILENAME} to $builddir/SRPMS/\n";
+            &mkdirhier("$builddir/SRPMS");
+            system("cp $pkgs->{$pkg}{FILENAME} $builddir/SRPMS/");
+            $rpm = $pkgs->{$pkg}{FILENAME};
+            $rpm =~ s/^.*\/([^\/]+)$/$1/;
+            $pkgs->{$pkg}{OUTFILES} = "$builddir/SRPMS/$rpm";
+            foreach $rpm (@{$pkgs->{$pkg}{BINS}}) {
+                my $bin;
+
+                $rpm =~ m/^.*\/([^\/]+)\.(\w+)\.rpm$/;
+                $arch = $2;
+                $bin = "$builddir/RPMS/$arch/$1.$arch.rpm";
+                $pkgs->{$pkg}{OUTFILES} .= " $bin";
+                dprint "Copying $rpm to $builddir/RPMS/$arch\n";
+                &mkdirhier("$builddir/RPMS/$arch");
+                system("cp $rpm $builddir/RPMS/$arch/");
+            }
+        } elsif ($pkgs->{$pkg}{TYPE} eq "rpm") {
             my $arch;
 
             # Binary package.  Just move it into place.
@@ -1877,7 +1919,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.118 $ created on $Date: 2001/02/28 05:00:02 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.119 $ created on $Date: 2001/03/02 00:22:51 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
