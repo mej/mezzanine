@@ -1,32 +1,166 @@
-#!/bin/sh -x
-
-LOGFILE=/var/tmp/safetool.log
-
-PATH=/bin:/usr/bin:/sbin:/usr/sbin
-CMD_LINE="$@"
-CMD=`basename $0`
-TSTAMP=`date`
-echo "safetool ($$):  $0 $CMD_LINE" >> $LOGFILE
-chmod 666 $LOGFILE
-
-# Unfortunately, this makes the OS binaries CD too big for the CD. :(
+#!/usr/bin/perl
 #
-#if [ "$CMD" = "strip" ]; then
-#  exit 0
-#fi
+# safetool -- An attempt to beat naughty packages into submission
+# 
+# Copyright (C) 2000, Michael Jennings
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies of the Software, its documentation and marketing & publicity
+# materials, and acknowledgment shall be given in the documentation, materials
+# and software packages that this Software was used.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+# $Id: safetool,v 1.3 2000/07/19 20:26:35 mej Exp $
+#
 
-if [ "`whoami`" = "root" ]; then
-  echo $CMD_LINE | grep /tmp >/dev/null 2>&1
-  if [ $? -ne 0 ]; then
-    echo "safetool ($$):  Command line does not contain /tmp.  I refuse to do that as root." >> $LOGFILE
-    exit 0
-  fi
-else
-  TMP=`echo $CMD_LINE | sed 's/-o[ ]*[^ ]*//;s/-g[ ]*[^ ]*//;'`
-  CMD_LINE="$TMP"
-fi
+# Include the Perl Modules we need
+use POSIX 'strftime';
 
-if [ "$CMD" != "safetool" ]; then
-  $CMD $CMD_LINE
-fi
-exit 0
+# Generate timestamp for debugging/log file
+sub
+get_timestamp
+{
+    return strftime("%A, %d %B %Y %H:%M:%S %Z", localtime);
+}
+
+# Log file output
+sub
+lprintf
+{
+    print "[$progname $$ ${\(&get_timestamp())}] ";
+    my $fmt = shift;
+    printf $fmt, @_;
+}
+sub
+lprint
+{
+    print "[$progname $$ ${\(&get_timestamp())}] ", @_;
+}
+
+# Check options for install
+sub
+parse_options_for_install
+{
+    my @args;
+    my ($cwd, $end_of_opts, $tmp, $skip, $arg);
+
+    chomp($cwd = `pwd`);
+    $end_of_opts = $skip = 0;
+
+    foreach $arg (@_) {
+        if ($skip) {
+            $skip--;
+            next;
+        }
+        if ($arg eq "--") {
+            $end_of_opts = 1;
+            next;
+        }
+        if (! $end_of_opts) {
+            if ($arg eq "-o" || $arg eq "-g") {
+                $skip = 1;
+                next;
+            } elsif ($arg =~ /^-[og].+/) {
+                next;
+            }
+        }
+        push @args, $arg;
+    }
+    $arg = $args[$#arg];
+    if (-e $arg) {
+        if ($arg !~ /^\//) {
+            $tmp = $cwd . "/$arg";
+        } else {
+            $tmp = $arg;
+        }
+        if ($tmp !~ /^\/tmp/ && $tmp !~ /^\/var\/tmp/) {
+            lprint "Argument \"$arg\" ($tmp) points outside tmp space.  Exiting.\n";
+            return ();
+        }
+    }
+    return @args;
+}
+
+# Check options for a generic program
+sub
+parse_options_generic
+{
+    my @args = @_;
+    my ($cwd, $end_of_opts, $tmp);
+
+    chomp($cwd = `pwd`);
+    $end_of_opts = 0;
+
+    foreach $arg (@_) {
+        if ($arg eq "--") {
+            $end_of_opts = 1;
+            next;
+        }
+        next if (($arg =~ /^-/) && (! $end_of_opts));  # It's an unknown option
+        next if (! -e $arg);  # It's not a file, or it's a non-existent file
+        if ($arg !~ /^\//) {
+            $tmp = $cwd . "/$arg";
+        } else {
+            $tmp = $arg;
+        }
+        if ($tmp !~ /^\/tmp/ && $tmp !~ /^\/var\/tmp/) {
+            lprint "Argument \"$arg\" points outside tmp space.  Exiting.\n";
+            return ();
+        }
+    }
+    return @args;
+}
+
+# main() here is basically the same as main() in C
+sub
+main
+{
+    my @args;
+
+    # Set up the basic variables
+    $progname = "safetool";
+    $version = "2.0";
+    $logfile = "/var/tmp/safetool.log";
+    $argc = $#ARGV + 2;
+
+    # Open logfile
+    if (open(LOGFILE, ">>$logfile")) {
+        chmod(0666, $logfile);
+    } else {
+        open(LOGFILE, ">&STDOUT");
+    }
+    select LOGFILE; $| = 1;
+
+    # Set up the environment
+    $ENV{PATH} = "/bin:/usr/bin:/sbin:/usr/sbin";
+
+    # Do the work
+    ($fake_prog = $0) =~ s/^.*\/([^\/]+)$/$1/;
+    if ($fake_prog =~ /install$/) {
+        @args = &parse_options_for_install(@ARGV);
+    } else {
+        @args = &parse_options_generic(@ARGV);
+    }
+
+    close(LOGFILE);
+    if ($#args >= 0) {
+        return (system($fake_prog, @args) >> 8);
+    } else {
+        return 0;
+    }
+}
+
+exit &main();

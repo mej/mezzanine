@@ -701,3 +701,8 @@ Tue Jul 18 21:47:28 2000                        Michael Jennings (mej)
 
 Parsing bug.  Ick. =P
 ----------------------------------------------------------------------
+Wed Jul 19 13:33:29 2000                        Michael Jennings (mej)
+
+New, smarter safetool, done in Perl.  Hopefully this will help our
+space issues.
+----------------------------------------------------------------------
