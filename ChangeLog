@@ -224,3 +224,8 @@ Wed May 24 19:42:08 2000                        Michael Jennings (mej)
 
 Parallelizing has been added.  Time to see if it works.
 ----------------------------------------------------------------------
+Thu May 25 11:43:59 2000                        Michael Jennings (mej)
+
+A few bugs in parallelization fixed.  It works now, but it still needs
+some speed improvements.
+----------------------------------------------------------------------

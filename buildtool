@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.27 2000/05/25 02:29:47 mej Exp $
+# $Id: buildtool,v 1.28 2000/05/25 18:31:56 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -437,7 +437,7 @@ parse_product_entry
     if (! $type) {
         # They didn't tell us the type, so let's guess educatedly.
         $type_guess = 1;
-        ($name = shift @inp) =~ s/^[^:]*://;
+        ($name = shift @inp) =~ s/^\w*://;
         dprint "Guessing type of \"$name\"\n";
         if ($name =~ /src\.rpm/) {
             # Name ends with .src.rpm.  That's an easy one.
@@ -1265,14 +1265,13 @@ do_package_stage
 
     qprint "$progname:  Entering the package accumulation stage.  (${\(&get_timestamp())})\n";
 
-    # Create the directories where we'll put the packages
-    # FIXME:  The prod files should probably be able to specify this
-    if (! -d "$basedir/$prod") {
-        mkdir("$basedir/$prod", 0755) || &fatal_error("Cannot create $basedir/$prod -- $!\n");
-        foreach $dir ("SRPMS", "RPMS") {
-            mkdir("$basedir/$prod/$dir", 0755);
-        }
-    }
+    # FIXME:  The prod files should specify this
+    #if (! -d "$basedir/$prod") {
+    #    mkdir("$basedir/$prod", 0755) || &fatal_error("Cannot create $basedir/$prod -- $!\n");
+    #    foreach $dir ("SRPMS", "RPMS") {
+    #        mkdir("$basedir/$prod/$dir", 0755);
+    #    }
+    #}
     
     foreach $pkg (@p) {
         if ($pkgs->{$pkg}{STAGES} !~ /p/) {
@@ -1289,7 +1288,6 @@ do_package_stage
         opendir(DIR, "$builddir/SRPMS") || &fatal_error("Cannot open directory $builddir/SRPMS -- $!\n");
         @contents = readdir(DIR);
         foreach $rpm (@contents) {
-            dprint "Checking $builddir/SRPMS/$rpm\n";
             if ($rpm =~ /^\Q$pkg-\E\S*\Q$version-$release\E\.(?:no)?src\.rpm$/) {
                 dprint "Got output file $rpm\n";
                 push @outfiles, "$builddir/SRPMS/$rpm";
@@ -1312,6 +1310,9 @@ do_package_stage
             next;
         }
         dprint "Output files for $pkg:  ", join(" ", @outfiles), "\n";
+
+        # For now, just punt here.
+        next;
 
         # Move each RPM into the appropriate place
         foreach $rpm (@outfiles) {
@@ -1411,17 +1412,20 @@ parallel_build
     $idx = 0;
     # Set $nprocs equal to the index within @children that should not be exceeded.
     $nprocs = $num_cpus - 1;
-    do {
+    # The "!$idx || " part of the test below is required because perl's do...while construct
+    # sucks.  You can't use next/last from within it.  Someone shoot whoever decided that.
+    qprintf "$progname:  Beginning $num_cpus-way build of %d packages.  (${\(&get_timestamp())})\n", $#packages + 1;
+    while (!$idx || $#children >= 0) {
         for (; $idx <= $#packages && $#children < $nprocs; $idx++) {
             # Spawn a buildtool child process to handle the next package
             $pkg = $packages[$idx];
-            $pname = "$pkgs->{$pkg}{TYPE}:$pkgs->{$pkg}{MODULE}/$pkgs->{$pkg}{FILENAME}";
+            $pname = "$pkgs->{$pkg}{TYPE}:$pkgs->{$pkg}{FILENAME}";
             $var_string = "";
             foreach $var (keys %{$pkgs->{$pkg}}) {
                 next if ($var eq "TYPE");
                 $var_string .= "$var=$pkgs->{$pkg}{$var} ";
             }
-            $cmd = "$buildtool --master $master_pid -Ql $builddir/logs/$pkg.log -p \"$pname $var_string\" </dev/null >/dev/null 2>&1";
+            $cmd = "$buildtool --master $master_pid -Ql $basedir/logs/$pkg.log -p \"$pname $var_string\" </dev/null >/dev/null 2>&1";
             $pid = &spawn_cmd($cmd);
             push @children, $pid;
             $child_pkg{$pid} = $pkg;
@@ -1446,7 +1450,7 @@ parallel_build
                 my @tmp;
 
                 # The last line of the logfile should give the error message
-                if (!open(ERRLOG, "$builddir/logs/$pkg.log")) {
+                if (!open(ERRLOG, "$basedir/logs/$pkg.log")) {
                     &fail_package($pkg, "???", "Child process returned $err but the log file is missing");
                     next;
                 }
@@ -1462,7 +1466,8 @@ parallel_build
             }
         }
         # End of loop.  Time to spawn the next child.
-    } while ($#children >= 0);
+    }
+    qprint "$progname:  Parallel build complete.  (${\(&get_timestamp())})\n";
 }
 
 # This routine does the actual build process
@@ -1539,8 +1544,10 @@ main
         } else {
             $GLOBAL_LOG = \*LOGFILE;
             open(STDERR, ">&LOGFILE");
+            select LOGFILE; $| = 1;
         }
     }
+    select STDOUT; $| = 1;
     if ($opt_D) {
         $basedir = $opt_D;
     } elsif ($ENV{BASE_DIR} && $ENV{BASE_DIR} =~ /^\//) {
