@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.65 2004/07/28 21:40:21 mej Exp $
+# $Id: pkgtool,v 1.66 2004/09/01 00:26:19 mej Exp $
 #
 
 use strict;
@@ -104,7 +104,7 @@ main
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.65 $ created on $Date: 2004/07/28 21:40:21 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.66 $ created on $Date: 2004/09/01 00:26:19 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || (!scalar(@ARGV) && !scalar(%OPTION) && &basename($0) !~ /^mz/)) {
         &print_usage_info();
     }
@@ -155,7 +155,7 @@ main
     &pkgvar_tar($OPTION{"tar"});
     &pkgvar_zip($OPTION{"zip"});
     &pkgvar_topdir($OPTION{"destdir"});
-    $config->set("INSTROOT", &pkgvar_instroot((($OPTION{"root"} eq "none") ? ("") : ($OPTION{"root"} || $config->get("INSTROOT") || ""))));
+    $config->set("INSTROOT", &pkgvar_instroot((($OPTION{"root"} && $OPTION{"root"} eq "none") ? ("") : ($OPTION{"root"})) || $config->get("INSTROOT") || ""));
     if ($config->set("BUILDUSER", &pkgvar_set("builduser", $OPTION{"user"} || $config->get("BUILDUSER") || ""))) {
         &file_owner(&pkgvar_get("builduser"), "", &pkgvar_instroot());
     }
