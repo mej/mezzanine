@@ -692,3 +692,8 @@ everything it touches.
 Allow abbreviations and CVS-like synonyms for keyword expansion mode
 specification in addition to the old "source" and "binary" options.
 ----------------------------------------------------------------------
+Fri Jan 28 19:35:42 2005                        Michael Jennings (mej)
+
+Keep logfile if we actually built the package, even if it succeeded
+before.  This should fix bug#744.
+----------------------------------------------------------------------

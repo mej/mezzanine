@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.201 2004/10/29 20:35:28 mej Exp $
+# $Id: buildtool,v 1.202 2005/01/29 00:36:40 mej Exp $
 #
 
 use strict;
@@ -567,8 +567,8 @@ build_package_forked
                     wprint "Breakage log file $logfile.broken exists -- Package fixed itself!?\n";
                     &nuke_tree("$logfile.broken");
                     &nuke_tree("$logfile.save");
-                } elsif (-e "$logfile.save") {
-                    dprint "Previous successful log file $logfile.save exists -- Moving back into place.\n";
+                } elsif ((! $num_built) && (-e "$logfile.save")) {
+                    dprint "Log file $logfile.save for actual build exists -- Moving back into place.\n";
                     &move_files($logfile, "$logfile.latest");
                     &move_files("$logfile.save", $logfile);
                 }
@@ -1069,7 +1069,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.201 $ created on $Date: 2004/10/29 20:35:28 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.202 $ created on $Date: 2005/01/29 00:36:40 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
