@@ -265,3 +265,7 @@ Wed Jan 14 21:46:23 2004                        Michael Jennings (mej)
 
 Fixes to chroot builds and dependency handling.
 ----------------------------------------------------------------------
+Fri Jan 23 08:30:25 2004                        Michael Jennings (mej)
+
+Working on parallel build fixes.
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.167 2004/01/15 01:20:06 mej Exp $
+# $Id: buildtool,v 1.168 2004/01/23 12:04:28 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -297,22 +297,20 @@ build_package_forked
             }
             if ($pkgs->{$pkg}{"INSTROOT"}) {
                 # This package build is chrooted.
-                &pkgvar_instroot(&pkgvar_buildroot() . "instroot");
+                &pkgvar_instroot(&pkgvar_buildroot() . "/instroot");
 
                 if ($pkgs->{$pkg}{"INSTROOT_COPY"}) {
-                    my @output;
-
-                    @output = &run_cmd($pkgs->{$pkg}{"INSTROOT_COPY"},
-                                       "$pkgs->{$pkg}{INSTROOT} " . &pkgvar_instroot(), "instroot-copy:  ");
-                    if ($output[0] != MEZZANINE_SUCCESS) {
-                        wprint "Copy of install root failed.\n";
-                        &pkgvar_instroot($pkgs->{$pkg}{"INSTROOT"});
-                    }
+                    # Copy COPY command to INIT so that we only use it if the build is needed.
+                    $pkgs->{$pkg}{"INSTROOT_INIT"} = $pkgs->{$pkg}{"INSTROOT_COPY"} . ' ' . $pkgs->{$pkg}{"INSTROOT"};
+                    $pkgs->{$pkg}{"INSTROOT"} = &pkgvar_instroot();
                 }
             } else {
                 &pkgvar_instroot("");
             }
             $err = &build_single_package($pkg);
+            if (&pkgvar_instroot() && -d &pkgvar_instroot()) {
+                &nuke_tree(&pkgvar_instroot());
+            }
             close(LOGFILE) if ($GLOBAL_LOG);
             exit ($err);
         } elsif ($! !~ /No more processes/ && $! !~ /Resource temporarily unavailable/) {
@@ -658,7 +656,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.167 $ created on $Date: 2004/01/15 01:20:06 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.168 $ created on $Date: 2004/01/23 12:04:28 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
