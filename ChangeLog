@@ -68,3 +68,7 @@ Mon Feb 25 19:00:20 2002                        Michael Jennings (mej)
 
 Updated Debian changelog
 ----------------------------------------------------------------------
+Tue Feb 26 15:49:08 2002                        Michael Jennings (mej)
+
+Fixed the usage of $EDITOR in case it's more than one word.
+----------------------------------------------------------------------

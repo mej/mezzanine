@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.10 2002/02/25 22:01:22 mej Exp $
+# $Id: RevCtl.pm,v 1.11 2002/02/26 19:00:32 mej Exp $
 #
 
 package Mezzanine::RevCtl;
@@ -369,7 +369,7 @@ do_changelog_entry
 
     dprint "Current directory is \"$cwd\", module name is \"$module\"\n";
     print "Please edit your commit message now...\n";
-    system($ENV{"EDITOR"} ? $ENV{"EDITOR"} : "vi", $logfile);
+    system("/bin/sh -c \"" . ($ENV{"EDITOR"} ? $ENV{"EDITOR"} : "vi") . " $logfile\"");
 
     # Abort if the logfile was not modified or is too small.
     @stat_info = stat($logfile);
