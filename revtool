@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.58 2001/02/27 07:49:53 mej Exp $
+# $Id: revtool,v 1.59 2001/03/20 03:45:36 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -159,7 +159,7 @@ check_tag
     #      restrictive than CVS's own rules but is enforced for standards compliance.
     #   4. Product tags are only subject to rule #3.
 
-    if ($tag !~ /^[-A-Z0-9]+$/) {
+    if ($tag !~ /^[-_A-Z0-9]+$/) {
         dprint "Tag $tag failed character constraint check.\n";
         return 0;
     }
@@ -769,7 +769,7 @@ import_vendor_sources
         $module =~ s/^.*\/([^\/]+)$/$1/;
     }
     ($vendor_tag = $module) =~ tr/[a-z]/[A-Z]/;
-    $vendor_tag =~ s/[^-A-Z0-9]/-/g;
+    $vendor_tag =~ s/[^-A-Z0-9]/_/g;
     if ($tag) {
         $release_tag = $tag;
     } elsif ($rtag) {
@@ -789,7 +789,7 @@ import_vendor_sources
         return REVTOOL_INVALID_TAG;
     }
     ($version = $release_tag) =~ s/^[^-]+-//;
-    $version =~ tr/-/./;
+    $version =~ tr/_/./;
     $version =~ tr/[A-Z]/[a-z]/;
     $msg = "Import of $module $version";
 
@@ -954,7 +954,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.58 $ created on $Date: 2001/02/27 07:49:53 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.59 $ created on $Date: 2001/03/20 03:45:36 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

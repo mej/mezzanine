@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.122 2001/03/19 06:17:59 mej Exp $
+# $Id: buildtool,v 1.123 2001/03/20 03:45:36 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -445,7 +445,7 @@ pkg_to_release_tag
 
     $tag = "$pkg_name-$pkg_version";
     $tag =~ tr/[a-z]/[A-Z]/;
-    $tag =~ s/[^-A-Z0-9]/-/g;
+    $tag =~ s/[^-A-Z0-9]/_/g;
     return $tag;
 }
 
@@ -1918,7 +1918,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.122 $ created on $Date: 2001/03/19 06:17:59 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.123 $ created on $Date: 2001/03/20 03:45:36 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.31 2001/02/27 07:49:53 mej Exp $
+# $Id: pkgtool,v 1.32 2001/03/20 03:45:36 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -260,7 +260,7 @@ replace_defines
 sub
 parse_spec_file
 {
-    my $specfile = $_[0];
+    my ($specfile, $catalog) = @_;
     my ($line, $oldline, $stage, $pkg);
     local *SPECFILE;
 
@@ -333,7 +333,17 @@ parse_spec_file
     @patches = sort {$a <=> $b} keys %patch;
     @headers = sort {uc($a) cmp uc($b)} keys %header;
 
-    if ($debug) {
+    if ($catalog) {
+        foreach $src (@sources) {
+            print "S:$src:$source{$src}\n";
+        }
+        foreach $p (@patches) {
+            print "P:$p:$patch{$p}\n";
+        }
+        foreach $h (@headers) {
+            print "H:$h:$header{$h}\n";
+        }
+    } elsif ($debug) {
         dprint "Got the following sources:\n";
         foreach $src (@sources) {
             dprint "    Source $src -> $source{$src}\n";
@@ -1031,7 +1041,7 @@ rpm_generate_source_files
     @contents = readdir(DIR);
     closedir(DIR);
 
-    &parse_spec_file($specfile) if ($specfile);
+    &parse_spec_file($specfile, 0) if ($specfile);
 
     if (! $release_tag) {
         ($release_tag = "$define{PACKAGE_NAME}-$define{PACKAGE_VERSION}") =~ tr/[a-z]/[A-Z]/;
@@ -1260,9 +1270,9 @@ main
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "b|build", "i|install", "c|contents", "q|query=s",
-                   "g|generate", "o|sources:s", "p|package=s", "s|specfile|scripts=s", "m|module=s",
-                   "r|release-tag=s", "t|head-tag=s", "P|program=s", "R|rcfile=s", "tar=s", "zip=s",
-                   "tagfile=s", "D|destdir=s", "root=s");
+                   "g|generate", "u|unarch|unarchive", "C|catalog", "o|sources:s", "p|package=s",
+                   "s|specfile|scripts=s", "m|module=s", "r|release-tag=s", "t|head-tag=s", "P|program=s",
+                   "R|rcfile=s", "tar=s", "zip=s", "tagfile=s", "D|destdir=s", "root=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -1270,7 +1280,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.31 $ created on $Date: 2001/02/27 07:49:53 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.32 $ created on $Date: 2001/03/20 03:45:36 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1284,15 +1294,19 @@ main
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
         # This is a really silly way to shut up the "used only once" warnings.
-        $opt_h = $opt_v = $opt_b = $opt_c = $opt_i = $opt_g = 0;
+        $opt_h = $opt_v = $opt_b = $opt_c = $opt_i = $opt_g = $opt_u = $opt_C = 0;
     }
 
     if ($opt_b) {
         $mode = "build";
     } elsif ($opt_i) {
         $mode = "install";
+    } elsif ($opt_u) {
+        $mode = "unarchive";
     } elsif ($opt_c) {
         $mode = "contents";
+    } elsif ($opt_C) {
+        $mode = "catalog";
     } elsif ($opt_g) {
         $mode = "generate";
     } elsif ($opt_q) {
@@ -1401,6 +1415,16 @@ main
             $ret = &deb_show_contents($pkg_file);
         } elsif ($type eq "tar") {
             $ret = &tar_show_contents($pkg_file);
+        }
+    } elsif ($mode eq "catalog") {
+        if (! $specfile) {
+            eprint "Please specify a spec file/script directory\n";
+            return PKGTOOL_SYNTAX_ERROR;
+        }
+        if ($type eq "rpm") {
+            $ret = &parse_spec_file($specfile, 1);
+        } elsif ($type eq "deb") {
+        } elsif ($type eq "tar") {
         }
     } elsif ($mode eq "generate") {
         if (! $specfile) {

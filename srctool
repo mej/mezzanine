@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.1 2001/03/19 06:17:59 mej Exp $
+# $Id: srctool,v 1.2 2001/03/20 03:45:36 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -77,6 +77,9 @@ sub SRCTOOL_FATAL_ERROR()     {1;}
 sub SRCTOOL_SYNTAX_ERROR()    {2;}
 sub SRCTOOL_COMMAND_FAILED()  {3;}
                                 
+sub SRCTOOL_INVALID_PACKAGE() {10;}
+sub SRCTOOL_FILE_OP_FAILED()  {11;}
+
 sub SRCTOOL_TERMINATED()      {50;}
 sub SRCTOOL_CRASHED()         {60;}
 sub SRCTOOL_UNSPECIFIED_ERROR {127;}
@@ -196,7 +199,12 @@ mkdirhier
             mkdir($path, 0755) || eprint("Unable to create $path -- $!\n");
         }
     }
-    dprint "Something went wrong in mkdirhier()!\n" if (! -d $_[0]);
+    if (! -d $_[0]) {
+        dprint "Something went wrong in mkdirhier()!\n";
+        return 0;
+    } else {
+        return 1;
+    }
 }
 
 # Emulate rm -rf
@@ -225,6 +233,159 @@ nuke_tree
     return 1;
 }
 
+# Grep a directory for files matching a particular expression
+sub grepdir(&$);
+sub
+grepdir(&$)
+{
+    my ($func, $dir) = @_;
+    my @files;
+    local *DIR;
+
+    opendir(DIR, $dir) || return 0;
+    @files = grep(&$func($_), readdir(DIR));
+    closedir(DIR);
+    return @files;
+}
+
+# Create temporary working space in /var/tmp
+sub
+create_temp_space
+{
+    my $pkg = shift;
+    my $dir;
+
+    $dir = "/var/tmp/srctool.$$/$pkg";
+    &nuke_tree($dir);
+    &mkdirhier($dir) || return "";
+    mkdir("$dir/S");
+    mkdir("$dir/P");
+    return $dir;
+}
+
+# Generic Avalon command wrapper
+sub
+run_cmd
+{
+    my ($prog, $params, $show_output) = @_;
+    my ($err, $msg, $line, $cmd) = undef;
+    my @output;
+    local *CMD;
+
+    if ($debug) {
+        $cmd = "$prog -d $params";
+    } else {
+        $cmd = "$prog $params";
+    }
+
+    dprint "About to run $cmd\n";
+    if (!open(CMD, "$cmd 2>&1 |")) {
+        return (-1, "Execution of \"$cmd\" failed -- $!");
+    }
+    while (<CMD>) {
+        chomp($line = $_);
+        push @output, $line;
+        if ($show_output) {
+            print "$show_output$line\n";
+            # Check the output for errors
+            if ($line =~ /^\w+:\s*error:\s*(\S.*)$/i) {
+                $msg = $1;
+            }
+        } else {
+            dprint "From $prog -> $line\n";
+        }
+    }
+    close(CMD);
+    $err = $? >> 8;
+    dprint "\"$cmd\" returned $err\n";
+    return ($err, ($show_output ? $msg : @output));
+}
+
+# Import a package
+sub
+import_package
+{
+    my ($pkgfile, $name) = @_;
+    my ($err, $msg, $cmd, $pwd, $tmpdir, $rpmcmd, $pkg, $ver, $rel, $spec, $tag);
+    my (@contents, @srcs, @patches, @tmp);
+
+    chomp($pwd = `/bin/pwd`);
+
+    if (-f $pkgfile) {
+        # If it's a file, make sure it's an SRPM
+        if ($pkgfile =~ /^(?:.*\/)?([^\/]+)-([^-]+)-([^-]+)\.(no)?src\.rpm$/) {
+            ($pkg, $ver, $rel) = ($1, $2, $3);
+        } else {
+            eprint "Invalid package for import:  $pkgfile\n";
+            return SRCTOOL_INVALID_PACKAGE;
+        }
+        print "Importing $pkgfile into $pkg tree....\n\n";
+        # Create a working tree to be imported
+        $tmpdir = &create_temp_space($pkg);
+        $rpmcmd = "rpm --define \"_sourcedir $tmpdir/S\" --define \"_specdir $tmpdir\"";
+        # Install the SRPM into the temporary directory
+        @tmp = &run_cmd("pkgtool", "-P '$rpmcmd' -ip $pkgfile", 0);
+        if (($err = shift @tmp) != 0) {
+            eprint "Unable to install $pkgfile\n";
+            return SRCTOOL_COMMAND_FAILED;
+        }
+        # The spec file should be the only file in $tmpdir itself
+        @tmp = &grepdir(sub {-f "$tmpdir/$_"}, $tmpdir);
+        if (scalar(@tmp) != 1) {
+            my $n = scalar(@tmp);
+            &fatal_error("$n spec files?!\n");
+        }
+        $spec = "$tmpdir/" . (shift @tmp);
+        # Get a list of all source and patch files
+        @tmp = &run_cmd("pkgtool", "-P '$rpmcmd' -Cs $spec", 0);
+        if (($err = shift @tmp) != 0) {
+            eprint "Unable to catalog $pkgfile\n";
+            return SRCTOOL_COMMAND_FAILED;
+        }
+        foreach my $line (@tmp) {
+            my ($type, $num, $filename) = split(":", $line);
+
+            if ($type eq "S") {
+                push @srcs, $filename;
+            } elsif ($type eq "P") {
+                push @patches, $filename;
+            }
+        }
+        # Move the patches to $tmpdir/P/
+        foreach my $patch (@patches) {
+            if (! -f "$tmpdir/S/$patch") {
+                eprint "Missing patch file $patch?!\n";
+                return SRCTOOL_FILE_OP_FAILED;
+            } else {
+                if (!link("$tmpdir/S/$patch", "$tmpdir/P/$patch") || !unlink("$tmpdir/S/$patch")) {
+                    eprint "Unable to move $patch to $tmpdir/P/ -- $!\n";
+                    return SRCTOOL_FILE_OP_FAILED;
+                }
+            }
+        }
+        chdir($tmpdir);
+        $tag = "$pkg-$ver-$rel";
+        $tag =~ tr/a-z/A-Z/;
+        $tag =~ s/\./_/g;
+        ($err, $msg) = &run_cmd("revtool", "-xit $tag", "  ");
+        if ($err) {
+            eprint "Import of $pkgfile failed -- $msg\n";
+            return $err;
+        }
+        chdir($pwd);
+        $tmpdir =~ s/\/$pkg//;
+        &nuke_tree($tmpdir);
+    } elsif (-d $pkgfile) {
+    }
+    return SRCTOOL_SUCCESS;
+}
+
+sub
+prepare_tree
+{
+
+}
+
 # main() here is basically the same as main() in C
 sub
 main
@@ -234,7 +395,8 @@ main
     $version = "1.0";
 
     # See the Getopt::Long man page for details on the syntax of this line
-    @valid_opts = ("h|help", "v|version", "d|debug");
+    @valid_opts = ("h|help", "v|version", "d|debug", "i|import", "p|prepare", "m|mod|modify",
+                   "r|resync", "a|apply:s", "n|name=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -242,7 +404,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.1 $ created on $Date: 2001/03/19 06:17:59 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.2 $ created on $Date: 2001/03/20 03:45:36 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -256,10 +418,12 @@ main
     } elsif ($opt_h) {
 	&print_usage_info();   # Never returns
         # This is a really silly way to shut up the "used only once" warnings.
-        $opt_h = $opt_v = 0;
+        $opt_h = $opt_v = $opt_a = $opt_i = $opt_m = $opt_p = $opt_r = 0;
     }
 
     $debug = ($opt_d ? $opt_d : 0);
+    $pkgname = ($opt_n ? $opt_n : "");
+    @flist = @ARGV;
 
     # Signal handling
     $SIG{HUP} = 'IGNORE';
@@ -276,6 +440,20 @@ main
     $SIG{TTOU} = \&handle_fatal_signal;
     $SIG{__WARN__} = \&handle_warning;
 
+    if ($0 =~ /avimport$/ || $opt_i) {
+        foreach $f (@flist) {
+            my $err;
+
+            $err = &import_package($f, $pkgname);
+            return $err if ($err);
+        }
+    } elsif ($0 =~ /avprep$/ || $opt_p) {
+        &prepare_tree(@flist);
+    } elsif ($0 =~ /avmod$/ || $opt_m) {
+    } elsif ($0 =~ /avpatch$/ || $opt_a) {
+    } elsif ($opt_r) {
+    } else {
+    }
     return SRCTOOL_SUCCESS;
 }
 
