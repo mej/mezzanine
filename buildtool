@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.75 2000/06/20 23:00:46 mej Exp $
+# $Id: buildtool,v 1.76 2000/06/21 02:46:28 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1813,7 +1813,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.75 $ created on $Date: 2000/06/20 23:00:46 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.76 $ created on $Date: 2000/06/21 02:46:28 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1874,9 +1874,9 @@ main
         $slave = 0;
         $num_cpus = 1;
     }
-    if ($opt_D) {
+    if ($opt_D && -d $opt_D) {
         $basedir = $opt_D;
-    } elsif ($ENV{BASE_DIR} && $ENV{BASE_DIR} =~ /^\//) {
+    } elsif ($ENV{BASE_DIR} && $ENV{BASE_DIR} =~ /^\// && -d $ENV{BASE_DIR}) {
         $basedir = $ENV{BASE_DIR};
     } else {
         chomp($basedir = `pwd`);

@@ -529,3 +529,7 @@ Tue Jun 20 16:10:31 2000                        Michael Jennings (mej)
 
 Added the code for importing and tagging.  Untested at this point.
 ----------------------------------------------------------------------
+Tue Jun 20 19:56:03 2000                        Michael Jennings (mej)
+
+Make sure the directories exist before trying to use them.
+----------------------------------------------------------------------
