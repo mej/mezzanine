@@ -1138,3 +1138,8 @@ Fri Apr  6 19:24:18 2001                        Michael Jennings (mej)
 
 Another fix
 ----------------------------------------------------------------------
+Mon Apr  9 22:28:46 2001                        Michael Jennings (mej)
+
+Got imgtool changes in.  Still trying to beat pkgsort into submission,
+but it's making progress.
+----------------------------------------------------------------------

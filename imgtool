@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: imgtool,v 1.9 2001/04/07 02:24:25 mej Exp $
+# $Id: imgtool,v 1.10 2001/04/10 05:29:11 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -104,14 +104,11 @@ find_packages
 {
     my @pkgs = @_;
     my (@contents, @rpms);
-    local *DIR;
 
     foreach $dir (@pkgdirs) {
         my @tmp;
 
-        opendir(DIR, "$dir") || return @rpms;
-        @tmp = grep($_ =~ /(i386|noarch)\.rpm$/, readdir(DIR));
-        closedir(DIR);
+        @tmp = &grepdir(sub {$_ =~ /\.rpm$/ && $_ !~ /\.(no)?src\.rpm$/}, $dir);
         push @contents, @tmp;
         foreach $tmp (@tmp) {
             $path{$tmp} = $dir;
@@ -119,13 +116,30 @@ find_packages
     }
 
     foreach $rpm (@contents) {
-        my ($pkg, $ver, $rel);
+        my ($pkg, $ver, $rel, $arch);
 
-        $rpm =~ m/^([^\/]+)-([^-\/]+)-([^-\/]+)$/;
-        ($pkg, $ver, $rel) = ($1, $2, $3);
+        $rpm =~ m/^([^\/]+)-([^-\/]+)-([^-\/]+)\.(\w+)\.rpm$/;
+        ($pkg, $ver, $rel, $arch) = ($1, $2, $3, $4);
         if (!defined($rpm_name{$pkg})) {
             $rpm_name{$pkg} = $rpm;
+            $arch{$pkg} = $arch;
         } elsif ($rpm ne $rpm_name{$pkg}) {
+            if ($arch ne $arch{$pkg}) {
+                my $found = 0;
+
+                foreach my $a (@arch_list) {
+                    if ($arch eq $a) {
+                        $rpm_name{$pkg} = $rpm;
+                        $arch{$pkg} = $arch;
+                        $found = 1;
+                        last;
+                    } elsif ($arch{$pkg} eq $a) {
+                        $found = 1;
+                        last;
+                    }
+                }
+                next if ($found);
+            }
             eprint "Multiple RPM's found for $pkg:  $rpm (new) vs. $rpm_name{$pkg} (old)\n";
             if (-t) {
                 my $ans;
@@ -135,6 +149,7 @@ find_packages
                 if ($ans =~ /^\s*y(es)?\s*$/i) {
                     print "Using $rpm for $pkg\n";
                     $rpm_name{$pkg} = $rpm;
+                    $arch{$pkg} = $arch;
                 } else {
                     print "Ignoring $rpm\n";
                 }
@@ -231,7 +246,7 @@ main
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "i|image=s", "D|dir=s", "a|archive=s",
-                   "l|list=s", "t|test", "k|keep");
+                   "l|list=s", "t|test", "k|keep", "A|arch=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -239,7 +254,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.9 $ created on $Date: 2001/04/07 02:24:25 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.10 $ created on $Date: 2001/04/10 05:29:11 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -273,10 +288,18 @@ main
     $keep = ($opt_k ? 1 : 0);
     $global_flags = ($opt_t ? "--justdb --noscripts --notriggers" : 0);
     $archive = ($opt_a ? $opt_a : 0);
+    if ($archive && $archive !~ /^\//) {
+        $archive = &getcwd() . "/$archive";
+    }
     if ($opt_l) {
         @pkgs = &get_package_list($opt_l);
     } else {
         @pkgs = @ARGV;
+    }
+    if ($opt_A) {
+        @arch_list = split(/[ ,:\|]/, $opt_A);
+    } else {
+        @arch_list = ("i386", "noarch", "i586", "i686");
     }
 
     # Oops-proofing

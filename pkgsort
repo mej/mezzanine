@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgsort,v 1.12 2001/04/07 02:22:39 mej Exp $
+# $Id: pkgsort,v 1.13 2001/04/10 05:29:11 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -52,6 +52,7 @@ print_usage_info
     print "    -D --dir <directory>             Specify one or more directories from which to take packages\n";
     print "    -l --list <file>                 Take the input package list from \"file\" instead of the command line\n";
     print "    -o --outfile <file>              Output the resulting package list to \"file\" instead of stdout\n";
+    print "    -m --mode <mode>                 Specify either \"source\" or \"binary\" package resolution\n";
     print "\n";
     print "Valid sort flags are:  a for alphabetical by binary package\n";
     print "                       d for dependency\n";
@@ -151,46 +152,48 @@ find_packages
         $rpm =~ m/^([^\/]+)-([^-\/]+)-([^-\/]+)\.\w+\.rpm$/;
         $pkg = $1;
         if ($have_cache{"$path{$rpm}/$rpm"}) {
-            if (grep($_ eq $pkg || $_ eq $src_rpm{$src_package{$pkg}} || $_ eq $rpm, @pkgs)) {
+            if (grep($_ eq $pkg || ($mode eq "src" && $_ eq $src_rpm{$src_package{$pkg}}) || $_ eq $rpm, @pkgs)) {
                 xpush @new_pkgs, $pkg;
             }
             next;
         }
-        $srpm = &get_srpm_for_rpm($rpm);
-        $srpm =~ m/^([^\/]+)-([^-\/]+)-([^-\/]+)\.\w+\.rpm$/;
-        ($spkg, $ver, $rel) = ($1, $2, $3);
-        dprint "Package $pkg from $spkg $ver-$rel ($srpm)\n";
-        if (scalar(@_)) {
+        if ($mode eq "src") {
+            $srpm = &get_srpm_for_rpm($rpm);
+            $srpm =~ m/^([^\/]+)-([^-\/]+)-([^-\/]+)\.\w+\.rpm$/;
+            ($spkg, $ver, $rel) = ($1, $2, $3);
+            dprint "Package $pkg from $spkg $ver-$rel ($srpm)\n";
             next if (!grep($_ eq $pkg || $_ eq $spkg || $_ eq $rpm, @pkgs));
-        }
-        xpush @new_pkgs, $pkg;
-        xpush @{$bin_packages{$spkg}}, $pkg;
-        if (defined($src_version{$spkg})) {
-            if ($src_version{$spkg} ne $ver || $src_release{$spkg} ne $rel) {
-                eprint "Multiple versions of $spkg found:  $spkg-$ver-$rel (new) vs. $spkg-$src_version{$spkg}-$src_release{$spkg} (old)\n";
-                if (-t) {
-                    my $ans;
+            xpush @{$bin_packages{$spkg}}, $pkg;
+            if (defined($src_version{$spkg})) {
+                if ($src_version{$spkg} ne $ver || $src_release{$spkg} ne $rel) {
+                    eprint "Multiple versions of $spkg found:  $spkg-$ver-$rel (new) vs. $spkg-$src_version{$spkg}-$src_release{$spkg} (old)\n";
+                    if (-t) {
+                        my $ans;
 
-                    print "Shall I replace the old one with the new one?\n";
-                    chomp($ans = <STDIN>);
-                    if ($ans =~ /^\s*y(es)?\s*$/i) {
-                        print "Using $rpm for $pkg\n";
-                        undef @{$rpm_list{$pkg}};
-                        push @{$rpm_list{$pkg}}, $rpm;
+                        print "Shall I replace the old one with the new one?\n";
+                        chomp($ans = <STDIN>);
+                        if ($ans =~ /^\s*y(es)?\s*$/i) {
+                            print "Using $rpm for $pkg\n";
+                            undef @{$rpm_list{$pkg}};
+                            push @{$rpm_list{$pkg}}, $rpm;
+                        } else {
+                            print "Ignoring $rpm\n";
+                            next;
+                        }
                     } else {
-                        print "Ignoring $rpm\n";
+                        print "I will ignore $rpm\n";
                         next;
                     }
-                } else {
-                    print "I will ignore $rpm\n";
-                    next;
                 }
             }
+            $src_version{$pkg} = $ver;
+            $src_release{$pkg} = $rel;
+            $src_package{$pkg} = $spkg;
+            $src_rpm{$spkg} = $srpm;
+        } else {
+            next if (!grep($_ eq $pkg || $_ eq $rpm, @pkgs));
         }
-        $src_version{$pkg} = $ver;
-        $src_release{$pkg} = $rel;
-        $src_package{$pkg} = $spkg;
-        $src_rpm{$spkg} = $srpm;
+        xpush @new_pkgs, $pkg;
         xpush @{$rpm_list{$pkg}}, $rpm;
     }
     return @new_pkgs;
@@ -310,7 +313,7 @@ consistency_check
         if (! $force) {
             &fatal_error("Consistency check failed.  Aborting.\n");
         } else {
-            print "Consistency check failed.  Resulting package set will not function properly.\n";
+            print "Consistency check failed.  Resulting package set may not function properly.\n";
         }
     }
 
@@ -352,9 +355,11 @@ query_packages
         }
         dprint "Package $pkg:  ", join(", ", @{$rpm_list{$pkg}}), "\n";
         @{$provides{$pkg}} = ($pkg);
-        if ($pkg ne $src_package{$pkg}) {
-            &pkg_add_dep($pkg, $src_package{$pkg});
-        }
+        @{$what_provides{$pkg}} = ($pkg);
+        # FIXME:  Should this stay enabled for "src" mode?  I'm not sure, but it breaks "bin" mode.
+        #if ($pkg ne $src_package{$pkg}) {
+        #    &pkg_add_dep($pkg, $src_package{$pkg});
+        #}
         foreach $rpm (@{$rpm_list{$pkg}}) {
             $cmd = "pkgtool -qd -p $path{$rpm}/$rpm";
 
@@ -371,6 +376,7 @@ query_packages
                     $line =~ s/^\w+:  \s*(\S.+)\s*$/$1/;
                     $line =~ s/^\s+//;  $line =~ s/\s+$//;
                     next if ($pkg eq $line);
+                    next if ($line =~ /^\// && -d $line);
                     &pkg_add_cap($pkg, $line);
                 } elsif ($line =~ /^Requires/) {
                     $line =~ s/^\w+:  \s*//;
@@ -566,7 +572,11 @@ dep_sort
 
     foreach $pkg (@old_pkgs) {
         $ftr = $last_dep = $loc = -1;
-        $deps = scalar(@{$requires{$pkg}});
+        if (defined($requires{$pkg})) {
+            $deps = scalar(@{$requires{$pkg}});
+        } else {
+            $deps = 0;
+        }
 
         for ($i = 0; $i < $cnt; $i++) {
             if ($pkgs[$i] eq $pkg) {
@@ -779,7 +789,7 @@ main
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "D|dir=s", "l|list=s",
-                   "o|outfile=s", "f|format=s", "s|sort=s", "F|force");
+                   "o|outfile=s", "f|format=s", "s|sort=s", "F|force", "m|mode=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -787,7 +797,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.12 $ created on $Date: 2001/04/07 02:22:39 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.13 $ created on $Date: 2001/04/10 05:29:11 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -805,6 +815,13 @@ main
     &debug_set($opt_d);
     $outfile = ($opt_o ? $opt_o : "-");
     $force = $opt_F;
+    if ($opt_m =~ /^b(in)?(ary)?$/i) {
+        $mode = "bin";
+    } elsif ($opt_m =~ /^s(rc|ource)?$/i) {
+        $mode = "src";
+    } else {
+        $mode = "";
+    }
     if ($opt_f) {
         if ($opt_f eq substr("names", 0, length($opt_f))) {
             $output_format = "names";
