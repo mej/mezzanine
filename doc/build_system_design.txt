@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: build_system_design.txt,v 1.1 2000/12/21 02:54:45 mej Exp $
+#  $Id: build_system_design.txt,v 1.2 2000/12/21 23:24:24 mej Exp $
 #
 ########################################################################
 
@@ -45,4 +45,12 @@ product.  Anything else is simply a benefit, not a necessity.
    mistakes as possible.  Specifically, violations of policy should be
    handled as sanely as they can be, but should not be allowed to
    happen directly.
- - 
+ - The Build System should enforce and encourage well-organized and
+   structured package maintenance, but it should also make alterations
+   and updates to packages as simple and straight-forward as possible,
+   whether through simplicity of design or simplicity of tools.
+ - The Build System must allow for the complete testing of builds
+   without requiring an update of the master repository.  In other
+   words, changes must be able to be tested prior to being pushed to
+   the master server.
+
