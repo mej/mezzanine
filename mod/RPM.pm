@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.18 2004/01/10 13:40:58 mej Exp $
+# $Id: RPM.pm,v 1.19 2004/01/15 01:20:06 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -92,9 +92,10 @@ rpm_form_command
     if ($type eq "build") {
         if (! &pkgvar_command()) {
             if (&pkgvar_instroot()) {
-                &pkgvar_command("chroot " . &pkgvar_instroot() . " /usr/bin/rpmbuild");
+                &pkgvar_command("chroot " . &pkgvar_instroot()
+                                . " /usr/bin/rpmbuild --define '_debug_package %{nil}' --define '_enable_debug_packages 0' --define '__debug_package 0'");
             } else {
-                &pkgvar_command("/usr/bin/rpmbuild");
+                &pkgvar_command("/usr/bin/rpmbuild --define '_debug_package %{nil}' --define '_enable_debug_packages 0' --define '__debug_package 0'");
             }
         } elsif (&pkgvar_instroot()) {
             &pkgvar_command("chroot " . &pkgvar_instroot() . " " . &pkgvar_command());
@@ -172,6 +173,8 @@ parse_spec_file
     my $specfile = &pkgvar_instructions();
     my ($line, $oldline, $stage, $pkg);
     local *SPECFILE;
+
+    undef $specdata;
 
     if (! $specfile) {
         wprint "How can I parse a spec file with no name?\n";

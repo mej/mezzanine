@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.29 2004/01/10 13:40:58 mej Exp $
+# $Id: Build.pm,v 1.30 2004/01/15 01:20:06 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -303,7 +303,7 @@ install_deps($)
     $inst .= &pkgvar_get("hint_installer");
     @tmp = &run_cmd($inst, $deps, "pkg-installer:  ");
     if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
-        return "Unable to install $pkg ($err)";
+        return "Unable to install $deps ($err)";
     }
 
     return "";
@@ -625,6 +625,68 @@ build_spm
     return &build_topdir();
 }
 
+# This function knows how to build packages from Package Development
+# Repositories (PDR's).  It is usually called by build_package() but
+# can be called directly as long as the chdir() has been done already
+# and we're 100% certain that it's a PDR.
+sub
+build_pdr
+{
+    my ($specfile, $topdir, $instroot);
+    my (@tmp, @tmp2);
+
+    dprint &print_args(@_);
+
+    &prepare_build_tree();
+    $topdir = &pkgvar_topdir();
+    $instroot = &pkgvar_instroot();
+
+    @tmp = &grepdir(sub {/\.spec(\.in)?$/ && -f $_ && -s _}, ".");
+    if (!scalar(@tmp)) {
+        return (MEZZANINE_MISSING_FILES, "@{[getcwd()]} does not seem to contain build instructions", undef);
+    } elsif (scalar(@tmp) > 1) {
+        return (MEZZANINE_BAD_MODULE, "Only one specfile/script dir allowed per package (@tmp)", undef);
+    }
+
+    &copy_files($tmp[0], "$instroot$topdir/SPECS");
+    $specfile = "$topdir/SPECS/" . &basename($tmp[0]);
+
+    &pkgvar_instructions($instroot . $specfile);
+    if (! $specdata || (&basename($specdata->{"SPECFILE"}) ne &basename($specfile))) {
+        &parse_spec_file();
+    }
+
+    if ($specdata && $specdata->{"BUILD_DEPS"} && scalar(@{$specdata->{"BUILD_DEPS"}})) {
+        my $ret;
+
+        $ret = &install_deps(join(' ', @{$specdata->{"BUILD_DEPS"}}));
+        if ($ret) {
+            wprint "Build dependency installation failed:  $ret\n";
+        }
+    }
+    &pkgvar_instructions($specfile);
+
+    @tmp = map { $specdata->{"SOURCE"}{$_} } @{$specdata->{"SOURCES"}};
+    push @tmp, map { $specdata->{"PATCH"}{$_} } @{$specdata->{"PATCHES"}};
+
+    if (scalar(@tmp)) {
+        &copy_files(@tmp, "$instroot$topdir/SOURCES");
+    }
+
+    # Parse the prod file for this PDR if it exists.
+    if (&parse_prod_file()) {
+        my $pkg = &pkgvar_name();
+
+        if ($pkgs->{$pkg}{SRCS}) {
+            &pkgvar_srcs($pkgs->{$pkg}{SRCS});
+        }
+        if ($pkgs->{$pkg}{ARCH}) {
+            &pkgvar_architecture($pkgs->{$pkg}{ARCH});
+        }
+    }
+    return &build_topdir();
+}
+
 # This function handles the "special case" FST's which have their very own
 # Makefile.mezz.  As with build_spm(), the chdir() must have already been done.
 sub
@@ -719,7 +781,7 @@ build_fst
     $pkgdir = "$instroot$topdir/RPMS";
 
     # Look for the build instructions (spec file, debian/ directory, etc.)
-    if (! $specfile) {
+    if (! $specfile || ! -f $specfile) {
         if ($target_format eq "rpms") {
             @tmp = &grepdir(sub {/spec(\.in)?$/});
         } elsif ($target_format eq "debs") {
@@ -853,7 +915,7 @@ sub
 build_package
 {
     my ($pwd, $pkg);
-    my @ret;
+    my @ret = ();
 
     dprint &print_args(@_);
 
@@ -872,9 +934,42 @@ build_package
             # There's a custom Makefile.  It's a Custom Full Source Tree (FST).
             @ret = &build_cfst();
         } else {
-            # If it's not either of the above, it better be a standard Full Source Tree (FST),
-            # and it better conform to the proper assumptions or provide other instructions.
-            @ret = &build_fst();
+            my @specs = &grepdir(sub {/\.spec(\.in)?$/}, ".");
+
+            if (scalar(@specs) == 1) {
+                # There's a spec file.  Make sure we have all sources.
+                &pkgvar_instructions($specs[0]);
+                &parse_spec_file();
+
+                if ($specdata && $specdata->{"SOURCES"} && scalar(@{$specdata->{"SOURCES"}})) {
+                    my @tmp;
+
+                    @tmp = map { $specdata->{"SOURCE"}{$_} } @{$specdata->{"SOURCES"}};
+                    if ($specdata->{"PATCHES"}) {
+                        push @tmp, map { $specdata->{"PATCH"}{$_} } @{$specdata->{"PATCHES"}};
+                    }
+                    dprint "Searching . for:  ", join(", ", @tmp), "\n";
+                    @tmp = grep(! -f &basename($_), @tmp);
+                    dprint "Missing:  ", join(", ", @tmp), "\n";
+                    if (!scalar(@tmp)) {
+                        # All sources and patches are here.  It's a PDR.
+                        @ret = &build_pdr();
+                    } else {
+                        dprint "Not PDR:  Some sources missing.\n";
+                    }
+                } else {
+                    dprint "Not PDR:  No sources found in spec.\n";
+                }
+            } else {
+                dprintf("Not PDR:  Found %d spec files.\n",
+                    scalar(@specs));
+            }
+
+            if (!scalar(@ret)) {
+                # If it's not any of the above, it better be a standard Full Source Tree (FST),
+                # and it better conform to the proper assumptions or provide other instructions.
+                @ret = &build_fst();
+            }
         }
     } elsif (-f _ && -s _) {
         # It's a file.  Must be a package file of some type.

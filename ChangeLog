@@ -261,3 +261,7 @@ Sat Jan 10 10:07:58 2004                        Michael Jennings (mej)
 Install BuildRequires and BuildPrereq's in addition to Hints before
 building.
 ----------------------------------------------------------------------
+Wed Jan 14 21:46:23 2004                        Michael Jennings (mej)
+
+Fixes to chroot builds and dependency handling.
+----------------------------------------------------------------------
