@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: build_system_design.txt,v 1.3 2001/01/04 02:31:50 mej Exp $
+#  $Id: build_system_design.txt,v 1.4 2001/01/05 04:18:59 mej Exp $
 #
 ########################################################################
 
@@ -194,6 +194,91 @@ Existing utilities which fall into this category include:
 
 3.  IMPLEMENTATION DETAILS
 --------------------------
+
+The fundamental purpose of the Build System is to automate the
+creation and management of software products.  Every task performed by
+Avalon could be done by hand instead.  However, part of the purpose of
+the Avalon toolkit is to automate complex process and hide the details
+of their implementation from the end user.  That said, those who
+design and maintain the Build System need to know how things actually
+work in case something goes wrong, be it with the back-end system
+itself or one of the Avalon tools.
+
+3.1.  Server Setup
+------------------
+
+The build server will be responsible for running the CVS daemon
+process.  Due to the number of trees which must be provided by this
+server, the following script is recommended:
+
+    #!/bin/sh
+    #
+    # /usr/local/bin/cvs_server
+    #
+
+    CVSBASE=/cvs
+
+    cd $CVSBASE
+    TREES=`find . -maxdepth 1 -user build -group build -type d \
+        -print | sed "s%^\.%$CVSBASE%g" | egrep -v "^$CVSBASE$"`
+
+    for i in $TREES ; do
+      ROOTS="$ROOTS --allow-root=$i"
+    done
+    exec /usr/bin/cvs $ROOTS -b /usr/bin pserver
+
+Once this script is in place as /usr/local/bin/cvs_server, the
+following line should be added to /etc/inetd.conf (or the equivalent
+if stock inetd is not in use):
+
+cvspserver stream tcp nowait.2048 build /usr/sbin/tcpd /usr/local/bin/cvs_server
+
+Naturally, the "build" user/group should be created first, along with
+the /cvs directory, and the following should be added to
+/etc/services:
+
+cvspserver        2401/tcp                        # CVS client/server operations
+cvspserver        2401/udp                        # CVS client/server operations
+
+The /cvs directory should be owned by build:build with permissions
+2775.  A cron job may be employed to maintain appropriate ownerships
+and permissions (2775 for directories, 0664 for files).
+
+A single skeleton directory, .skel, will be located under /cvs and
+will contain the basic template for all new CVS trees which will
+subsequently be created.  All global modifications to CVS management
+files should be done first in the .skel directory, then pushed out to
+the other trees.
+
+3.2.  Directory Structure
+-------------------------
+
+All build system data will be stored in directories underneath the
+global CVS root directory, /cvs.  Each individual product should have
+its own tree.  A master project called "build" will contain the Avalon
+tools as well as product files for all products in the system.
+
+Within each product tree will be located individual modules, one per
+component package or package set.  Package sets are groups of packages
+which are not maintained locally and can therefore be used exclusively
+in their package form.  Any locally-maintained or locally-modified
+packages must be in separate modules.  Package set directories should
+be named starting with either "contrib-" (for source packages) or
+"bin-" (for binary packages), followed by an indication of the
+platform for which they are intended (e.g., "rh" for RedHat, "deb" for
+Debian, etc.).  Other directories, those for individual packages,
+should be named according to the package name.
+
+3.3.  Module Structure
+----------------------
+
+Each individual module directory will contain the various source files
+(including tarballs) and patch files from the original source
+package.  They should be committed and altered in place and intact.
+Avalon will provide tools to automate the manipulation of these files
+in such a way as to fulfill the project design goals which seem
+overlooked by the implementation.  Past experience with branching and
+tagging has revealed CVS to be less than sufficient.
 
 
 4.  HIGH-LEVEL PROCESS OVERVIEW
