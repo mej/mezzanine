@@ -776,3 +776,9 @@ Mon Aug 28 18:12:32 2000                        Michael Jennings (mej)
 Added a --tag option to ease building everything based on a particular
 tag.
 ----------------------------------------------------------------------
+Tue Sep  5 23:13:10 2000                        Michael Jennings (mej)
+
+pkgtool now has the ability to query package dependencies.  This is
+required for pkgsort, a new utility I'm working on for the 7.0.1
+project.  It's almost done.
+----------------------------------------------------------------------

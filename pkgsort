@@ -1,0 +1,449 @@
+#!/usr/bin/perl -w
+#
+# pkgsort -- Tool for generating source/patch files from a source code repository
+# 
+# Copyright (C) 2000, Michael Jennings
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies of the Software, its documentation and marketing & publicity
+# materials, and acknowledgment shall be given in the documentation, materials
+# and software packages that this Software was used.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+# $Id: pkgsort,v 1.1 2000/09/06 06:15:05 mej Exp $
+#
+
+# Include the Perl Modules we need
+require POSIX;
+require Getopt::Long;
+
+# Constants
+#
+# Return codes for pkgtool
+sub PKGTOOL_SUCCESS()           {0;}
+sub PKGTOOL_FATAL_ERROR()       {1;}
+sub PKGTOOL_SYNTAX_ERROR()      {2;}
+sub PKGTOOL_COMMAND_FAILED()    {3;}
+
+sub PKGTOOL_MISSING_FILES()     {10;}
+sub PKGTOOL_SPEC_ERRORS()       {11;}
+sub PKGTOOL_DEPENDENCIES()      {12;}
+sub PKGTOOL_ARCH_MISMATCH()     {13;}
+sub PKGTOOL_BUILD_FAILURE()     {14;}
+sub PKGTOOL_BAD_MODULE()        {15;}
+
+sub PKGTOOL_TERMINATED()        {50;}
+sub PKGTOOL_CRASHED()           {60;}
+sub PKGTOOL_UNSPECIFIED_ERROR   {127;}
+
+# Return codes for pkgsort
+sub PKGSORT_SUCCESS()           {0;}
+sub PKGSORT_FATAL_ERROR()       {1;}
+sub PKGSORT_SYNTAX_ERROR()      {2;}
+sub PKGSORT_COMMAND_FAILED()    {3;}
+
+sub PKGSORT_UNRESOLVED_DEP()    {10;}
+sub PKGSORT_CIRCULAR_DEP()      {11;}
+
+sub PKGSORT_TERMINATED()        {50;}
+sub PKGSORT_CRASHED()           {60;}
+sub PKGSORT_UNSPECIFIED_ERROR   {127;}
+
+
+# Print usage information
+sub
+print_usage_info
+{
+    print "\n";
+    $leader = "$progname $version Usage Information";
+    $underbar = $leader;
+    $underbar =~ s/./-/g;
+    print "$leader\n$underbar\n";
+    print "\n";
+    print "  Syntax:   pkgsort [ options ]\n";
+    print "\n";
+    print "    -h --help                        Show this usage information\n";
+    print "    -d --debug                       Turn on debugging\n";
+    print "    -v --version                     Show version and copyright\n";
+    print "    -D --dir <directory>             Specify one or more directories from which to take packages\n";
+    print "    -l --list <file>                 Take the input package list from \"file\" instead of the command line\n";
+    print "    -o --outfile <file>              Output the resulting package list to \"file\" instead of stdout\n";
+    print "\n";
+    exit(PKGSORT_SUCCESS);
+}
+
+# Generate timestamp for debugging/log file
+sub
+get_timestamp
+{
+    return POSIX::strftime("%A, %d %B %Y %H:%M:%S %Z", localtime);
+}
+
+# Report a fatal error
+sub
+fatal_error
+{
+    my $msg = "$progname:  FATAL:  $_[0]";
+
+    print STDERR $msg;
+    exit(PKGSORT_FATAL_ERROR);
+}
+
+# Debugging output
+sub
+dprintf
+{
+    return if (! $debug);
+    print "[debug:$progname] ";
+    printf @_;
+}
+sub
+dprint
+{
+    my @dbg;
+    my ($f, $l, $s);
+
+    return if (! $debug);
+    @dbg = caller(1);
+    ($f, $l, $s) = @dbg[1, 2, 3];
+    $f =~ s/^.*\/([^\/]+)$/$1/;
+    print "[$f/$l/$s()] ", @_;
+}
+
+# Print an error
+sub
+eprintf
+{
+    print "$progname:  Error:  ";
+    printf @_;
+}
+sub
+eprint
+{
+    print "$progname:  Error:  ", @_;
+}
+
+# Handle a terminate signal
+sub
+handle_signal
+{
+    my $sig = $_[0];
+
+    eprint "Someone sent me a SIG$sig asking me to exit, so I shall.\n";
+    close($GLOBAL_LOG) if ($GLOBAL_LOG);
+    exit PKGSORT_TERMINATED;
+}
+
+# Handle a fatal signal
+sub
+handle_fatal_signal
+{
+    my $sig = $_[0];
+
+    eprint "Caught fatal signal SIG$sig.  Cleaning up and aborting...\n";
+    close($GLOBAL_LOG) if ($GLOBAL_LOG);
+    exit PKGSORT_CRASHED;
+}
+
+# Handle a perl warning
+sub
+handle_warning
+{
+    dprint @_;
+}
+
+sub
+get_package_list
+{
+    my $filename = $_[0];
+    my $line;
+    my @pkgs;
+    local *LISTFILE;
+
+    open(LISTFILE, $filename) || return @pkgs;
+    dprint "Reading package list from $filename\n";
+    while (<LISTFILE>) {
+        chomp($line = $_);
+        # Skip comments and empty lines
+        next if ($line =~ /^\#/ || $line =~ /^\s*$/);
+
+        # These lines strip leading and trailing whitespace, then grab the contents of
+        # the line before any intervening spaces but after any slashes.
+        $line =~ s/^\s+//;
+        $line =~ s/\s+$//;
+        $line =~ s/^.*\///g;
+        dprint "Looking at $line\n";
+#        if ($line =~ /^\S+\s+(-\S+.*)$/) {
+#            $flags = $1;
+#        }
+        $line =~ s/^(\S+)\s+.*$/$1/;
+
+        # Skip lines with colons (product variables from product files)
+        next if ($line =~ /:/);
+
+        # If we get here, what remains is a package
+        dprint "Got package:  $line\n";
+        push @pkgs, $line;
+#        if ($flags) {
+#            $flags{$line} = $flags;
+#            dprint "Set flags for $line to $flags{$line}\n";
+#        }
+    }
+    close(LISTFILE);
+    return @pkgs;
+}
+
+sub
+find_packages
+{
+    my @pkgs = @_;
+    my (@contents, @rpms);
+    local *DIR;
+
+    foreach $dir (@pkgdirs) {
+        my @tmp;
+
+        opendir(DIR, "$dir") || return @rpms;
+        @tmp = grep($_ =~ /(?<!src)\.rpm$/, readdir(DIR));
+        closedir(DIR);
+        push @contents, @tmp;
+        foreach $tmp (@tmp) {
+            $path{$tmp} = $dir;
+        }
+    }
+
+    foreach $rpm (@contents) {
+        my ($pkg, $ver, $rel);
+
+        $rpm =~ m/^([^\/]+)-([^-\/]+)-([^-\/]+)\.\w+\.rpm$/;
+        ($pkg, $ver, $rel) = ($1, $2, $3);
+        if (!defined($rpm_list{$pkg})) {
+            push @{$rpm_list{$pkg}}, $rpm;
+        } elsif (!grep($_ eq $rpm, @{$rpm_list{$pkg}})) {
+            my ($old_pkg, $old_ver, $old_rel);
+
+            $rpm_list{$pkg}[0] =~ m/^([^\/]+)-([^-\/]+)-([^-\/]+)\.\w+\.rpm$$/;
+            ($old_pkg, $old_ver, $old_rel) = ($1, $2, $3);
+            if ($old_ver eq $ver && $old_rel eq $rel) {
+                push @{$rpm_list{$pkg}}, $rpm;
+            } else {
+                eprint "Multiple versions of $pkg found:  $pkg-$ver-$rel (new) vs. $old_pkg-$old_ver-$old_rel (old)\n";
+                if (-t) {
+                    my $ans;
+
+                    print "Shall I replace the old one with the new one?\n";
+                    chomp($ans = <STDIN>);
+                    if ($ans =~ /^\s*y(es)?\s*$/i) {
+                        print "Using $rpm for $pkg\n";
+                        undef @{$rpm_list{$pkg}};
+                        push @{$rpm_list{$pkg}}, $rpm;
+                    } else {
+                        print "Ignoring $rpm\n";
+                    }
+                } else {
+                    print "I will ignore $rpm\n";
+                }
+            }
+        }
+    }
+}
+
+sub
+query_packages
+{
+    my @pkgs = @_;
+    my ($line, $cmd, $rpm, $prog);
+    local *CMD;
+
+    print "Gathering dependency information....\n";
+    foreach $pkg (@pkgs) {
+        if (!defined($rpm_list{$pkg})) {
+            eprint "No package found for $pkg!\n";
+            next;
+        }
+        dprint "Package $pkg:  ", join(", ", @{$rpm_list{$pkg}}), "\n";
+        foreach $rpm (@{$rpm_list{$pkg}}) {
+            $cmd = "pkgtool -qd -p $path{$rpm}/$rpm";
+
+            open(CMD, "$cmd 2>&1 |") || &fatal_error("Unable to execute pkgtool -- $!\n");
+            if ($debug) {
+                dprint "$cmd\n";
+            } else {
+                print "$pkg  ";
+            }
+            while (<CMD>) {
+                chomp($line = $_);
+                if ($line =~ /^Contains/) {
+                    $line =~ s/^\w+:  \s*(\S.+)\s*$/$1/;
+                    $line =~ s/^\s+//;  $line =~ s/\s+$//;
+                    push @{$contains{$pkg}}, $line;
+                    push @{$what_contains{$line}}, $pkg;
+                } elsif ($line =~ /^Provides/) {
+                    $line =~ s/^\w+:  \s*(\S.+)\s*$/$1/;
+                    $line =~ s/^\s+//;  $line =~ s/\s+$//;
+                    push @{$provides{$pkg}}, $line;
+                    push @{$what_provides{$line}}, $pkg;
+                } elsif ($line =~ /^Requires/) {
+                    $line =~ s/^\w+:  \s*//;
+                    $line =~ s/\s+[-=<>lteqng]+\s+\S+$//;
+                    $line =~ s/^\s+//;  $line =~ s/\s+$//;
+                    push @{$requires{$pkg}}, $line;
+                    push @{$what_requires{$line}}, $pkg;
+                } else {
+                    eprint "$line\n";
+                }
+            }
+            close(CMD);
+            if ($? != PKGTOOL_SUCCESS) {
+                &fatal_error("Query of $rpm failed (error $?).\n");
+            }
+        }
+    }
+    print "\nQuery complete.\n";
+
+    if ($debug) {
+        foreach $pkg (sort keys %contains) {
+            dprint "Package $pkg contains:\n";
+            foreach $file (@{$contains{$pkg}}) {
+                dprint "     $file\n";
+            }
+        }
+        foreach $pkg (sort keys %provides) {
+            dprint "Package $pkg provides:\n";
+            foreach $file (@{$provides{$pkg}}) {
+                dprint "     $file\n";
+            }
+        }
+        foreach $pkg (sort keys %requires) {
+            dprint "Package $pkg requires:\n";
+            foreach $file (@{$requires{$pkg}}) {
+                dprint "     $file\n";
+            }
+        }
+
+        foreach $file (sort keys %what_contains) {
+            dprint "Packages containing $file:  ", join(", ", @{$what_contains{$file}}), "\n";
+        }
+        foreach $file (sort keys %what_provides) {
+            dprint "Packages providing $file:  ", join(", ", @{$what_provides{$file}}), "\n";
+        }
+        foreach $file (sort keys %what_requires) {
+            dprint "Packages requiring $file:  ", join(", ", @{$what_requires{$file}}), "\n";
+        }
+    }
+    return IMGTOOL_SUCCESS;
+}
+
+sub
+cmp_packages
+{
+    my ($pkg1, $pkg2) = @_;
+    my ($requires, $provides) = (0, 0);
+
+    # First, see if pkg1 requires anything that pkg2 provides ($requires)
+
+
+    # Next, see if pkg1 provides anything that pkg2 requires ($provides)
+
+
+    # Check for circular dependency and return a value
+
+    return 0;
+}
+
+sub
+sort_packages
+{
+    my @pkgs = @_;
+
+    @pkgs = sort cmp_packages @pkgs;
+    foreach $pkg (@pkgs) {
+        foreach $rpm (sort @{$rpm_list{$pkg}}) {
+            print "$rpm\n";
+        }
+    }
+}
+
+# main() here is basically the same as main() in C
+sub
+main
+{
+    my $ret;
+
+    # Set up the basic variables
+    $progname = "pkgsort";
+    $version = "1.0";
+
+    # See the Getopt::Long man page for details on the syntax of this line
+    @valid_opts = ("h|help", "v|version", "d|debug", "D|dir=s", "l|list=s", "o|outfile=s");
+    Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
+    Getopt::Long::GetOptions(@valid_opts);
+
+    # Post-parse the options stuff
+    select STDOUT; $| = 1;
+    if ($opt_v) {
+        # Do not edit this variable.  It is updated automatically by CVS when you commit
+        my $rcs_info = 'CVS Revision $Revision: 1.1 $ created on $Date: 2000/09/06 06:15:05 $ by $Author: mej $ ';
+
+        $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
+        $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
+        $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
+        print "\n";
+	print "$progname $version by Michael Jennings <mej\@eterm.org>\n";
+        print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
+        print "  ($rcs_info)\n";
+        print "\n";
+	return PKGSORT_SUCCESS;
+    } elsif ($opt_h) {
+	&print_usage_info();   # Never returns
+        # This is a really silly way to shut up the "used only once" warnings.
+        $opt_h = $opt_v = 0;
+    }
+
+    $debug = ($opt_d ? $opt_d : 0);
+    $outfile = ($opt_o ? $opt_o : "-");
+    if ($opt_D) {
+        @pkgdirs = split(/[:\s]/, $opt_D);
+    } else {
+        @pkgdirs = glob('$ENV{BUILD_DIR}/RPMS/*');
+    }
+    if ($opt_l) {
+        @pkgs = &get_package_list($opt_l);
+    } else {
+        @pkgs = @ARGV;
+    }
+
+    # Signal handling
+    $SIG{HUP} = 'IGNORE';
+    $SIG{INT} = \&handle_signal;
+    $SIG{TERM} = \&handle_signal;
+    $SIG{QUIT} = \&handle_fatal_signal;
+    $SIG{ILL} = \&handle_fatal_signal;
+    $SIG{ABRT} = \&handle_fatal_signal;
+    $SIG{FPE} = \&handle_fatal_signal;
+    $SIG{SEGV} = \&handle_fatal_signal;
+    $SIG{BUS} = \&handle_fatal_signal;
+    $SIG{TSTP} = \&handle_fatal_signal;
+    $SIG{TTIN} = \&handle_fatal_signal;
+    $SIG{TTOU} = \&handle_fatal_signal;
+    $SIG{__WARN__} = \&handle_warning;
+
+    &find_packages(@pkgs);
+    &query_packages(@pkgs);
+    &sort_packages(@pkgs);
+}
+
+exit &main();

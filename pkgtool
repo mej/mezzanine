@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.22 2000/08/23 21:55:39 mej Exp $
+# $Id: pkgtool,v 1.23 2000/09/06 06:15:05 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -96,6 +96,7 @@ print_usage_info
     print "    -b --build                       Build a package\n";
     print "    -i --install                     Install (unarchive) a package\n";
     print "    -c --contents                    Check the contents of a package\n";
+    print "    -q --query <type>                Query attributes of a package\n";
     print "    -o --sources [srcs]              Specify the sources to generate\n";
     print "    -p --package <file>              Specify the package filename\n";
     print "    -s --specfile --scripts <path>   Specify the spec file (or debian script directory) to use\n";
@@ -731,26 +732,102 @@ sub
 deb_show_contents
 {
     my $pkg_file = $_[0];
-    my ($dpkg, $cmd);
-    my @inp;
+    my ($dpkg, $cmd, $line);
     local *DPKG;
 
     $dpkg = ($pkg_prog ? $pkg_prog : "dpkg");
-    $cmd = "$dpkg -c " . ($pkg_file ? "-p $pkg_file" : "");
+    $cmd = "$dpkg -c " . ($pkg_file ? "$pkg_file" : "");
     dprint "About to run \"$cmd\"\n";
     if (!open(DPKG, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }
     while (<DPKG>) {
         chomp;
-        @inp = split /\s+/;
-        print "$inp[8]\n";
+        ($line = $_) =~ s/^.* \.(\/.*)$/$1/;
+        print "$line\n";
     }
     close(DPKG);
     dprint "\"$cmd\" returned $?\n";
     if ($? != 0) {
         return PKGTOOL_UNSPECIFIED_ERROR;
     }
+    return PKGTOOL_SUCCESS;
+}
+
+sub
+rpm_query
+{
+    my ($pkg_file, $query_type) = @_;
+    my ($rpm, $rpm_opt, $cmd, $rc, $line);
+    my (@prov, @deps);
+    local *RPM;
+
+    if ($query_type eq "d") {
+        $rpm_opt = "-q --qf '[Contains:  %{FILENAMES}\n][Provides:  %{PROVIDES}\n][Requires:  %{REQUIRENAME} %{REQUIREFLAGS:depflags} %{REQUIREVERSION}\n]'";
+    } else {
+        eprint "Unrecognized query type \"$query_type\"\n";
+        return PKGTOOL_SYNTAX_ERROR;
+    }
+    $rpm = ($pkg_prog ? $pkg_prog : "rpm");
+    $rc = ($rcfile ? "--rcfile '/usr/lib/rpm/rpmrc:$rcfile'" : "");
+    $cmd = "$rpm $rc $rpm_opt " . ($pkg_file ? "-p $pkg_file" : "");
+    dprint "About to run \"$cmd\"\n";
+    if (!open(RPM, "$cmd 2>&1 |")) {
+        eprint "Execution of \"$cmd\" failed -- $!\n";
+    }
+    while (<RPM>) {
+        print;
+    }
+    close(RPM);
+    dprint "\"$cmd\" returned $?\n";
+    if ($? != 0) {
+        return PKGTOOL_UNSPECIFIED_ERROR;
+    }
+    return PKGTOOL_SUCCESS;
+}
+
+sub
+deb_query
+{
+    my ($pkg_file, $query_type) = @_;
+    my ($dpkg, $cmd, $line);
+    my (@prov, @deps);
+    local *DPKG;
+
+    if ($query_type eq "d") {
+    } else {
+        eprint "Unrecognized query type \"$query_type\"\n";
+        return PKGTOOL_SYNTAX_ERROR;
+    }
+    $dpkg = ($pkg_prog ? $pkg_prog : "dpkg");
+    $cmd = "$dpkg -I " . ($pkg_file ? "$pkg_file" : "");
+    dprint "About to run \"$cmd\"\n";
+    if (!open(DPKG, "$cmd 2>&1 |")) {
+        eprint "Execution of \"$cmd\" failed -- $!\n";
+    }
+    while (<DPKG>) {
+        chomp($line = $_);
+        if ($query_type eq "d") {
+            if ($line =~ /^\s*Provides:\s+(.*)$/) {
+                ($line = $1) =~ s/[\(\)]//g;
+                push @prov, split(/\s*,\s*/, $line);
+            } elsif ($line =~ /^\s*Depends:\s+(.*)$/) {
+                ($line = $1) =~ s/[\(\)]//g;
+                push @deps, split(/\s*,\s*/, $line);
+            }
+        }
+    }
+    close(DPKG);
+    dprint "\"$cmd\" returned $?\n";
+    if ($? != 0) {
+        return PKGTOOL_UNSPECIFIED_ERROR;
+    }
+    foreach $prov (@prov) {
+        print "Capability:  $prov\n";
+    }
+    foreach $dep (@deps) {
+        print "Dependency:  $dep\n";
+    }   
     return PKGTOOL_SUCCESS;
 }
 
@@ -1075,7 +1152,7 @@ main
     $version = "1.2";
 
     # See the Getopt::Long man page for details on the syntax of this line
-    @valid_opts = ("h|help", "v|version", "d|debug", "b|build", "i|install", "c|contents",
+    @valid_opts = ("h|help", "v|version", "d|debug", "b|build", "i|install", "c|contents", "q|query=s",
                    "g|generate", "o|sources:s", "p|package=s", "s|specfile|scripts=s", "m|module=s",
                    "r|release-tag=s", "t|head-tag=s", "P|program=s", "R|rcfile=s", "tar=s", "zip=s",
                    "tagfile=s", "D|destdir=s", "root=s");
@@ -1086,7 +1163,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.22 $ created on $Date: 2000/08/23 21:55:39 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.23 $ created on $Date: 2000/09/06 06:15:05 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1111,6 +1188,9 @@ main
         $mode = "contents";
     } elsif ($opt_g) {
         $mode = "generate";
+    } elsif ($opt_q) {
+        $mode = "query";
+        $query_type = $opt_q;
     } else {
         &fatal_error("Nothing to do!\n");
     }
@@ -1215,6 +1295,16 @@ main
         if ($type eq "rpm") {
             $ret = &rpm_generate_source_files($specfile, $module, $srcs, $head_tag, $release_tag);
         } elsif ($type eq "deb") {
+        }
+    } elsif ($mode eq "query") {
+        if (! $specfile && ! $pkg_file) {
+            eprint "Please specify a spec file/script directory or a package file.\n";
+            return PKGTOOL_SYNTAX_ERROR;
+        }
+        if ($type eq "rpm") {
+            $ret = &rpm_query($pkg_file, $query_type);
+        } elsif ($type eq "deb") {
+            $ret = &deb_query($pkg_file, $query_type);
         }
     }
 
