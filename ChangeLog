@@ -151,3 +151,7 @@ packages.
 
 I also fixed a minor issue revtool had with ChangeLog creation.
 ----------------------------------------------------------------------
+Thu May 18 22:05:11 2000                        Michael Jennings (mej)
+
+I think this way will be better.
+----------------------------------------------------------------------
