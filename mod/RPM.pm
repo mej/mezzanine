@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.13 2003/06/02 17:08:27 mej Exp $
+# $Id: RPM.pm,v 1.14 2003/06/02 17:10:09 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -456,7 +456,7 @@ rpm_compare_versions($$)
     }
 
     # We've reached the end of one of the strings.
-    if (length($v1) {
+    if (length($v1)) {
         return (($v1 =~ /^(snap|pre|alpha|beta|rc)/) ? (-1) : (1));
     } elsif (length($v2)) {
         return (($v2 =~ /^(snap|pre|alpha|beta|rc)/) ? (1) : (-1));
