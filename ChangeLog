@@ -494,3 +494,7 @@ Tue Jun 22 20:18:54 2004                        Michael Jennings (mej)
 
 This may or may not fix buildtool.  Pkg.pm is still broken. :(
 ----------------------------------------------------------------------
+Wed Jun 23 22:58:22 2004                        Michael Jennings (mej)
+
+Additional fixes to finally eliminate RevCtl.pm altogether.
+----------------------------------------------------------------------

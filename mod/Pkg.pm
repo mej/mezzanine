@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.23 2004/06/23 00:21:24 mej Exp $
+# $Id: Pkg.pm,v 1.24 2004/06/24 03:01:07 mej Exp $
 #
 
 package Mezzanine::Pkg;
@@ -32,6 +32,8 @@ use Mezzanine::PkgVars;
 use Mezzanine::RPM;
 use Mezzanine::Deb;
 use Mezzanine::Tar;
+use Mezzanine::SCM;
+
 use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
 BEGIN {
@@ -57,7 +59,7 @@ use vars ('@EXPORT_OK');
 ### Initialize private global variables
 
 ### Function prototypes
-sub fetch_package();
+sub fetch_package($);
 sub package_install();
 sub package_show_contents();
 sub package_query($);
@@ -73,15 +75,12 @@ END {
 
 # Use revtool to download a package from the master repository
 sub
-fetch_package
+fetch_package($)
 {
+    my $scm = shift;
     my $pkg_file = &pkgvar_filename();
     my ($err, $msg, $line) = undef;
     my $missing = 0;
-    local *REVTOOL;
-
-    # FIXME:  ALL WRONG!
-    return (MEZZANINE_SUCCESS, "");
 
     if (! $pkg_file) {
         return (MEZZANINE_MISSING_PKGS, "Nothing to fetch?");
@@ -96,11 +95,12 @@ fetch_package
         return (MEZZANINE_DUPLICATE, undef);
     }
 
-    if (&login_to_master()) {
-        $err = &update_from_master($pkg_file);
+    if ($scm->login()) {
+        $err = $scm->get($pkg_file);
         return ($err, "");
+    } else {
+        return (MEZZANINE_BAD_LOGIN, "Login failure");
     }
-    return (MEZZANINE_BAD_LOGIN, "Login failure");
 }
 
 sub

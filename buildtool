@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.189 2004/06/23 00:21:24 mej Exp $
+# $Id: buildtool,v 1.190 2004/06/24 03:01:07 mej Exp $
 #
 
 use strict;
@@ -582,7 +582,7 @@ download_packages
         }
 
         nprint "$pkg..." if (! &debug_get());
-        ($err, $msg) = &fetch_package();
+        ($err, $msg) = &fetch_package($package_scm);
         if ($err != MEZZANINE_SUCCESS && $err != MEZZANINE_DUPLICATE) {
             &fail_package($pkg, $msg);
             next;
@@ -996,7 +996,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.189 $ created on $Date: 2004/06/23 00:21:24 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.190 $ created on $Date: 2004/06/24 03:01:07 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
