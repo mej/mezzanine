@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.3 2000/05/09 23:14:48 mej Exp $
+# $Id: buildtool,v 1.4 2000/05/09 23:51:08 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -60,37 +60,44 @@ get_time_stamp {
 # Debugging output
 sub
 dprintf {
-
-    my @args = @_;
-    if ($debug) {  # Don't print any of this stuff if we're not debugging
-	$args[0] = "[debug] " . $args[0];  # Prefix "[debug]" to the format string
-	return (printf @args);  # Pass all args to printf()
-    }
+    return if (! $debug);
+    print "[debug] ";
+    printf @_;
 }
 sub
 dprint {
-
-    my @args = @_;
-    if ($debug) {  # Don't print any of this stuff if we're not debugging
-	$args[0] = "[debug] " . $args[0];  # Prefix "[debug]" to the format string
-	return (print @args);  # Pass all args to print()
-    }
+    print "[debug] ", @_ if ($debug);
 }
 
 # Print an error
 sub
 eprintf {
-
-    my @args = @_;
     print STDERR "$progname:  Error:  ";
-    return (printf STDERR @args);
+    printf STDERR @_;
 }
 sub
 eprint {
+    print STDERR "$progname:  Error:  ", @_;
+}
 
-    my @args = @_;
-    print STDERR "$progname:  Error:  ";
-    return (print @args);
+# Normal print (i.e., don't print this in -q or -Q mode)
+sub
+nprintf {
+    printf @_ if ($verbosity >= 2);
+}
+sub
+nprint {
+    print @_ if ($verbosity >= 2);
+}
+
+# Quiet print (i.e., print in -q mode but not in -Q mode)
+sub
+qprintf {
+    printf @_ if ($verbosity >= 1);
+}
+sub
+qprint {
+    print @_ if ($verbosity >= 1);
 }
 
 # Parse product definition files recursively to establish
@@ -211,24 +218,24 @@ parse_product_def {
 sub
 do_bootstrap_stage {
 
-    foreach $pkg (@packages) {
-        print "$progname:  Starting bootstrap stage for the \"$pkg\" package....\n";
+    foreach $pkg (grep $pkgs->{$_}{TYPE} ne "srpm", @packages) {
+        nprint "$progname:  Starting bootstrap stage for the \"$pkg\" package....\n";
 
 
 
-        print "$progname:  Bootstrap stage for \"$pkg\" is complete.\n";
+        nprint "$progname:  Bootstrap stage for \"$pkg\" is complete.\n";
     }
 }
 
 sub
 do_compose_stage {
 
-    foreach $pkg (@packages) {
-        print "$progname:  Starting compose stage for the \"$pkg\" package....\n";
+    foreach $pkg (grep $pkgs->{$_}{TYPE} ne "srpm", @packages) {
+        nprint "$progname:  Starting compose stage for the \"$pkg\" package....\n";
 
 
 
-        print "$progname:  Compose stage for \"$pkg\" is complete.\n";
+        nprint "$progname:  Compose stage for \"$pkg\" is complete.\n";
     }
 }
 
@@ -236,11 +243,11 @@ sub
 do_explode_stage {
 
     foreach $pkg (@packages) {
-        print "$progname:  Starting explode stage for the \"$pkg\" package....\n";
+        nprint "$progname:  Starting explode stage for the \"$pkg\" package....\n";
 
 
 
-        print "$progname:  Explode stage for \"$pkg\" is complete.\n";
+        nprint "$progname:  Explode stage for \"$pkg\" is complete.\n";
     }
 }
 
@@ -248,11 +255,11 @@ sub
 do_build_stage {
 
     foreach $pkg (@packages) {
-        print "$progname:  Starting build stage for the \"$pkg\" package....\n";
+        nprint "$progname:  Starting build stage for the \"$pkg\" package....\n";
 
 
 
-        print "$progname:  Build stage for \"$pkg\" is complete.\n";
+        nprint "$progname:  Build stage for \"$pkg\" is complete.\n";
     }
 }
 
@@ -260,11 +267,11 @@ sub
 do_package_stage {
 
     foreach $pkg (@packages) {
-        print "$progname:  Starting package accumulation stage for the \"$pkg\" package....\n";
+        nprint "$progname:  Starting package accumulation stage for the \"$pkg\" package....\n";
 
 
 
-        print "$progname:  Package accumulation stage for \"$pkg\" is complete.\n";
+        nprint "$progname:  Package accumulation stage for \"$pkg\" is complete.\n";
     }
 }
 
@@ -272,11 +279,11 @@ sub
 do_iso_stage {
 
     foreach $pkg (@packages) {
-        print "$progname:  Starting ISO image stage for the \"$pkg\" package....\n";
+        nprint "$progname:  Starting ISO image stage for the \"$pkg\" package....\n";
 
 
 
-        print "$progname:  ISO image stage for \"$pkg\" is complete.\n";
+        nprint "$progname:  ISO image stage for \"$pkg\" is complete.\n";
     }
 }
 
@@ -326,10 +333,12 @@ BEGIN {
     $version = "0.1.0";
 
     # See the Getopt::Mixed man page for details on the syntax of this line
-    $valid_opts = "h help>h v version>v d debug>d b=s build>b p=s product>p package>p";
+    $valid_opts = "h help>h v version>v d debug>d b=s build>b p=s product>p package>p"
+                   . " q quiet>q Q really-quiet>Q";
 
     Getopt::Mixed::getOptions($valid_opts);
     $debug = $opt_d;
+    $verbosity = ($opt_Q ? 0 : ($opt_q ? 1 : 2));
     if ($opt_v) {
 	print "$progname $version by Michael Jennings\n";
         print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
