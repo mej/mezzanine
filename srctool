@@ -1,0 +1,282 @@
+#!/usr/bin/perl -w
+#
+# srctool -- Tool for generating disk images, CD's, etc.
+# 
+# Copyright (C) 2001, Michael Jennings
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies of the Software, its documentation and marketing & publicity
+# materials, and acknowledgment shall be given in the documentation, materials
+# and software packages that this Software was used.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+# $Id: srctool,v 1.1 2001/03/19 06:17:59 mej Exp $
+#
+
+# Include the Perl Modules we need
+require POSIX;
+require Getopt::Long;
+
+# Constants
+#
+# Return codes for revtool
+sub REVTOOL_NO_SERVER()           {1;}
+sub REVTOOL_SERVER_CRASH()        {2;}
+sub REVTOOL_BAD_LOGIN()           {3;}
+sub REVTOOL_COMMAND_FAILED()      {4;}
+sub REVTOOL_ACCESS_DENIED()       {5;}
+sub REVTOOL_NO_SOURCES()          {6;}
+
+sub REVTOOL_FILE_NOT_FOUND()      {21;}
+sub REVTOOL_FILE_REMOVED()        {22;}
+sub REVTOOL_CONFLICT_FOUND()      {23;}
+sub REVTOOL_INVALID_TAG()         {24;}
+
+sub REVTOOL_BAD_ADDITION()        {41;}
+sub REVTOOL_BAD_REMOVAL()         {42;}
+
+sub REVTOOL_NEED_UPDATE()         {61;}
+sub REVTOOL_BAD_LOG_ENTRY()       {62;}
+
+sub REVTOOL_UNSPECIFIED_ERROR()   {127;}
+
+
+# Return codes for pkgtool
+sub PKGTOOL_SUCCESS()           {0;}
+sub PKGTOOL_FATAL_ERROR()       {1;}
+sub PKGTOOL_SYNTAX_ERROR()      {2;}
+sub PKGTOOL_COMMAND_FAILED()    {3;}
+
+sub PKGTOOL_MISSING_FILES()     {10;}
+sub PKGTOOL_SPEC_ERRORS()       {11;}
+sub PKGTOOL_DEPENDENCIES()      {12;}
+sub PKGTOOL_ARCH_MISMATCH()     {13;}
+sub PKGTOOL_BUILD_FAILURE()     {14;}
+sub PKGTOOL_BAD_MODULE()        {15;}
+
+sub PKGTOOL_TERMINATED()        {50;}
+sub PKGTOOL_CRASHED()           {60;}
+sub PKGTOOL_UNSPECIFIED_ERROR   {127;}
+
+# Return codes for srctool
+sub SRCTOOL_SUCCESS()         {0;}
+sub SRCTOOL_FATAL_ERROR()     {1;}
+sub SRCTOOL_SYNTAX_ERROR()    {2;}
+sub SRCTOOL_COMMAND_FAILED()  {3;}
+                                
+sub SRCTOOL_TERMINATED()      {50;}
+sub SRCTOOL_CRASHED()         {60;}
+sub SRCTOOL_UNSPECIFIED_ERROR {127;}
+
+# Print usage information
+sub
+print_usage_info
+{
+    print "\n";
+    $leader = "$progname $version Usage Information";
+    $underbar = $leader;
+    $underbar =~ s/./-/g;
+    print "$leader\n$underbar\n";
+    print "\n";
+    print "  Syntax:   srctool [ options ]\n";
+    print "\n";
+    print "    -h --help                        Show this usage information\n";
+    print "    -d --debug                       Turn on debugging\n";
+    print "    -v --version                     Show version and copyright\n";
+    print "\n";
+    exit(SRCTOOL_SUCCESS);
+}
+
+# Generate timestamp for debugging/log file
+sub
+get_timestamp
+{
+    return POSIX::strftime("%A, %d %B %Y %H:%M:%S %Z", localtime);
+}
+
+# Report a fatal error
+sub
+fatal_error
+{
+    my $msg = "$progname:  FATAL:  $_[0]";
+
+    print STDERR $msg;
+    exit(SRCTOOL_FATAL_ERROR);
+}
+
+# Debugging output
+sub
+dprintf
+{
+    return if (! $debug);
+    print "[debug:$progname] ";
+    printf @_;
+}
+sub
+dprint
+{
+    my @dbg;
+    my ($f, $l, $s);
+
+    return if (! $debug);
+    @dbg = caller(1);
+    ($f, $l, $s) = @dbg[1, 2, 3];
+    $f =~ s/^.*\/([^\/]+)$/$1/;
+    print "[$f/$l/$s()] ", @_;
+}
+
+# Print an error
+sub
+eprintf
+{
+    print "$progname:  Error:  ";
+    printf @_;
+}
+sub
+eprint
+{
+    print "$progname:  Error:  ", @_;
+}
+
+# Handle a terminate signal
+sub
+handle_signal
+{
+    my $sig = $_[0];
+
+    eprint "Someone sent me a SIG$sig asking me to exit, so I shall.\n";
+    close($GLOBAL_LOG) if ($GLOBAL_LOG);
+    exit SRCTOOL_TERMINATED;
+}
+
+# Handle a fatal signal
+sub
+handle_fatal_signal
+{
+    my $sig = $_[0];
+
+    eprint "Caught fatal signal SIG$sig.  Cleaning up and aborting...\n";
+    close($GLOBAL_LOG) if ($GLOBAL_LOG);
+    exit SRCTOOL_CRASHED;
+}
+
+# Handle a perl warning
+sub
+handle_warning
+{
+    dprint @_;
+}
+
+# Make a directory hierarchy
+sub
+mkdirhier
+{
+    my $dir = $_[0];
+    my @dirs = split("/", $dir);
+    my $path = "";
+
+    dprint "mkdirhier($dir) called.\n";
+    foreach $dir (@dirs) {
+        $path .= "$dir/";
+        if (! -d $path) {
+            dprint "mkdirhier() creating \"$path\"\n";
+            mkdir($path, 0755) || eprint("Unable to create $path -- $!\n");
+        }
+    }
+    dprint "Something went wrong in mkdirhier()!\n" if (! -d $_[0]);
+}
+
+# Emulate rm -rf
+sub
+nuke_tree
+{
+    my $path = $_[0];
+    my @files;
+    local *DIR;
+
+    if ((-d $path) && !(-l $path)) {
+        opendir(DIR, $path) || return 0;
+        @files = readdir(DIR);
+        closedir(DIR);
+        foreach $f (@files) {
+            if ($f ne "." && $f ne "..") {
+                &nuke_tree("$path/$f");
+            }
+        }
+        dprint "Removing directory $path\n";
+        rmdir $path || return 0;
+    } else {
+        dprint "Unlinking $path\n";
+        unlink($path) || return 0;
+    }
+    return 1;
+}
+
+# main() here is basically the same as main() in C
+sub
+main
+{
+    # Set up the basic variables
+    $progname = "srctool";
+    $version = "1.0";
+
+    # See the Getopt::Long man page for details on the syntax of this line
+    @valid_opts = ("h|help", "v|version", "d|debug");
+    Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
+    Getopt::Long::GetOptions(@valid_opts);
+
+    # Post-parse the options stuff
+    select STDOUT; $| = 1;
+    if ($opt_v) {
+        # Do not edit this variable.  It is updated automatically by CVS when you commit
+        my $rcs_info = 'CVS Revision $Revision: 1.1 $ created on $Date: 2001/03/19 06:17:59 $ by $Author: mej $ ';
+
+        $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
+        $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
+        $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
+        print "\n";
+	print "$progname $version by Michael Jennings <mej\@eterm.org>\n";
+        print "Copyright (c) 2001, Michael Jennings and VA Linux Systems, Inc.\n";
+        print "  ($rcs_info)\n";
+        print "\n";
+	return SRCTOOL_SUCCESS;
+    } elsif ($opt_h) {
+	&print_usage_info();   # Never returns
+        # This is a really silly way to shut up the "used only once" warnings.
+        $opt_h = $opt_v = 0;
+    }
+
+    $debug = ($opt_d ? $opt_d : 0);
+
+    # Signal handling
+    $SIG{HUP} = 'IGNORE';
+    $SIG{INT} = \&handle_signal;
+    $SIG{TERM} = \&handle_signal;
+    $SIG{QUIT} = \&handle_fatal_signal;
+    $SIG{ILL} = \&handle_fatal_signal;
+    $SIG{ABRT} = \&handle_fatal_signal;
+    $SIG{FPE} = \&handle_fatal_signal;
+    $SIG{SEGV} = \&handle_fatal_signal;
+    $SIG{BUS} = \&handle_fatal_signal;
+    $SIG{TSTP} = \&handle_fatal_signal;
+    $SIG{TTIN} = \&handle_fatal_signal;
+    $SIG{TTOU} = \&handle_fatal_signal;
+    $SIG{__WARN__} = \&handle_warning;
+
+    return SRCTOOL_SUCCESS;
+}
+
+exit &main();

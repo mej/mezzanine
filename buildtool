@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.121 2001/03/13 04:57:35 mej Exp $
+# $Id: buildtool,v 1.122 2001/03/19 06:17:59 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -226,7 +226,7 @@ qprint
     print @_;
 }
 
-# Handle a terminate signal
+# Handle a terminate signal (like SIGINT from Ctrl-C)
 sub
 handle_signal
 {
@@ -256,7 +256,7 @@ handle_warning
     dprint @_;
 }
 
-# Count CPU's
+# Count CPU's for purposes of parallelization
 sub
 count_cpus
 {
@@ -307,7 +307,28 @@ mkdirhier
     dprint "Something went wrong in mkdirhier()!\n" if (! -d $_[0]);
 }
 
-# Spawn a child, return its PID to the parent and exec the child
+# Emulate rm -rf
+sub
+nuke_tree
+{
+    my $path = $_[0];
+    my @files;
+    local *DIR;
+
+    if ((-d $path) && !(-l $path)) {
+        foreach $f (&grepdir(sub {$_ !~ /^\.\.?$/}, $path)) {
+            &nuke_tree("$path/$f");
+        }
+        dprint "Removing directory $path\n";
+        rmdir $path || return 0;
+    } else {
+        dprint "Unlinking $path\n";
+        unlink($path) || return 0;
+    }
+    return 1;
+}
+
+# Spawn a child buildtool
 sub
 spawn_cmd
 {
@@ -326,7 +347,6 @@ spawn_cmd
             $slave = 1;
             $master = 0;
             $opt_master = 0;
-            $end_stage = "p" if ($end_stage eq "i" || $end_stage eq "a");
             close $GLOBAL_LOG if ($GLOBAL_LOG);
             open(STDOUT, ">/dev/null");
             open(STDIN, "</dev/null");
@@ -339,6 +359,8 @@ spawn_cmd
                 select LOGFILE; $| = 1;
                 select STDOUT; $| = 0;
             }
+	    # Reduce the package list to just one package.  Then we can proceed
+	    # without having to incur the performance penalty of an exec().
             @packages = ($pkg);
             @failed_pkgs = ();
             &build_process();
@@ -452,7 +474,8 @@ place_file
         my ($regex, $stop, $dest, $image, $subdir);
 
         # Format is:  /regexp/.path  where . is some delimiter character that
-        # tells us whether to check other locations or stop once we match.
+        # tells us whether to check other locations or stop once we match
+	# (':' to continue looking for matches, or '=' to stop if a match is found).
         dprint "Testing location \"$location\"\n";
         if ($location !~ m/^\/([^\/]+)\/(.)(\S+)$/) {
             eprint "Location specifier \"$location\" is invalid.\n";
@@ -467,25 +490,35 @@ place_file
             next if ($file !~ $regex);
         }
         dprint "Match found.\n";
+
+	# Grab the first part of the destination path, make sure it's an image module
         ($image = $dest) =~ s/^([^\/]+)\/.*$/$1/;
         if (!defined($pkgs->{$image}{TYPE}) || ($pkgs->{$image}{TYPE} ne "image")) {
             qprint "Warning:  Destination \"$dest\" is not a package of type \"image\".\n";
         }
+
+	# If the destination does not contain a filename, add the filename portion of
+	# $file to the directory path in $dest.  The destination could be used to rename
+	# a file, however; that's why this check is in place.
         if (substr($dest, -3, 3) ne substr($file, -3, 3)) {
             my $tmp;
 
             ($tmp = $file) =~ s/^.*\/([^\/]+)$/$1/;
             $dest = "$dest/$tmp";
         }
+	# If it exists, delete it
         if (-e $dest) {
             &nuke_tree($dest);
         }
+	# Then link it
         dprint "Linking $dest to $file\n";
         if (!link($file, $dest)) {
             &fail_package($pkg, "package accumulation", "Unable to hard-link to $file from $dest -- $!");
             return $found;
         }
         $found++;
+	# If the stop character is '=', stop checking for matches for this package.
+	# If it's ':' (actually, any other character than '='), keep looking for matches.
         last if ($stop eq "=");
         dprint "Non-exclusive match.  Continuing on....\n";
     }
@@ -499,16 +532,21 @@ initial_setup
 {
     my @contents;
 
+    # Create the build directory if it doesn't exist.  If we can't, die.
     if (! -d "$builddir") {
         if (!mkdir("$builddir", 0755)) {
             &fatal_error("Cannot create $builddir -- $!\n");
         }
     }
+
+    # Create the RPM directories also.  Same deal as above.
     foreach $dir ("BUILD", "SRPMS", "RPMS", "SPECS", "SOURCES") {
         if (! -d "$builddir/$dir") {
             mkdir("$builddir/$dir", 0755) || &fatal_error("Cannot create $builddir/$dir -- $!\n");
         }
     }
+
+    # If the build root exists, get rid of it, then make a new (empty) one.
     if (-d $buildroot) {
         nprint "Buildroot $buildroot exists.  I am removing it.\n";
         &nuke_tree($buildroot);
@@ -517,7 +555,8 @@ initial_setup
 
     chdir("$builddir");
 
-    # Pre-scan all the binary RPM's for future use in possibly parallel processes.
+    # Pre-scan all the binary RPM's for future use in possibly parallel processes.  We need
+    # to know what SRPM each binary came from, because some (lame) packages change the base name.
     if (! $opt_nocache) {
         nprint "Updating state information....\n";
         dprint "Scanning binary RPM's in $builddir/RPMS for their corresponding SRPM's.\n";
@@ -529,25 +568,23 @@ initial_setup
     }
 }
 
-# Emulate rm -rf
+# What to do if a package fails
 sub
-nuke_tree
+fail_package
 {
-    my $path = $_[0];
-    my @files;
-    local *DIR;
+    my ($pkg, $stage, $msg) = @_;
 
-    if ((-d $path) && !(-l $path)) {
-        foreach $f (&grepdir(sub {$_ !~ /^\.\.?$/}, $path)) {
-            &nuke_tree("$path/$f");
-        }
-        dprint "Removing directory $path\n";
-        rmdir $path || return 0;
+    push @failed_pkgs, $pkg;
+    $failure->{$pkg}{STAGE} = $stage;
+    if ($msg) {
+        ($failure->{$pkg}{MESSAGE} = $msg) =~ s/\.+$//;
+        eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage:  $failure->{$pkg}{MESSAGE}.\n";
     } else {
-        dprint "Unlinking $path\n";
-        unlink($path) || return 0;
+        eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage.\n";
     }
-    return 1;
+    exit(BUILDTOOL_PACKAGE_FAILED) if (! $opt_f);
+    @packages = grep($_ ne $pkg, @packages);
+    return 0;
 }
 
 # Locate the product file for a particular product
@@ -604,7 +641,7 @@ find_product_file
     }
 
     # Well, rats.  We've eliminated the simple cases.  Time to get creative.
-    # Find all the product files and search for one that matches
+    # Find all the product files and search each one for a match.
     foreach $prodfile (sort(&grepdir(sub {/\.prod$/}, $proddir))) {
         my (@lines, @names, @versions);
 
@@ -647,9 +684,8 @@ parse_product_entry
     undef %pkgvars;
     undef $module;
     undef $type;
+    # For now, the line we're passed is whitespace-delimited.
     @inp = split(/\s+/, $line);
-    #@inp = ($line =~ m/\s*((?:\S*(?:\"[^\"]+\")?\S*)+)\s*/g);
-    #pop @inp;  # There will always be an empty value at the end.  Get rid of it.
     dprint "Input is \"", join("\" \"", @inp), "\"\n";
     if ($inp[0] =~ /^(prod|mod|s?rpm|tar|tbz|tgz|ima?ge?)[^:]*:/) {
         # Line begins with <type>:<name>, like "module:Eterm"
@@ -712,6 +748,9 @@ parse_product_entry
         nprint "$progname:  Note:  Since you didn't specify, I have guessed that \"$name\" is a $type.\n";
     }
     if ($name =~ /\/.+$/) {
+	# If the name contains a / and at least *something* after it, split out the module name
+	# (the part before the /) and the actual package name (the part after the /).  Otherwise,
+	# assume that the module name is exactly the same as the package name.
         ($module = $name) =~ s/^([^\/]+)(.+)$/$1/;
         $name =~ s/^(.*)\/([^\/]+)$/$2/;
     } else {
@@ -723,8 +762,10 @@ parse_product_entry
     foreach $varval (@inp) {
         ($var, $val) = split("=", $varval, 2);
         $var = &get_var_name($var);
+	# Store them in %pkgvars for now; we'll move them later.
         $pkgvars{$var} = $val;
     }
+    # Some package types require special treatment at this point.
     if ($type eq "product") {
         my ($pname, $pver);
 
@@ -802,7 +843,7 @@ parse_product_entry
         $filename = sprintf("%s$name-$pkgvars{VERSION}-$pkgvars{RELEASE}.$arch.rpm", ($module ? "$module/" : ""));
     }
 
-    # Check for duplicates
+    # Check for duplicate packages.
     if (grep($_ eq $name, @packages)) {
         if ($type eq "rpm" && ($pkgs->{$name}{TYPE} eq "srpm" || $pkgs->{$name}{TYPE} eq "tar")) {
             push(@{$pkgs->{$name}{BINS}}, $filename);
@@ -828,7 +869,7 @@ parse_product_entry
     # Go through each propogated variable.  If there is no assigned value for that
     # variable for the current package, see if it has a value for the parent product
     # of that package.  If not, try the parent product of that product, and continue
-    # going back through the product hierarchy until we find a value or run out.
+    # going back through the product hierarchy until we find a value or run out or products.
     #
     # FIXME:  Perhaps these shouldn't be hard-coded.  Perhaps we should keep a list of
     #         all package/product variables we've encountered thus far and iterate
@@ -851,14 +892,17 @@ parse_product_entry
             }
         }
     }
+    # This goes here to avoid the fallback mechanism above.
     if (defined($pkgs->{$name}{REVISION}) && $pkgs->{$name}{REVISION} =~ /^head$/i) {
-        # This goes here to avoid the fallback mechanism above.
         undef $pkgs->{$name}{REVISION};
     }
+    # If we haven't been told which stages we want, use the defaults.
     if (!defined $pkgs->{$name}{STAGES}) {
         $pkgs->{$name}{STAGES} = &get_package_stages($type);
     }
+    # Add the package name to the list of packages
     push @packages, $name;
+    # Set the parent product name
     $pkgs->{$name}{PRODUCT} = ($prod ? $prod : "unknown-product");
     dprint "parse_product_entry():  Parent product of $name set to $prod.  I'm done, returning 1.\n";
     return 1;
@@ -875,6 +919,7 @@ parse_prod_file
     my $prod = $prodname;
     local *PROD;
 
+    # First, find the product file and open it.
     dprint "parse_prod_file($prodname, $prodver, $parent_prod)\n";
     if (!($prodfile = &find_product_file($prodname, $prodver))) {
         dprint "parse_prod_file():  find_product_file() failed.  Returning 0.\n";
@@ -883,6 +928,7 @@ parse_prod_file
     dprint "parse_prod_file():  Found product file \"$prodfile\"\n";
     open(PROD, "$prodfile") || return 0;
 
+    # Ignore everything until we encounter a product name
     ($skip_to_name, $skip_to_next_ver, $found) = (1, 0, 0); 
     while (<PROD>) {
         chomp($line = $_);
@@ -940,9 +986,6 @@ parse_prod_file
                 $var = &get_var_name($var);
                 dprint "parse_prod_file():  Product variable for $prod:  $var -> $val\n";
                 $prods->{$prod}{$var} = $val;
-#                if ($prods->{$prod}{VARS} !~ /$var/) {
-#                    $prods->{$prod}{VARS} .= "$var ";
-#                }
             } elsif (!($skip_to_name || $skip_to_next_ver)) {
                 my $tmp;
 
@@ -957,25 +1000,7 @@ parse_prod_file
     return ($found);
 }
 
-# What to do if a package fails
-sub
-fail_package
-{
-    my ($pkg, $stage, $msg) = @_;
-
-    push @failed_pkgs, $pkg;
-    $failure->{$pkg}{STAGE} = $stage;
-    if ($msg) {
-        ($failure->{$pkg}{MESSAGE} = $msg) =~ s/\.+$//;
-        eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage:  $failure->{$pkg}{MESSAGE}.\n";
-    } else {
-        eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage.\n";
-    }
-    exit(BUILDTOOL_PACKAGE_FAILED) if (! $opt_f);
-    @packages = grep($_ ne $pkg, @packages);
-    return 0;
-}
-
+# Use revtool to download a package from the master repository
 sub
 fetch_package
 {
@@ -1029,6 +1054,7 @@ build_pkgs
         }
     }
     $rpmrc = "$buildroot/$pkg-rpmrc";
+    # Create the rpmrc and rpmmacros files if they don't exist
     &create_rpm_files($pkg) if (! -s $rpmrc);
     $target = ($main::target ? " --target=$main::target" : ($pkgs->{$pkg}{ARCH} ? " --target=$pkgs->{$pkg}{ARCH}" : ""));
     $prog = "-P '$prog$target'";
@@ -1041,6 +1067,7 @@ build_pkgs
     if ($pkgs->{$pkg}{TAGFILE}) {
         $cmd .= " --tagfile $pkgs->{$pkg}{TAGFILE}";
     }
+    # Run pkgtool with above parameters to build the package
     dprint "About to run \"$cmd\"\n";
     if (!open(PKGTOOL, "$cmd </dev/null 2>&1 |")) {
         return (1, "Execution of \"$cmd\" failed -- $!", undef);
@@ -1062,6 +1089,7 @@ build_pkgs
         $msg = "Unhandled RPM build error" if (! $msg);
     }
 
+    # Record output files for later use
     if ($out_files) {
         $pkgs->{$pkg}{OUTFILES} = $out_files;
         if ($out_files =~ /src\.rpm/) {
@@ -1081,6 +1109,8 @@ gen_sources
     my ($err, $msg) = (0, 0);
     local *PKGTOOL;
 
+    # pkgtool does all the work.  Really this routine just sets up the parameters and
+    # grabs the output.  There's nothing fancy going on here at all.
     $rpmrc = "$buildroot/$pkg-rpmrc";
     &create_rpm_files($pkg) if (! -s $rpmrc);
     $prog = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
@@ -1134,6 +1164,7 @@ gen_sources
     return ($err, $msg);
 }
 
+# Create the rpmrc and rpmmacros files for a package
 sub
 create_rpm_files
 {
@@ -1182,6 +1213,9 @@ do_bootstrap_stage
         @p = @packages;
     }
 
+    ### The bootstrap stage is where everything gets downloaded.  The list of packages is cycled
+    ### through, and each file/module is retrieved from the master repository.  Unfortunately,
+    ### this process cannot be properly parallelized because CVS isn't parallel-safe for checkouts.
     qprint "$progname:  Entering the bootstrap stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (@p) {
         my @flist;
@@ -1193,11 +1227,15 @@ do_bootstrap_stage
             next;
         }
         nprint "$progname:  Starting bootstrap stage for the \"$pkg\" package....\n";
+
+	# Create @flist, the list of files we need to download for this package.
+	# Unless it's an SRPM plus binary RPM's, there will only be one file.
         if (defined($pkgs->{$pkg}{BINS})) {
             @flist = ($pkgs->{$pkg}{FILENAME}, @{$pkgs->{$pkg}{BINS}});
         } else {
             push(@flist, $pkgs->{$pkg}{FILENAME});
         }
+	# Set the proper CVSROOT and tag for the checkout.
         if ($global_tree) {
             $cvsroot = "-D $global_tree";
         } elsif ($pkgs->{$pkg}{CVSROOT}) {
@@ -1213,17 +1251,19 @@ do_bootstrap_stage
         } else {
             $tag = "";
         }
+
+	# Check out each file using revtool
         foreach $filename (@flist) {
             last if ($err);
             dprint "Checking for $filename\n";
-            # If it already exists , go on.
+            # If it already exists, go on.
             if ((($pkgs->{$pkg}{TYPE} eq "module" || $pkgs->{$pkg}{TYPE} eq "image") && -d $filename)
                 || (($pkgs->{$pkg}{TYPE} eq "srpm" || $pkgs->{$pkg}{TYPE} eq "rpm" || $pkgs->{$pkg}{TYPE} eq "tar") && -f $filename && -s _)) {
                 nprint "$progname:  $filename already exists.  I'll assume it's the right one.\n";
                 next;
             }
             $cmd = "$revtool -l $cvsroot $tag -g $filename";
-            ($err, $msg) = &fetch_package($cmd);  # Download the package using revtool
+            ($err, $msg) = &fetch_package($cmd);
             if ($err) {
                 &fail_package($pkg, "bootstrap", $msg);
                 next;
@@ -1258,6 +1298,9 @@ do_component_stage
         @p = @packages;
     }
 
+    ### The component stage is where all the individual package components are obtained and put
+    ### into place.  For modules, this means creating source and patch files and copying them into.
+    ### For source packages, it means exploding the source package.  No other packages use this stage.
     qprint "$progname:  Entering the component stage.  (${\(&get_timestamp())})\n";
 
     foreach $pkg (@p) {
@@ -1349,6 +1392,7 @@ do_component_stage
                 &fail_package($pkg, "component", "Execution of \"$cmd\" failed -- $!");
                 next;
             }
+	    # We've got to record the spec file name for later use
             if (defined $pkgs->{$pkg}{SPECFILE}) {
                 $specfile = $pkgs->{$pkg}{SPECFILE};
             } else {
@@ -1455,6 +1499,8 @@ do_build_stage
         @p = @packages;
     }
 
+    ### The build stage is where module, SRPM, and tar packages are built from sources.  Also,
+    ### binary packages (and source packages with binaries) are copied into the RPM directories.
     qprint "$progname:  Entering the build stage.  (${\(&get_timestamp())})\n";
 
     foreach $pkg (@p) {
@@ -1495,7 +1541,7 @@ do_build_stage
             &mkdirhier("$builddir/RPMS/$arch");
             system("cp $pkgs->{$pkg}{FILENAME} $builddir/RPMS/$arch/");
         } elsif ($pkgs->{$pkg}{TYPE} eq "tar") {
-            # Rebuild from the spec file
+            # Rebuild from the tarball
             ($err, $msg, $srpm) = &build_pkgs($pkg, $pkgs->{$pkg}{FILENAME});
             dprint "do_build_stage():  build_pkgs($pkg, $specfile) returned $err, $msg, $srpm\n";
             if ($err) {
@@ -1573,6 +1619,8 @@ do_package_stage
         @p = @packages;
     }
 
+    ### The package accumulation stage is where the output files (source and binary RPM's) from the
+    ### build stage are copied (technically, linked) into their proper locations within image modules.
     qprint "$progname:  Entering the package accumulation stage.  (${\(&get_timestamp())})\n";
 
     foreach $pkg (@p) {
@@ -1586,6 +1634,7 @@ do_package_stage
         $release = $pkgs->{$pkg}{RELEASE};
         undef @outfiles;
 
+	### Look for output files.  Hopefully we recorded them from earlier.  If not, hunt for them.
         dprint "Checking for output files for $pkg $version-$release\n";
         if ($pkgs->{$pkg}{OUTFILES}) {
             dprint "Output files [$pkgs->{$pkg}{OUTFILES}] saved from earlier.\n";
@@ -1629,13 +1678,14 @@ do_package_stage
             }
         }
 
+	# If we didn't find any, something is very wrong.
         if ($#outfiles == -1) {
             &fail_package($pkg, "package accumulation", "No output RPM's were found");
             next;
         }
         dprint "Output files for $pkg:  ", join(" ", @outfiles), "\n";
 
-        # Move each RPM into the appropriate place
+        # Copy each RPM into the appropriate place
         foreach $rpm (@outfiles) {
             my $found;
 
@@ -1651,6 +1701,7 @@ do_package_stage
     qprint "$progname:  Package accumulation stage is now complete.  (${\(&get_timestamp())})\n";
 }
 
+# Clean up the RPM build directories and the build root
 sub
 cleanup
 {
@@ -1667,6 +1718,8 @@ summarize_failures
 {
     my ($ns, $nf, $nt);
 
+    # $ns is the number of successful packages.  $nf is the number of failures.
+    # $nt is the total number of packages we tried to build.
     $ns = $#packages + 1;
     $nf = $#failed_pkgs + 1;
     $nt = $ns + $nf;
@@ -1865,7 +1918,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.121 $ created on $Date: 2001/03/13 04:57:35 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.122 $ created on $Date: 2001/03/19 06:17:59 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1901,6 +1954,8 @@ main
     $target = ($opt_t ? $opt_t : undef);
     $global_tree = ($opt_tree ? $opt_tree : undef);
     $global_tag = ($opt_tag ? $opt_tag : undef);
+
+    # Set up the start/end stage identifiers
     $start_stage = ($opt_B ? $opt_B : "s");
     if (index("Zscbp", $start_stage) == -1) {
         eprint "Bad start stage \"$start_stage\".  Assuming \"s\".\n";
@@ -1918,6 +1973,8 @@ main
         }
         dprint "Building stages \"$start_stage\" through \"$end_stage\"\n";
     }
+
+    # Figure out parallelization stuff
     if ($opt_master) {
         $slave = 1;
         $master = 0;
@@ -1954,6 +2011,8 @@ main
             last;
         }
     }
+
+    # If we don't have a products directory, try to download one.
     if (!defined $proddir) {
         my ($err, $msg);
 
