@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.109 2000/11/07 18:30:44 mej Exp $
+# $Id: buildtool,v 1.110 2000/11/07 18:46:34 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -364,6 +364,8 @@ get_var_name
         $var = "DESCRIPTION";
     } elsif ($var =~ /^SOURCE/) {
         $var = "SRCS";
+    } elsif ($var =~ /^MACRO/) {
+        $var = "MACROS";
     }
     return $var;
 }
@@ -1877,7 +1879,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.109 $ created on $Date: 2000/11/07 18:30:44 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.110 $ created on $Date: 2000/11/07 18:46:34 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -912,3 +912,7 @@ Tue Nov  7 09:46:47 2000                        Michael Jennings (mej)
 
 Improved macro support to allow per-package macros.
 ----------------------------------------------------------------------
+Tue Nov  7 10:02:58 2000                        Michael Jennings (mej)
+
+Let MACRO == MACROS.
+----------------------------------------------------------------------
