@@ -154,3 +154,7 @@ Sun Sep 22 16:05:11 2002                        Michael Jennings (mej)
 
 Fixes for spec file handling in merges/imports of SRPM's.
 ----------------------------------------------------------------------
+Thu Apr 10 15:07:54 2003                        Michael Jennings (mej)
+
+Fixes to spec file handling.
+----------------------------------------------------------------------
