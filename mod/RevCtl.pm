@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.11 2002/02/26 19:00:32 mej Exp $
+# $Id: RevCtl.pm,v 1.12 2002/02/26 19:59:04 mej Exp $
 #
 
 package Mezzanine::RevCtl;
@@ -339,12 +339,35 @@ login_to_master
     return 1;
 }
 
+# Find the base level of a module
+sub
+find_module_changelog
+{
+    my ($orig_wd, $repo, $rel_dir);
+
+    $orig_wd = &getcwd();
+    $rel_dir = &basename($orig_wd);
+    $repo = &cat_file("CVS/Repository");
+    while ((! -e "ChangeLog") && $repo && ($repo =~ /\//)) {
+        chdir("..");
+        $rel_dir = &basename(&getcwd()) . "/$rel_dir";
+        $repo = &cat_file("CVS/Repository");
+    }
+    if (-e "$ChangeLog") {
+        $rel_dir =~ s!^[^/]*/!!;
+        $rel_dir = "." if (! $rel_dir);
+        return $rel_dir;
+    } else {
+        return "";
+    }
+}
+
 # Compose a new entry for the ChangeLog
 sub
 do_changelog_entry
 {
     my $log = $_[0];
-    my ($pwd, $username, $fullname, $line, $module);
+    my ($pwd, $username, $fullname, $line, $module, $rel_dir);
     my @stat_info;
     my $logfile = "/var/tmp/.cvs.commit.$$";
     local *LOGFILE;
@@ -380,27 +403,26 @@ do_changelog_entry
 
     return $logfile if (! $log);
 
-    chomp($module = &cat_file("CVS/Repository"));
-    if (($module ne $pwd) && (! -f "ChangeLog")) {
-        # We're not in the module directory and there's no ChangeLog here.
-        wprint "This commit is not being done from the top of the module, and I see no ChangeLog here.\n";
-        wprint "I will proceed without writing a ChangeLog entry.  If you are in the wrong directory,\n";
-        wprint "hit Ctrl-C now to abort this commit, and try again from the correct path.  If you want\n";
-        wprint "me to write a ChangeLog entry for you here, abort the commit and touch ChangeLog.\n";
-        sleep(10);
+    $rel_dir = &find_module_changelog();
+    if ($rel_dir && ($rel_dir ne ".")) {
+        my @tmp = @ARGV;
+
+        @ARGV = ();
+        foreach my $tmp (@tmp) {
+            push @ARGV, "$rel_dir/$tmp";
+        }
+    }
+    if (! -f "ChangeLog") {
+        if (!open(CL, ">ChangeLog")) {
+            print "WARNING:  Unable to create ChangeLog:  $!\n";
+            return "";
+        }
+        &add_new_files("ChangeLog");
     } else {
-        if (! -f "ChangeLog") {
-            if (!open(CL, ">ChangeLog")) {
-                print "WARNING:  Unable to create ChangeLog:  $!\n";
-                return "";
-            }
-            &add_new_files("ChangeLog");
-        } else {
-            chmod(0644, "ChangeLog") if (! -w "ChangeLog");
-            if (!open(CL, ">>ChangeLog")) {
-                print "WARNING:  Unable to write to ChangeLog:  $!\n";
-                return "";
-            }
+        chmod(0644, "ChangeLog") if (! -w "ChangeLog");
+        if (!open(CL, ">>ChangeLog")) {
+            print "WARNING:  Unable to write to ChangeLog:  $!\n";
+            return "";
         }
     }
     open(LOGFILE, "<$logfile");

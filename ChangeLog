@@ -77,3 +77,7 @@ Tue Feb 26 15:58:10 2002                        Michael Jennings (mej)
 If arguments are given to mzput without -a or -r, assume -x, but do
 the ChangeLog.
 ----------------------------------------------------------------------
+Tue Feb 26 16:47:34 2002                        Michael Jennings (mej)
+
+Better finding of ChangeLog...I hope.
+----------------------------------------------------------------------
