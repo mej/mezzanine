@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.82 2000/07/10 19:06:36 mej Exp $
+# $Id: buildtool,v 1.83 2000/07/11 05:16:18 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1231,7 +1231,7 @@ do_compose_stage
 
         ($err, $msg) = &gen_sources($pkg, $specfile);
         if ($err) {
-            &fail_package($pkg, "compose", "Creation of vendor source tarball $tarball from failed");
+            &fail_package($pkg, "compose", "Creation of vendor sources failed -- $msg");
             next;
         }
 
@@ -1792,7 +1792,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.82 $ created on $Date: 2000/07/10 19:06:36 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.83 $ created on $Date: 2000/07/11 05:16:18 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.13 2000/07/08 03:04:54 mej Exp $
+# $Id: pkgtool,v 1.14 2000/07/11 05:16:18 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -433,7 +433,8 @@ update_to_tag
     my (@new_files);
     local *REVTOOL;
 
-    $cmd = "revtool -gt $tag" . ($src_files ? " $src_files" : "");
+    $tag = ($tag ? "-t $tag" : "--reset");
+    $cmd = "revtool -g $tag" . ($src_files ? " $src_files" : "");
     dprint "About to run $cmd\n";
     if (!open(REVTOOL, "$cmd 2>&1 |")) {
         $err = REVTOOL_COMMAND_FAILED;
@@ -470,6 +471,7 @@ create_source_file
     my $cmd;
     local *CMD;
 
+    dprint "Source files:  \"$src_files\"\n";
     if ($tarball) {
         print "Generating $tarball...\n";
         if ($tar) {
@@ -563,6 +565,7 @@ gen_diff
 
             ($fname = $1) =~ s/^$module\///;
             @tmp = grep(($fname eq $_) || ($fname =~ /^$_\//), @src_files);
+            dprint "New diff for \"$fname\", match list is \"", join("\" \"", @tmp), "\"\n";
             if ($#tmp < 0) {
                 # Not a source file.  Ignore it.
                 dprint "Ignoring patch to $fname\n";
@@ -888,11 +891,19 @@ rpm_generate_source_files
             if ($tags[$i] =~ /^$tag_prefix-PATCH-(\d+)$/) {
                 my $num = $1;
 
+                if (!defined($patch{$num})) {
+                    print "$progname:  Warning:  Patch $num exists as a tag but is not referenced in the spec file.\n";
+                    next;
+                }
                 $last_tag{$patch{$num}} = $tags[$i - 1];
                 dprint "Previous tag for patch $num ($patch{$num}) is $last_tag{$patch{$num}}\n";
             } elsif ($tags[$i] =~ /^$tag_prefix-SOURCE-(\d+)$/) {
                 my $num = $1;
 
+                if (!defined($source{$num})) {
+                    print "$progname:  Warning:  Source $num exists as a tag but is not referenced in the spec file.\n";
+                    next;
+                }
                 $last_tag{$source{$num}} = $tags[$i - 1];
                 dprint "Previous tag for source $num ($source{$num}) is $last_tag{$source{$num}}\n";
             } elsif ($tags[$i] =~ /^(.*)-(SOURCE|PATCH)-\d+$/) {
@@ -921,6 +932,7 @@ rpm_generate_source_files
         #closedir(DIR);
 
         # Generate all the source files that already exist
+        &update_to_tag($release_tag) if ($release_tag);
         foreach $src (@srcs) {
             my @tmp;
 
@@ -928,6 +940,8 @@ rpm_generate_source_files
             @tmp = split(/[\&\s]+/, $src_files);
             @all_srcs = (@all_srcs, @tmp);
             @tmp = grep(-e $_, @tmp);
+            next if ($#tmp < 0);
+            dprint "\@tmp contains $#tmp + 1 elements:  ", join(" ", @tmp), "\n";
             $src_files = join(" ", @tmp);
             $err = &create_source_file($src_files, $tarball, $destdir, $tar, $zip);
             if ($err) {
@@ -995,6 +1009,7 @@ rpm_generate_source_files
                 return $err;
             }
         }
+        &update_to_tag($head_tag ? $head_tag : "");
     } else {
         # Just sources.  Do it like we always have.
         foreach $src (@srcs) {
@@ -1028,9 +1043,10 @@ main
     Getopt::Long::GetOptions(@valid_opts);
 
     # Post-parse the options stuff
+    select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.13 $ created on $Date: 2000/07/08 03:04:54 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.14 $ created on $Date: 2000/07/11 05:16:18 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
