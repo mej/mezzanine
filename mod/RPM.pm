@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.12 2003/06/02 17:06:11 mej Exp $
+# $Id: RPM.pm,v 1.13 2003/06/02 17:08:27 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -372,10 +372,6 @@ rpm_build
 
     return ($err, $msg, join(' ', @out_files));
 }
-
-#define CHAR_CLASS_MATCH(a, b)      ((isalpha(a) && isalpha(b)) \
-                                     || (isdigit(a) && isdigit(b)) \
-                                     || (!isalnum(a) && !isalnum(b)))
 
 sub
 rpm_compare_versions($$)

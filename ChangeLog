@@ -180,3 +180,7 @@ Mon Jun  2 14:42:30 2003                        Michael Jennings (mej)
 Working on fixing uptool to not nuke packages of other architectures
 than the current one.
 ----------------------------------------------------------------------
+Mon Jun  2 14:45:28 2003                        Michael Jennings (mej)
+
+Oops, forgot to nuke that macro.
+----------------------------------------------------------------------
