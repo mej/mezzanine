@@ -36,6 +36,8 @@ find $RPM_BUILD_ROOT%{_prefix} -type f -print | \
         perl -pe 's@(%{_mandir}/man.*\.\d+(pm)?)$@$1*@g' | \
         grep -v perllocal.pod | \
         grep -v "\.packlist" > @MODULE@-filelist
+find $RPM_BUILD_ROOT%{_prefix} -type f -name .packlist -exec rm -f {} \;
+find $RPM_BUILD_ROOT%{_prefix} -type f -name perllocal.pod -exec rm -f {} \;
 if [ "$(cat @MODULE@-filelist)X" = "X" ] ; then
     echo "ERROR: EMPTY FILE LIST"
     exit -1
