@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 #
 # buildtool -- Product Build Management Tool
 # 
@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.19 2000/05/20 00:37:01 mej Exp $
+# $Id: buildtool,v 1.20 2000/05/21 04:15:40 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -46,6 +46,7 @@ sub REVTOOL_ACCESS_DENIED()       {5;}
 sub REVTOOL_FILE_NOT_FOUND()      {21;}
 sub REVTOOL_FILE_REMOVED()        {22;}
 sub REVTOOL_CONFLICT_FOUND()      {23;}
+sub REVTOOL_INVALID_TAG()         {24;}
 
 # 41-60 are add/remove errors
 sub REVTOOL_BAD_ADDITION()        {41;}
@@ -97,11 +98,19 @@ dprintf
     return if (! $debug);
     print "[debug:$progname] ";
     printf @_;
+    if ($GLOBAL_LOG) {
+        print $GLOBAL_LOG "[debug:$progname] ";
+        printf $GLOBAL_LOG @_;
+    }
 }
 sub
 dprint
 {
-    print "[debug:$progname] ", @_ if ($debug);
+    return if (! $debug);
+    print "[debug:$progname] ", @_;
+    if ($GLOBAL_LOG) {
+        print $GLOBAL_LOG "[debug:$progname] ", @_;
+    }
 }
 
 # Print an error
@@ -110,35 +119,58 @@ eprintf
 {
     print STDERR "$progname:  Error:  ";
     printf STDERR @_;
+    if ($GLOBAL_LOG) {
+        print $GLOBAL_LOG "$progname:  Error:  ";
+        printf $GLOBAL_LOG @_;
+    }
 }
 sub
 eprint
 {
     print STDERR "$progname:  Error:  ", @_;
+    if ($GLOBAL_LOG) {
+        print $GLOBAL_LOG "$progname:  Error:  ", @_;
+    }
 }
 
 # Normal print (i.e., don't print this in -q or -Q mode)
 sub
 nprintf
 {
-    printf @_ if ($verbosity >= 2);
+    return if ($verbosity < 2);
+    printf @_;
+    if ($GLOBAL_LOG) {
+        printf $GLOBAL_LOG @_;
+    }
 }
 sub
 nprint
 {
-    print @_ if ($verbosity >= 2);
+    return if ($verbosity < 2);
+    print @_;
+    if ($GLOBAL_LOG) {
+        print $GLOBAL_LOG @_;
+    }
 }
 
 # Quiet print (i.e., print in -q mode but not in -Q mode)
 sub
 qprintf
 {
-    printf @_ if ($verbosity >= 1);
+    return if ($verbosity < 1);
+    printf @_;
+    if ($GLOBAL_LOG) {
+        printf $GLOBAL_LOG @_;
+    }
 }
 sub
 qprint
 {
-    print @_ if ($verbosity >= 1);
+    return if ($verbosity < 1);
+    print @_;
+    if ($GLOBAL_LOG) {
+        print $GLOBAL_LOG @_;
+    }
 }
 
 # Make a directory hierarchy
@@ -190,28 +222,32 @@ get_var_name
 sub
 find_product_file
 {
-    my ($prodname, $version) = @_;
+    my ($prodname, $prodver) = @_;
     my $prod = "$prodname-$prodver";
     my $prodfile;
     my @contents;
+    local *PRODFILE;
 
-    # If it already has the .prod extension, and it exists, return that
-    if ($prod =~ /\.prod$/) {
-        if (-f $prod) {
-            return $prod;
-        } elsif (-f "$proddir/$prod") {
-            # Just needed a path
-            return "$proddir/$prod";
+    dprint "find_product_file($prodname, $prodver)\n";
+    if ($prodver) {
+        # If it already has the .prod extension, and it exists, return that
+        if ($prod =~ /\.prod$/) {
+            if (-f $prod) {
+                return $prod;
+            } elsif (-f "$proddir/$prod") {
+                # Just needed a path
+                return "$proddir/$prod";
+            } else {
+                $prod =~ s/\.prod$//;
+            }
         } else {
-            $prod =~ s/\.prod$//;
-        }
-    } else {
-        # It has no .prod extension.  Let's try just giving it one.
-        if (-f "$prod.prod") {
-            return "$prod.prod";
-        } elsif (-f "$proddir/$prod.prod") {
-            # Extension and path needed...
-            return "$proddir/$prod.prod";
+            # It has no .prod extension.  Let's try just giving it one.
+            if (-f "$prod.prod") {
+                return "$prod.prod";
+            } elsif (-f "$proddir/$prod.prod") {
+                # Extension and path needed...
+                return "$proddir/$prod.prod";
+            }
         }
     }
 
@@ -238,19 +274,19 @@ find_product_file
     # Well, rats.  We've eliminated the simple cases.  Time to get creative.
     # Find all the product files and search for one that matches
     opendir(DIR, "$proddir");
-    @contents = grep($_ =~ /\.prod$/, readdir(DIR));
+    @contents = sort(grep($_ =~ /\.prod$/, readdir(DIR)));
     closedir(DIR);
     foreach $prodfile (@contents) {
         my (@lines, @names, @versions);
 
-        dprint "Searching product file $prodfile for a match...\n";
+        dprint "find_product_file():  Searching product file $prodfile for a match...\n";
         open(PRODFILE, "$proddir/$prodfile") || next;
         @lines = <PRODFILE>;
         @names = grep($_ =~ /^\s*name\s*:/i, @lines);
         @versions = grep($_ =~ /^\s*ver(sion)?\s*:/i, @lines);
         if (grep($_ =~ /$prodname/, @names) && grep($_ =~ /$prodver/, @versions)) {
             # Found it.
-            dprint "Match found!\n";
+            dprint "find_product_file():  Match found!\n";
             return "$proddir/$prodfile";
         }
     }
@@ -263,11 +299,12 @@ sub
 parse_product_entry
 {
     my ($line, $prodname, $prodver) = @_;
-    my ($type, $name, $module, $filename, $pkgvar);
+    my ($type, $name, $module, $filename, $pkgvar, $var, $val);
     my $type_guess = 0;
-    my %pkgvars;
+    my (%pkgvars, @inp);
     my $prod = "$prodname-$prodver";
 
+    dprint "parse_product_entry(\"$line\", \"$prodname\", \"$prodver\")\n";
     undef %pkgvars;
     undef $module;
     undef $type;
@@ -276,6 +313,7 @@ parse_product_entry
         # Line begins with <type>:<name>, like "module:Eterm"
         ($type, $name) = split(":", shift @inp);
         $type =~ tr/[A-Z]/[a-z]/;
+        dprint "parse_product_entry():  Found type \"$type\" and name \"$name\"\n";
         if ($type =~ /^prod/) {
             $type = "product";
         } elsif ($type =~ /^mod/) {
@@ -291,12 +329,10 @@ parse_product_entry
         # They didn't tell us the type, so let's guess educatedly.
         $type_guess = 1;
         ($name = shift @inp) =~ s/^[^:]*://;
+        dprint "Guessing type of \"$name\"\n";
         if ($name =~ /\.src\.rpm/) {
             # Name ends with .src.rpm.  That's an easy one.
             $type = "srpm";
-        } elsif (-d "$basedir/$name") {
-            # If a directory exists in the basedir with that name, probably a module
-            $type = "module";
         } else {
             my @contents = ();
 
@@ -306,6 +342,8 @@ parse_product_entry
                 closedir(DIR);
             }
             @contents = grep($_ =~ /^$name-?/ && $_ =~ /\.prod$/, @contents);
+            # Product files win over modules because they contain more detail
+            # about the package and are more likely to succeed.
             if ($#contents >= 0) {
                 $type = "product";
                 ($name = $contents[0]) =~ s/\.prod$//;
@@ -315,8 +353,7 @@ parse_product_entry
         }
     }
     if ($type_guess) {
-        nprint "$progname:  Warning:  Since you didn't specify, I have guessed that \"$name\" is a $type.\n";
-        nprint "$progname:  If this is wrong, please specify its type in the product definition.\n";
+        nprint "$progname:  Note:  Since you didn't specify, I have guessed that \"$name\" is a $type.\n";
     }
     if ($name =~ /\/.+$/) {
         ($module = $name) =~ s/^([^\/]+)(.+)$/$1/;
@@ -324,7 +361,6 @@ parse_product_entry
     } else {
         $module = $name;
     }
-    dprint "Module is $module, name is $name\n";
     # The rest of the line is whitespace-delimited sets of var=value
     foreach $varval (@inp) {
         ($var, $val) = split("=", $varval);
@@ -341,25 +377,34 @@ parse_product_entry
         } elsif ($name =~ /^(\S+)-((?:\d|us|a|alpha|b|beta)[^-]+)$/) {
             ($pname, $pver) = ($1, $2);
         } else {
-            eprint "I can't figure out what to do with the product \"$name\"\n";
-            next;
+            $pver = 0;
         }
 
         # Recursively convert products into their component packages
+        $prods->{$name}{PRODUCT} = $prod;
+        dprint "parse_product_entry():  Parent product of $name is $prod.\n";
         if (! &parse_prod_file($pname, $pver)) {
+            dprint "parse_product_entry():  parse_prod_file($pname, $pver) failed.\n";
+            undef $prods->{$name}{PRODUCT};
             if ($type_guess) {
                 # If this was a guess, a potential infinite loop exists if we try
                 # to parse the product entry again.  So just punt at this point.
+                dprint "parse_product_entry() returning 0.\n";
                 return 0;
             } else {
+                my $tmp;
+
                 $line =~ s/^[^:]+://;
-                return &parse_product_entry($line, $prodname, $prodver);
+                $tmp = &parse_product_entry($line, $prodname, $prodver);
+                dprint "parse_product_entry():  parse_product_entry(\"$line\", $prodname, $prodver) returned $tmp, so I will to.\n";
+                return $tmp;
             }
-        } else {
-            $prods->{$name}{PRODUCT} = $prod;
         }
+        dprint "parse_product_entry():  parse_prod_file($pname, $pver) succeeded, so I'm returning 1.\n";
+        return 1;
     }
 
+    dprint "parse_product_entry():  Module is $module, name is $name\n";
     # Add defaults for stuff that is required
     if ($type eq "module") {
         if ($pkgvars{REVISION} =~ /^head$/i) {
@@ -397,11 +442,12 @@ parse_product_entry
     $pkgs->{$name}{TYPE} = $type;
     $pkgs->{$name}{MODULE} = $module;
     $pkgs->{$name}{FILENAME} = ($filename ? $filename : $module);
-    dprint "New package:  $name is a $pkgs->{$name}{TYPE}\n";
+    dprint "parse_product_entry():  New package:  $name (module $pkgs->{$name}{MODULE}, "
+            . "filename $pkgs->{$name}{FILENAME}) is a $pkgs->{$name}{TYPE}\n";
     foreach $pkgvar (keys %pkgvars) {
         if ($pkgvars{$pkgvar} !~ /^$/) {
             $pkgs->{$name}{$pkgvar} = $pkgvars{$pkgvar};
-            dprint "Added variable $pkgvar to package $name with value \"$pkgs->{$name}{$pkgvar}\"\n";
+            dprint "parse_product_entry():  Added variable $pkgvar to package $name with value \"$pkgs->{$name}{$pkgvar}\"\n";
         }
     }
     # Go through each propogated variable.  If there is no assigned value for that
@@ -409,15 +455,15 @@ parse_product_entry
     # of that package.  If not, try the parent product of that product, and continue
     # going back through the product hierarchy until we find a value or run out.
     foreach $pkgvar ("REVISION", "LOCATIONS", "RPMCMD", "TAR", "ZIP", "STAGES", "CVSROOT") {
-        if (! $pkgs->{$pkg}{$pkgvar}) {
+        if (! $pkgs->{$name}{$pkgvar}) {
             my ($pkg, $val) = undef;
 
-            dprint "No value for the variable $pkgvar for $name.\n";
+            dprint "parse_product_entry():  No value for the variable $pkgvar for $name.\n";
             for ($pkg = $prod; $pkg; $pkg = $prods->{$pkg}{PRODUCT}) {
-                dprint "Checking $pkg for $pkgvar\n";
+                dprint "parse_product_entry():  Checking $pkg for $pkgvar\n";
                 if ($prods->{$pkg}{$pkgvar}) {
                     $val = $prods->{$pkg}{$pkgvar};
-                    dprint "Found fallback value $val in product $pkg\n";
+                    dprint "parse_product_entry():  Found fallback value $val in product $pkg\n";
                     last;
                 }
             }
@@ -427,10 +473,12 @@ parse_product_entry
         }
     }
     if (!defined $pkgs->{$name}{STAGES}) {
+        dprint "parse_product_entry():  Defaulting to all stages for $name\n";
         $pkgs->{$name}{STAGES} = "scebpia";
     }
     push @packages, $name;
     $pkgs->{$name}{PRODUCT} = $prod;
+    dprint "parse_product_entry():  Parent product of $name set to $prod.  I'm done, returning 1.\n";
     return 1;
 }
 
@@ -441,18 +489,22 @@ sub
 parse_prod_file
 {
     my ($prodname, $prodver) = @_;
-    my ($prodfile, $skip_to_name, $skip_to_next_ver, $found);
+    my ($prodfile, $skip_to_name, $skip_to_next_ver, $found, $line);
     my $prod = "$prodname-$prodver";
+    local *PROD;
 
+    dprint "parse_prod_file($prodname, $prodver)\n";
     if (!($prodfile = &find_product_file($prodname, $prodver))) {
+        dprint "parse_prod_file():  find_product_file() failed.  Returning 0.\n";
         return 0;
     }
+    dprint "parse_prod_file():  Found product file \"$prodfile\"\n";
     open(PROD, "$prodfile") || return 0;
 
     ($skip_to_name, $skip_to_next_ver, $found) = (1, 0, 0); 
     while (<PROD>) {
         chomp($line = $_);
-        dprint "Parsing $prodfile:  \"$line\"\n";
+        dprint "parse_prod_file():  Parsing $prodfile:  \"$line\"\n";
         $line =~ s/^\s*(.*\S)\s*$/$1/;  # Strip leading and trailing whitespace
         next if ($line =~ /^\#/ || $line !~ /\S/);
         next if ($skip_to_name && $line !~ /^name\s*:/i);
@@ -460,6 +512,7 @@ parse_prod_file
         if ($skip_to_name) {
             $line =~ s/^[^:]+:\s*//;
             if ($line eq $prodname) {
+                dprint "parse_prod_file():  Found product name match\n";
                 $skip_to_name = 0;
                 $skip_to_next_ver = 1;
                 next;
@@ -469,34 +522,46 @@ parse_prod_file
             last;
         } elsif ($skip_to_next_ver) {
             $line =~ s/^[^:]+:\s*//;
+            next if ($line ne $prodver && $prodver);
+            # Found it!
             if ($line eq $prodver) {
-                # Found it!
-                ($found, $skip_to_next_ver) = (1, 0);
-                push @products, $prod;
-                next;
+                dprint "parse_prod_file():  Found product version match.  Time to parse the product.\n";
+            } else {
+                dprint "parse_prod_file():  No product version given.  Using first entry:  $line\n";
+                $prodver = $line;
+                $prod = "$prodname-$prodver";
             }
+            ($found, $skip_to_next_ver) = (1, 0);
+            push @products, $prod;
+            next;
         } elsif ($line =~ /^ver(sion)?\s*:/) {
             # New version.  Time to quit.
             last;
         } else {
-            if ($line =~ /^(prod|mod|srpm)/i && $line =~ /^([^ \t:]+)\s*:\s*(\S+.*)$/) {
+            dprint "parse_prod_file():  Checking \"$line\" for product variables.\n";
+            if ($line !~ /^(prod|mod|srpm)/i && $line =~ /^([^ \t:]+)\s*:\s*(\S+.*)$/) {
                 my ($var, $val);
 
                 # The regexp above should only match var:value (a product variable)
                 ($var, $val) = ($1, $2);
                 $var = &get_var_name($var);
-                dprint "Product variable for $prod:  $var -> $val\n";
+                dprint "parse_prod_file():  Product variable for $prod:  $var -> $val\n";
                 $prods->{$prod}{$var} = $val;
-                if ($prods->{$prod}{VARS} !~ /$var/) {
-                    $prods->{$prod}{VARS} .= "$var ";
-                }
+#                if ($prods->{$prod}{VARS} !~ /$var/) {
+#                    $prods->{$prod}{VARS} .= "$var ";
+#                }
             } else {
-                &parse_product_entry($line, $prodname, $prodver);  # Ignore return value
+                my $tmp;
+
+                dprint "parse_prod_file():  Calling parse_product_entry()...\n";
+                $tmp = &parse_product_entry($line, $prodname, $prodver);
+                dprint "parse_prod_file():  parse_product_entry() returned $tmp\n";
             }
         }
     }
+    dprint "parse_prod_file():  Closing file $prodfile and returning $found\n";
     close(PROD);
-    return (found ? 1 : 0);
+    return ($found);
 }
 
 # What to do if a package fails
@@ -522,11 +587,12 @@ sub
 fetch_package
 {
     my $cmd = $_[0];
-    my ($msg, $line) = undef;
+    my ($err, $msg, $line) = undef;
+    local *REVTOOL;
 
     dprint "About to run $cmd\n";
     if (!open(REVTOOL, "$cmd 2>&1 |")) {
-        $err = 1;
+        $err = REVTOOL_COMMAND_FAILED;
         $msg = "Execution of \"$cmd\" failed -- $!";
         last;
     }
@@ -540,12 +606,13 @@ fetch_package
         next if ($line =~ /^\[debug:/);
         # Check the output for errors
         if ($line =~ /^revtool:\s*Error/) {
-            $msg = "$line";
+            ($msg = $line) =~ s/^revtool:\s*Error:\s*//;
         }
     }
     close(REVTOOL);
-    dprint "\"$cmd\" returned $?\n";
-    return ($? >> 8, $msg);
+    $err = $?;
+    dprintf "\"$cmd\" returned $err (%d)\n", $err >> 8;
+    return ($err >> 8, $msg);
 }
 
 # Build RPMS from the spec file
@@ -555,6 +622,7 @@ build_rpms
     my ($pkg, $specfile) = @_;
     my ($cmd, $rpm, $msg, $err, $line, $srpm);
     my (@failed_deps, @not_found, @spec_errors);
+    local *RPM;
 
     $rpm = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
     $cmd = "$rpm --rcfile $rpmrc -ba $specfile";
@@ -607,7 +675,8 @@ build_rpms
     } elsif ($#spec_errors != -1) {
         $msg = sprintf("The spec file contains the following errors:  \"%s\"", join("\" \"", @spec_errors));
     }
-    return ($err >> 8, $msg, $srpm);
+    dprintf "build_rpms():  Returning $err, $msg, $srpm\n";
+    return ($err, $msg, $srpm);
 }
 
 #
@@ -616,10 +685,10 @@ build_rpms
 sub
 do_bootstrap_stage
 {
-    my $line;
-    my $err;
-    my $msg;
+    my ($line, $err, $msg);
     my @p = @packages;
+    local *RPMMACROS;
+    local *RPMRC;
 
     qprint "$progname:  Entering the bootstrap stage.  (${\(&get_timestamp())})\n";
     if (! -d "$builddir") {
@@ -679,7 +748,7 @@ do_bootstrap_stage
         }
         $cmd = "$revtool $cvsroot $tag -g $filename";
         ($err, $msg) = &fetch_package($cmd);  # Download the package using revtool
-        if ($err == 1) {
+        if ($err) {
             &fail_package($pkg, "bootstrap", $msg);
             next;
         }
@@ -697,11 +766,15 @@ do_bootstrap_stage
 sub
 do_compose_stage
 {
-    my ($specfile, $target, $pn, $dir, $err, $line, $src, $tarball);
+    my ($specfile, $target, $pn, $dir, $err, $line, $src, $tarball, $cwd);
     my (@contents, @tmp, @dirs, @sfiles, @srcs);
     my @p = @packages;
+    local *DIR;
+    local *CMD;
 
     qprint "$progname:  Entering the compose stage.  (${\(&get_timestamp())})\n";
+    chomp($cwd = `pwd`);
+
     # No compose stage for SRPM's since they're *already* SRPM's....
     foreach $pkg (grep $pkgs->{$_}{TYPE} eq "module", @p) {
         if ($pkgs->{$pkg}{STAGES} !~ /c/) {
@@ -712,7 +785,7 @@ do_compose_stage
 
         # The first step is to examine the module directory to find
         # the names of the vendor source files/directories and the spec file.
-        if (! chdir($pkgs->{$pkg}{MODULE})) {
+        if (! chdir("$cwd/$pkgs->{$pkg}{MODULE}")) {
             &fail_package($pkg, "compose", "Could not chdir into $pkgs->{$pkg}{MODULE} -- $!");
             next;
         }
@@ -773,19 +846,21 @@ do_compose_stage
                     $cmd =~ s/\%t/$builddir\/SOURCES\/$tarball/;
                 } else {
                     if ($pkgs->{$pkg}{ZIP}) {
-                        $zip = "--use-compress-program=$pkgs->{$pkg}{ZIP}";
-                    } elsif ($sfile =~ /(gz|Z)$/) {
+                        $zip = "--use-compress-program=\"$pkgs->{$pkg}{ZIP}\"";
+                    } elsif ($src =~ /(gz|Z)$/) {
                         $zip = "--use-compress-program=gzip";
-                    } elsif ($sfile =~ /\.bz2$/) {
+                    } elsif ($src =~ /\.bz2$/) {
                         $zip = "--use-compress-program=bzip2";
                     }
                     $cmd = "tar --exclude CVS --exclude RCS --exclude BitKeeper --exclude SCCS"
-                            . "\"$zip\" -cf $builddir/SOURCES/$tarball $src_files";
+                            . " $zip -cf $builddir/SOURCES/$tarball $src_files";
                 }
                 dprint "Creating $tarball:  $cmd\n";
+                unlink($tarball);
                 if (!open(CMD, "$cmd 2>&1 |")) {
                     &fail_package($pkg, "compose", "Execution of \"$cmd\" failed -- $!");
-                    next;
+                    $err = 1;
+                    last;
                 }
                 $err = 0;
                 while (<CMD>) {
@@ -796,21 +871,27 @@ do_compose_stage
                 dprint "\"$cmd\" returned $?\n";
                 if ($?) {
                     &fail_package($pkg, "compose", "Creation of vendor source tarball $tarball from failed");
-                    next;
+                    $err = 1;
+                    last;
                 }
             } else {
                 my $rc;
 
-                $rc = system("cp $src_files $builddir/SOURCES/") >> 8;
+                $rc = system("cp -f $src_files $builddir/SOURCES/") >> 8;
                 if ($rc) {
                     &fail_package($pkg, "compose", "Unable to copy $src_files to $builddir/SOURCES/ -- $!");
                     $err = 1;
+                    last;
                 }
             }
+        }
+        if ($err) {
+            next;
         }
 
         # Now build the new SRPM from the new vendor source tarball and the spec file.
         ($err, $msg, $srpm) = &build_rpms($pkg, $specfile);
+        dprint "do_compose_stage():  build_rpms($pkg, $specfile) returned $err, $msg, $srpm\n";
         if ($err) {
             &fail_package($pkg, "compose", $msg);
             next;
@@ -824,13 +905,6 @@ do_compose_stage
         $pkgs->{$pkg}{FILENAME} = "$pkgs->{$pkg}{MODULE}/$pkgs->{$pkg}{FILENAME}";
         dprint "Filename is $pkgs->{$pkg}{FILENAME}\n";
 
-        # Go back to where we were.
-        if ($basedir =~ /^\.?\.$/) {
-            chdir("..");
-        } else {
-            chdir("$basedir");
-        }
-
         nprint "$progname:  Compose stage for \"$pkg\" is complete.\n";
     }
     qprint "$progname:  Compose stage is now complete.  (${\(&get_timestamp())})\n";
@@ -842,6 +916,7 @@ do_explode_stage
     my ($cmd, $err, $msg, $line, $specfile, $rpm) = undef;
     my @manifest;
     my @p = @packages;
+    local *RPM;
 
     qprint "$progname:  Entering the explode stage.  (${\(&get_timestamp())})\n";
 
@@ -951,7 +1026,7 @@ sub
 do_build_stage
 {
     my ($cmd, $err, $msg, $line, $specfile, $rpm, $tmp, $target) = undef;
-    my ($target_age, $orig_age, $spec_age);
+    my ($target_age, $orig_age, $spec_age, $srpm);
     my @p = @packages;
 
     qprint "$progname:  Entering the build stage.  (${\(&get_timestamp())})\n";
@@ -983,7 +1058,8 @@ do_build_stage
         }
 
         # Rebuild from the spec file
-        ($err, $msg) = &build_rpms($pkg, $specfile);
+        ($err, $msg, $srpm) = &build_rpms($pkg, $specfile);
+        dprint "do_build_stage():  build_rpms($pkg, $specfile) returned $err, $msg, $srpm\n";
         if ($err) {
             &fail_package($pkg, "build", $msg);
         }
@@ -997,9 +1073,9 @@ do_package_stage
 {
     my ($path, $version, $release);
     my @outfiles;
-    my @tmp;
     my @contents;
     my @p = @packages;
+    local *DIR;
 
     qprint "$progname:  Entering the package accumulation stage.  (${\(&get_timestamp())})\n";
 
@@ -1020,7 +1096,7 @@ do_package_stage
         nprint "$progname:  Starting package accumulation stage for the \"$pkg\" package....\n";
         $version = $pkgs->{$pkg}{VERSION};
         $release = $pkgs->{$pkg}{RELEASE};
-        undef @outfiles, @tmp;
+        undef @outfiles;
 
         # Find all the RPM's installed by this package
         dprint "Opening directory $builddir/SRPMS to scan for output files.\n";
@@ -1106,7 +1182,7 @@ do_cleanup_stage
 sub
 summarize_failures
 {
-    my $ns, $nf, $nt;
+    my ($ns, $nf, $nt);
 
     $ns = $#packages + 1;
     $nf = $#failed_pkgs + 1;
@@ -1156,6 +1232,52 @@ build_process
 sub
 main
 {
+    # Set up the basic variables
+    $progname = "buildtool";
+    $version = "0.1.0";
+
+    # Synchronize output so it doesn't get all jumbled
+    select STDERR; $| = 1;
+    select STDOUT; $| = 1;
+
+    # See the Getopt::Mixed man page for details on the syntax of this line
+    $valid_opts = "h help>h v version>v d debug>d b=s build>b p=s product>p package>p"
+                   . " q quiet>q Q really-quiet>Q silent>Q D dir>D f force>f l=s log>l";
+    Getopt::Mixed::getOptions($valid_opts);
+
+    # Post-parse the options stuff
+    if ($opt_v) {
+	print "$progname $version by Michael Jennings\n";
+        print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
+	exit(0);
+    }
+    if ($opt_h) {
+	&print_usage_info();   # Never returns
+    }
+    $debug = $opt_d;
+    $verbosity = ($opt_Q ? 0 : ($opt_q ? 1 : 2));
+    $GLOBAL_LOG = 0;
+    if ($opt_l) {
+        if (!open(LOGFILE, ">$opt_l")) {
+            eprint "Unable to open $opt_l -- $!\n";
+        } else {
+            $GLOBAL_LOG = \*LOGFILE;
+        }
+    }
+    if ($opt_D) {
+        $proddir = $opt_D;
+    } elsif ($ENV{PROD_DIR} && $ENV{PROD_DIR} =~ /^\//) {
+        $proddir = $ENV{PROD_DIR};
+    } else {
+        chomp($proddir = `pwd`);
+        $proddir .= "/products";
+    }
+    $opt_b = "p" if (! $opt_b);
+    chomp($basedir = (($ENV{BASE_DIR} && $ENV{BASE_DIR} =~ /^\//) ? $ENV{BASE_DIR} : `pwd`));
+    $builddir = ($ENV{BUILD_DIR} ? $ENV{BUILD_DIR} : "$basedir/build");
+    $revtool = sprintf("revtool%s", ($opt_d ? " --debug" : ""));
+
+    # We actually begin work here.
     $prod = $opt_p;
     if ($prod =~ /^(\S+)-((?:\d|us|a|alpha|b|beta)[^-]+)$/) {
         ($prodname, $prodver) = ($1, $2);
@@ -1163,7 +1285,7 @@ main
         ($prodname, $prodver) = ($prod, 0);
     }
     if ($prod) {
-        qprint "$progname:  Building product $prodname version $prodver\n";
+        qprint "$progname:  Building product:  $prodname $prodver\n";
     } else {
         eprint "You didn't tell me what to build, so I'm not quite sure what to do.\n";
         eprint "If you aren't familiar with how to use $progname, try $progname --help.\n";
@@ -1178,54 +1300,13 @@ main
             return;
         }
     }
+    dprint "Products to be built:  ", join(" ", @products), "\n";
 
     if ($opt_b ne "Z") {  # -dbZ, a.k.a. How To Debug the Parser :-)
         &build_process();
         &summarize_failures();
     }
-}
-
-BEGIN {
-
-    # Set up the basic variables
-    $progname = "buildtool";
-    $version = "0.1.0";
-
-    # Synchronize output so it doesn't get all jumbled
-    select STDERR; $| = 1;
-    select STDOUT; $| = 1;
-
-    # See the Getopt::Mixed man page for details on the syntax of this line
-    $valid_opts = "h help>h v version>v d debug>d b=s build>b p=s product>p package>p"
-                   . " q quiet>q Q really-quiet>Q silent>Q D dir>D f force>f";
-
-    Getopt::Mixed::getOptions($valid_opts);
-    $debug = $opt_d;
-    $verbosity = ($opt_Q ? 0 : ($opt_q ? 1 : 2));
-    if ($opt_D) {
-        $proddir = $opt_D;
-    } elsif ($ENV{PROD_DIR} && $ENV{PROD_DIR} =~ /^\//) {
-        $proddir = $ENV{PROD_DIR};
-    } else {
-        chomp($proddir = `pwd`);
-        $proddir .= "/products";
-    }
-    $opt_b = "p" if (! $opt_b);
-    chomp($basedir = (($ENV{BASE_DIR} && $ENV{BASE_DIR} =~ /^\//) ? $ENV{BASE_DIR} : `pwd`));
-    $builddir = ($ENV{BUILD_DIR} ? $ENV{BUILD_DIR} : "$basedir/build");
-    $revtool = sprintf("revtool%s", ($opt_d ? " --debug" : ""));
-    if ($opt_v) {
-	print "$progname $version by Michael Jennings\n";
-        print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
-	exit(0);
-    }
-    if ($opt_h) {
-	&print_usage_info();   # Never returns
-    }
+    close(LOGFILE) if ($GLOBAL_LOG);
 }
 
 &main();
-
-END {
-
-}

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.19 2000/05/19 04:40:36 mej Exp $
+# $Id: revtool,v 1.20 2000/05/21 04:15:40 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -43,6 +43,7 @@ sub REVTOOL_ACCESS_DENIED()       {5;}
 sub REVTOOL_FILE_NOT_FOUND()      {21;}
 sub REVTOOL_FILE_REMOVED()        {22;}
 sub REVTOOL_CONFLICT_FOUND()      {23;}
+sub REVTOOL_INVALID_TAG()         {24;}
 
 # 41-60 are add/remove errors
 sub REVTOOL_BAD_ADDITION()        {41;}
@@ -235,74 +236,106 @@ sub
 update_from_master
 {
     my $file_list = join(" ", @_);
-    my ($tag, $err, $tries, $line);
-    my @conflicts = undef;
+    my ($tag, $err, $tries, $line, $cmd, $file, $mode);
+    my (@conflicts, @not_found, @removed, @co, @up);
 
     if ($opt_t) {
         $tag = "-r $opt_t";
     }
     dprint "File list is \"$file_list\", tag is \"$tag\"\n";
-    $cmd = sprintf("/bin/sh -c \"cvs $cvsroot %s\"",
-                   ($file_list =~ /^\s*$/ ? "update -Pd" : "checkout $tag $file_list"));
 
-    for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
-        $err = 0;
-        dprint "About to run $cmd\n";
-        if (!open(CMD, "$cmd 2>&1 |")) {
-            eprint "Execution of \"$cmd\" failed -- $!";
-            return REVTOOL_COMMAND_FAILED;
+    # Figure out which files exist and update those.  Checkout the rest.
+    foreach $file (split(/\s+/, $file_list)) {
+        if (-e $file) {
+            dprint "Updating $file\n";
+            push @up, $file;
+        } else {
+            dprint "Checking out $file\n";
+            push @co, $file;
         }
-        while (<CMD>) {
-            chomp($line = $_);
-            print "$line\n";
-            # Check the output for errors
-            if ($line =~ /^cvs \w+: cannot find password/) {
-                eprint "You must login to the repository first.\n";
-                $err = REVTOOL_BAD_LOGIN;
-                last;
-            } elsif ($line =~ /^cvs server: cannot find module/) {
-                eprint "$filename does not seem to exist in the repository.\n";
-                $err = REVTOOL_FILE_NOT_FOUND;
-                last;
-            } elsif ($line =~ /^cvs server: warning: $filename is not \(any longer\) pertinent/) {
-                eprint "$filename was removed from the repository.  Please update the product file.\n";
-                $err = REVTOOL_FILE_REMOVED;
-                last;
-            } elsif ($line =~ /^C /) {
-                $line =~ s/^C //;
-                push @conflicts, $line;
-                $err = REVTOOL_CONFLICT_FOUND;
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server was unreachable.\n";
-                    $err = REVTOOL_NO_SERVER;
+    }
+
+    foreach $mode (0, 1) {
+        my ($flist, $subcmd);
+
+        if ($mode) {
+            next if ($#co < 0);
+            $flist = join(" ", @co);
+            $subcmd = "checkout $tag";
+        } else {
+            next if ($#up < 0);
+            $flist = join(" ", @up);
+            $subcmd = "update $tag -Pd";
+        }
+        $cmd = "/bin/sh -c \"cvs $cvsroot $subcmd $flist\"";
+
+        for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
+            $err = 0;
+            dprint "About to run $cmd\n";
+            if (!open(CMD, "$cmd 2>&1 |")) {
+                eprint "Execution of \"$cmd\" failed -- $!";
+                return REVTOOL_COMMAND_FAILED;
+            }
+            while (<CMD>) {
+                chomp($line = $_);
+                print "$line\n";
+                # Check the output for errors
+                if ($line =~ /^cvs \w+: cannot find password/) {
+                    eprint "You must login to the repository first.\n";
+                    $err = REVTOOL_BAD_LOGIN;
                     last;
-                }
-            } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
-                if ($tries < 10) {
-                    $err = -1;
-                    print "The CVS server crashed.  I'll wait a bit and try again.\n";
-                    sleep 3;
-                } else {
-                    eprint "The CVS server kept crashing.\n";
-                    $err = REVTOOL_SERVER_CRASH;
-                    last;
+                } elsif ($line =~ /^cvs server: cannot find module .(\S+). /) {
+                    push @not_found, $1;
+                    $err = REVTOOL_FILE_NOT_FOUND;
+                } elsif ($line =~ /^cvs server: warning: (\w+) is not \(any longer\) pertinent/) {
+                    push @removed, $1;
+                    $err = REVTOOL_FILE_REMOVED;
+                } elsif ($line =~ /^C /) {
+                    $line =~ s/^C //;
+                    push @conflicts, $line;
+                    $err = REVTOOL_CONFLICT_FOUND;
+                } elsif ($line =~ /^cvs \[\w+ aborted\]: no such tag/) {
+                    eprint "$opt_t is not a valid tag for $file_list\n";
+                    $err = REVTOOL_INVALID_TAG;
+                } elsif ($line =~ /^cvs \[\w+ aborted\]: connect to \S+ failed: Connection refused/) {
+                    if ($tries < 10) {
+                        $err = -1;
+                        print "The CVS server seems to be down.  I'll wait a bit and try again.\n";
+                        sleep 3;
+                    } else {
+                        eprint "The CVS server was unreachable.\n";
+                        $err = REVTOOL_NO_SERVER;
+                        last;
+                    }
+                } elsif ($line =~ /^cvs \[\w+ aborted\]: received .* signal/) {
+                    if ($tries < 10) {
+                        $err = -1;
+                        print "The CVS server crashed.  I'll wait a bit and try again.\n";
+                        sleep 3;
+                    } else {
+                        eprint "The CVS server kept crashing.\n";
+                        $err = REVTOOL_SERVER_CRASH;
+                        last;
+                    }
                 }
             }
+            close(CMD);
+            dprint "\"$cmd\" returned $?\n";
         }
-        close(CMD);
-        dprint "\"$cmd\" returned $?\n";
     }
     if ($err == 0 && $? != 0) {
         eprint "An unknown error must have occured, because the command returned $?\n";
         $err = REVTOOL_UNSPECIFIED_ERROR;
-    } elsif ($err == REVTOOL_CONFLICT_FOUND) {
-        eprint "The following files had conflicts:  ", join(" ", @conflicts), "\n";
-        eprint "Please correct these errors and try again.\n";
+    } elsif ($err) {
+        if ($#conflicts != -1) {
+            eprint "The following files had conflicts:  ", join(" ", @conflicts), "\n";
+        }
+        if ($#not_found != -1) {
+            eprint "The following files/modules were not found in the repository:  ", join(" ", @not_found), "\n";
+        }
+        if ($#removed != -1) {
+            eprint "The following files/modules were removed from the repository:  ", join(" ", @removed), "\n";
+        }
     }
     return $err;
 }
@@ -503,9 +536,9 @@ main
     if ($opt_g) {
         $retval = &update_from_master(@ARGV);
     } elsif ($opt_p) {
-        if (!($retval = &update_from_master(undef))) {
+        if (!($retval = &update_from_master($opt_x ? @ARGV : undef))) {
             if ($opt_x) {
-                &commit_to_master(@ARGV, $addlist, $remlist);
+                &commit_to_master(@ARGV, ($addlist ? $addlist : undef), ($remlist ? $remlist : undef));
             } else {
                 &commit_to_master();
             }
