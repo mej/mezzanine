@@ -1,11 +1,29 @@
 #!/usr/bin/perl -w
 #
 # revtool -- Source Code Revision Control Tool
+# 
+# Copyright (C) 2000, Michael Jennings
 #
-# Michael Jennings
-# 05 May 2000
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# $Id: revtool,v 1.2 2000/05/06 02:50:27 mej Exp $
+# The above copyright notice and this permission notice shall be included in
+# all copies of the Software, its documentation and marketing & publicity
+# materials, and acknowledgment shall be given in the documentation, materials
+# and software packages that this Software was used.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+# $Id: revtool,v 1.3 2000/05/06 06:38:21 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -61,10 +79,69 @@ dprint {
     }
 }
 
+# Commit changes to the master repository
+sub
+commit_to_master {
+    my $logfile = "/var/tmp/.cvs.commit.$$";
+    my ($command, $username, $fullname, $rc);
+
+    open(LOGFILE, ">$logfile") || die("Cannot write to $logfile -- $!\n");
+    dprint("Opened log file $logfile for commit log\n");
+    $username = $ENV{"LOGNAME"};
+    @pw_info = getpwnam($username);
+    $fullname = $pw_info[6];
+    print LOGFILE scalar localtime, "\t", ($fullname ? "$fullname ($username)" : "$username"), "\n\n";
+    close(LOGFILE);
+    print "Please edit your commit message now...\n";
+    system($ENV{"EDITOR"} ? $ENV{"EDITOR"} : "vi", $logfile);
+    open(LOGFILE, "<$logfile");
+    open(CL, ">>ChangeLog");
+    while (<CL>) {
+        print CL $_;
+    }
+    print CL "------------------------------------------------------------\n";
+    close(CL);
+    close(LOGFILE);
+    $command = sprintf("/bin/sh -c \"cvs commit %s -F $logfile\"", ($opt_r ? "-r $opt_r" : ""));
+    $rc = system($command) >> 8;
+    unlink $logfile;
+    return ($rc);
+}
+
+# Update from the master repository
+sub
+update_from_master {
+
+}
+
+# Tag the sources
+sub
+tag_local_sources {
+
+}
+
+# Import a vendor branch
+sub
+import_vendor_sources {
+
+}
+
+# Tag the repository
+sub
+tag_repository_sources {
+
+}
+
 # main() here is basically the same as main() in C
 sub
 main {
 
+    if ($opt_g) {
+        &update_from_master();
+    }
+    if ($opt_p) {
+        &commit_to_master();
+    }
 }
 
 BEGIN {
@@ -76,12 +153,12 @@ BEGIN {
     chomp($hostname = `hostname`);
 
     # See the Getopt::Mixed man page for details on the syntax of this line
-    $valid_opts = "h help>h v version>v d debug>d";
+    $valid_opts = "h help>h v version>v d debug>d g p t=s i=s r=s";
 
     Getopt::Mixed::getOptions($valid_opts);
     $debug = $opt_d;
     if ($opt_v) {
-	print "$progname $version by Michael Jennings.\n";
+	print "$progname $version by Michael Jennings\n";
         print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
 	exit(0);
     }
