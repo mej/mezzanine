@@ -1212,3 +1212,10 @@ Wed May  9 11:06:38 2001                        Michael Jennings (mej)
 
 Post-2.0 updates and bugfixes.
 ----------------------------------------------------------------------
+Wed May  9 13:48:03 2001                      Walt Drummond (drummond)
+- Added avalon.1 man page; overview for tool set
+- Added support for avdiff, avstatus, avlog
+- Added _some_ of the query type codes to the revtool.1 manpage
+  Partially closed bug #1144
+- Changed the av* hardlinks to symlinks to aid readability
+----------------------------------------------------------------------
