@@ -79,3 +79,9 @@ Tue May  9 17:12:33 2000                        Michael Jennings (mej)
 
 Timestamping and general stage notices.
 ----------------------------------------------------------------------
+Tue May  9 22:37:20 2000                        Michael Jennings (mej)
+
+Lots of changes here.  The big deal is that buildtool should be able
+to (mostly) bootstrap redhat-6.2 now.  Also, revtool -g works, and I
+added some to revtool to make it more flexible WRT adds and removes.
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.5 2000/05/10 00:12:53 mej Exp $
+# $Id: buildtool,v 1.6 2000/05/10 05:38:30 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -32,8 +32,8 @@ use Getopt::Mixed;
 
 # Print usage information
 sub
-print_usage_info {
-
+print_usage_info
+{
     print "\n";
     $leader = "$progname $version Usage Information";
     $underbar = $leader;
@@ -42,61 +42,75 @@ print_usage_info {
     print "\n";
     print "  Syntax:   buildtool [ options ]\n";
     print "\n";
-    print "    -h --help         Show this usage information\n";
-    print "    -d --debug        Turn on debugging\n";
-    print "    -v --version      Show version and copyright\n";
+    print "    -h --help                        Show this usage information\n";
+    print "    -d --debug                       Turn on debugging\n";
+    print "    -v --version                     Show version and copyright\n";
+    print "    -b --build [stage]               Stop building after a particular stage (see below)\n";
+    print "    -p --product --package [name]    Specify the product or package to build\n";
+    print "    -q --quiet                       Be somewhat quiet.  Simply gives basic progress info\n";
+    print "    -Q --really-quiet --silent       Be very quiet.  Only errors are reported\n";
+    print "    -D --dir [directory]             Specify \"directory\" as the location of your .prod files\n";
+    print "    -f --force                       Ignore errors, build as much as possible\n";
     print "\n";
     exit(0);
 }
 
 # Generate timestamp for debugging/log file
 sub
-get_timestamp {
-
+get_timestamp
+{
     $ts = POSIX::strftime("%A, %d %B %Y %H:%M:%S %Z", localtime);
     return $ts;
 }
 
 # Debugging output
 sub
-dprintf {
+dprintf
+{
     return if (! $debug);
-    print "[debug] ";
+    print "[debug:$progname] ";
     printf @_;
 }
 sub
-dprint {
-    print "[debug] ", @_ if ($debug);
+dprint
+{
+    print "[debug:$progname] ", @_ if ($debug);
 }
 
 # Print an error
 sub
-eprintf {
+eprintf
+{
     print STDERR "$progname:  Error:  ";
     printf STDERR @_;
 }
 sub
-eprint {
+eprint
+{
     print STDERR "$progname:  Error:  ", @_;
 }
 
 # Normal print (i.e., don't print this in -q or -Q mode)
 sub
-nprintf {
+nprintf
+{
     printf @_ if ($verbosity >= 2);
 }
 sub
-nprint {
+nprint
+{
     print @_ if ($verbosity >= 2);
 }
 
 # Quiet print (i.e., print in -q mode but not in -Q mode)
 sub
-qprintf {
+qprintf
+{
     printf @_ if ($verbosity >= 1);
 }
 sub
-qprint {
+qprint
+{
     print @_ if ($verbosity >= 1);
 }
 
@@ -104,16 +118,11 @@ qprint {
 # all the products we need to work with and what packages or
 # other products compose them.
 sub
-parse_product_def {
-
+parse_product_def
+{
     my $prod = $_[0];
 
-    if (!(open(PROD, "$ENV{PROD_DIR}/${prod}.prod") || open(PROD, "${prod}.prod"))) {
-#        print STDERR "$progname:  I'm sorry, but I can't seem to find a product definition for $prod.\n";
-#        print STDERR "$progname:  I looked in ", ($ENV{"PROD_DIR"} ? "$ENV{PROD_DIR} and" : ""), "the current directory.\n";
-#        print STDERR "$progname:  I'll try to just ignore it and go on, but things could break.\n";
-        return 0;
-    }
+    open(PROD, "$proddir/${prod}.prod") || return 0;
 
     # For now, just skip the product information.  Eventually we might care, but not now.
     # The first blank line signifies the end of the product information.
@@ -127,15 +136,11 @@ parse_product_def {
         $line =~ s/\s+$//;
         next if ($line !~ /\S/ || $line =~ /^\#/);  # Ignore blank lines and comment lines
         undef %pkgvars;
+        undef $module;
         @inp = split(/\s+/, $line);
         # Line begins with <type>:<name>, like "module:Eterm"
         ($type, $name) = split(":", shift @inp);
         $type =~ tr/[A-Z]/[a-z]/;
-        if ($name =~ /\//) {
-            ($module, $name) = split("/", $name);
-        } else {
-            $module = $name;
-        }
         if ($type =~ /^prod/) {
             $type = "product";
         } elsif ($type =~ /^mod/) {
@@ -146,6 +151,11 @@ parse_product_def {
             eprint "Unrecognized type \"$type\" for package $name.  I'll have to skip that one.\n";
             next;
         }
+        if ($name =~ /\/.+$/) {
+            ($module = $name) =~ s/^([^\/]+)(.+)$/$1/;
+            $name =~ s/^(.*)\/([^\/]+)$/$2/;
+        }
+        dprint "Module is $module, name is $name\n";
         if ($type eq "product") {
             # Recursively convert products into their component packages
             &parse_product_def($name);
@@ -170,6 +180,7 @@ parse_product_def {
                     undef $pkgvars{RELEASE};
                 }
             } elsif ($type eq "srpm") {
+                $name =~ s/\.src\.rpm$//;
                 if (! $pkgvars{RELEASE}) {
                     if ($name !~ /^\S+-[^-]+-[^-]+$/) {
                         eprint "I wasn't given enough information about the $name package in ${prod}.prod.  For SRPM\n";
@@ -198,7 +209,7 @@ parse_product_def {
             }
             # Now that we've got the name/version/release in their final forms, set up the data structures.
             $pkgs->{$name}{TYPE} = $type;
-            $pkgs->{$name}{MODULE} = $module;
+            $pkgs->{$name}{MODULE} = ($module ? $module : $name);
             dprint "New package:  $name is a $pkgs->{$name}{TYPE}\n";
             foreach $pkgvar (keys %pkgvars) {
                 if ($pkgvars{$pkgvar}) {
@@ -206,103 +217,238 @@ parse_product_def {
                     dprint "Added variable $pkgvar to package $name with value \"$pkgs->{$name}{$pkgvar}\"\n";
                 }
             }
+            push @packages, $name;
         }
     }
     close(PROD);
     return 1;
 }
 
+# What to do if a package fails
+sub
+fail_package
+{
+    my ($pkg, $stage, $msg) = @_;
+
+    push @failed_pkgs, $pkg;
+    $failure->{$pkg}{STAGE} = $stage;
+    if ($msg) {
+        $failure->{$pkg}{MESSAGE} = $msg;
+        eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage:  $failure->{$pkg}{MESSAGE}.\n";
+    } else {
+        eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage.\n";
+    }
+    exit(-1) if (! $opt_f);
+    @packages = grep($_ ne $pkg, @packages);
+    return 0;
+}
+
 #
 # The build process stages
 #
 sub
-do_bootstrap_stage {
+do_bootstrap_stage
+{
+    my $line;
 
     qprint "$progname:  Entering the bootstrap stage.  (${\(&get_timestamp())})\n";
-    foreach $pkg (grep $pkgs->{$_}{TYPE} ne "srpm", @packages) {
+    if (! -d "$basedir/build") {
+        mkdir("$basedir/build", 0755) || die "Cannot create $basedir/build -- $!\n";
+        foreach $dir ("BUILD", "SRPMS", "RPMS", "SPECS", "SOURCES") {
+            mkdir("$basedir/build/$dir", 0755);
+        }
+    }
+    if (-f "$ENV{HOME}/.rpmmacros" && -s "$ENV{HOME}/.rpmmacros") {
+        $rpmmacros = "$ENV{HOME}/.rpmmacros";
+    } else {
+        $rpmmacros = "$basedir/rpmmacros";
+        if (!(-f "$basedir/rpmmacros" && -s "$basedir/rpmmacros")) {
+            # Create basic rpmmacros
+            open(RPMMACROS, ">$rpmmacros") || die "Cannot create $rpmmacros -- $!\n";
+            print RPMMACROS "\%_topdir        $basedir/build\n";
+            close(RPMMACROS);
+        }
+    }
+    if (-f "$ENV{HOME}/.rpmrc" && -s "$ENV{HOME}/.rpmrc") {
+        $rpmrc = "$ENV{HOME}/.rpmrc";
+    } else {
+        $rpmrc = "$basedir/rpmrc";
+        if (!(-f "$basedir/rpmrc" && -s "$basedir/rpmrc")) {
+            # Create basic rpmrc
+            open(RPMRC, ">$rpmrc") || die "Cannot create $rpmrc -- $!\n";
+            print RPMRC "optflags:   i386 -O2 -march=pentium\n";
+            print RPMRC "macrofiles: /usr/lib/rpm/macros:/usr/lib/rpm/%{_target}/macros:/etc/rpm/macros.specspo:",
+                         "/etc/rpm/macros:/etc/rpm/%{_target}/macros:~/.rpmmacros:$rpmmacros\n";
+            close(RPMRC);
+        }
+    }
+    foreach $pkg (@packages) {
+        $err = 0;
         nprint "$progname:  Starting bootstrap stage for the \"$pkg\" package....\n";
-
-
-
+        $module = $pkgs->{$pkg}{MODULE};
+        if ($pkgs->{$pkg}{TYPE} eq "module") {
+        } elsif ($pkgs->{$pkg}{TYPE} eq "srpm") {
+            $version = $pkgs->{$pkg}{VERSION};
+            $release = $pkgs->{$pkg}{RELEASE};
+            $filename = "$module/$pkg-$version-$release.src.rpm";
+            dprint "Checking for $filename\n";
+            # If it already exists with nonzero size as a plain binary file, go on.
+            next if (-f $filename && -s $filename && -B $filename);
+            if ($pkgs->{$pkg}{CVSROOT}) {
+                $cvsroot = "-D $pkgs->{$pkg}{CVSROOT}";
+            } else {
+                $cvsroot = "";
+            }
+            if ($pkgs->{$pkg}{TAG}) {
+                $tag = "-t $pkgs->{$pkg}{TAG}";
+            } else {
+                $tag = "";
+            }
+            $cmd = "$revtool $cvsroot $tag -g $filename";
+            dprint "About to run $cmd\n";
+            if (!open(REVTOOL, "$cmd 2>&1 |")) {
+                &fail_package($pkg, "bootstrap", "Execution of \"$cmd\" failed -- $!");
+                next;
+            }
+            while (<REVTOOL>) {
+                chomp($line = $_);
+                if ($debug) {
+                    nprint "From revtool -> $line\n";
+                } else {
+                    nprint "$line\n";
+                }
+                next if ($line =~ /^\[debug:/);
+                # Check the output for errors
+                if ($line =~ /^cvs server: cannot find module/) {
+                    $err = 1;
+                    $msg = "$filename does not seem to exist in the repository";
+                } elsif ($line =~ /^revtool:\s*Error/) {
+                    $err = 1;
+                    $msg = "$line";
+                } elsif ($line =~ /^cvs server: warning: $filename is not \(any longer\) pertinent/) {
+                    $err = 1;
+                    $msg = "$filename was removed from the repository.  Please update the product file.";
+                    last;
+                }
+            }
+            close(REVTOOL);
+            if ($err) {
+                &fail_package($pkg, "bootstrap", $msg);
+                next;
+            }
+            if (!(-f $filename && -s $filename && -B $filename)) {
+                # If it's not there, we must've missed the error.
+                &fail_package($pkg, "bootstrap", "Unhandled error condition [$line]");
+                next;
+            }
+        }
         nprint "$progname:  Bootstrap stage for \"$pkg\" is complete.\n";
     }
     qprint "$progname:  Bootstrap stage is now complete.  (${\(&get_timestamp())})\n";
 }
 
 sub
-do_compose_stage {
-
+do_compose_stage
+{
     qprint "$progname:  Entering the compose stage.  (${\(&get_timestamp())})\n";
+    # No compose stage for SRPM's since they're *already* SRPM's....
     foreach $pkg (grep $pkgs->{$_}{TYPE} ne "srpm", @packages) {
         nprint "$progname:  Starting compose stage for the \"$pkg\" package....\n";
-
-
-
+        if ($pkgs->{$pkg}{TYPE} eq "module") {
+        }
         nprint "$progname:  Compose stage for \"$pkg\" is complete.\n";
     }
     qprint "$progname:  Compose stage is now complete.  (${\(&get_timestamp())})\n";
 }
 
 sub
-do_explode_stage {
-
+do_explode_stage
+{
     qprint "$progname:  Entering the explode stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (@packages) {
         nprint "$progname:  Starting explode stage for the \"$pkg\" package....\n";
-
-
-
+        if ($pkgs->{$pkg}{TYPE} eq "module") {
+        } elsif ($pkgs->{$pkg}{TYPE} eq "srpm") {
+        }
         nprint "$progname:  Explode stage for \"$pkg\" is complete.\n";
     }
     qprint "$progname:  Explode stage is now complete.  (${\(&get_timestamp())})\n";
 }
 
 sub
-do_build_stage {
-
+do_build_stage
+{
     qprint "$progname:  Entering the build stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (@packages) {
         nprint "$progname:  Starting build stage for the \"$pkg\" package....\n";
-
-
-
+        if ($pkgs->{$pkg}{TYPE} eq "module") {
+        } elsif ($pkgs->{$pkg}{TYPE} eq "srpm") {
+        }
         nprint "$progname:  Build stage for \"$pkg\" is complete.\n";
     }
     qprint "$progname:  Build stage is now complete.  (${\(&get_timestamp())})\n";
 }
 
 sub
-do_package_stage {
-
+do_package_stage
+{
     qprint "$progname:  Entering the package accumulation stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (@packages) {
         nprint "$progname:  Starting package accumulation stage for the \"$pkg\" package....\n";
-
-
-
+        if ($pkgs->{$pkg}{TYPE} eq "module") {
+        } elsif ($pkgs->{$pkg}{TYPE} eq "srpm") {
+        }
         nprint "$progname:  Package accumulation stage for \"$pkg\" is complete.\n";
     }
     qprint "$progname:  Package accumulation stage is now complete.  (${\(&get_timestamp())})\n";
 }
 
 sub
-do_iso_stage {
-
+do_iso_stage
+{
     qprint "$progname:  Entering the ISO image stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (@packages) {
         nprint "$progname:  Starting ISO image stage for the \"$pkg\" package....\n";
-
-
-
+        if ($pkgs->{$pkg}{TYPE} eq "module") {
+        } elsif ($pkgs->{$pkg}{TYPE} eq "srpm") {
+        }
         nprint "$progname:  ISO image stage for \"$pkg\" is complete.\n";
     }
     qprint "$progname:  ISO image stage is now complete.  (${\(&get_timestamp())})\n";
 }
 
+sub
+do_cleanup_stage
+{
+    qprint "$progname:  Entering the cleanup stage.  (${\(&get_timestamp())})\n";
+    foreach $pkg (@packages) {
+        nprint "$progname:  Starting cleanup stage for the \"$pkg\" package....\n";
+        if ($pkgs->{$pkg}{TYPE} eq "module") {
+        } elsif ($pkgs->{$pkg}{TYPE} eq "srpm") {
+        }
+        nprint "$progname:  Cleanup stage for \"$pkg\" is complete.\n";
+    }
+    qprint "$progname:  Cleanup stage is now complete.  (${\(&get_timestamp())})\n";
+}
+
+# Once we're all done, summarize any failures at the very end
+# so that they're easy to find if the user is generating a log.
+sub
+summarize_failures
+{
+    foreach $pkg (@failed_pkgs) {
+        if ($failure->{$pkg}{MESSAGE}) {
+            eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage:  $failure->{$pkg}{MESSAGE}.\n";
+        } else {
+            eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage.\n";
+        }
+    }
+}
+
 # main() here is basically the same as main() in C
 sub
-main {
-
+main
+{
     if (!$opt_p) {
         eprint "You didn't tell me what to build, so I'm not quite sure what to do.\n";
         eprint "If you aren't familiar with how to use $progname, try $progname --help.\n";
@@ -315,7 +461,6 @@ main {
         eprint "$opt_p does not seem to be a product.  Perhaps you made a typo?\n";
         return;
     }
-    @packages = keys %{$pkgs};
 
     # Perform the build in stages, checking after each one to see if we should stop
     &do_bootstrap_stage();
@@ -334,8 +479,9 @@ main {
     return if ($opt_b eq "p");
 
     &do_iso_stage();
-    return if ($opt_b eq "i");  # Technically not necessary, but what the heck.
+    return if ($opt_b eq "i");
 
+    &do_cleanup_stage();
 }
 
 BEGIN {
@@ -346,11 +492,20 @@ BEGIN {
 
     # See the Getopt::Mixed man page for details on the syntax of this line
     $valid_opts = "h help>h v version>v d debug>d b=s build>b p=s product>p package>p"
-                   . " q quiet>q Q really-quiet>Q";
+                   . " q quiet>q Q really-quiet>Q silent>Q D dir>D f force>f";
 
     Getopt::Mixed::getOptions($valid_opts);
     $debug = $opt_d;
     $verbosity = ($opt_Q ? 0 : ($opt_q ? 1 : 2));
+    if ($opt_D) {
+        $proddir = $opt_D;
+    } elsif ($ENV{PROD_DIR}) {
+        $proddir = $ENV{PROD_DIR};
+    } else {
+        $proddir = ".";
+    }
+    $basedir = ($ENV{BASE_DIR} ? $ENV{BASE_DIR} : ".");
+    $revtool = sprintf("revtool%s", ($opt_d ? " --debug" : ""));
     if ($opt_v) {
 	print "$progname $version by Michael Jennings\n";
         print "Copyright (c) 2000, Michael Jennings and VA Linux Systems, Inc.\n";
