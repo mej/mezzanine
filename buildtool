@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.105 2000/10/13 06:25:19 mej Exp $
+# $Id: buildtool,v 1.106 2000/10/31 20:08:51 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -993,7 +993,7 @@ fail_package
     push @failed_pkgs, $pkg;
     $failure->{$pkg}{STAGE} = $stage;
     if ($msg) {
-        $failure->{$pkg}{MESSAGE} = $msg;
+        ($failure->{$pkg}{MESSAGE} = $msg) =~ s/\.+$//;
         eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage:  $failure->{$pkg}{MESSAGE}.\n";
     } else {
         eprint "Package \"$pkg\" failed at the $failure->{$pkg}{STAGE} stage.\n";
@@ -1874,7 +1874,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.105 $ created on $Date: 2000/10/13 06:25:19 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.106 $ created on $Date: 2000/10/31 20:08:51 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
