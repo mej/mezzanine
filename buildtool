@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.32 2000/05/31 23:51:34 mej Exp $
+# $Id: buildtool,v 1.33 2000/06/06 00:02:23 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -254,9 +254,9 @@ mkdirhier
     my @dirs = split("/", $dir);
     my $path = "";
 
+    dprint "mkdirhier($dir) called.\n";
     foreach $dir (@dirs) {
         $path .= "$dir/";
-        dprint "mkdirhier() checking for \"$path\"\n";
         if (! -d $path) {
             dprint "mkdirhier() creating \"$path\"\n";
             mkdir($path, 0755) || eprint("Unable to create $path -- $!\n");
@@ -274,11 +274,11 @@ spawn_cmd
 
     do {
         if ($pid = fork()) {
-            # Parent
+            # Parent -- return PID
             nprint "Spawned child process $pid to build $pkg (log file is $logfile)\n";
             return $pid;
         } elsif (defined $pid) {
-            # Child
+            # Child -- reset state as needed and jump to build process
             $opt_f = 0;
             $verbosity = 0;
             $slave = 1;
@@ -291,6 +291,7 @@ spawn_cmd
                 eprint "Unable to open $logfile -- $!\n";
             } else {
                 $GLOBAL_LOG = \*LOGFILE;
+                system("chattr +S $logfile");  # Try to set sync on the log file, fail silently
                 open(STDERR, ">&LOGFILE");
                 select LOGFILE; $| = 1;
                 select STDOUT; $| = 0;
@@ -317,8 +318,7 @@ get_var_name
 
     $var =~ tr/[a-z]/[A-Z]/;
 
-    # Commonly shortened variables are REVISION/TAG,
-    # VERSION, DATE, CVSROOT, SPECFILE, DIRS
+    # Commonly shortened variables
     if ($var =~ /^REV/ || $var =~ /^TAG/) {
         $var = "REVISION";
     } elsif ($var =~ /^REL/) {
@@ -329,10 +329,39 @@ get_var_name
         $var = "SPECFILE";
     } elsif ($var =~ /^DIR/) {
         $var = "DIRS";
+    } elsif ($var =~ /^PATCH/) {
+        $var = "PATCHES";
     } elsif ($var =~ /^LOC/) {
         $var = "LOCATIONS";
     }
     return $var;
+}
+
+# Translate a package type into its default STAGES variable
+sub
+get_package_stages
+{
+    my $type = $_[0];
+
+    if ($type eq "rpm") {
+        return "spia";
+    } elsif ($type eq "module") {
+        return "scpia";
+    } elsif ($type eq "image") {
+        return "sa";
+    } else {
+        return "scebpia";
+    }
+}
+
+# Find the proper location within the image for an output file
+sub
+get_package_location
+{
+    my ($pkg, $file) = @_;
+    my ($wildcard, $location);
+
+    
 }
 
 # Locate the product file for a particular product
@@ -449,6 +478,8 @@ parse_product_entry
             $type = "srpm";
         } elsif ($type =~ /^rpm/) {
             $type = "rpm";
+        } elsif ($type =~ /^image/) {
+            $type = "image";
         } else {
             eprint "$type is not a valid package type.  I'll try to guess the correct one.\n";
             $type = 0;
@@ -616,13 +647,7 @@ parse_product_entry
         }
     }
     if (!defined $pkgs->{$name}{STAGES}) {
-        if ($type eq "rpm") {
-            dprint "parse_product_entry():  Defaulting to minimal stages for binary package $name\n";
-            $pkgs->{$name}{STAGES} = "spia";
-        } else {
-            dprint "parse_product_entry():  Defaulting to all stages for source package $name\n";
-            $pkgs->{$name}{STAGES} = "scebpia";
-        }
+        $pkgs->{$name}{STAGES} = &get_package_stages($type);
     }
     push @packages, $name;
     $pkgs->{$name}{PRODUCT} = $prod;
@@ -770,7 +795,7 @@ build_rpms
     my ($pkg, $specfile) = @_;
     my ($cmd, $rpm, $line, $target);
     my ($err, $msg, $srpm) = (0, 0, 0);
-    my (@failed_deps, @not_found, @spec_errors);
+    my (@failed_deps, @not_found, @spec_errors, @out_files);
     local *RPM;
 
     $rpm = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
@@ -784,8 +809,11 @@ build_rpms
     while (<RPM>) {
         chomp($line = $_);
         nprint "$line\n";
-        if ($line =~ /^Wrote: .*src\.rpm$/) {
-            ($srpm = $line) =~ s/^Wrote:\s+//;
+        if ($line =~ /^Wrote:\s+(\S+\.\w+\.rpm)$/) {
+            push @out_files, $1;
+            if ($line =~ /src\.rpm$/) {
+                ($srpm = $line) =~ s/^Wrote:\s+//;
+            }
         } elsif ($line =~ /^line \d+: [^:]+: /
                  || $line =~ /^Failed to find \w+:/
                  || $line =~ /^Symlink points to BuildRoot: /) {
@@ -831,6 +859,10 @@ build_rpms
                        join("\", \"", @not_found));
     } elsif ($#spec_errors != -1) {
         $msg = sprintf("The spec file contains the following errors:  \"%s\"", join("\", \"", @spec_errors));
+    }
+
+    if ($#out_files >= 0) {
+        $pkgs->{$pkg}{OUTFILES} = join(" ", @out_files);
     }
     dprint "build_rpms():  Returning $err, $msg, $srpm\n";
     return ($err, $msg, $srpm);
@@ -1315,25 +1347,30 @@ do_package_stage
         $release = $pkgs->{$pkg}{RELEASE};
         undef @outfiles;
 
-        # Find all the RPM's installed by this package
-        dprint "Opening directory $builddir/SRPMS to scan for output files.\n";
-        opendir(DIR, "$builddir/SRPMS") || &fatal_error("Cannot open directory $builddir/SRPMS -- $!\n");
-        @contents = readdir(DIR);
-        foreach $rpm (@contents) {
-            if ($rpm =~ /^\Q$pkg-\E\S*\Q$version-$release\E\.(?:no)?src\.rpm$/) {
-                dprint "Got output file $rpm\n";
-                push @outfiles, "$builddir/SRPMS/$rpm";
+        if ($pkgs->{$pkg}{OUTFILES}) {
+            dprint "Output files [$pkgs->{$pkg}{OUTFILES}] saved from earlier.\n";
+            @outfiles = split(" ", $pkgs->{$pkg}{OUTFILES});
+        } else {
+            # Find all the RPM's installed by this package
+            dprint "Opening directory $builddir/SRPMS to scan for output files.\n";
+            opendir(DIR, "$builddir/SRPMS") || &fatal_error("Cannot open directory $builddir/SRPMS -- $!\n");
+            @contents = readdir(DIR);
+            foreach $rpm (@contents) {
+                if ($rpm =~ /^\Q$pkg-\E\S*\Q$version-$release\E\.(?:no)?src\.rpm$/) {
+                    dprint "Got output file $rpm\n";
+                    push @outfiles, "$builddir/SRPMS/$rpm";
+                }
             }
-        }
-        closedir(DIR);
+            closedir(DIR);
 
-        dprint "Opening directory $builddir/RPMS to scan for output files.\n";
-        @contents = glob("$builddir/RPMS/*/$pkg*.rpm");
-        foreach $rpm (@contents) {
-            dprint "Checking $rpm\n";
-            if ($rpm =~ /$version-$release/) {
-                dprint "Got output file $rpm\n";
-                push @outfiles, $rpm;
+            dprint "Opening directory $builddir/RPMS to scan for output files.\n";
+            @contents = glob("$builddir/RPMS/*/$pkg*.rpm");
+            foreach $rpm (@contents) {
+                dprint "Checking $rpm\n";
+                if ($rpm =~ /$version-$release/) {
+                    dprint "Got output file $rpm\n";
+                    push @outfiles, $rpm;
+                }
             }
         }
 
@@ -1580,6 +1617,7 @@ main
             eprint "Unable to open $opt_l -- $!\n";
         } else {
             $GLOBAL_LOG = \*LOGFILE;
+            system("chattr +S $opt_l");  # Try to set sync on the log file, fail silently
             open(STDERR, ">&LOGFILE");
             select LOGFILE; $| = 1;
         }

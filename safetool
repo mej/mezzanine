@@ -1,0 +1,28 @@
+#!/bin/sh -x
+
+LOGFILE=/var/tmp/safetool.log
+
+CMD_LINE="$@"
+CMD=`basename $0`
+echo "safetool ($$):  $0 $CMD_LINE" >> $LOGFILE
+chmod 666 $LOGFILE
+
+if [ "$CMD" = "strip" ]; then
+  exit 0
+fi
+
+if [ "`whoami`" = "root" ]; then
+  echo $CMD_LINE | grep /tmp >/dev/null 2>&1
+  if [ $? -ne 0 ]; then
+    echo "safetool ($$):  Command line does not contain /tmp.  I refuse to do that as root." >> $LOGFILE
+    exit 0
+  fi
+else
+  TMP=`echo $CMD_LINE | sed 's/-o[ ]*[^ ]*//;s/-g[ ]*[^ ]*//;'`
+  CMD_LINE="$TMP"
+fi
+
+if [ "$CMD" != "safetool" ]; then
+  $CMD $CMD_LINE
+fi
+exit 0

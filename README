@@ -4,7 +4,7 @@
 #  Written by:  Michael Jennings
 #               Ted T'so
 #
-#  $Id: README,v 1.2 2000/05/09 03:42:12 mej Exp $
+#  $Id: README,v 1.3 2000/06/06 00:02:23 mej Exp $
 #
 ########################################################################
 
@@ -17,20 +17,30 @@ design philosophies behind it.  It also details the various standards
 policies which govern its contents, so those planning on adding and/or
 maintaining its contents should read those sections carefully.
 
+Before you can build any products, you must set your machine up to be
+able to run the build system tools.  Since you are reading this README
+file, you must have checked out the "base" module.  Within that module
+is a directory called "pm" which contains another directory called
+"getopt."  This getopt directory contains the Getopt::Mixed Perl module
+which is required for the build scripts to function properly.  You will
+need to go into pm/getopt as root and run the following command as
+root:  "perl Makefile.PL ; make ; make install".  Once you have done
+this, return to the base directory and proceed as shown below.
+
 For those wishing to simply build a particular VA product, you will
 find a directory called products under this one.  It contains a series
 of files with .prod extensions.  Find the file with the name of the
 product you wish to build, then invoke the following command at your
 shell prompt:
 
-$ ./buildtool -bp -p <product>
+$ ./buildtool -p <product>
 
 ...where <product> is the name of the product file, but without the
 .prod on the end.  This command should be run by your regular user
 account (not root) and should be run from the directory which contains
 buildtool and this README file.  Executing this command will build all
 packages associated with that product, both binary and source packages.
-If you wish to build ISO images as well, use -bi instead of -bp.
+If you wish to build ISO images as well, use -bi as well as -p.
 
 The following sections will have more detailed information on how to
 use the system, so if you are going to be involved in the actual day-
@@ -60,17 +70,33 @@ from the exploded sources.
 The former case is much more complicated.  Packages which are modified
 internally by VA are stored as directory trees containing the source,
 the necessary spec files, and any other files required by the build
-process.
+process.  These directory trees will hereafter be referred to by their
+proper term in revision control lingo, "modules."
 
-2.  Revision Control
---------------------
+Two tools are employed as user-level interfaces to this system.  The
+first, called "revtool," handles all interaction with the revision
+control system.  It encapsulates all revision control system-specific
+commands and gives them an interface which is independent of the
+underlying system.  Thus, if the repository was moved from CVS to, say,
+BitKeeper, revtool's code would change, but its interface would remain
+the same.
 
-3.  Packages
-------------
+The second tool is "buildtool," mentioned briefly above.  buildtool is
+what takes a product name/version pair, like "va-redhat-6.2.1" and
+translates that via a series of product definition/configuration files
+("prod files" for short) into a set of packages to build.  It then
+builds those packages, creating both source and binary package files.
+It can also build ISO images for CD's from these packages and some
+template modules.
 
-4.  Standards and Conventions
+2.  Revision Control with revtool
+---------------------------------
+
+3.  Building Products
+---------------------
+
+4.  Package Maintainer's Guide
+------------------------------
+
+5.  Standards and Conventions
 -----------------------------
-
-5.  Tool Usage Guidelines
--------------------------
-

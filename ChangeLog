@@ -252,3 +252,8 @@ Wed May 31 17:02:41 2000                        Michael Jennings (mej)
 Updated the product files to include binary packages for those whose
 source packages won't compile.
 ----------------------------------------------------------------------
+Mon Jun  5 17:13:10 2000                        Michael Jennings (mej)
+
+Adding safetool and pkgtool.  safetool should work; pkgtool isn't
+ready yet.  Also added some .cvsignore files.
+----------------------------------------------------------------------
