@@ -244,3 +244,7 @@ Sat Jan  3 19:45:10 2004                        Michael Jennings (mej)
 
 Fix rebuild of SRPM's.
 ----------------------------------------------------------------------
+Mon Jan  5 14:33:06 2004                        Michael Jennings (mej)
+
+Added support for instroot init/reset/copy.
+----------------------------------------------------------------------

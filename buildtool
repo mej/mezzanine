@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.161 2003/12/31 11:53:50 mej Exp $
+# $Id: buildtool,v 1.162 2004/01/05 18:05:23 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -215,7 +215,23 @@ build_single_package
         # Build the source
         &pkgvar_target($target);
         if ($pkgs->{$pkg}{"INSTROOT"}) {
+            $ENV{"HOME"} = &pkgvar_buildroot();
             &pkgvar_instroot($pkgs->{$pkg}{"INSTROOT"});
+            if (! -e $pkgs->{$pkg}{"INSTROOT"} && $pkgs->{$pkg}{"INSTROOT_INIT"}) {
+                my @output;
+
+                @output = &run_cmd($pkgs->{$pkg}{"INSTROOT_INIT"}, $instroot, 1);
+                if ($output[0] != MEZZANINE_SUCCESS) {
+                    wprint "Initialization of install root failed.\n";
+                }
+            } elsif (-e $pkgs->{$pkg}{"INSTROOT"} && $pkgs->{$pkg}{"INSTROOT_RESET"}) {
+                my @output;
+
+                @output = &run_cmd($pkgs->{$pkg}{"INSTROOT_RESET"}, $instroot, 1);
+                if ($output[0] != MEZZANINE_SUCCESS) {
+                    wprint "Reset of install root failed.\n";
+                }
+            }
         } else {
             &pkgvar_instroot("");
         }
@@ -274,7 +290,20 @@ build_package_forked
             }
             if ($pkgs->{$pkg}{"INSTROOT"}) {
                 # This package build is chrooted.
+                &pkgvar_instroot(&pkgvar_buildroot() . "instroot");
 
+                if ($pkgs->{$pkg}{"INSTROOT_COPY"}) {
+                    my @output;
+
+                    @output = &run_cmd($pkgs->{$pkg}{"INSTROOT_COPY"},
+                                       "$pkgs->{$pkg}{INSTROOT} " . &pkgvar_instroot(), 1);
+                    if ($output[0] != MEZZANINE_SUCCESS) {
+                        wprint "Copy of install root failed.\n";
+                        &pkgvar_instroot($pkgs->{$pkg}{"INSTROOT"});
+                    }
+                }
+            } else {
+                &pkgvar_instroot("");
             }
             $err = &build_single_package($pkg);
             close(LOGFILE) if ($GLOBAL_LOG);
@@ -595,7 +624,8 @@ main
                    "p|prod|product|prodfile=s", "C|cflags=s",
                    "T|tag=s", "nocache", "clean:s", "U|user=s",
                    "i|instroot|jail=s", "H|hints=s",
-                   "hi|hint-installer=s");
+                   "hi|hint-installer=s", "ii|instroot-init=s",
+                   "ir|instroot-reset=s", "ic|instroot-copy=s");
 
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
@@ -605,7 +635,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.161 $ created on $Date: 2003/12/31 11:53:50 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.162 $ created on $Date: 2004/01/05 18:05:23 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -640,7 +670,32 @@ main
     $global_tag = $opt_T;
     &pkgvar_cleanup($opt_clean);
     &pkgvar_target($opt_t);
-    &pkgvar_instroot($opt_i);
+
+    if ($opt_i) {
+        my ($instroot, $instroot_init, $instroot_reset, $instroot_copy);
+
+        $instroot = $opt_i;
+        $instroot_init = $opt_ii;
+        $instroot_reset = $opt_ir;
+        $instroot_copy = $opt_ic;
+
+        &pkgvar_instroot($instroot);
+
+        # Set INSTROOT_* using fallbacks.
+        if ($instroot_init) {
+            &assign_product_variable($prod, "INSTROOT_INIT", $instroot_init);
+        }
+        if ($instroot_reset) {
+            &assign_product_variable($prod, "INSTROOT_RESET", $instroot_reset);
+        } elsif ($instroot_init) {
+            &assign_product_variable($prod, "INSTROOT_RESET", $instroot_init);
+        }
+        if ($instroot_copy) {
+            &assign_product_variable($prod, "INSTROOT_COPY", $instroot_copy);
+        } elsif ($instroot_init) {
+            &assign_product_variable($prod, "INSTROOT_COPY", $instroot_init);
+        }
+    }
 
     # Handle hint file/directory specification
     if ($opt_H) {
@@ -684,7 +739,7 @@ main
     } else {
         $prod = $prodname = &basename(&getcwd());
     }
-    &pkgvar_buildroot($ENV{MEZZANINE_BUILDROOT});
+    &pkgvar_buildroot($ENV{"MEZZANINE_BUILDROOT"});
 
     if (! $opt_clean) {
         $opt_clean = "build";

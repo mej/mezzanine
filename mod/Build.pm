@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.26 2004/01/03 23:17:14 mej Exp $
+# $Id: Build.pm,v 1.27 2004/01/05 18:05:23 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -117,7 +117,7 @@ count_cpus
 sub
 prepare_build_tree
 {
-    my ($name, $topdir, $buildroot, $instroot, $instructions, $rpmmacros, $rpmrc);
+    my ($name, $topdir, $buildroot, $instroot, $instructions, $rpmmacros, $rpmrc, $ret);
     local *RPMMACROS;
     local *RPMRC;
 
@@ -192,13 +192,9 @@ prepare_build_tree
     xpush @my_dirs, $buildroot;
     dprint "I created:  ", join(" ", @my_dirs), "\n";
 
-    if ($instroot) {
-        my $ret;
-
-        $ret = &install_hints();
-        if ($ret) {
-            wprint "Hint installation failed:  $ret\n";
-        }
+    $ret = &install_hints();
+    if ($ret) {
+        wprint "Hint installation failed:  $ret\n";
     }
 
     return ($name, $topdir, $buildroot);

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.17 2003/12/31 19:40:25 mej Exp $
+# $Id: Prod.pm,v 1.18 2004/01/05 18:05:23 mej Exp $
 #
 
 package Mezzanine::Prod;
@@ -38,8 +38,13 @@ BEGIN {
     $VERSION     = 2.1;
 
     @ISA         = ('Exporter');
-    # Exported functions go here
-    @EXPORT      = ('@products', '@packages', '$prods', '$pkgs', '&make_build_dir', '&make_log_dir', '&get_var_name', '&find_product_file', '&parse_product_entry', '&parse_prod_file');
+
+    @EXPORT = ('@products', '@packages', '$prods', '$pkgs',
+               '&make_build_dir', '&make_log_dir', '&get_var_name',
+               '&find_product_file', '&parse_product_entry',
+               '&parse_prod_file', '&assign_product_variable',
+               '&assign_package_variable');
+
     %EXPORT_TAGS = ();
 
     # Exported variables go here
@@ -418,9 +423,6 @@ parse_product_entry
     $pkgs->{$name}{"MODULE"} = $module;
     $pkgs->{$name}{"FILENAME"} = ($filename ? $filename : $module);
     $pkgs->{$name}{"INSTROOT"} = &pkgvar_get("instroot");
-    $pkgs->{$name}{"INSTROOT_INIT"} = &pkgvar_get("instroot_init");
-    $pkgs->{$name}{"INSTROOT_RESET"} = &pkgvar_get("instroot_reset") || $pkgs->{$name}{"INSTROOT_INIT"};
-    $pkgs->{$name}{"INSTROOT_COPY"} = &pkgvar_get("instroot_copy") || $pkgs->{$name}{"INSTROOT_RESET"};
     $pkgs->{$name}{"HINTS"} = &pkgvar_get("hints");
     $pkgs->{$name}{"HINT_INSTALLER"} = &pkgvar_get("hint_installer");
     dprint "New package:  $name (module $pkgs->{$name}{MODULE}, "
@@ -554,6 +556,28 @@ parse_prod_file($$$)
     return (1);
 }
 
+sub
+assign_product_variable
+{
+    my ($prod, $var, $val) = @_;
+
+    $var = &get_var_name($var);
+    dprint "Product variable for $prod:  $var -> $val\n";
+    $prods->{$prod}{$var} = $val;
+    xpush @allvars, $var;
+}
+
+sub
+assign_package_variable
+{
+    my ($pkg, $var, $val) = @_;
+
+    $var = &get_var_name($var);
+    dprint "Package variable for $pkg:  $var -> $val\n";
+    $pkgs->{$pkg}{$var} = $val;
+    xpush @allvars, $var;
+}
+
 ### Private functions
 
 sub
@@ -602,26 +626,6 @@ skip_to_version
         }
     }
     return "";
-}
-
-sub
-assign_product_variable
-{
-    my ($prod, $var, $val) = @_;
-
-    $var = &get_var_name($var);
-    dprint "Product variable for $prod:  $var -> $val\n";
-    $prods->{$prod}{$var} = $val;
-}
-
-sub
-assign_package_variable
-{
-    my ($pkg, $var, $val) = @_;
-
-    $var = &get_var_name($var);
-    dprint "Package variable for $pkg:  $var -> $val\n";
-    $pkgs->{$pkg}{$var} = $val;
 }
 
 1;
