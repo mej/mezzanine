@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.21 2004/03/01 03:10:04 mej Exp $
+# $Id: Prod.pm,v 1.22 2004/03/05 22:26:32 mej Exp $
 #
 
 package Mezzanine::Prod;
@@ -98,6 +98,7 @@ make_build_dir
     if (!chdir($builddir)) {
         &fatal_error("Unable to chdir to build directory -- $!\n");
     }
+    chown($mz_uid, $mz_gid, $builddir);
     dprint "Chose build directory $builddir\n";
     return $builddir;
 }
@@ -114,6 +115,7 @@ make_log_dir
     if (!(-d $logdir || &mkdirhier($logdir, 0755))) {
         &fatal_error("Unable to create log directory -- $!\n");
     }
+    chown($mz_uid, $mz_gid, $logdir);
     dprint "Chose log directory $logdir\n";
     return $logdir;
 }

@@ -324,3 +324,7 @@ Fixed overwriting of old packages with new ones in pkgtool.
 
 Added code for alternative build/log tree layout.
 ----------------------------------------------------------------------
+Fri Mar  5 17:26:11 2004                        Michael Jennings (mej)
+
+The orc-style build tree layout seems to be working.
+----------------------------------------------------------------------

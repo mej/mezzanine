@@ -23,12 +23,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.174 2004/03/01 03:10:04 mej Exp $
+# $Id: buildtool,v 1.175 2004/03/05 22:26:32 mej Exp $
 #
 
 # Include the Perl Modules we need
 use POSIX;
 use Getopt::Long;
+use File::Find;
 use Mezzanine::Util;
 use Mezzanine::RevCtl;
 use Mezzanine::PkgVars;
@@ -50,7 +51,7 @@ my @valid_opts = ("h|help", "v|version", "d|debug", "q|quiet",
                   "U|user=s", "L|location=s", "i|instroot|jail=s",
                   "H|hints=s", "hi|hint-installer=s",
                   "ii|instroot-init=s", "ir|instroot-reset=s",
-                  "ic|instroot-copy=s", "u|user=s");
+                  "ic|instroot-copy=s", "u|user=s", "b|buildtree=s");
 
 # Program variables
 my ($progname, $version, $author, $ret) = ("buildtool", "3.0", "Michael Jennings <mej\@eterm.org>", MEZZANINE_SUCCESS);
@@ -213,7 +214,8 @@ scan_rpm_dirs
     # each binary came from, because some (lame) packages change the base name.
     nprint "Updating state information....\n";
     dprint "Scanning binary RPM's in $topdir/RPMS for their corresponding SRPM's.\n";
-    @contents = glob("$topdir/RPMS/*/*.rpm");
+    #@contents = glob("$topdir/RPMS/*/*.rpm");
+    find({ "wanted" => sub { ! -d $_ && $_ =~ /\.rpm$/ && $_ !~ /src\.rpm$/ && push @contents, $_ }, "no_chdir" => 1 }, $topdir);
     foreach my $rpm (@contents) {
         my $srpm;
 
@@ -237,6 +239,7 @@ build_single_package
     my ($pkgfile, $err, $msg, $outfiles);
 
     # Binaries or not, we need to know the full path and name of the source package.
+    dprintf("Building $pkg in %s.  MOO\n", &pkgvar_topdir());
     &pkgvar_name($pkg);
     if (! ($pkgfile = &pkgvar_filename($pkgs->{$pkg}{MODULE}, $pkgs->{$pkg}{FILENAME}))) {
         &fail_package($pkg, "I don't know what file/module to build from!");
@@ -284,6 +287,7 @@ build_single_package
                 dprintf("Building as %s (%lu:%lu)\n", &pkgvar_get("builduser"), $mz_uid, $mz_gid);
             }
         }
+        dprint "Build tree layout style:  $buildtree_layout\n";
         ($err, $msg, $outfiles) = &build_package();
         if ($err != MEZZANINE_SUCCESS) {
             &fail_package($pkg, $msg);
@@ -330,7 +334,9 @@ build_package_forked
                 #system("chattr +S $logfile");  # Try to set sync on the log file, fail silently
                 open(STDERR, ">&LOGFILE");
                 select LOGFILE; $| = 1;
+                chown($mz_uid, $mz_gid, $logfile);
             }
+            qprintf("Package build of $pkg started.  (%s)\n", &get_timestamp());
             $buildroot = &pkgvar_buildroot();
             if ($buildroot) {
                 &pkgvar_buildroot("$buildroot/$pkg.$$");
@@ -485,8 +491,18 @@ place_package_files
                 # Then link it
                 dprint "ln -f $file $dest\n";
                 if (!link($file, $dest)) {
-                    &fail_package($pkg, "Unable to create $dest as a link to $file -- $!");
-                    return MEZZANINE_SYSTEM_ERROR;
+                    if (exists($!{EXDEV}) && ($!{EXDEV})) {
+                        # Cross-device link attempt.  Copy instead.
+                        if (&copy_files($file, $dest) != 1) {
+                            &fail_package($pkg, "Unable to create $dest as a link to $file -- $!");
+                            return MEZZANINE_SYSTEM_ERROR;
+                        } else {
+                            dprint "Can't link across devices; had to copy.\n";
+                        }
+                    } else {
+                        &fail_package($pkg, "Unable to create $dest as a link to $file -- $!");
+                        return MEZZANINE_SYSTEM_ERROR;
+                    }
                 }
             }
 
@@ -510,9 +526,9 @@ parallel_build
 
     # Create the directories for building this product
     if ($buildtree_layout eq "orc") {
-        $builddir = &make_build_dir((($ENV{"MEZZANINE_BUILDDIR"}) ?
-                                     ($ENV{"MEZZANINE_BUILDDIR"}) :
-                                     (&getcwd() . "/build.mezz")));
+        $builddir = (($ENV{"MEZZANINE_BUILDDIR"}) ?
+                     ($ENV{"MEZZANINE_BUILDDIR"}) :
+                     (&getcwd() . "/build.mezz"));
         $logdir = $builddir;
         &pkgvar_topdir($builddir);
     } else {
@@ -522,10 +538,11 @@ parallel_build
         $logdir = &make_log_dir((($ENV{"MEZZANINE_LOGDIR"}) ?
                                  ($ENV{"MEZZANINE_LOGDIR"}) : ("$builddir/logs")));
         &pkgvar_topdir($builddir);
+
+        # Need to do this here for parallel builds because it's not parallel-safe.  Race condition. :(
+        &prepare_build_tree();
     }
 
-    # Need to do this here for parallel builds because it's not parallel-safe.  Race condition. :(
-    &prepare_build_tree();
 
     if (! $opt_nocache) {
         &scan_rpm_dirs();
@@ -541,24 +558,32 @@ parallel_build
 
         # As long as there are packages left to build or children left to wait on, we loop.
         for (; scalar(@packages) && (scalar(@children) < $num_cpus);) {
-            my ($pkg, $logfile);
+            my ($pkg, $logfile, $save_builddir);
 
             # Spawn child processes until we fill up our allotment ($num_cpus)
             $pkg = shift @packages;
+            if ($pkgs->{$pkg}{"BUILDUSER"}) {
+                &file_owner($pkgs->{$pkg}{"BUILDUSER"}, "", "");
+            }
             if ($buildtree_layout eq "orc") {
                 my $dirname;
 
-                $dirname = sprintf("/%s-%s-%s", $pkg, %pkgs->{$pkg}{"VERSION"},
+                $dirname = sprintf("/%s-%s-%s", $pkg, $pkgs->{$pkg}{"VERSION"},
                                    $pkgs->{$pkg}{"RELEASE"});
+                $save_builddir = $builddir;
                 $builddir .= $dirname;
                 &make_build_dir($builddir);
                 $logdir = $builddir;
                 &pkgvar_topdir($builddir);
-            }
+                &pkgvar_set("buildpkglist_filename", "$logdir/$pkg.pkglist");
+            } 
             $logfile = "$logdir/$pkg.log";
             $pid = &build_package_forked($pkg, $logfile);
             push @children, $pid;
             $child_pkg{$pid} = $pkg;
+            if ($save_builddir) {
+                $builddir = $save_builddir;
+            }
         }
 
         # Okay, we can't build anything more right now.  Print some status info.
@@ -589,12 +614,22 @@ parallel_build
             # Yay! :-)
             &complete_package($pkg);
         } else {
+            my $logfile;
             my @tmp;
             local *ERRLOG;
 
             # Doh, it failed.  Look through the log file to try and find the problem.
-            if (!open(ERRLOG, "$logdir/$pkg.log")) {
-                &fail_package($pkg, "Child process returned $err but the log file is missing");
+            if ($buildtree_layout eq "orc") {
+                my $dirname;
+
+                $dirname = sprintf("/%s-%s-%s", $pkg, $pkgs->{$pkg}{"VERSION"},
+                                   $pkgs->{$pkg}{"RELEASE"});
+                $logfile = "$builddir$dirname/$pkg.log";
+            } else {
+                $logfile = "$logdir/$pkg.log";
+            }
+            if (!open(ERRLOG, $logfile)) {
+                &fail_package($pkg, "Child process returned $err but log file $logfile is missing");
                 next;
             }
             @tmp = <ERRLOG>;
@@ -627,9 +662,9 @@ build_product
 
     # Create the directories for building this product
     if ($buildtree_layout eq "orc") {
-        $builddir = &make_build_dir((($ENV{"MEZZANINE_BUILDDIR"}) ?
-                                     ($ENV{"MEZZANINE_BUILDDIR"}) :
-                                     (&getcwd() . "/build.mezz")));
+        $builddir = (($ENV{"MEZZANINE_BUILDDIR"}) ?
+                     ($ENV{"MEZZANINE_BUILDDIR"}) :
+                     (&getcwd() . "/build.mezz"));
         $logdir = $builddir;
         &pkgvar_topdir($builddir);
     } else {
@@ -656,12 +691,13 @@ build_product
         if ($buildtree_layout eq "orc") {
             my $dirname;
 
-            $dirname = sprintf("/%s-%s-%s", $pkg, %pkgs->{$pkg}{"VERSION"},
+            $dirname = sprintf("/%s-%s-%s", $pkg, $pkgs->{$pkg}{"VERSION"},
                                $pkgs->{$pkg}{"RELEASE"});
-            $builddir .= $dirname;
+            $builddir = &pkgvar_topdir() . $dirname;
             &make_build_dir($builddir);
             $logdir = $builddir;
             &pkgvar_topdir($builddir);
+            &pkgvar_set("buildpkglist_filename", "$logdir/$pkg.pkglist");
         }
         &build_single_package($pkg);
         &pkgvar_reset(%preserve_pkg_vars);
@@ -730,7 +766,7 @@ main
     #
     if ($opt_v) {
         &print_version($progname, $version, $author,
-                       'CVS Revision $Revision: 1.174 $ created on $Date: 2004/03/01 03:10:04 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.175 $ created on $Date: 2004/03/05 22:26:32 $ by $Author: mej $ ');
         # Never returns
     }
     if ($opt_h) {

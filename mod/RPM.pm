@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.24 2004/03/01 03:10:04 mej Exp $
+# $Id: RPM.pm,v 1.25 2004/03/05 22:26:32 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -123,7 +123,7 @@ rpm_form_command
         if (&pkgvar_architecture()) {
             $cmd .= " --target='" . &pkgvar_architecture() . "'";
         }
-    } elsif ($type eq "install") {
+    } elsif ($type eq "install" || $type eq "buildpkglist") {
         if (&pkgvar_instroot()) {
             $cmd .= " --root='" . &pkgvar_instroot() . "'";
         }
@@ -163,6 +163,8 @@ rpm_form_command
         } else {
             $cmd .= " -a";
         }
+    } elsif ($type eq "buildpkglist") {
+        $cmd .= " -qa --qf '%25{NAME} %10{EPOCH} %15{VERSION} %15{RELEASE}\n' | sort -bf";
     }
     $cmd .= "\"";
 
@@ -207,8 +209,8 @@ parse_spec_file
         } else {
             #dprint "Parsing from $specfile, line $.: \"$line\"\n";
         }
-        if ($line =~ /^\%(prep|build|install|clean|changelog|trigger|triggerpostun|triggerun|triggerin|verifyscript)\s*$/
-            || $line =~ /^\%(package|preun|pre|postun|post|files|description)(\s+\w+)?$/) {
+        if ($line =~ /^\%(prep|build|install|clean|changelog|trigger|triggerpostun|triggerun|triggerin|verifyscript)\s+/
+            || $line =~ /^\%(package|preun|pre|postun|post|files|description)\s+/) {
             my $param = $2;
 
             $stage = $1;
@@ -459,13 +461,38 @@ rpm_build()
     my (@failed_deps, @not_found, @spec_errors, @out_files);
     local *CMD;
 
+    if (&pkgvar_get("buildpkglist_filename")) {
+        my $outfile = &pkgvar_get("buildpkglist_filename");
+        local *PKGLIST;
+
+        dprint "Saving package list to $outfile.\n";
+        if (open(PKGLIST, ">$outfile")) {
+            $cmd = &rpm_form_command("buildpkglist");
+            if (!open(CMD, "$cmd </dev/null 2>&1 |")) {
+                eprint "Execution of \"$cmd\" failed -- $!\n";
+                return MEZZANINE_COMMAND_FAILED;
+            }
+            while (<CMD>) {
+                #dprint "Got package list item:  $_";
+                print PKGLIST $_;
+            }
+            close(CMD);
+            close(PKGLIST);
+            chown($mz_uid, $mz_gid, $outfile);
+            &pkgvar_command("");
+        } else {
+            eprint "Unable to write to \"$outfile\" -- $!\n";
+        }
+    } else {
+        dprint "Not saving package list; no file given.\n";
+    }
     $cmd = &rpm_form_command("build");
-    $err = $msg = 0;
+    $err = MEZZANINE_SUCCESS;
+    $msg = 0;
     if (!open(CMD, "$cmd </dev/null 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
         return MEZZANINE_COMMAND_FAILED;
     }
-    $err = MEZZANINE_SUCCESS;
     while (<CMD>) {
         chomp($line = $_);
         print "$line\n";

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.32 2004/01/26 20:46:10 mej Exp $
+# $Id: Build.pm,v 1.33 2004/03/05 22:26:32 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -450,8 +450,10 @@ cleanup_build_tree
         push(@dirs, "$topdir/BUILD", "$topdir/SOURCES", "$topdir/SRPMS", "$topdir/RPMS", "$topdir/SPECS") if ($topdir);
         push(@dirs, "$instroot$topdir/BUILD", "$instroot$topdir/SOURCES", "$instroot$topdir/SRPMS",
              "$instroot$topdir/RPMS", "$instroot$topdir/SPECS") if ("$instroot$topdir");
-    } elsif ($type =~ /(build)?root/) {
+    } elsif ($type =~ /buildroot/) {
         push(@dirs, $buildroot) if ($buildroot);
+    } elsif ($type =~ /instroot/) {
+        push(@dirs, $instroot) if ($instroot);
     } elsif ($type =~ /build/) {
         push(@dirs, "$topdir/BUILD", "$topdir/SOURCES", "$topdir/SRPMS", "$topdir/RPMS", "$topdir/SPECS") if ($topdir);
         push(@dirs, "$instroot$topdir/BUILD", "$instroot$topdir/SOURCES", "$instroot$topdir/SRPMS",

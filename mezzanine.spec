@@ -1,7 +1,7 @@
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
 Version: 1.6
-Release: 0.19
+Release: 0.22
 Copyright: BSD
 Group: Development/Tools
 Source: %{name}.tar.gz
@@ -9,7 +9,7 @@ BuildRoot: /tmp/%{name}-%{version}-root
 Packager: Michael Jennings <mej@kainx.org>
 Vendor: KainX.Org (http://www.kainx.org/)
 URL: http://www.kainx.org/mezzanine/
-Requires: perl, perl(Net::FTP), perl(Cwd), perl(POSIX), perl(File::Copy), perl(Getopt::Long)
+Requires: perl, perl(Net::FTP), perl(Cwd), perl(POSIX), perl(File::Copy), perl(Getopt::Long), perl(File::Find)
 BuildRequires: docbook-style-dsssl
 BuildArch: noarch
 

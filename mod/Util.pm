@@ -21,11 +21,12 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.28 2004/03/01 03:10:04 mej Exp $
+# $Id: Util.pm,v 1.29 2004/03/05 22:26:32 mej Exp $
 #
 
 package Mezzanine::Util;
 use strict;
+use vars '$debug', '$progname', '$mz_uid', '$mz_gid';
 use English;
 
 BEGIN {
@@ -80,10 +81,10 @@ use vars ('@EXPORT_OK');
 ### Private global variables
 
 ### Initialize exported package variables
-my $debug = 0;
-my $progname = "Mezzanine";
-my $mz_uid = $UID;
-my $mz_gid = $GID;
+$debug = 0;
+$progname = "Mezzanine";
+$mz_uid = $UID;
+$mz_gid = $GID;
 $mz_gid =~ s/\s+.*$//;
 
 ### Initialize private global variables
@@ -424,6 +425,9 @@ mkdirhier($$)
     my @dirs = split("/", $dir);
     my $path = "";
 
+    if (-d $dir) {
+        return 1;
+    }
     if (!defined($mask)) {
         $mask = 0755;
     }
@@ -441,6 +445,7 @@ mkdirhier($$)
         dprint "Something went wrong in mkdirhier()!\n";
         return 0;
     } else {
+        dprint "Created $_[0] for $mz_uid:$mz_gid.\n";
         return 1;
     }
 }
@@ -504,6 +509,10 @@ move_files
         # Save permissions of the source file.
         $mode = ((stat($f))->mode() & 0775) || 0600;
 
+        if (! -l $target) {
+            unlink($target);
+        }
+        &mkdirhier(&dirname($target));
         if (!&File::Copy::move($f, $target)) {
             eprint "Unable to move $f to $target -- $!\n";
             return $fcnt;
@@ -551,6 +560,10 @@ copy_files
         # Save permissions of the source file.
         $mode = ((stat($f))->mode() & 0775) || 0600;
 
+        if (! -l $target) {
+            unlink($target);
+        }
+        &mkdirhier(&dirname($target));
         if (!&File::Copy::copy($f, $target)) {
             eprint "Unable to copy $f to $target -- $!.  Copied $fcnt files.\n";
             return $fcnt;
