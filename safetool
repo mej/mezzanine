@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: safetool,v 1.3 2000/07/19 20:26:35 mej Exp $
+# $Id: safetool,v 1.4 2000/07/20 01:16:57 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -149,12 +149,15 @@ main
 
     # Do the work
     ($fake_prog = $0) =~ s/^.*\/([^\/]+)$/$1/;
+    lprint "Called for $fake_prog:  $0 \"", join("\" \"", @ARGV), "\"\n";
+
     if ($fake_prog =~ /install$/) {
         @args = &parse_options_for_install(@ARGV);
     } else {
         @args = &parse_options_generic(@ARGV);
     }
 
+    print "\n";
     close(LOGFILE);
     if ($#args >= 0) {
         return (system($fake_prog, @args) >> 8);

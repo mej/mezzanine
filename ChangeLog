@@ -706,3 +706,7 @@ Wed Jul 19 13:33:29 2000                        Michael Jennings (mej)
 New, smarter safetool, done in Perl.  Hopefully this will help our
 space issues.
 ----------------------------------------------------------------------
+Wed Jul 19 18:23:51 2000                        Michael Jennings (mej)
+
+Clean things up a touch in the log file.
+----------------------------------------------------------------------
