@@ -958,3 +958,8 @@ Thu Dec 21 15:23:15 2000                        Michael Jennings (mej)
 
 Addition from Walt.
 ----------------------------------------------------------------------
+Wed Jan  3 18:31:08 2001                        Michael Jennings (mej)
+
+Lots of work on the design document.  Also, hopefully, a real fix for
+the RPATH problem.  Here comes beta 8....
+----------------------------------------------------------------------

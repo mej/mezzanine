@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: build_system_design.txt,v 1.2 2000/12/21 23:24:24 mej Exp $
+#  $Id: build_system_design.txt,v 1.3 2001/01/04 02:31:50 mej Exp $
 #
 ########################################################################
 
@@ -18,6 +18,8 @@ servers, scripts, etc., which are used in concert to create software
 products.  Avalon refers to the set of custom tools which simplify and
 streamline the process of using the Build System and are generally
 considered a part, though not the whole, of the Build System itself.
+However, since so much of the Build System is implemented in Avalon,
+the terms may be used somewhat interchangeably.
 
 1.  PROJECT GOALS AND REQUIREMENTS
 ----------------------------------
@@ -53,4 +55,147 @@ product.  Anything else is simply a benefit, not a necessity.
    without requiring an update of the master repository.  In other
    words, changes must be able to be tested prior to being pushed to
    the master server.
+
+2.  BUILD SYSTEM TOOLS AND COMPONENTS
+-------------------------------------
+
+Facilitation and satisfaction of the above design goals will require a
+complete system composed of many individual pieces working in
+concert.  Almost all of these pieces, except for those which are
+provided by outside sources, will be engineered as part of Avalon, the
+build system toolkit.
+
+2.1.  Source Code Management
+----------------------------
+
+The backbone of any good software management system is source code
+control.  There are many choices, of varying degrees of quality,
+supportability, and functionality, including CVS, RCS, SCCS,
+BitKeeper, Aegis, and ClearCase.  The Build System is designed in such
+a way as to minimalize dependency on any one source code management
+system.  However, for various reasons, it has been designed thus far
+for use with CVS.  Therefore, a CVS server will be present on the
+build server.  This CVS server will be responsible for containing all
+build system files in a revision-controlled environment.
+
+For simplicity, this document may refer to the CVS server rather than
+trying to come up with an acronym that isn't the name of one of the
+above systems.  If you choose to use a different backend for your
+repository, make appropriate substitutions where necessary.
+
+2.2.  Repository Interaction
+----------------------------
+
+In order to retrieve software packages from the master repository,
+Avalon will have to provide some mechanism for interacting with that
+repository for purposes of package retrieval and package management.
+
+All direct interaction with the master repository will be encapsulated
+by a single tool, known as revtool, whose interface will be generic
+enough to be applicable to any source code management system.  Should
+it be determined that CVS is no longer the ideal choice for the back
+end, the inner workings of revtool would require modification to
+"talk the new language," so to speak, but its external interface (and
+by extension, all other Avalon tools) would remain unchanged.
+
+The following tasks will be accomplished via revtool:
+ - retrieving data from the master repository
+ - committing changes to the master repository
+ - generating diffs by querying the master repository
+ - tagging particular changes or changesets in the master repository
+
+Additional tasks may also be performed by revtool to provide a more
+complete interface for developers to a particular source code system,
+but any functionality not listed here is not critical to proper
+operation of the build environment and is therefore subject to changes
+in interface, syntax, etc.
+
+2.3.  Package Management
+------------------------
+
+In order to simplify working with individual package files, as well as
+to facilitate some level of package portability between differing
+packaging systems, Avalon will employ an encapsulation layer, in the
+form of a program called pkgtool, for managing package files directly.
+The approach for this tool is analogous to that of revtool; i.e., the
+interface should be consistent regardless of package type, and should
+be generic enough to be applicable to an arbitrary package format.
+Initially, only RPM support is required; however, pkgtool will be
+written in such a way as to be extensible in the future to work with
+other package types (notably DEB's).
+
+The following tasks will be accomplished via pkgtool:
+ - building binary packages from a source package or equivalent
+ - install packages, with or without a virtual root
+ - examine the contents of a package
+ - identify dependencies of a package
+ - generate source package from a repository module
+
+Additional tasks may also be performed by pkgtool to provide a more
+complete interface to the various package management tasks, but any
+functionality not listed here is not critical to proper operation of
+the build environment and is therefore subject to changes in
+interface, syntax, etc.
+
+2.4.  Package Maintenance
+-------------------------
+
+Since the most efficient and most feasible way to store and manage
+packages is not necessarily the most efficient way of actually making
+changes to and working with those packages, Avalon will provide a
+source management tool, srctool, to automate many of the routine tasks
+performed by package maintainers.  This program will fulfill several
+requirements of the build system not directly addressed by the
+back-end implementation.
+
+The following tasks will be accomplished via srctool:
+ - importing source packages into the repository
+ - adding, removing, and altering patches
+ - resynchronizing patches with current source
+ - generating patches based on new changes
+ - preparing a module for active development
+
+Since srctool is a developer utility and will not be used directly by
+any other build system component, its interface will be geared toward
+developer simplicity but may change as needed.
+
+2.5.  Product Creation
+----------------------
+
+The culminating force of the build system is the piece that creates
+the end result -- products.  Avalon employs a single program,
+buildtool, which takes product description files ("prod files") and
+creates products from their component packages based on the
+information in those files.  It will utilize the other Avalon
+components to perform this task.
+
+The sole purpose of buildtool is to create products from individual
+packages.  However, it should be as flexible as possible in doing so,
+leaving as much flexibility in the hands of the developer as it can.
+Specifically, builds should be distributable and parallelizable.
+
+2.6.  Additional Utilities
+--------------------------
+
+Over time, extemporaneous tools will be added to Avalon as specific
+needs arise.  These tools are not a part of the build system proper,
+since they are not specifically a part of managing generic software
+products, but are nonetheless used in the ongoing maintenance of the
+distribution specifically.
+
+Existing utilities which fall into this category include:
+ - compstool - A script for sanity-checking RH comps files
+ - imgtool - Creates chrooted install images and tarballs
+ - pkgsort - Sorts packages and creates list/prod files
+ - redhat-*-cdtool - Scripts for creating RH install CD's
+ - safetool - Enforces instroot's
+ - websync - Updates the web site with the latest build
+
+
+3.  IMPLEMENTATION DETAILS
+--------------------------
+
+
+4.  HIGH-LEVEL PROCESS OVERVIEW
+-------------------------------
 
