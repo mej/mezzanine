@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.51 2000/06/13 03:30:14 mej Exp $
+# $Id: buildtool,v 1.52 2000/06/13 04:59:02 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1057,17 +1057,14 @@ do_bootstrap_stage
             local *SL;
 
             if (open(SL, "$filename/.buildtool.symlinks")) {
-                my $cwd;
-
-                chomp($cwd = `pwd`);
                 while (<SL>) {
-                    my $link_from, $link_to, $line;
+                    my ($link_from, $link_to, $line);
 
                     chomp($line = $_);
                     next if ($line =~ /^\s*\#/ || $line !~ / -> /);
                     ($link_from, $link_to) = split(" -> ", $line);
                     dprint "Creating symlink:  $link_from -> $link_to\n";
-                    if (!symlink($link_to, $link_from)) {
+                    if (!symlink($link_to, "$filename/$link_from")) {
                         qprint "Warning:  Unable to symlink $link_from to $link_to -- $!\n";
                     }
                 }
@@ -1762,7 +1759,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.51 $ created on $Date: 2000/06/13 03:30:14 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.52 $ created on $Date: 2000/06/13 04:59:02 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
