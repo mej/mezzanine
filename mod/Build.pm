@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.11 2001/08/03 03:08:07 mej Exp $
+# $Id: Build.pm,v 1.12 2001/08/09 22:04:46 mej Exp $
 #
 
 package Avalon::Build;
@@ -374,7 +374,7 @@ build_topdir
 {
     my ($specfile, $topdir, $buildroot, $target_format) = @_;
 
-    dprint &print_args(@_), "\n";
+    dprint &print_args(@_);
 
     if ($target_format eq "rpms") {
         return &build_rpms_from_topdir($specfile, $topdir, $buildroot);
@@ -401,7 +401,7 @@ build_spm
     my $specfile;
     my (@tmp, @tmp2);
 
-    dprint &print_args(@_), "\n";
+    dprint &print_args(@_);
 
     if (! -d "F") {
         &show_backtrace();
@@ -440,7 +440,7 @@ build_cfst
     my ($err, $msg, $cmd, $make, $pkgdir, $outfiles);
     local *MAKE;
 
-    dprint &print_args(@_), "\n";
+    dprint &print_args(@_);
 
     if (!(-f "Makefile.avalon" && -s _)) {
         &show_backtrace();
@@ -448,6 +448,7 @@ build_cfst
     }
     &prepare_build_tree($pkg, $topdir, $buildroot);
 
+    $pkgdir = "$topdir/RPMS";
     $make = "make -f Makefile.avalon";
     $cmd = "$make $target_format BUILD_DIR=$topdir BUILD_ROOT=$buildroot RPMRC=$buildroot/$pkg-rpmrc PKG_DIR=$pkgdir";
 
@@ -498,7 +499,7 @@ build_fst
     my ($specfile, $cmd, $ret);
     my (@srcs, @tmp);
 
-    dprint &print_args(@_), "\n";
+    dprint &print_args(@_);
 
     # Look for the build instructions (spec file, debian/ directory, etc.)
     if ($target_format eq "rpms") {
@@ -508,16 +509,19 @@ build_fst
     } else {
         @tmp = &grepdir(sub {/spec(\.in)?$/ || ($_ =~ m/debian/ && -d $_)});
     }
+    dprint @tmp, "\n";
     if (!scalar(@tmp)) {
         return (AVALON_MISSING_FILES, "I'm sorry, but \"$pkg\" doesn't seem to have instructions for building $target_format", undef);
     }
+
+    &prepare_build_tree($pkg, $topdir, $buildroot);
     $specfile = $tmp[0];
     if (! &copy($specfile, "$topdir/SPECS/")) {
         return (AVALON_SYSTEM_ERROR, "Unable to copy $specfile to $topdir/SPECS/ -- $!\n", undef);
     }
     # Get ready to build, figure out what sources we need, and create them all.
-    &prepare_build_tree($pkg, $topdir, $buildroot);
     @srcs = &get_source_list($specfile, ".", undef);
+    dprint @srcs, "\n";
     $ret = &create_source_files("$topdir/SOURCES", "", "", \@srcs);
     if ($ret != AVALON_SUCCESS) {
         return ($ret, "Creation of source files failed", undef);
@@ -536,7 +540,7 @@ build_srpm
     my $err;
     my (@tmp, @specs);
 
-    dprint &print_args(@_), "\n";
+    dprint &print_args(@_);
 
     &prepare_build_tree($pkg, $topdir, $buildroot);
     @tmp = &rpm_show_contents($pkg);
@@ -569,7 +573,7 @@ build_tarball
     my ($pkg, $topdir, $buildroot, $target_format) = @_;
     my $cmd;
 
-    dprint &print_args(@_), "\n";
+    dprint &print_args(@_);
 
     if ($target_format eq "rpms") {
         return &build_rpms_from_tarball($pkg, $topdir, $buildroot);
@@ -587,13 +591,12 @@ build_package
     my $pwd;
     my @ret;
 
-    dprint &print_args(@_), "\n";
+    dprint &print_args(@_);
 
     $pwd = &getcwd();
 
     if ($target_format =~ /rpm/i) {
         $target_format = "rpms";
-        $pkgdir = "$topdir/RPMS";
     } elsif ($target_format =~ /deb/i) {
         $target_format = "debs";
     } else {
