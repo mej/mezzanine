@@ -3,7 +3,7 @@
 #
 #  Written by:  Michael Jennings
 #
-#  $Id: todo_list.txt,v 1.10 2001/03/21 07:53:31 mej Exp $
+#  $Id: todo_list.txt,v 1.11 2001/03/22 02:36:17 mej Exp $
 #
 ########################################################################
 
@@ -18,7 +18,7 @@ New Tools [19/46]
  - For manipulating source packages (srctool) [13/32]
     + Explode and import SRPM's into SPM's [1/4]
     + Import FST's [1/3]
-    - Prepare working tree [2/5]
+    + Prepare working tree [2/5]
     - Generate new patches [2/4]
     - Resync patches [2/5]
     - Add/remove/modify patches [4/7]
