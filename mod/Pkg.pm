@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.4 2001/04/17 03:20:47 mej Exp $
+# $Id: Pkg.pm,v 1.5 2001/06/08 23:40:50 mej Exp $
 #
 
 package Avalon::Pkgtool;
@@ -36,7 +36,7 @@ BEGIN {
 
     @ISA         = ('Exporter');
     # Exported functions go here
-    @EXPORT      = ('$specdata', '&parse_spec_file');
+    @EXPORT      = ('$specdata', '&parse_spec_file', '&parse_srcs_file');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -53,6 +53,7 @@ $specdata = 0;
 
 ### Function prototypes
 sub parse_spec_file($$);
+sub parse_srcs_file($);
 
 # Private functions
 sub add_define($$);
@@ -168,6 +169,38 @@ parse_spec_file($$)
         }
     }
     return $specdata;
+}
+
+# Parse the avalon.srcs file inside a module.
+sub
+parse_srcs_file($)
+{
+    my $filename = $_[0];
+    my $srcs;
+    local *SRCSFILE;
+
+    # Read the entire file into a string, converting newlines to commas.
+    open(SRCSFILE, $filename) || return 0;
+    $srcs = join(',', <SRCSFILE>);
+    close(SRCSFILE);
+
+    dprint "Pre-parse SRCS variable:  $srcs\n";
+
+    # Eliminate whitespace around colons and commas, and condense duplicates
+    $srcs =~ s/\s*:+\s*/:/g;
+    $srcs =~ s/\s*,+\s*/,/g;
+
+    # Eliminate leading and trailing whitespace
+    $srcs =~ s/^\s*//;
+    $srcs =~ s/\s*$//;
+
+    # All remaining whitespace should separate source files/directories, so
+    # replace it all with ampersands
+    $srcs =~ s/\s+/&/g;
+
+    dprint "Post-parse SRCS variable:  $srcs\n";
+
+    return split(',', $srcs);
 }
 
 ### Private functions

@@ -1246,3 +1246,14 @@ Added sample Makefile.avalon and update buildtool manpage to reference
 it.
 
 ----------------------------------------------------------------------
+Fri Jun  8 16:38:58 2001                        Michael Jennings (mej)
+
+Fixed in-place building of packages to leave RPM's in the current
+directory.
+
+Fixed avtag and avrtag so you don't need the -t/-T options.
+
+Moved the SRCS info to the avalon.srcs file for in-place builds.
+
+Fixed revtool's login routine to only login if required.
+----------------------------------------------------------------------

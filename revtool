@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.69 2001/05/29 19:23:39 mej Exp $
+# $Id: revtool,v 1.70 2001/06/08 23:40:50 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -79,23 +79,23 @@ check_tag
     # The regexp's below enforce the following tag rules:
     #   1. Branch tags must begin with a branch key, hypen, the package name, hyphen, e.g. VA-KERNEL-
     #   2. Non-branch tags are the same, but without the branch key at the beginning, e.g. KERNEL-
-    #   3. Tags must contain only uppercase characters and hyphens.  Note that this rule is more
-    #      restrictive than CVS's own rules but is enforced for standards compliance.
+    #   3. Tags must contain only uppercase characters, underscores, and hyphens.  Note that this
+    #      rule is more restrictive than CVS's own rules but is enforced for standards compliance.
     #   4. Product tags are only subject to rule #3.
 
     if ($tag !~ /^[-_A-Z0-9]+$/) {
-        dprint "Tag $tag failed character constraint check.\n";
+        eprint "Tag $tag failed character constraint check.  Tags may only contain the following:  A-Z, 0-9, -, and _.\n";
         return 0;
     }
     if (! $ptag) {
         if ($opt_b) {
             if ($tag !~ /^([A-Z]+)-$module-/) {
-                dprint "Tag $tag failed branch name check.\n";
+                eprint "Tag $tag failed branch name check.  Branch tags must begin with the branch tag prefix.\n";
                 return 0;
             }
         } else {
             if ($tag !~ /^$module-/) {
-                dprint "Tag $tag failed name check.\n";
+                eprint "Tag $tag failed name check.  Tags should be in the form MODULE-VERSION-RELEASE (e.g., FOO-2_0_3-1).\n";
                 return 0;
             }
         }
@@ -289,15 +289,7 @@ login_to_master
     my ($cmd, $line, $pass, $err, $msg, $found);
     local (*CMD, *CVSPASS);
 
-    if (-t STDIN) {
-        $cmd = "/bin/sh -c \"cvs -d $login login\"";
-        $err = &talk_to_server("login", $cmd);
-        if ($err) {
-            return 0;
-        }
-    } else {
-        dprint "Performing automated login with an empty password.\n";
-        open(CVSPASS, "$ENV{HOME}/.cvspass") || return 0;
+    if (open(CVSPASS, "$ENV{HOME}/.cvspass")) {
         $found = 0;
         while (<CVSPASS>) {
             chomp($line = $_);
@@ -309,12 +301,20 @@ login_to_master
         close(CVSPASS);
         if ($found) {
             dprint "Login not required.\n";
-        } else {
-            dprint "Login not found.  Adding cvspass entry.\n";
-            open(CVSPASS, ">> $ENV{HOME}/.cvspass");
-            print CVSPASS "$login A\n";
-            close(CVSPASS);
+            return 1;
         }
+    }
+    if (-t STDIN) {
+        $cmd = "/bin/sh -c \"cvs -d $login login\"";
+        $err = &talk_to_server("login", $cmd);
+        if ($err) {
+            return 0;
+        }
+    } else {
+        dprint "Performing automated login with an empty password.\n";
+        open(CVSPASS, ">> $ENV{HOME}/.cvspass");
+        print CVSPASS "$login A\n";
+        close(CVSPASS);
     }
     return 1;
 }
@@ -839,7 +839,7 @@ BEGIN {
     } elsif ($0 =~ /diff$/) {
 	$mode = "query";
 	$query = 'd';
-    } elsif ($0 =~ /status$/) {
+    } elsif ($0 =~ /stat(us)?$/) {
 	$mode = "query";
 	$query = 's';
     } elsif ($0 =~ /log$/) {
@@ -884,8 +884,16 @@ BEGIN {
         $mode = "login";
     }
     $cvsroot = "-d $opt_D" if ($opt_D);
-    $tag = $opt_t;
-    $rtag = $opt_T;
+    if ($opt_t) {
+        $tag = $opt_t;
+    } elsif ($mode eq "tag") {
+        $tag = shift @ARGV;
+    }
+    if ($opt_T) {
+        $rtag = $opt_T;
+    } elsif ($mode eq "rtag") {
+        $rtag = shift @ARGV;
+    }
     $ptag = ($opt_ptag ? ($tag ? $tag : $rtag) : $opt_ptag);
     dprint "Debugging is on, mode is $mode, CVSROOT is $cvsroot, tag is $tag, rtag is $rtag\n";
     if ($opt_l) {
@@ -899,7 +907,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.69 $ created on $Date: 2001/05/29 19:23:39 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.70 $ created on $Date: 2001/06/08 23:40:50 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -1,6 +1,6 @@
 %define name     avalon
 %define ver      2.0
-%define rel      5
+%define rel      6
 %define prefix   /usr
 
 Summary: Avalon -- The VA Software Engineering Build System
@@ -48,7 +48,7 @@ done
 
 (
   cd $RPM_BUILD_ROOT%{_bindir}
-  for i in get co put ci info add new rm purge rtag tag reset login diff status log ; do
+  for i in get co put ci info add new rm purge rtag tag reset login diff stat status log ; do
     ln -s revtool av$i
     echo ".so revtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/av$i.1
   done

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.140 2001/05/11 16:04:32 drummond Exp $
+# $Id: buildtool,v 1.141 2001/06/08 23:40:49 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -258,7 +258,7 @@ place_file
 
     dprint "place_file(\"$pkg\", \"$file\") called.\n";
     if (!defined($pkgs->{$pkg}{LOCATIONS})) {
-        $pkgs->{$pkg}{LOCATIONS} = "/./:$builddir";
+        $pkgs->{$pkg}{LOCATIONS} = "/./:$basedir";
     }
 
     foreach $location (split(",", $pkgs->{$pkg}{LOCATIONS})) {
@@ -1278,7 +1278,7 @@ do_component_stage
             ### If everything is there, skip this stage for this package.
             if (! $err) {
                 nprint "$progname:  SRPM has already been completely exploded.\n";
-                nprint "$progname:  Explode stage for \"$pkg\" is complete.\n";
+                nprint "$progname:  Component stage for \"$pkg\" is complete.\n";
                 next;
             }
 
@@ -1799,7 +1799,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.140 $ created on $Date: 2001/05/11 16:04:32 $ by $Author: drummond $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.141 $ created on $Date: 2001/06/08 23:40:49 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1902,13 +1902,10 @@ main
     } else {
         my $cwd = &getcwd();
 
-	dprint "No product info on commnand-line\n";
-
         $prod = $prodname = &basename($cwd);
-        $basedir = $builddir = &dirname($cwd);
-	dprint "prod = $prod\n";
-	dprint "basedir = $basedir\n";
-	dprint "builddir = $builddir\n";
+        $basedir = $cwd;
+        $builddir = &dirname($cwd);
+	dprint "No product specified.  Assuming product \"$prod\" with base dir $basedir and build dir $builddir\n";
     }
     $buildroot = ($ENV{BUILDROOT} ? $ENV{BUILDROOT} : "/var/tmp/buildtool.$$");
     qprint "$progname:  Building product:  $prodname", ($prodver ? " $prodver" : ""), "\n";
@@ -1927,7 +1924,8 @@ main
 
         ($err, $msg) = &fetch_package("$revtool -g products");
         if ($err) {
-            eprint "Unable to find/download products directory -- $msg.  This could be bad.\n";
+            eprint "Unable to find/download products directory -- $msg.\n";
+            eprint "I may not have sufficient information to build $prodname.  This could be bad.\n";
         }
     }
 
