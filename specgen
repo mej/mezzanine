@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: specgen,v 1.3 2004/03/26 21:31:20 mej Exp $
+# $Id: specgen,v 1.4 2004/05/10 14:47:00 mej Exp $
 #
 
 use strict;
@@ -243,7 +243,7 @@ scan_package(\%)
 
         ### Scan for signs of package type.
         if (! $OPTION{"template"}) {
-            if (grep { $_ =~ /^configure\.(ac|in)$/ } @filelist) {
+            if (grep { $_ =~ /^configure(\.ac|\.in)?$/ } @filelist) {
                 $template->file("GNU-autosplat.spec");
             } elsif (grep { $_ eq "Imakefile" } @filelist) {
                 $template->file("imake.spec");
@@ -294,7 +294,7 @@ scan_package(\%)
     }
 
     chdir($savecwd);
-    &clean_temp_space();
+    &clean_temp_space($tmpdir);
 }
 
 sub
@@ -369,7 +369,7 @@ main
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.3 $ created on $Date: 2004/03/26 21:31:20 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.4 $ created on $Date: 2004/05/10 14:47:00 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || !scalar(@ARGV)) {
 	&print_usage_info();
     }

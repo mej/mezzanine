@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.183 2004/04/20 02:57:37 mej Exp $
+# $Id: buildtool,v 1.184 2004/05/10 14:46:59 mej Exp $
 #
 
 use strict;
@@ -40,6 +40,7 @@ use Mezzanine::Src;
 use Mezzanine::Pkg;
 use Mezzanine::Build;
 use Mezzanine::Prod;
+use Mezzanine::Instroot;
 
 my $GLOBAL_LOG = 0;  # Overall log file for product build
 my $verbosity = 2;  # Logging verbosity
@@ -51,8 +52,9 @@ my $prod = "";
 my $failure;
 my @failed_pkgs;
 my @completed_pkgs;
-my $num_cpus;
+my $num_processes;
 my $num_built = 0;
+my @instroot_pool;
 
 # RPM/SRPM cache data.
 my $rpm_cache;
@@ -171,6 +173,14 @@ is_build_needed
     my @stat1;
     my @srpm_matches;
 
+    if ($config->get("REBUILD")) {
+        return 1;
+    } else {
+        foreach my $key ($config->keys()) {
+            dprintf("Got config key %s with value %s.\n", $key, $config->get($key));
+        }
+    }
+
     $pkg = &pkgvar_name();
     if (!$pkg) {
         dprint "Doh!  is_build_needed() called with no package name set.  I suck!\n";
@@ -206,9 +216,7 @@ is_build_needed
 
         dprint "Checking $srpm...\n";
         @stat2 = stat($srpm);
-        if ($OPTION{"rebuild"}) {
-            ### Allow rebuild of older successful packages as sanity check.
-        } elsif ($stat2[9] >= $stat1[9]) {
+        if ($stat2[9] >= $stat1[9]) {
             # SRPM is newer than (or the same age as) the file/module.  Skip it.
             dprint "$srpm is newer than $pkgfile; no need to build.\n";
             &pkgvar_filename($srpm);
@@ -464,25 +472,21 @@ build_package_forked
             if ($buildroot) {
                 &pkgvar_buildroot("$buildroot/$pkg.$$");
             } else {
-                &pkgvar_buildroot("/var/tmp/mezzanine-buildroot.$$");
+                &pkgvar_buildroot(&create_temp_space($pkg, "dironly"));
             }
             if ($pkgs->{$pkg}{"INSTROOT"}) {
                 # This package build is chrooted.
-                &pkgvar_instroot(&pkgvar_buildroot() . "/instroot");
-                &mkdirhier(&pkgvar_instroot());
 
-                if ($pkgs->{$pkg}{"INSTROOT_COPY"}) {
-                    # Copy COPY command to INIT so that we only use it if the build is needed.
-                    $pkgs->{$pkg}{"INSTROOT_INIT"} = $pkgs->{$pkg}{"INSTROOT_COPY"} . ' ' . $pkgs->{$pkg}{"INSTROOT"};
-                    $pkgs->{$pkg}{"INSTROOT"} = &pkgvar_instroot();
-                }
+                &pkgvar_instroot($pkgs->{$pkg}{"INSTROOT"});
+                $pkgs->{$pkg}{"INSTROOT_RESET"} = "true";
             } else {
                 &pkgvar_instroot("");
             }
             $err = &build_single_package($pkg);
             &cleanup_build_tree();
             if (&pkgvar_instroot() && -d &pkgvar_instroot()) {
-                &nuke_tree(&pkgvar_instroot());
+                ### Not here.  We use the pool now.
+                ### &nuke_tree(&pkgvar_instroot());
             }
             if (&pkgvar_buildroot() && -d &pkgvar_buildroot()) {
                 &nuke_tree(&pkgvar_buildroot());
@@ -698,15 +702,26 @@ parallel_build
     &download_packages(@packages);
     &update_package_list(\@packages);
 
-    qprint "$PROGNAME:  Beginning $num_cpus-way build of ${\(scalar(@packages))} packages.  (${\(&get_timestamp())})\n";
+    if ($config->get("INSTROOT")) {
+        for (my $i = 0; $i < $num_processes; $i++) {
+            $instroot_pool[$i] = Mezzanine::Instroot->new(
+                                                          "SOURCE" => $config->get("INSTROOT"),
+                                                          "INIT" => $config->get("INSTROOT_INIT"),
+                                                          "RESET" => $config->get("INSTROOT_RESET")
+                                                         );
+            $instroot_pool[$i]->init();
+        }
+    }
+
+    qprint "$PROGNAME:  Beginning $num_processes-way build of ${\(scalar(@packages))} packages.  (${\(&get_timestamp())})\n";
     for (; scalar(@packages) || scalar(@children);) {
         my ($pid, $line, $left, $failed, $bldg, $err, $pkg);
 
         # As long as there are packages left to build or children left to wait on, we loop.
-        for (; scalar(@packages) && (scalar(@children) < $num_cpus);) {
+        for (; scalar(@packages) && (scalar(@children) < $num_processes);) {
             my ($logfile, $save_builddir);
 
-            # Spawn child processes until we fill up our allotment ($num_cpus)
+            # Spawn child processes until we fill up our allotment ($num_processes)
             $pkg = shift @packages;
             if ($pkgs->{$pkg}{"BUILDUSER"}) {
                 &file_owner($pkgs->{$pkg}{"BUILDUSER"}, "", "");
@@ -721,7 +736,21 @@ parallel_build
                 $logdir = $builddir;
                 &pkgvar_topdir($builddir);
                 &pkgvar_set("buildpkglist_filename", "$logdir/$pkg.pkglist");
-            } 
+            }
+            if ($pkgs->{$pkg}{"INSTROOT"}) {
+                foreach my $ir (@instroot_pool) {
+                    if ($ir->status() eq "available") {
+                        $pkgs->{$pkg}{"INSTROOT"} = $ir->path();
+                        $ir->use();
+                        last;
+                    } elsif ($ir->status() eq "dirty") {
+                        $ir->reset();
+                        $pkgs->{$pkg}{"INSTROOT"} = $ir->path();
+                        $ir->use();
+                        last;
+                    }
+                }
+            }
             $logfile = "$logdir/$pkg.log";
             $pid = &build_package_forked($pkg, $logfile);
             push @children, $pid;
@@ -802,6 +831,19 @@ parallel_build
                 &fail_package($pkg, "Error $err (log file $logfile is empty)");
             }
         }
+        # Return its instroot to the pool, if needed.
+        if ($pkgs->{$pkg}{"INSTROOT"} && -d $pkgs->{$pkg}{"INSTROOT"}) {
+            foreach my $ir (@instroot_pool) {
+                if ($ir->path() eq $pkgs->{$pkg}{"INSTROOT"}) {
+                    if ($err == MEZZANINE_BUILD_UNNEEDED) {
+                        $ir->release_clean();
+                    } else {
+                        $ir->release();
+                    }
+                    last;
+                }
+            }
+        }
         # End of loop.  Time to spawn the next child.
     }
     &cleanup_build_tree();
@@ -875,7 +917,8 @@ build_product
 sub
 summarize_failures
 {
-    my ($ns, $nf, $nt, $nb, $face);
+    my ($ns, $nf, $nt, $nb, $face, $summary_file);
+    local *SUMMARY;
 
     # $ns is the number of successful packages.  $nf is the number of failures.
     # $nt is the total number of packages we tried to build.
@@ -896,13 +939,30 @@ summarize_failures
         $face = ":-|";
     }
 
+    if ($config->get("LOGFILE")) {
+        $summary_file = $config->get("LOGFILE") . ".summary";
+    } else {
+        $summary_file = &getcwd() . "/$PROGNAME.summary";
+    }
+    if (!open(SUMMARY, ">$summary_file")) {
+        $summary_file = "";
+    }
     qprint "Build Summary:  $ns Successful    $nf Failed    $nb Not Built    $nt Total    $face\n";
+    if ($summary_file) {
+        print SUMMARY "Build Summary:  $ns Successful    $nf Failed    $nb Not Built    $nt Total    $face\n";
+    }
     if ($nf) {
         foreach my $pkg (@failed_pkgs) {
             if ($failure->{$pkg}{MESSAGE}) {
                 eprint "Package \"$pkg\" failed:  $failure->{$pkg}{MESSAGE}.\n";
+                if ($summary_file) {
+                    print SUMMARY "Package \"$pkg\" failed:  $failure->{$pkg}{MESSAGE}.\n";
+                }
             } else {
                 eprint "Package \"$pkg\" failed; reason unknown.  Check the log to see what went wrong.\n";
+                if ($summary_file) {
+                    print SUMMARY "Package \"$pkg\" failed; reason unknown.  Check the log to see what went wrong.\n";
+                }
             }
         }
     }
@@ -927,7 +987,7 @@ main
                "savecfg|save-config");
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.183 $ created on $Date: 2004/04/20 02:57:37 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.184 $ created on $Date: 2004/05/10 14:46:59 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
@@ -940,9 +1000,6 @@ main
     }
 
     # Set basic options
-    if (defined($OPTION{"debug"})) {
-        $config->set("DEBUG", $OPTION{"debug"});
-    }
     &debug_set($config->set("DEBUG", $OPTION{"debug"} || $config->get("DEBUG") || 0));
     $verbosity = $config->get("VERBOSITY") || 2;
     if ($OPTION{"silent"}) {
@@ -957,6 +1014,10 @@ main
     $buildtree_layout = $config->set("BUILDTREE_LAYOUT", $OPTION{"buildtree"} || $config->get("BUILDTREE_LAYOUT") || "mej");
     $config->set("CLEAN", &pkgvar_cleanup($OPTION{"clean"} || $config->get("CLEAN") || $config->get("BUILDTREE_LAYOUT")));
     $config->set("TARGET", &pkgvar_target($OPTION{"target"} || $config->get("TARGET") || ""));
+    $config->set("REBUILD", $OPTION{"rebuild"} || $config->get("REBUILD") || 0);
+    if (! $config->get("REBUILD")) {
+        ### &fatal_error("Rebuild is " . $config->get("REBUILD"));
+    }
 
     # Open log file, if any.
     $config->set("LOGFILE", $OPTION{"log"} || $config->get("LOGFILE") || "");
@@ -994,19 +1055,19 @@ main
         $OPTION{"parallel"} = $config->get("PARALLELIZE");
     }
     if (defined($OPTION{"parallel"})) {
-        $num_cpus = &count_cpus();
+        $num_processes = &count_cpus();
         if ($OPTION{"parallel"}) {
             my ($mult, $add) = (1, 0);
 
             $OPTION{"parallel"} =~ m/^(?:[Xx]([\d.]+))?([-+][\d.]+)?$/;
             ($mult, $add) = ($1, $2);
-            $num_cpus = $num_cpus * ($mult ? $mult : 1) + ($add ? $add : 0);
+            $num_processes = $num_processes * ($mult ? $mult : 1) + ($add ? $add : 0);
         }
         $config->set("PARALLELIZE", $OPTION{"parallel"});
     } else {
-        $num_cpus = 1;
+        $num_processes = 1;
     }
-    dprint "Using $num_cpus parallel process(es).\n";
+    dprint "Using $num_processes parallel process(es).\n";
 
     # Try to parse the product name we were given into a name or a name-version combo
     if ($OPTION{"prod"}) {
@@ -1068,7 +1129,7 @@ main
                                                                          $config->get("INSTROOT_SOURCE_RSYNC")));
             }
             if (! $instroot_copy) {
-                $instroot_copy = $config->set("INSTROOT_RESET", "rsync -Ha --delete --delete-after");
+                $instroot_copy = $config->set("INSTROOT_COPY", "rsync -Ha --delete --delete-after");
             }
         }
 
@@ -1133,7 +1194,7 @@ main
 
     dprint "Products to be built (", scalar(@packages), " packages):  ", join(" ", @products), "\n";
 
-    if ($num_cpus > 1) {
+    if ($num_processes > 1) {
         $ret = &parallel_build(@packages);
     } else {
         $ret = &build_product(@packages);

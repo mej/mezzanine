@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.18 2004/03/26 21:31:20 mej Exp $
+# $Id: Src.pm,v 1.19 2004/05/10 14:47:00 mej Exp $
 #
 
 package Mezzanine::Src;
@@ -46,8 +46,7 @@ BEGIN {
     @EXPORT = ('$WORK_DIR', '&find_files', '&find_subdirs',
                '&generate_symlink_file', '&install_spm_files',
                '&create_temp_space', '&clean_temp_space',
-               '&convert_srpm_to_spm', '&convert_srpm_to_pdr',
-               '&run_cmd', '&run_mz_cmd');
+               '&convert_srpm_to_spm', '&convert_srpm_to_pdr');
 
     %EXPORT_TAGS = ( );
 
@@ -72,8 +71,6 @@ sub generate_symlink_file($);
 sub install_spm_files($);
 sub convert_srpm_to_spm($$);
 sub convert_srpm_to_pdr($$);
-sub run_cmd($$$);
-sub run_mz_cmd($$$);
 
 # Private functions
 
@@ -257,59 +254,6 @@ convert_srpm_to_pdr($)
         return MEZZANINE_COMMAND_FAILED;
     }
     return MEZZANINE_SUCCESS;
-}
-
-# Generic wrapper to grab command output
-sub
-run_cmd($$$)
-{
-    my ($prog, $params, $show_output) = @_;
-    my ($err, $msg, $line, $cmd) = undef;
-    my @output;
-    local *CMD;
-
-    $cmd = "$prog $params";
-
-    dprint "About to run $cmd\n";
-    if (!open(CMD, "$cmd 2>&1 |")) {
-        return (-1, "Execution of \"$cmd\" failed -- $!");
-    }
-    while (<CMD>) {
-        chomp($line = $_);
-        $line =~ s/^.*\r//g;
-        push @output, $line;
-        if ($show_output) {
-            print "$show_output$line\n";
-        } else {
-            dprint "From $prog -> $line\n";
-        }
-    }
-    close(CMD);
-    $err = $? >> 8;
-    dprint "\"$cmd\" returned $err\n";
-    return ($err, @output);
-}
-
-# Wrapper for Mezzanine commands specifically
-sub
-run_mz_cmd($$$)
-{
-    my ($prog, $params, $show_output) = @_;
-    my ($err, $msg, $line, $cmd) = undef;
-    my (@output, @tmp);
-
-    $params = "--debug $params" if ($debug);
-    @output = &run_cmd($prog, $params, $show_output);
-    $err = shift @output;
-    if ($err) {
-        my @tmp;
-
-        @tmp = grep(/^\w+:\s*error:\s*(\S.*)$/i, @output);
-        if (scalar(@tmp)) {
-            $msg = $tmp[$#tmp];
-        }
-    }
-    return ($err, ($show_output ? $msg : @output));
 }
 
 ### Private functions

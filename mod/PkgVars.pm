@@ -126,6 +126,8 @@ END {
 sub
 pkgvar_get($)
 {
+    dprintf("Package variable \"%s\" -> \"%s\"\n", $_[0],
+            (($pkgvars{$_[0]}) ? ($pkgvars{$_[0]}) : ("")));
     return $pkg_vars{$_[0]};
 }
 
@@ -158,6 +160,7 @@ pkgvar_set(%)
             $pkg_vars{$var} = ($param ?  $param : $orig_pkg_vars{$var});
         }
         $ret = $pkg_vars{$var};
+        dprint "Package variable \"$var\" -> \"$ret\"\n";
     }
     return $ret;
 }

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.27 2004/04/15 00:25:43 mej Exp $
+# $Id: RPM.pm,v 1.28 2004/05/10 14:47:00 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -684,7 +684,7 @@ replace_defines($)
             #reset;
         } else {
             #dprint "Definition not found.\n";
-            $line =~ s/\%\{$var\}//g;
+            $line =~ s/\%\{\Q$var\E\}//g;
         }
     }
     return $line;

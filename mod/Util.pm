@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.35 2004/05/10 14:39:43 mej Exp $
+# $Id: Util.pm,v 1.36 2004/05/10 14:47:00 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -43,23 +43,22 @@ BEGIN {
     @ISA         = ('Exporter');
 
     @EXPORT = ('$debug', '$PROGNAME', '$VERSION', '$mz_uid',
-               '$mz_gid', '$TMP_DIR', '%OPTION', '&mezz_init',
-               '&debug_get', '&debug_set', '&print_version',
-               '&file_user', '&file_group', '&file_owner',
-               '&get_timestamp', '&fatal_error', '&dprintf',
-               '&dprint', '&eprintf', '&eprint', '&wprintf',
-               '&wprint', '&handle_signal', '&handle_fatal_signal',
-               '&install_signal_handlers', '&handle_warning',
-               '&show_backtrace', '&print_args', '&mkdirhier',
-               '&nuke_tree', '&move_files', '&copy_files',
-               '&copy_tree', '&create_temp_space',
+               '$mz_gid', '%OPTION', '&mezz_init', '&debug_get',
+               '&debug_set', '&print_version', '&file_user',
+               '&file_group', '&file_owner', '&get_timestamp',
+               '&fatal_error', '&dprintf', '&dprint', '&eprintf',
+               '&eprint', '&wprintf', '&wprint', '&handle_signal',
+               '&handle_fatal_signal', '&install_signal_handlers',
+               '&handle_warning', '&show_backtrace', '&print_args',
+               '&mkdirhier', '&nuke_tree', '&move_files',
+               '&copy_files', '&copy_tree', '&create_temp_space',
                '&clean_temp_space', '&basename', '&dirname',
                '&grepdir', '&limit_files', '&xpush', '&cat_file',
                '&parse_rpm_name', '&should_ignore', '&touch_file',
-               '&MEZZANINE_SUCCESS', '&MEZZANINE_FATAL_ERROR',
-               '&MEZZANINE_SYNTAX_ERROR', '&MEZZANINE_SYSTEM_ERROR',
-               '&MEZZANINE_COMMAND_FAILED', '&MEZZANINE_DUPLICATE',
-               '&MEZZANINE_FILE_NOT_FOUND',
+               '&run_cmd', '&run_mz_cmd', '&MEZZANINE_SUCCESS',
+               '&MEZZANINE_FATAL_ERROR', '&MEZZANINE_SYNTAX_ERROR',
+               '&MEZZANINE_SYSTEM_ERROR', '&MEZZANINE_COMMAND_FAILED',
+               '&MEZZANINE_DUPLICATE', '&MEZZANINE_FILE_NOT_FOUND',
                '&MEZZANINE_FILE_OP_FAILED',
                '&MEZZANINE_ACCESS_DENIED', '&MEZZANINE_BAD_ADDITION',
                '&MEZZANINE_BAD_LOG_ENTRY', '&MEZZANINE_BAD_LOGIN',
@@ -92,14 +91,6 @@ $VERSION = "0.0";
 $mz_uid = $UID;
 ($mz_gid = $GID) =~ s/\s+.*$//;
 %OPTION = ();
-
-$TMP_DIR = "/var/tmp/mezzanine.$$";
-foreach my $var ("MEZZANINE_TMP", "MEZZANINE_TEMP", "MEZZANINE_TEMPDIR", "MEZZANINE_TMPDIR", "TEMP", "TMP", "TMPPATH") {
-    if ($ENV{$var} && -d $ENV{$var} && -w _) {
-        $TMP_DIR = "$ENV{$var}/mezzanine.$$";
-        last;
-    }
-}
 
 ### Initialize private global variables
 
@@ -710,9 +701,21 @@ create_temp_space($$$)
     my @dirlist;
 
     if (! $tmpdir) {
-        $tmpdir = $TMP_DIR;
+        foreach my $var ("MEZZANINE_TMP", "MEZZANINE_TEMP", "MEZZANINE_TEMPDIR", "MEZZANINE_TMPDIR", "TEMP", "TMP", "TMPPATH") {
+            if ($ENV{$var} && -d $ENV{$var} && -w _) {
+                $tmpdir = "$ENV{$var}/mezzanine.$$";
+                last;
+            }
+        }
+        if (! $tmpdir) {
+            $tmpdir = sprintf("/var/tmp/mezzanine.%d.%04x", $$, rand(32767));
+        }
     }
-    $dir = "$tmpdir/$pkg";
+    if ($pkg) {
+        $dir = "$tmpdir/$pkg";
+    } else {
+        $dir = $tmpdir;
+    }
     dprint "Creating $type temp space in $dir.\n";
     &nuke_tree($dir);
     &mkdirhier($dir) || return "";
@@ -736,8 +739,11 @@ create_temp_space($$$)
 sub
 clean_temp_space($)
 {
-    my $tmpdir = $_[0] || $TMP_DIR;
+    my $tmpdir = $_[0];
 
+    if (! $tmpdir) {
+        return;
+    }
     dprint "Cleaning temp space in $tmpdir.\n";
     return &nuke_tree($tmpdir);
 }
@@ -864,6 +870,59 @@ touch_file($)
 
     open(TMP, ">$file") && close(TMP);
     chown($mz_uid, $mz_gid, $file);
+}
+
+# Generic wrapper to grab command output
+sub
+run_cmd($$$)
+{
+    my ($prog, $params, $show_output) = @_;
+    my ($err, $msg, $line, $cmd) = undef;
+    my @output;
+    local *CMD;
+
+    $cmd = "$prog $params";
+
+    dprint "About to run $cmd\n";
+    if (!open(CMD, "$cmd 2>&1 |")) {
+        return (-1, "Execution of \"$cmd\" failed -- $!");
+    }
+    while (<CMD>) {
+        chomp($line = $_);
+        $line =~ s/^.*\r//g;
+        push @output, $line;
+        if ($show_output) {
+            print "$show_output$line\n";
+        } else {
+            dprint "From $prog -> $line\n";
+        }
+    }
+    close(CMD);
+    $err = $? >> 8;
+    dprint "\"$cmd\" returned $err\n";
+    return ($err, @output);
+}
+
+# Wrapper for Mezzanine commands specifically
+sub
+run_mz_cmd($$$)
+{
+    my ($prog, $params, $show_output) = @_;
+    my ($err, $msg, $line, $cmd) = undef;
+    my (@output, @tmp);
+
+    $params = "--debug $params" if ($debug);
+    @output = &run_cmd($prog, $params, $show_output);
+    $err = shift @output;
+    if ($err) {
+        my @tmp;
+
+        @tmp = grep(/^\w+:\s*error:\s*(\S.*)$/i, @output);
+        if (scalar(@tmp)) {
+            $msg = $tmp[$#tmp];
+        }
+    }
+    return ($err, ($show_output ? $msg : @output));
 }
 
 1;
