@@ -1361,3 +1361,7 @@ Mon Aug 13 17:02:57 2001                        Michael Jennings (mej)
 Packages can now have their own product files which are picked up by
 the build.
 ----------------------------------------------------------------------
+Mon Aug 13 17:25:35 2001                        Michael Jennings (mej)
+
+Finalized the 0.8 version by making sure pkgtool groks "avbuild."
+----------------------------------------------------------------------
