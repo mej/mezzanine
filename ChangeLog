@@ -630,3 +630,7 @@ Tue Jul 11 20:59:40 2000                        Michael Jennings (mej)
 
 Added the -C/--cflags option to buildtool for setting $CFLAGS.
 ----------------------------------------------------------------------
+Wed Jul 12 14:40:17 2000                        Michael Jennings (mej)
+
+Making the boss happy.  Default flags are now "-O2 -march=pentiumpro".
+----------------------------------------------------------------------
