@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.4 2000/05/06 06:44:26 mej Exp $
+# $Id: revtool,v 1.5 2000/05/06 06:48:11 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -96,7 +96,7 @@ commit_to_master {
     system($ENV{"EDITOR"} ? $ENV{"EDITOR"} : "vi", $logfile);
     open(LOGFILE, "<$logfile");
     open(CL, ">>ChangeLog");
-    while (<CL>) {
+    while (<LOGFILE>) {
         print CL $_;
     }
     print CL "------------------------------------------------------------\n";
