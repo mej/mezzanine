@@ -281,3 +281,8 @@ Mon Jun  5 22:26:40 2000                        Michael Jennings (mej)
 Fixed a bug with revtool -g and added the ability to query for a list
 of tags on a file (revtool -qt).  pkgtool will need this.
 ----------------------------------------------------------------------
+Tue Jun  6 12:05:15 2000                        Michael Jennings (mej)
+
+Fixed a buildtool bug with binary RPM packages and changed the entry
+for XFree in the product file.
+----------------------------------------------------------------------
