@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.146 2001/07/20 20:29:35 mej Exp $
+# $Id: buildtool,v 1.147 2001/07/25 02:57:32 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -33,7 +33,7 @@ use Cwd;
 use Avalon::Util;
 use Avalon::Src;
 use Avalon::Pkg;
-#use Avalon::Build;
+use Avalon::Build;
 use Avalon::Prod;
 
 # Print usage information
@@ -87,10 +87,6 @@ spawn_cmd
             return $pid;
         } elsif (defined $pid) {
             # Child -- reset state as needed and jump to build process
-            $opt_f = 0;
-            $verbosity = 0;
-            $slave = 1;
-            $master = 0;
             close $GLOBAL_LOG if ($GLOBAL_LOG);
             open(STDOUT, ">/dev/null");
             open(STDIN, "</dev/null");
@@ -102,11 +98,6 @@ spawn_cmd
                 open(STDERR, ">&LOGFILE");
                 select LOGFILE; $| = 1;
             }
-	    # Reduce the package list to just one package.  Then we can proceed
-	    # without having to incur the performance penalty of an exec().
-            @packages = ($pkg);
-            @failed_pkgs = ();
-            &build_process();
             close(LOGFILE) if ($GLOBAL_LOG);
             exit (AVALON_SUCCESS);
         } elsif ($! !~ /No more processes/ && $! !~ /Resource temporarily unavailable/) {
@@ -181,21 +172,9 @@ do_package_stage
     my @p;
     local *DIR;
 
-    if ($#_ >= 0) {
-        @p = @_;
-    } else {
-        @p = @packages;
-    }
-
-    ### The package accumulation stage is where the output files (source and binary RPM's) from the
-    ### build stage are copied (technically, linked) into their proper locations within image modules.
-    qprint "$progname:  Entering the package accumulation stage.  (${\(&get_timestamp())})\n";
+    @p = @packages;
 
     foreach $pkg (@p) {
-        if ($pkgs->{$pkg}{STAGES} !~ /p/) {
-            nprint "$progname:  Skipping package accumulation stage for the \"$pkg\" package.\n";
-            next;
-        }
         nprint "$progname:  Starting package accumulation stage for the \"$pkg\" package....\n";
         $type = $pkgs->{$pkg}{TYPE};
         $version = $pkgs->{$pkg}{VERSION};
@@ -388,27 +367,6 @@ parallel_build
     qprint "$progname:  Parallel build complete.  (${\(&get_timestamp())})\n";
 }
 
-# This routine does the actual build process
-sub
-build_process
-{
-    # Perform the build in stages, checking after each one to see if we should stop
-    &do_bootstrap_stage() if ($start_stage eq "s");
-    return if ($end_stage eq "s" || $#packages == -1);
-
-    if ($master) {
-        &parallel_build();
-    } else {
-        &do_component_stage() if ("sc" =~ /$start_stage/);
-        return if ($end_stage eq "c");
-
-        &do_build_stage() if ("scb" =~ /$start_stage/);
-        return if ($end_stage eq "b");
-
-        &do_package_stage();
-    }
-}
-
 # main() here is basically the same as main() in C
 sub
 main
@@ -433,7 +391,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.146 $ created on $Date: 2001/07/20 20:29:35 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.147 $ created on $Date: 2001/07/25 02:57:32 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

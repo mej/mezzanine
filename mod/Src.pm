@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.6 2001/07/18 22:47:49 mej Exp $
+# $Id: Src.pm,v 1.7 2001/07/25 02:57:32 mej Exp $
 #
 
 package Avalon::Src;
@@ -34,7 +34,7 @@ BEGIN {
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
-    $VERSION     = 2.0;
+    $VERSION     = 2.1;
 
     @ISA         = ('Exporter');
     # Exported functions go here

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.2 2001/07/20 20:29:35 mej Exp $
+# $Id: Prod.pm,v 1.3 2001/07/25 02:57:32 mej Exp $
 #
 
 package Avalon::Prod;
@@ -32,7 +32,7 @@ BEGIN {
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
-    $VERSION     = 2.0;
+    $VERSION     = 2.1;
 
     @ISA         = ('Exporter');
     # Exported functions go here
@@ -50,9 +50,13 @@ use vars ('@EXPORT_OK');
 $prods = undef;
 $pkgs = undef;
 $failure = undef;
+@products = ();
+@packages = ();
+@failed_pkgs = ();
 
 ### Initialize private global variables
 $proddir = ".";
+@allvars = ();
 
 ### Function prototypes
 sub get_var_name($);
@@ -215,6 +219,8 @@ find_product_file
         ($prodfile = "$proddir/$prodname-$prodver") =~ s/(\.prod)?$/.prod/;
         if (-f $prodfile) {
             return $prodfile;
+        } elsif (defined($ENV{AVALON_PRODUCTS}) && -f "$ENV{AVALON_PRODUCTS}/$prodfile") {
+            return "$ENV{AVALON_PRODUCTS}/$prodfile";
         }
     }
 
@@ -222,6 +228,8 @@ find_product_file
     ($prodfile = "$proddir/$prodname") =~ s/(\.prod)?$/.prod/;
     if (-f $prodfile) {
         return $prodfile;
+    } elsif (defined($ENV{AVALON_PRODUCTS}) && -f "$ENV{AVALON_PRODUCTS}/$prodfile") {
+        return "$ENV{AVALON_PRODUCTS}/$prodfile";
     }
 
     # Give up.  It doesn't exist.
@@ -448,6 +456,7 @@ parse_product_entry
     foreach $pkgvar (keys %pkgvars) {
         if ($pkgvars{$pkgvar} !~ /^$/) {
             $pkgs->{$name}{$pkgvar} = $pkgvars{$pkgvar};
+            xpush(@allvars, $var);
             dprint "parse_product_entry():  Added variable $pkgvar to package $name with value \"$pkgs->{$name}{$pkgvar}\"\n";
         }
     }
@@ -459,7 +468,7 @@ parse_product_entry
     # FIXME:  Perhaps these shouldn't be hard-coded.  Perhaps we should keep a list of
     #         all package/product variables we've encountered thus far and iterate
     #         through those only, since we're guaranteed no others will have a fallback.
-    foreach $pkgvar ("TAG", "LOCATIONS", "CVSROOT") {
+    foreach $pkgvar (@allvars) {
         if (! $pkgs->{$name}{$pkgvar}) {
             my ($pkg, $val) = undef;
 
@@ -507,6 +516,7 @@ parse_prod_file($$$)
 
     # Ignore everything until we encounter a product name
     ($skip_to_name, $skip_to_next_ver, $found) = (1, 0, 0); 
+    @allvars = ();
     while (<PROD>) {
         chomp($line = $_);
         dprint "parse_prod_file():  Parsing $prodfile:  \"$line\"\n";
@@ -569,7 +579,6 @@ parse_prod_file($$$)
     close(PROD);
     return ($found);
 }
-
 
 ### Private functions
 
