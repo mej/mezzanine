@@ -21,22 +21,20 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.37 2004/05/10 14:52:17 mej Exp $
+# $Id: Util.pm,v 1.38 2004/06/04 17:16:40 mej Exp $
 #
 
 package Mezzanine::Util;
-use strict;
-use vars '$debug', '$PROGNAME', '$VERSION', '$mz_uid', '$mz_gid', '$TMP_DIR', '%OPTION';
+use Exporter;
+use POSIX;
 use English;
 use Getopt::Long;
+use File::Copy;
+use File::stat;
+use vars '$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS',
+    '$debug', '$PROGNAME', '$VERSION', '$mz_uid', '$mz_gid', '%OPTION';
 
 BEGIN {
-    use strict;
-    use Exporter   ();
-    use File::Copy;
-    use File::stat;
-    use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
-
     # set the version for version checking
     $VERSION     = 2.1;
 
@@ -72,7 +70,8 @@ BEGIN {
                '&MEZZANINE_ARCH_MISMATCH', '&MEZZANINE_BAD_MODULE',
                '&MEZZANINE_BUILD_FAILURE', '&MEZZANINE_DEPENDENCIES',
                '&MEZZANINE_MISSING_FILES', '&MEZZANINE_SPEC_ERRORS',
-               '&MEZZANINE_MISSING_PKGS', '&MEZZANINE_TERMINATED',
+               '&MEZZANINE_MISSING_PKGS',
+               '&MEZZANINE_INVALID_PACKAGE', '&MEZZANINE_TERMINATED',
                '&MEZZANINE_CRASHED', '&MEZZANINE_UNSPECIFIED_ERROR');
 
     %EXPORT_TAGS = ( );
@@ -180,6 +179,9 @@ sub MEZZANINE_SPEC_ERRORS()        {66;}
 
 # compstool-related errors
 sub MEZZANINE_MISSING_PKGS()       {81;}
+
+# srctool-related errors
+sub MEZZANINE_INVALID_PACKAGE()    {100;}
 
 # Abnormal errors
 sub MEZZANINE_TERMINATED()        {120;}
@@ -499,7 +501,7 @@ mkdirhier($$)
         $mask = 0755;
     }
     #dprint "mkdirhier($dir) called.\n";
-    foreach $dir (@dirs) {
+    foreach my $dir (@dirs) {
         $path .= "$dir/";
         if (! -d $path) {
             #dprint "Creating \"$path\"\n";
@@ -726,7 +728,7 @@ create_temp_space($$$)
     } elsif ($type eq "build") {
 	@dirlist = ("BUILD", "SOURCES", "SRPMS", "RPMS", "SPECS");
     }
-    foreach $d (@dirlist) {
+    foreach my $d (@dirlist) {
 	if (!&mkdirhier("$dir/$d")) {
 	    eprint "Creation of $dir/$d failed -- $!\n";
 	    return "";

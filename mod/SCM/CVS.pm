@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: CVS.pm,v 1.1 2004/04/07 18:24:40 mej Exp $
+# $Id: CVS.pm,v 1.2 2004/06/04 17:16:40 mej Exp $
 #
 
 package Mezzanine::SCM::CVS;
@@ -70,10 +70,14 @@ can_handle($)
     my $path = shift;
 
     dprint "CVS::can_handle():  $proto $class $path\n";
-    return 1;
+    if ((-d "$path/CVS") && (-f "$path/CVS/Repository")
+        && (-f "$path/CVS/Root") && (-f "$path/CVS/Entries")) {
+        return 1;
+    } else {
+        return 0;
+    }
 }
 
 
-### Private functions
 
 1;

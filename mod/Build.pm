@@ -21,26 +21,25 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.39 2004/04/20 02:57:37 mej Exp $
+# $Id: Build.pm,v 1.40 2004/06/04 17:16:40 mej Exp $
 #
 
 package Mezzanine::Build;
+use strict;
+use Exporter;
+use POSIX;
+use File::Copy;
+use Mezzanine::Util;
+use Mezzanine::PkgVars;
+use Mezzanine::Pkg;
+use Mezzanine::Src;
+use Mezzanine::RPM;
+use Mezzanine::Deb;
+use Mezzanine::Tar;
+use Mezzanine::Prod;
+use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
 BEGIN {
-    use strict;
-    use Exporter   ();
-    use Cwd;
-    use File::Copy;
-    use Mezzanine::Util;
-    use Mezzanine::PkgVars;
-    use Mezzanine::Pkg;
-    use Mezzanine::Src;
-    use Mezzanine::RPM;
-    use Mezzanine::Deb;
-    use Mezzanine::Tar;
-    use Mezzanine::Prod;
-    use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
-
     # set the version for version checking
     $VERSION     = 2.1;
 
@@ -64,7 +63,7 @@ BEGIN {
 use vars ('@EXPORT_OK');
 
 ### Private global variables
-@my_dirs = ();
+my @my_dirs = ();
 
 ### Initialize exported package variables
 
@@ -301,7 +300,8 @@ sub
 install_deps($)
 {
     my $deps = $_[0];
-    my $inst;
+    my ($inst, $err);
+    my @tmp;
 
     if (! $deps) {
         dprint "Nothing to do.\n";
@@ -402,6 +402,8 @@ create_source_file
             return MEZZANINE_COMMAND_FAILED;
         }
         while (<CMD>) {
+            my $line;
+
             chomp($line = $_);
             print "tar output -> $line\n";
         }
@@ -754,6 +756,8 @@ build_cfst
     }
     $err = 0;
     while (<MAKE>) {
+        my $line;
+
         chomp($line = $_);
         dprint "$line\n";
         if ($line =~ /^make[^:]*:\s+\*\*\*\s+(.*)$/ && ! $msg) {
@@ -790,12 +794,13 @@ build_cfst
 sub
 build_fst
 {
-    my ($specfile, $cmd, $ret, $topdir, $buildroot, $instroot, $target_format);
+    my ($specfile, $cmd, $ret, $topdir, $buildroot, $instroot, $target_format, $pkgdir, $pkg);
     my (@srcs, @tmp);
 
     dprint &print_args(@_);
 
     &prepare_build_tree();
+    $pkg = &pkgvar_name();
     $topdir = &pkgvar_topdir();
     $buildroot = &pkgvar_buildroot();
     $instroot = &pkgvar_instroot();
@@ -926,6 +931,7 @@ sub
 build_tarball
 {
     my ($target_format, $cmd);
+    my $pkg = &pkgvar_name();
 
     dprint &print_args(@_);
 

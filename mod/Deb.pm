@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Deb.pm,v 1.5 2003/12/30 23:02:55 mej Exp $
+# $Id: Deb.pm,v 1.6 2004/06/04 17:16:40 mej Exp $
 #
 
 package Mezzanine::Deb;
@@ -180,10 +180,10 @@ deb_query
     if ($? != 0) {
         return MEZZANINE_UNSPECIFIED_ERROR;
     }
-    foreach $prov (@prov) {
+    foreach my $prov (@prov) {
         print "Capability:  $prov\n";
     }
-    foreach $dep (@deps) {
+    foreach my $dep (@deps) {
         print "Dependency:  $dep\n";
     }   
     } else {

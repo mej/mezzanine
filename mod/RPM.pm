@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.28 2004/05/10 14:47:00 mej Exp $
+# $Id: RPM.pm,v 1.29 2004/06/04 17:16:40 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -273,15 +273,15 @@ parse_spec_file
 
     if ($debug) {
         dprint "Got the following sources:\n";
-        foreach $src (@{$specdata->{"SOURCES"}}) {
+        foreach my $src (@{$specdata->{"SOURCES"}}) {
             dprint "    Source $src -> $specdata->{SOURCE}{$src}\n";
         }
         dprint "Got the following patches:\n";
-        foreach $p (@{$specdata->{"PATCHES"}}) {
+        foreach my $p (@{$specdata->{"PATCHES"}}) {
             dprint "    Patch $p -> $specdata->{PATCH}{$p}\n";
         }
         dprint "Got the following header info:\n";
-        foreach $h (@{$specdata->{"HEADERS"}}) {
+        foreach my $h (@{$specdata->{"HEADERS"}}) {
             dprint "    $h -> $specdata->{HEADER}{$h}\n";
         }
     }
@@ -668,7 +668,7 @@ replace_defines($)
         #dprint "Found macro:  $var\n";
         if (defined $specdata->{"DEFINES"}{$var}) {
             #dprint "Replacing with:  $specdata->{DEFINES}{$var}\n";
-            $line =~ s/\%$var/$specdata->{"DEFINES"}{$var}/g;
+            $line =~ s/\%\Q$var\E/$specdata->{"DEFINES"}{$var}/g;
             #reset;
         } else {
             #dprint "Definition not found.\n";
@@ -677,10 +677,16 @@ replace_defines($)
     while ($line =~ /\%\{([^\}]+)\}/g) {
         my $var = $1;
 
+        # GMK: Added this to escape the perils of nested defines like the following example:
+        # '%{expand: %%define __share %(if [ -d %{__prefix}/share/man ]; then echo /share ; else echo %%{nil} ; fi)}'
+        # Yes,... this is real, and it came from: rpm-4.2.2-0.14.src.rpm. I hope there is a more
+        # elegant way to fix this, but I will leave that to mej.
+        $var =~ s/[\[,\],\(,\)]//g;
+
         #dprint "Found macro:  $var\n";
         if (defined $specdata->{"DEFINES"}{$var}) {
             #dprint "Replacing with:  $specdata->{DEFINES}{$var}\n";
-            $line =~ s/\%\{$var\}/$specdata->{"DEFINES"}{$var}/eg;
+            $line =~ s/\%\{\Q$var\E\}/$specdata->{"DEFINES"}{$var}/eg;
             #reset;
         } else {
             #dprint "Definition not found.\n";

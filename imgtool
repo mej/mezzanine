@@ -23,13 +23,12 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: imgtool,v 1.17 2001/11/29 11:56:05 mej Exp $
+# $Id: imgtool,v 1.18 2004/06/04 17:16:40 mej Exp $
 #
 
 # Include the Perl Modules we need
-require POSIX;
-require Getopt::Long;
-use Cwd ('&getcwd', '&abs_path');;
+use POSIX;
+use Getopt::Long;
 use Mezzanine::Util;
 
 # Print usage information
@@ -106,14 +105,14 @@ find_packages
     my @pkgs = @_;
     my (@contents, @rpms);
 
-    foreach $dir (@pkgdirs) {
+    foreach my $dir (@pkgdirs) {
         my @tmp;
 
         @tmp = &grepdir(sub {$_ =~ /\.rpm$/ && $_ !~ /\.(no)?src\.rpm$/}, $dir);
         push @contents, @tmp;
     }
 
-    foreach $rpm (@contents) {
+    foreach my $rpm (@contents) {
         my ($pkg, $ver, $rel, $arch);
 
         $rpm =~ m/^(\S*\/)?([^\/]+)-([^-\/]+)-([^-\/]+)\.(\w+)\.rpm$/;
@@ -172,7 +171,7 @@ install_packages
         system("rpm --initdb --root=$imagedir");
     }
 
-    foreach $pkg (@pkgs) {
+    foreach my $pkg (@pkgs) {
         if (!defined($rpm_name{$pkg})) {
             if ($force) {
                 eprint "No package found for $pkg!\n";
@@ -273,7 +272,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.17 $ created on $Date: 2001/11/29 11:56:05 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.18 $ created on $Date: 2004/06/04 17:16:40 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -21,13 +21,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Template.pm,v 1.2 2004/03/26 21:31:20 mej Exp $
+# $Id: Template.pm,v 1.3 2004/06/04 17:16:40 mej Exp $
 #
 
 package Mezzanine::Template;
+use POSIX;
 use Class::Struct ('&struct');
 use Mezzanine::Util;
-use Cwd;
 
 BEGIN {
     use Exporter ();

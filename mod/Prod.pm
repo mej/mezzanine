@@ -21,18 +21,18 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.25 2004/03/30 22:55:50 mej Exp $
+# $Id: Prod.pm,v 1.26 2004/06/04 17:16:40 mej Exp $
 #
 
 package Mezzanine::Prod;
+use strict;
+use Exporter;
+use POSIX;
+use Mezzanine::Util;
+use Mezzanine::PkgVars;
+use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS', '@products', '@packages', '$prods', '$pkgs');
 
 BEGIN {
-    use strict;
-    use Exporter   ();
-    use Cwd;
-    use Mezzanine::Util;
-    use Mezzanine::PkgVars;
-    use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
     $VERSION     = 2.1;
@@ -57,14 +57,14 @@ use vars ('@EXPORT_OK');
 ### Initialize exported package variables
 $prods = undef;
 $pkgs = undef;
-$failure = undef;
 @products = ();
 @packages = ();
-@failed_pkgs = ();
 
 ### Initialize private global variables
-$proddir = ".";
-@allvars = ("TAG", "REPOSITORY", "LOCATIONS");
+my $failure = undef;
+my @failed_pkgs = ();
+my $proddir = ".";
+my @allvars = ("TAG", "REPOSITORY", "LOCATIONS");
 
 ### Function prototypes
 sub make_build_dir($);
@@ -298,7 +298,7 @@ parse_product_entry
     $pkgvars{"NAME"} = $name;
     $pkgvars{"MODULE"} = $module;
     $pkgvars{"TYPE"} = $type;
-    foreach $varval (@inp) {
+    foreach my $varval (@inp) {
         ($var, $val) = split("=", $varval, 2);
         $var = &get_var_name($var);
 	# Store them in %pkgvars for now; we'll move them later.
@@ -373,7 +373,7 @@ parse_product_entry
             if ($name =~ /^\S+-[^-]+-([^-]+)$/) {
                 $pkgvars{RELEASE} = $1;
             } else {
-                eprint "I wasn't given enough information about the $name package in $prodfile.  For RPM/SRPM\n";
+                eprint "I wasn't given enough information about the $name package.  For RPM/SRPM\n";
                 eprint "packages, the version and release information must be specified as variables or\n";
                 eprint "embedded in the package name.  I'm going to have to skip that one.\n";
                 return 0;
@@ -383,7 +383,7 @@ parse_product_entry
             if ($name =~ /^\S+-([^-]+)-[^-]+$/) {
                 $pkgvars{VERSION} = $1;
             } else {
-                eprint "I wasn't given enough information about the $name package in $prodfile.  For RPM/SRPM\n";
+                eprint "I wasn't given enough information about the $name package.  For RPM/SRPM\n";
                 eprint "packages, the version and release information must be specified as variables or\n";
                 eprint "embedded in the package name.  I'm going to have to skip that one.\n";
                 return 0;
@@ -429,7 +429,7 @@ parse_product_entry
     $pkgs->{$name}{"HINT_INSTALLER"} = &pkgvar_get("hint_installer");
     dprint "New package:  $name (module $pkgs->{$name}{MODULE}, "
         . "filename $pkgs->{$name}{FILENAME}) is a(n) $pkgs->{$name}{TYPE}\n";
-    foreach $pkgvar (keys %pkgvars) {
+    foreach my $pkgvar (keys %pkgvars) {
         if ($pkgvars{$pkgvar} !~ /^$/) {
             $pkgs->{$name}{$pkgvar} = $pkgvars{$pkgvar};
             xpush(@allvars, $pkgvar);
@@ -440,7 +440,7 @@ parse_product_entry
     # variable for the current package, see if it has a value for the parent product
     # of that package.  If not, try the parent product of that product, and continue
     # going back through the product hierarchy until we find a value or run out or products.
-    foreach $pkgvar (@allvars) {
+    foreach my $pkgvar (@allvars) {
         if (! $pkgs->{$name}{$pkgvar}) {
             my ($pkg, $val) = undef;
 

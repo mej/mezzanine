@@ -21,17 +21,17 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.21 2004/05/10 14:39:43 mej Exp $
+# $Id: RevCtl.pm,v 1.22 2004/06/04 17:16:40 mej Exp $
 #
 
 package Mezzanine::RevCtl;
+use strict;
+use Exporter;
+use POSIX;
+use Mezzanine::Util;
+use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
 BEGIN {
-    use strict;
-    use Exporter   ();
-    use Cwd;
-    use Mezzanine::Util;
-    use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking
     $VERSION     = 2.1;
@@ -62,66 +62,66 @@ use vars ('@EXPORT_OK');
 ### Initialize exported package variables
 
 # Constants
-%REVCTL_CMDS = (
-                "cvs" => {
-                    "command" => "cvs",
-                    "repository" => "",
+my %REVCTL_CMDS = (
+                   "cvs" => {
+                       "command" => "cvs",
+                       "repository" => "",
 
-                    # Options
-                    "binary_file" => "-kb",
-                    "source_file" => "-kkv",
-                    "regular_file" => "-ko",
-                    "recursive" => "-R",
-                    "non_recursive" => "",
-                    "get_from_branch" => "-r",
-                    "get_from_tag" => "-r",
-                    "get_from_date" => "-D",
-                    "merge_from_branch" => "-j",
-                    "merge_from_tag" => "-j",
-                    "merge_to_branch" => "-j",
-                    "merge_to_tag" => "-j",
-                    "create_branch" => "-b",
-                    "sticky_clear" => "-A",
-                    "exclusive" => "-I!",
+                       # Options
+                       "binary_file" => "-kb",
+                       "source_file" => "-kkv",
+                       "regular_file" => "-ko",
+                       "recursive" => "-R",
+                       "non_recursive" => "",
+                       "get_from_branch" => "-r",
+                       "get_from_tag" => "-r",
+                       "get_from_date" => "-D",
+                       "merge_from_branch" => "-j",
+                       "merge_from_tag" => "-j",
+                       "merge_to_branch" => "-j",
+                       "merge_to_tag" => "-j",
+                       "create_branch" => "-b",
+                       "sticky_clear" => "-A",
+                       "exclusive" => "-I!",
 
-                    # Commands
-                    #"login" => "login",
-                    "get_new" => "checkout",
-                    "get_update" => "update",
-                    "put" => "commit",
-                    "" => "",
-                    "" => "",
-                    "" => "",
-                    "" => "",
-                    "" => "",
-                    "" => "",
+                       # Commands
+                       #"login" => "login",
+                       "get_new" => "checkout",
+                       "get_update" => "update",
+                       "put" => "commit",
+                       "" => "",
+                       "" => "",
+                       "" => "",
+                       "" => "",
+                       "" => "",
+                       "" => "",
 
-                    # Bookkeeping
-                    "control_dir" => "CVS",
-                    "" => "",
-                    "" => "",
-                    "" => "",
-                    "" => "",
-                    "" => "",
-                    "" => "",
-                    "" => ""
-                },
-                "svn" => {
-                }
-               );
+                       # Bookkeeping
+                       "control_dir" => "CVS",
+                       "" => "",
+                       "" => "",
+                       "" => "",
+                       "" => "",
+                       "" => "",
+                       "" => "",
+                       "" => ""
+                       },
+                   "svn" => {
+                   }
+                  );
 
 ### Initialize private global variables
-$revctl_system = "cvs";
-$revctl_cmd = "/usr/bin/cvs";
-$repository = "";
-$keyword = "-ko";
-$recurse = "";
-$branch = "";
-$reset = "";
-$exclusive = "";
-$strict = 0;
-$tag = "";
-$rtag = "";
+my $revctl_system = "cvs";
+my $revctl_cmd = "/usr/bin/cvs";
+my $repository = "";
+my $keyword = "-ko";
+my $recurse = "";
+my $branch = "";
+my $reset = "";
+my $exclusive = "";
+my $strict = 0;
+my $tag = "";
+my $rtag = "";
 
 ### Function prototypes
 sub revctl_reset();
@@ -472,6 +472,7 @@ do_changelog_entry()
 {
     my $log = $_[0];
     my ($pwd, $username, $fullname, $line, $module, $rel_dir);
+    my @pw_info;
     my @stat_info;
     my $logfile = "/var/tmp/.cvs.commit.$$";
     local *LOGFILE;
@@ -494,7 +495,7 @@ do_changelog_entry()
     printf LOGFILE "%-25s%45s\n\n", scalar localtime, ($fullname ? "$fullname ($username)" : "$username");
     close(LOGFILE);
 
-    dprint "Current directory is \"$cwd\", module name is \"$module\"\n";
+    dprint "Current directory is \"$pwd\", module name is \"$module\"\n";
     print "Please edit your commit message now...\n";
     system("/bin/sh -c \"" . ($ENV{"EDITOR"} ? $ENV{"EDITOR"} : "vi") . " $logfile\"");
 
@@ -588,7 +589,7 @@ update_from_master(@)
     $err = &talk_to_server("get", $cmd{up}) if ($cmd{up} && ! $err);
 
     # Note:  The following exists solely because CVS is too lame to handle symlinks.
-    foreach $dirname (grep(-d $_, (scalar(@file_list) ? @file_list : "."))) {
+    foreach my $dirname (grep(-d $_, (scalar(@file_list) ? @file_list : "."))) {
         my $linkfile = "$dirname/.mezz.symlinks";
         local *SL;
 
@@ -741,12 +742,21 @@ sub
 import_vendor_sources($)
 {
     my $module = $_[0];
+    my $cmd;
 
     dprint &print_args(@_);
 
-    $module = &basename(&getcwd()) if (! $module);
+    if (! $module) {
+        $module = &basename(&getcwd());
+        if (-r "CVS/Repository") {
+            $module = &cat_file("CVS/Repository") . "/$module";
+        }
+    } elsif (-d $module) {
+        chdir($module);
+    }
+
     if (! $tag) {
-        ($tag = $module) =~ tr/[a-z]/[A-Z]/;
+        ($tag = &basename($module)) =~ tr/[a-z]/[A-Z]/;
     } else {
         $tag =~ s/^-r //;
     }

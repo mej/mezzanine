@@ -21,22 +21,21 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.20 2003/12/30 23:02:55 mej Exp $
+# $Id: Pkg.pm,v 1.21 2004/06/04 17:16:40 mej Exp $
 #
 
 package Mezzanine::Pkg;
+use strict;
+use Exporter;
+use Mezzanine::Util;
+use Mezzanine::RevCtl;
+use Mezzanine::PkgVars;
+use Mezzanine::RPM;
+use Mezzanine::Deb;
+use Mezzanine::Tar;
+use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
 BEGIN {
-    use strict;
-    use Exporter   ();
-    use Mezzanine::Util;
-    use Mezzanine::RevCtl;
-    use Mezzanine::PkgVars;
-    use Mezzanine::RPM;
-    use Mezzanine::Deb;
-    use Mezzanine::Tar;
-    use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
-
     # set the version for version checking
     $VERSION     = 2.1;
 
@@ -83,7 +82,7 @@ fetch_package
     local *REVTOOL;
 
     if (! $pkg_file) {
-        return (MEZZANINE_MISSING_SOURCES, "Nothing to fetch?");
+        return (MEZZANINE_MISSING_PKGS, "Nothing to fetch?");
     }
     foreach my $f (split(' ', $pkg_file)) {
         if (!(-d $f) && !(-f $f && -s _)) {
@@ -120,7 +119,7 @@ package_install
     } elsif ($pkg_type eq "tar") {
         return &tar_install();
     }
-    return (MEZZANINE_BAD_PACKAGE, "Unable to identify package $pkg_file.\n");
+    return (MEZZANINE_INVALID_PACKAGE, "Unable to identify package $pkg_file.\n");
 }
 
 sub
@@ -141,7 +140,7 @@ package_show_contents
     } elsif ($pkg_type eq "tar") {
         return &tar_show_contents($pkg_file);
     }
-    return (MEZZANINE_BAD_PACKAGE, "Unable to identify package $pkg_file.\n");
+    return (MEZZANINE_INVALID_PACKAGE, "Unable to identify package $pkg_file.\n");
 }
 
 sub
@@ -163,7 +162,7 @@ package_query
     } elsif ($pkg_type eq "tar") {
         return &tar_query($query_type);
     }
-    return (MEZZANINE_BAD_PACKAGE, "Unable to identify package $pkg_file.\n");
+    return (MEZZANINE_INVALID_PACKAGE, "Unable to identify package $pkg_file.\n");
 }
 
 sub
@@ -185,7 +184,7 @@ package_compare_versions
     } elsif ($pkg_type eq "tar") {
         return &tar_compare_versions($v1, $v2);
     }
-    return (MEZZANINE_BAD_PACKAGE, "Unable to identify package $pkg_file.\n");
+    return (MEZZANINE_INVALID_PACKAGE, "Unable to identify package $pkg_file.\n");
 }
 
 ### Private functions

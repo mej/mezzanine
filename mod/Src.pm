@@ -21,21 +21,21 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.19 2004/05/10 14:47:00 mej Exp $
+# $Id: Src.pm,v 1.20 2004/06/04 17:16:40 mej Exp $
 #
 
 package Mezzanine::Src;
+use Exporter;
+use POSIX;
+use File::Copy;
+use File::Find;
+use Mezzanine::Util;
+use Mezzanine::PkgVars;
+use Mezzanine::Pkg;
+use Mezzanine::RPM;
 
 BEGIN {
     use strict;
-    use Exporter   ();
-    use File::Copy;
-    use File::Find;
-    use Cwd ('&getcwd');
-    use Mezzanine::Util;
-    use Mezzanine::PkgVars;
-    use Mezzanine::Pkg;
-    use Mezzanine::RPM;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
     # set the version for version checking

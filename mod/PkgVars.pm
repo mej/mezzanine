@@ -25,14 +25,13 @@
 #
 
 package Mezzanine::PkgVars;
-use Cwd;
+use strict;
+use Exporter;
+use POSIX;
+use Mezzanine::Util;
+use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
 BEGIN {
-    use strict;
-    use Exporter();
-    use Mezzanine::Util;
-    use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
-
     # set the version for version checking
     $VERSION     = 2.1;
 
@@ -127,7 +126,7 @@ sub
 pkgvar_get($)
 {
     dprintf("Package variable \"%s\" -> \"%s\"\n", $_[0],
-            (($pkgvars{$_[0]}) ? ($pkgvars{$_[0]}) : ("")));
+            (($pkg_vars{$_[0]}) ? ($pkg_vars{$_[0]}) : ("")));
     return $pkg_vars{$_[0]};
 }
 
@@ -153,7 +152,7 @@ pkgvar_set(%)
         return undef;
     }
 
-    foreach $var (keys(%new_pkg_vars)) {
+    foreach my $var (keys(%new_pkg_vars)) {
         my $param = $new_pkg_vars{$var};
 
         if (defined($param)) {

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgsort,v 1.25 2004/04/01 23:25:24 mej Exp $
+# $Id: pkgsort,v 1.26 2004/06/04 17:16:40 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -137,14 +137,14 @@ find_packages
     my $i;
     local *DIR;
 
-    foreach $dir (@pkgdirs) {
+    foreach my $dir (@pkgdirs) {
         my @tmp;
 
         @tmp = &grepdir(sub {/(?<!src)\.rpm$/}, $dir);
         push @contents, @tmp;
     }
 
-    foreach $rpm (@contents) {
+    foreach my $rpm (@contents) {
         my ($srpm, $spkg, $pkg, $ver, $rel);
 
         ($pkg, undef, undef, undef) = &parse_rpm_name($rpm);
@@ -237,7 +237,7 @@ pkg_depends_on
             return 0;
         }
         # Next, check all of what $_[1] provides to see if $_[0] requires any of it
-        foreach $prov (@{$provides{$_[1]}}) {
+        foreach my $prov (@{$provides{$_[1]}}) {
             if (grep($_ eq $prov, @{$requires{$_[0]}})) {
                 return 1;
             }
@@ -298,7 +298,7 @@ add_implicit_dependency
     my @tmp;
 
     # For each package in $_[2..] ...
-    foreach $pkg (@pkgs) {
+    foreach my $pkg (@pkgs) {
         # ... if it depends on $_[0], and it's not $_[1], and $_[1] doesn't depend on it...
         if (&pkg_depends_on($pkg, $old_dep) && ($pkg ne $new_dep) && ! &pkg_depends_on($new_dep, $pkg)) {
             # ... make it depend on $_[1] too.
@@ -315,9 +315,9 @@ consistency_check
     my $oops = 0;
 
     # Look for unresolved dependencies
-    foreach $pkg (keys %requires) {
+    foreach my $pkg (keys %requires) {
         dprint "Checking dependencies for $pkg...";
-        foreach $dep (@{$requires{$pkg}}) {
+        foreach my $dep (@{$requires{$pkg}}) {
             if (defined($what_provides{$dep})) {
                 print STDERR "$dep ($what_provides{$dep}[0])..." if (&debug_get());
             } else {
@@ -330,10 +330,10 @@ consistency_check
     }
 
     # Make sure no two packages provide the same thing
-    foreach $cap (keys %what_provides) {
+    foreach my $cap (keys %what_provides) {
         if (scalar(@{$what_provides{$cap}}) > 1) {
             @{$conflicts{$cap}} = @{$what_provides{$cap}};
-            foreach $pkg (@{$conflicts{$cap}}) {
+            foreach my $pkg (@{$conflicts{$cap}}) {
                 $force{$pkg} = 1;
             }
             $oops = 1;
@@ -343,7 +343,7 @@ consistency_check
     if ($oops) {
         if (scalar(%unresolved_deps)) {
             eprint "The following dependencies are unresolved:\n";
-            foreach $dep (keys %unresolved_deps) {
+            foreach my $dep (keys %unresolved_deps) {
                 my $pkg;
 
                 chomp($pkg = `/bin/rpm -q --whatprovides $dep`);
@@ -354,7 +354,7 @@ consistency_check
         }
         if (scalar(%conflicts)) {
             eprint "The following file/provision conflicts were found:\n";
-            foreach $cap (keys %conflicts) {
+            foreach my $cap (keys %conflicts) {
                 eprint "    $cap is provided by ", join(", ", @{$conflicts{$cap}}), "\n";
                 xpush @conflict_pkgs, join(" & ", @{$conflicts{$cap}});
             }
@@ -369,7 +369,7 @@ consistency_check
     }
 
     # Go through the provides info and throw out any files/capabilities not required by other packages
-    foreach $pkg (keys %provides) {
+    foreach my $pkg (keys %provides) {
         dprint "Checking provides for $pkg\n";
         for ($i = 0; $i < scalar(@{$provides{$pkg}}); ) {
             my $file = $provides{$pkg}[$i];
@@ -399,7 +399,7 @@ query_packages
     local *CMD;
 
     print "Gathering dependency information....\n";
-    foreach $pkg (@pkgs) {
+    foreach my $pkg (@pkgs) {
         if (!defined($rpm_list{$pkg})) {
             eprint "No package found for $pkg!\n";
             next;
@@ -415,7 +415,7 @@ query_packages
         #if ($pkg ne $src_package{$pkg}) {
         #    &pkg_add_dep($pkg, $src_package{$pkg});
         #}
-        foreach $rpm (@{$rpm_list{$pkg}}) {
+        foreach my $rpm (@{$rpm_list{$pkg}}) {
             $cmd = "pkgtool -qd -p $rpm";
 
             next if ($have_cache{$rpm});
@@ -457,9 +457,9 @@ write_cache
 
     &mkdirhier("$ENV{HOME}/.mezz/pkgsort");
     open(CACHE, ">$ENV{HOME}/.mezz/pkgsort/cache") || return;
-    foreach $pkg (@pkgs) {
+    foreach my $pkg (@pkgs) {
         print CACHE "S:$pkg|$src_package{$pkg}|$src_rpm{$src_package{$pkg}}|$src_version{$pkg}|$src_release{$pkg}\n" if ($mode eq "src");
-        foreach $rpm (@{$rpm_list{$pkg}}) {
+        foreach my $rpm (@{$rpm_list{$pkg}}) {
             @s = stat($rpm);
 
             print CACHE "F:$pkg:$rpm:$s[9]\n";
@@ -507,7 +507,7 @@ read_cache
             @inp = split("\Q|", $line);
             shift @inp;
             dprint "Package $pkg provides:  ", join(", ", @inp), "\n";
-            foreach $dep (@inp) {
+            foreach my $dep (@inp) {
                 &pkg_add_cap($pkg, $dep);
             }
         } elsif ($line =~ /^R:([^\|]+)\|/) {
@@ -515,7 +515,7 @@ read_cache
             @inp = split("\Q|", $line);
             shift @inp;
             dprint "Package $pkg requires:  ", join(", ", @inp), "\n";
-            foreach $dep (@inp) {
+            foreach my $dep (@inp) {
                 &pkg_add_dep($pkg, $dep);
             }
         }
@@ -617,7 +617,7 @@ dep_sort
 
     $cnt = scalar(@old_pkgs);
 
-    foreach $pkg (@old_pkgs) {
+    foreach my $pkg (@old_pkgs) {
         $ftr = $last_dep = $loc = -1;
         if (defined($requires{$pkg})) {
             $deps = scalar(@{$requires{$pkg}});
@@ -772,7 +772,7 @@ sort_source_packages
     my @pkgs = @_;
     my @src_pkgs;
 
-    foreach $pkg (@pkgs) {
+    foreach my $pkg (@pkgs) {
         xpush @src_pkgs, $src_package{$pkg};
     }
     return @src_pkgs;
@@ -803,8 +803,8 @@ show_packages
                 if (scalar(@{$bin_packages{$pkg}})) {
                     my @tmp;
 
-                    foreach $bpkg (sort @{$bin_packages{$pkg}}) {
-                        foreach $rpm (sort @{$rpm_list{$bpkg}}) {
+                    foreach my $bpkg (sort @{$bin_packages{$pkg}}) {
+                        foreach my $rpm (sort @{$rpm_list{$bpkg}}) {
                             if ($rpm =~ /^(.+)-\Q$src_version{$bpkg}\E-\Q$src_release{$bpkg}.i386.rpm\E$/) {
                                 push @tmp, "bin-rh/$1";
                             } else {
@@ -825,7 +825,7 @@ show_packages
             }
         }
     } else {
-        foreach $pkg (@pkgs) {
+        foreach my $pkg (@pkgs) {
             my $flag = "";
 
             if ($force{$pkg}) {
@@ -837,7 +837,7 @@ show_packages
             if ($output_format eq "names") {
                 print OUTFILE "$pkg$flag\n";
             } elsif ($output_format eq "files") {
-                foreach $rpm (sort @{$rpm_list{$pkg}}) {
+                foreach my $rpm (sort @{$rpm_list{$pkg}}) {
                     print OUTFILE "$rpm$flag\n";
                 }
             }
@@ -867,7 +867,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.25 $ created on $Date: 2004/04/01 23:25:24 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.26 $ created on $Date: 2004/06/04 17:16:40 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

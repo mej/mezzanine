@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: compstool,v 1.9 2001/11/04 13:46:30 mej Exp $
+# $Id: compstool,v 1.10 2004/06/04 17:16:40 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -87,7 +87,7 @@ parse_comps_file
     }
     close(COMPS);
 
-    foreach $pkg (@pkgs) {
+    foreach my $pkg (@pkgs) {
         dprint "Looking at comps file package $pkg\n";
         if (!grep($_ =~ /\Q$pkg\E-[^-]+-[^-]+\.[^\.]+\.rpm/, @rpms)) {
             dprint "$pkg is missing\n";
@@ -95,7 +95,7 @@ parse_comps_file
         }
     }
 
-    foreach $rpm (@rpms) {
+    foreach my $rpm (@rpms) {
         my $rpmfile = &basename($rpm);
 
         dprint "Looking at package file $rpmfile\n";
@@ -139,7 +139,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.9 $ created on $Date: 2001/11/04 13:46:30 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.10 $ created on $Date: 2004/06/04 17:16:40 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -21,12 +21,11 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Instroot.pm,v 1.1 2004/05/10 14:47:00 mej Exp $
+# $Id: Instroot.pm,v 1.2 2004/06/04 17:16:40 mej Exp $
 #
 
 package Mezzanine::Instroot;
 use Mezzanine::Util;
-use Cwd;
 
 BEGIN {
     use Exporter ();

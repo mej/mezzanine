@@ -23,13 +23,12 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: uptool,v 1.17 2004/04/01 23:25:24 mej Exp $
+# $Id: uptool,v 1.18 2004/06/04 17:16:40 mej Exp $
 #
 
 # Include the Perl Modules we need
-require POSIX;
-require Getopt::Long;
-use Cwd;
+use POSIX;
+use Getopt::Long;
 use Net::FTP;
 use Mezzanine::Util;
 use Mezzanine::Pkg;
@@ -208,7 +207,7 @@ compare_lists($$)
 
         # Now, download all the matching files.
         dprint "File list for $pkg:  ", join(", ", @tmp), "\n";
-        foreach $rpm (@tmp) {
+        foreach my $rpm (@tmp) {
             # If we have it, continue.
             if (defined($lpkgs->{$pkg}) && grep(/^\Q$rpm\E$/, @{$lpkgs->{$pkg}{FILES}})) {
                 dprint "Not downloading $rpm (", join(", ", @{$lpkgs->{$pkg}{FILES}}), ").  Next!\n";
@@ -257,7 +256,7 @@ fetch_updates(@)
     undef $session;
     $last_login = "";
 
-    foreach $url (@urls) {
+    foreach my $url (@urls) {
         # Set defaults for stuff.
         ($port, $userid, $passwd) = ("21", "anonymous", "info\@kainx.org");
 
@@ -383,7 +382,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.17 $ created on $Date: 2004/04/01 23:25:24 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.18 $ created on $Date: 2004/06/04 17:16:40 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

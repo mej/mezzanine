@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.184 2004/05/10 14:46:59 mej Exp $
+# $Id: buildtool,v 1.185 2004/06/04 17:16:40 mej Exp $
 #
 
 use strict;
@@ -263,7 +263,11 @@ scan_rpm_dirs
 
             # Valid array ref.  Let's make sure the times match.
             @statinfo = stat($rpm);
-            $mtime = $aref->[$CFG_RPMCACHE_MTIME];
+            if ($aref->[$CFG_RPMCACHE_MTIME]) {
+                $mtime = $aref->[$CFG_RPMCACHE_MTIME];
+            } else {
+                $mtime = 0;
+            }
             if ($statinfo[9] > $mtime) {
                 # Our cache info is outdated.  We'll have to update it.
                 dprint "Out-of-date cache info for $rpm\n";
@@ -987,7 +991,7 @@ main
                "savecfg|save-config");
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.184 $ created on $Date: 2004/05/10 14:46:59 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.185 $ created on $Date: 2004/06/04 17:16:40 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
@@ -1156,7 +1160,13 @@ main
             foreach my $pkg (sort(@pkg_list)) {
                 my $prodfile_line;
 
-                $prodfile_line = $pkg;
+                if (-f $pkg) {
+                    $prodfile_line = $pkg;
+                } elsif ($pkg =~ /(CVS|SCCS)$/) {
+                    next;
+                } else {
+                    $prodfile_line = sprintf("%s MODULE=%s", &basename($pkg), $pkg);
+                }
                 &parse_product_entry($prodfile_line, $prod);
             }
         }

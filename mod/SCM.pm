@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: SCM.pm,v 1.1 2004/04/07 18:24:40 mej Exp $
+# $Id: SCM.pm,v 1.2 2004/06/04 17:16:40 mej Exp $
 #
 
 package Mezzanine::SCM;
@@ -81,9 +81,12 @@ new($)
     my $class = ref($proto) || $proto;
     my $type = shift;
 
-    if (lc($type) eq "cvs") {
+    if (! $type) {
+        return auto_detect();
+    } elsif (lc($type) eq "cvs" && grep { $_ eq "CVS" } @SCM_MODULE_LIST) {
         return Mezzanine::SCM::CVS->new();
-    } elsif (lc($type) eq "svn") {
+    } elsif ((lc($type) eq "svn" || lc($type) eq "subversion")
+             && grep { $_ eq "Subversion" } @SCM_MODULE_LIST) {
         return Mezzanine::SCM::Subversion->new();
     } else {
         return undef;
@@ -107,11 +110,12 @@ auto_detect($)
             eprint "can_handle() member function call failed -- $@\n";
         } elsif ($ret) {
             dprint "$mod can handle $path.\n";
+            return new($mod);
         } else {
             dprint "$mod cannot handle $path.\n";
-
         }
     }
+    return undef;
 }
 
 

@@ -23,13 +23,11 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.39 2004/05/10 14:47:00 mej Exp $
+# $Id: srctool,v 1.40 2004/06/04 17:16:40 mej Exp $
 #
 
-# Include the Perl Modules we need
-require POSIX;
-require Getopt::Long;
-use Cwd ('&getcwd', '&abs_path');
+use strict;
+use POSIX;
 use File::Copy ('&cp', '&mv');
 
 # Mezzanine modules
@@ -39,15 +37,21 @@ use Mezzanine::PkgVars;
 use Mezzanine::RPM;
 use Mezzanine::Src;
 use Mezzanine::Pkg;
+use Mezzanine::Config;
 
+my $config;
 my $import_as_pdr = 0;
+my $local_mode = 0;
+my $command = "";
 
 # Print usage information
 sub
 print_usage_info
 {
+    my ($leader, $underbar);
+
     print "\n";
-    $leader = "$progname $version Usage Information";
+    $leader = "$PROGNAME $VERSION Usage Information";
     $underbar = $leader;
     $underbar =~ s/./-/g;
     print "$leader\n$underbar\n";
@@ -67,6 +71,7 @@ print_usage_info
     print "    -D --dir <repository>            Specify the repository to use\n";
     print "    -L --local                       Local mode; do not talk to the master server\n";
     print "    -f --flat --pdr                  Import as a PDR (all files in top dir) rather than an SPM\n";
+    print "    -P --path <repo path>            Import into repository at specified path\n";
     print "\n";
     exit(MEZZANINE_SUCCESS);
 }
@@ -154,7 +159,7 @@ import_package
 		print "For future reference, you can specify this information on the command line like this:  -n $name\n";
 	    } else {
 		eprint "No package name/version supplied for FST import\n";
-		return MEZZANINE_MISSING_INFO;
+		return MEZZANINE_SYNTAX_ERROR;
 	    }
 	}
 
@@ -378,11 +383,11 @@ gen_patch($$)
 
     # Add the new patch file
     if ($local_mode) {
-        print "You requested local mode.  You will need to add the new patch by hand (mzadd P/$patch).\n";
+        print "You requested local mode.  You will need to add the new patch by hand (mzadd $patchdir$patch).\n";
     } else {
-        $err = &add_new_files("P/$patch");
+        $err = &add_new_files("$patchdir$patch");
         if ($err != MEZZANINE_SUCCESS && $err != MEZZANINE_DUPLICATE) {
-            eprint "Addition of directory P/$patch failed.\n";
+            eprint "Addition of directory $patchdir$patch failed.\n";
             return $err;
         }
         print "Patch added and ready for commit.\n";
@@ -548,8 +553,8 @@ sync_package
     }
 
     if ($local_mode) {
-        eprint "You requested local mode.  I will not be able to sync this module.\n";
-        return MEZZANINE_SYNTAX_ERROR;
+        #eprint "You requested local mode.  I will not be able to sync this module.\n";
+        #return MEZZANINE_SYNTAX_ERROR;
     }
 
     print "Syncing $pkg...\n";
@@ -562,7 +567,10 @@ sync_package
     }
     foreach my $a (grep(/^\?\s/, @output)) {
         $a =~ s/^\?\s+//;
-        push @add, $a;
+        if (($a ne "build.mezz") && ($a ne "work") && ($a ne "work+patched")
+            && ($a !~ /\.rpm$/) && ($a !~ /\.deb$/)) {
+            push @add, $a;
+        }
     }
     push @new, @add;
     foreach my $r (grep(/^U\s/, @output)) {
@@ -570,17 +578,25 @@ sync_package
         push @rm, $r;
     }
     push @old, @rm;
-    for (; scalar(@add); ) {
-        @output = &run_mz_cmd("revtool", &revctl_repository() . " -a " . join(" ", @add), 0);
-        @add = ();
-        foreach my $a (grep(/^\?\s/, @output)) {
-            $a =~ s/^\?\s+//;
-            push @add, $a;
+    if (! $local_mode) {
+        for (; scalar(@add); ) {
+            @output = &run_mz_cmd("revtool", &revctl_repository() . " -a " . join(" ", @add), 0);
+            @add = ();
+            foreach my $a (grep(/^\?\s/, @output)) {
+                $a =~ s/^\?\s+//;
+                push @add, $a;
+            }
+            push @new, @add;
         }
-        push @new, @add;
     }
     if (scalar(@rm)) {
-        @output = &run_mz_cmd("revtool", &revctl_repository() . " -r " . join(" ", @rm), 0);
+        if ($local_mode) {
+            foreach my $path (@rm) {
+                &nuke_tree($path);
+            }
+        } else {
+            @output = &run_mz_cmd("revtool", &revctl_repository() . " -r " . join(" ", @rm), 0);
+        }
     }
 
     if (!scalar(@new) && !scalar(@old)) {
@@ -647,69 +663,42 @@ move_package_files
 sub
 main
 {
-    # Set up the basic variables
-    $progname = "srctool";
-    $version = "2.1";
-    umask 022;
+    my $err;
+    my @flist;
 
-    # See the Getopt::Long man page for details on the syntax of this line
-    @valid_opts = ("h|help", "v|version", "d|debug", "i|import", "p|prepare",
-                   "m|merge", "r|resync", "a|apply|patch", "move", "n|name=s",
-                   "c|clean", "D|dir|repository=s", "L|local", "f|flat|pdr");
-    Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
-    Getopt::Long::GetOptions(@valid_opts);
-
-    # Post-parse the options stuff
-    select STDOUT; $| = 1;
-    if ($opt_v) {
-        # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.39 $ created on $Date: 2004/05/10 14:47:00 $ by $Author: mej $ ';
-
-        $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
-        $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
-        $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
-        print "\n";
-	print "$progname $version by Michael Jennings <mej\@eterm.org>\n";
-        print "Copyright (c) 2001, Michael Jennings\n";
-        print "  ($rcs_info)\n";
-        print "\n";
-	return MEZZANINE_SUCCESS;
-    } elsif ($opt_h) {
-	&print_usage_info();   # Never returns
+    &mezz_init("srctool", "3.0", "help|h", "version|v", "debug|d",
+               "import|i", "prepare|p", "merge|m", "resync|r",
+               "patch|apply|a", "move", "name|n=s", "clean|c",
+               "repository|dir|D=s", "local|L", "flat|pdr|f",
+               "path|P=s");
+    if ($OPTION{"version"}) {
+        &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
+                       'CVS Revision $Revision: 1.40 $ created on $Date: 2004/06/04 17:16:40 $ by $Author: mej $ ');
     }
+    if ($OPTION{"help"}) {
+        &print_usage_info();
+    }
+    select STDOUT; $| = 1;
+    $config = Mezzanine::Config->new("srctool/config");
 
-    &debug_set($opt_d);
-    &pkgvar_name($opt_n);
+    &debug_set($config->set("DEBUG", $OPTION{"debug"} || $config->get("DEBUG") || 0));
+    &pkgvar_name($OPTION{"name"});
     if (scalar(@ARGV)) {
 	@flist = @ARGV;
     }
-    &revctl_repository($opt_D);
-    if ($opt_L) {
+    &revctl_repository($OPTION{"repository"});
+    if ($OPTION{"local"}) {
         &revctl_command("/bin/true");
         $local_mode = 1;
     }
 
-    # Signal handling
-    $SIG{HUP} = 'IGNORE';
-    $SIG{INT} = \&handle_signal;
-    $SIG{TERM} = \&handle_signal;
-    $SIG{QUIT} = \&handle_fatal_signal;
-    $SIG{ILL} = \&handle_fatal_signal;
-    $SIG{ABRT} = \&handle_fatal_signal;
-    $SIG{FPE} = \&handle_fatal_signal;
-    $SIG{SEGV} = \&handle_fatal_signal;
-    $SIG{BUS} = \&handle_fatal_signal;
-    $SIG{TSTP} = \&handle_fatal_signal;
-    $SIG{TTIN} = \&handle_fatal_signal;
-    $SIG{TTOU} = \&handle_fatal_signal;
-
-    if ($0 =~ /mzimport$/ || $opt_i) {
+    if ($0 =~ /mzimport$/ || $OPTION{"import"}) {
         $command = "import";
-        if ($opt_f) {
+        if ($OPTION{"flat"}) {
             $import_as_pdr = 1;
         }
 	if (scalar(@flist)) {
-	    foreach $f (@flist) {
+	    foreach my $f (@flist) {
 		my $err;
 
                 &pkgvar_filename($f);
@@ -719,10 +708,10 @@ main
 	} else {
 	    return &import_package();
 	}
-    } elsif ($0 =~ /mzprep$/ || $opt_p) {
+    } elsif ($0 =~ /mzprep$/ || $OPTION{"prepare"}) {
         $command = "prep";
 	if (scalar(@flist)) {
-	    foreach $f (@flist) {
+	    foreach my $f (@flist) {
 		my $err;
 
                 &pkgvar_filename($f);
@@ -732,11 +721,11 @@ main
 	} else {
 	    return &prepare_tree();
 	}
-    } elsif ($0 =~ /mzmerge$/ || $opt_M) {
+    } elsif ($0 =~ /mzmerge$/ || $OPTION{"merge"}) {
         my $pkg;
 
         $command = "merge";
-        if ($opt_f) {
+        if ($OPTION{"flat"}) {
             $import_as_pdr = 1;
         }
         foreach my $f (@flist) {
@@ -760,7 +749,7 @@ main
             $err = &merge_file($f);
             return $err if ($err);
         }
-    } elsif ($0 =~ /mzpatch$/ || $opt_a) {
+    } elsif ($0 =~ /mzpatch$/ || $OPTION{"patch"}) {
         my ($pkg, $patch);
 
         $command = "patch";
@@ -793,10 +782,10 @@ main
         &pkgvar_filename($pkg);
         &pkgvar_name($patch);
         return &gen_patch();
-    } elsif ($0 =~ /mzclean$/ || $opt_c) {
+    } elsif ($0 =~ /mzclean$/ || $OPTION{"clean"}) {
         $command = "clean";
 	if (scalar(@flist)) {
-	    foreach $f (@flist) {
+	    foreach my $f (@flist) {
 		my $err;
 
                 &pkgvar_filename($f);
@@ -806,10 +795,10 @@ main
 	} else {
 	    return &clean_package();
 	}
-    } elsif ($0 =~ /mz(re)?sync$/ || $opt_r) {
+    } elsif ($0 =~ /mz(re)?sync$/ || $OPTION{"resync"}) {
         $command = "sync";
 	if (scalar(@flist)) {
-	    foreach $f (@flist) {
+	    foreach my $f (@flist) {
 		my $err;
 
                 &pkgvar_filename($f);
@@ -819,7 +808,7 @@ main
 	} else {
 	    return &sync_package();
 	}
-    } elsif ($0 =~ /mzmv$/ || $opt_move) {
+    } elsif ($0 =~ /mzmv$/ || $OPTION{"move"}) {
         $command = "move";
 	if (scalar(@flist) > 1) {
             $err = &move_package_files(@flist);
