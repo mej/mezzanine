@@ -644,3 +644,7 @@ Fixed diffs of CRLF-delimited files.
 
 Changed default timeout to 900 seconds.
 ----------------------------------------------------------------------
+Sun Oct  3 21:18:30 2004                        Michael Jennings (mej)
+
+Don't barf if stat fails.
+----------------------------------------------------------------------

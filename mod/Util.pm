@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.44 2004/09/30 21:59:55 mej Exp $
+# $Id: Util.pm,v 1.45 2004/10/04 01:19:07 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -576,7 +576,7 @@ move_files(@)
     }
     #dprint "Moving ", join(' ', @flist), " to $dest.\n";
     foreach my $f (@flist) {
-        my ($target, $mode);
+        my ($target, $mode, $statobj);
 
         if ($addname) {
             ($target = $f) =~ s/^(.*\/)?([^\/]+)$/$dest$2/;
@@ -585,7 +585,12 @@ move_files(@)
         }
 
         # Save permissions of the source file.
-        $mode = ((stat($f))->mode() & 0775) || 0600;
+        $statobj = stat($f);
+        if ($statobj) {
+            $mode = ($statobj->mode() & 0775) || 0600;
+        } else {
+            $mode = 0600;
+        }
 
         if (! -l $target) {
             unlink($target);
