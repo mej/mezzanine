@@ -389,3 +389,9 @@ anyway since it doesn't seem to break anything.  But I'm going to
 implement the revision control backend in a new and completely
 different way to (hopefully) be a lot easier to extend.
 ----------------------------------------------------------------------
+Tue Mar 30 21:21:57 2004                        Michael Jennings (mej)
+
+Converted pkgtool to use new mezz_init() and options stuff.
+
+Moved cache files.
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.177 2004/03/24 19:52:16 mej Exp $
+# $Id: buildtool,v 1.178 2004/03/31 02:22:23 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -215,7 +215,7 @@ scan_rpm_dirs
     # Pre-scan all the binary RPM's for future use We need to know what SRPM
     # each binary came from, because some (lame) packages change the base name.
     nprint "Updating state information....\n";
-    dprint "Scanning binary RPM's in $topdir/RPMS for their corresponding SRPM's.\n";
+    dprint "Scanning binary RPM's in $topdir for their corresponding SRPM's.\n";
     #@contents = glob("$topdir/RPMS/*/*.rpm");
     find({ "wanted" => sub { ! -d $_ && $_ =~ /\.rpm$/ && $_ !~ /src\.rpm$/ && push @contents, $_ }, "no_chdir" => 1 }, $topdir);
     foreach my $rpm (@contents) {
@@ -775,7 +775,7 @@ main
     #
     if ($opt_v) {
         &print_version($progname, $version, $author,
-                       'CVS Revision $Revision: 1.177 $ created on $Date: 2004/03/24 19:52:16 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.178 $ created on $Date: 2004/03/31 02:22:23 $ by $Author: mej $ ');
         # Never returns
     }
     if ($opt_h) {

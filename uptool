@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: uptool,v 1.15 2003/06/18 19:12:49 mej Exp $
+# $Id: uptool,v 1.16 2004/03/31 02:22:23 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -124,7 +124,7 @@ compare_packages()
 {
     my ($p1, $p2) = @_;
     my $ans;
-    my $cache_file = "$ENV{HOME}/.mezz.update_cache";
+    my $cache_file = "$ENV{HOME}/.mezz/uptool/cache";
     local *CACHE;
 
     if (-s $cache_file) {
@@ -149,11 +149,13 @@ compare_packages()
     print "Is $p2 more recent than $p1 [y/n]? ";
     chomp($ans = <STDIN>);
     if ($ans =~ /^\s*y(es)?\s*$/i) {
+        &mkdirhier(&dirname($cache_file));
         open(CACHE, ">>$cache_file");
         print CACHE "$p1 < $p2\n";
         close(CACHE);
         return 1;
     } else {
+        &mkdirhier(&dirname($cache_file));
         open(CACHE, ">>$cache_file");
         print CACHE "$p1 > $p2\n";
         close(CACHE);
@@ -380,7 +382,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.15 $ created on $Date: 2003/06/18 19:12:49 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.16 $ created on $Date: 2004/03/31 02:22:23 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

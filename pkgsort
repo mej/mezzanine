@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgsort,v 1.23 2004/01/23 22:54:48 mej Exp $
+# $Id: pkgsort,v 1.24 2004/03/31 02:22:23 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -454,7 +454,8 @@ write_cache
     my @pkgs = @_;
     local *CACHE;
 
-    open(CACHE, ">$ENV{HOME}/.pkgsort.cache") || return;
+    &mkdirhier("$ENV{HOME}/.mezz/pkgsort");
+    open(CACHE, ">$ENV{HOME}/.mezz/pkgsort/cache") || return;
     foreach $pkg (@pkgs) {
         print CACHE "S:$pkg|$src_package{$pkg}|$src_rpm{$src_package{$pkg}}|$src_version{$pkg}|$src_release{$pkg}\n" if ($mode eq "src");
         foreach $rpm (@{$rpm_list{$pkg}}) {
@@ -865,7 +866,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.23 $ created on $Date: 2004/01/23 22:54:48 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.24 $ created on $Date: 2004/03/31 02:22:23 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.32 2004/03/26 21:31:20 mej Exp $
+# $Id: Util.pm,v 1.33 2004/03/31 02:22:23 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -203,6 +203,7 @@ mezz_init($$@)
     $VERSION = shift;
     @valid_opts = @_;
 
+    $ENV{"LANG"} = "C" if (! $ENV{"LANG"});
     umask 022;
     &install_signal_handlers();
     select STDERR; $| = 1;
