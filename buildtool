@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.83 2000/07/11 05:16:18 mej Exp $
+# $Id: buildtool,v 1.84 2000/07/12 03:51:59 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -111,6 +111,7 @@ print_usage_info
     print "    -l --log <logfile>               Specify a log file to send informational output to\n";
     print "    -P --parallel                    Parallelize the build process based on the number of CPU's\n";
     print "    -t --target <arch>               Tell rpm to build for a particular target architecture\n";
+    print "    -C --cflags <flags>              Specify the \$CFLAGS variable to use for building\n";
     print "\n";
     print "The stages and their abbreviations (for use with the -b option) are:\n";
     print "  bootstrap (s), compose (c), explode (e), build (b), package accumulation (p), ISO image (i), cleanup (a)\n\n";
@@ -1097,7 +1098,8 @@ do_bootstrap_stage
             $cvsroot = "";
         }
         if ($pkgs->{$pkg}{REVISION}) {
-            $tag = "-t $pkgs->{$pkg}{REVISION}";
+            ($tag = $pkgs->{$pkg}{REVISION}) =~ s/^([^:]+):.*$/$1/;
+            $tag = "-t $tag";
         } else {
             $tag = "";
         }
@@ -1785,14 +1787,14 @@ main
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "b|build=s", "p|product|package=s",
                    "q|quiet", "Q|really-quiet|silent", "D|dir=s", "f|force", "l|log=s",
-                   "P|parallel", "t|target=s", "B|startbuild=s");
+                   "P|parallel", "t|target=s", "C|cflags=s", "B|startbuild=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.83 $ created on $Date: 2000/07/11 05:16:18 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.84 $ created on $Date: 2000/07/12 03:51:59 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1895,7 +1897,7 @@ main
 
     # Environment modifications
     $ENV{MAKE} = "make";  # Make sure we don't parallel build, because it doesn't work.
-    $ENV{CFLAGS} = "-O2 -march=pentium";  # A bit of optimization, but not much.
+    $ENV{CFLAGS} = ($opt_C ? $opt_C : "-O2 -march=pentium");
     $ENV{LD_LIBRARY_PATH} = "";  # Make glibc happy
     $ENV{PATH} = "/usr/build/bin:/usr/local/build/bin:/usr/lib/qt-1.45/bin:/usr/lib/qt-2.1.0/bin"
                   . ":/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/X11R6/bin:/usr/kerberos/sbin"

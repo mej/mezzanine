@@ -626,3 +626,7 @@ Mon Jul 10 22:23:56 2000                        Michael Jennings (mej)
 Several annoyances and missing features fixed here.  Looks like 1.2
 will come along soon.... :(
 ----------------------------------------------------------------------
+Tue Jul 11 20:59:40 2000                        Michael Jennings (mej)
+
+Added the -C/--cflags option to buildtool for setting $CFLAGS.
+----------------------------------------------------------------------
