@@ -47,3 +47,7 @@ Thu Jan  3 10:12:16 2002                        Michael Jennings (mej)
 Cleaned up the Debian stuff thanks to some help from Brian Almieda
 <bma@debian.org>.
 ----------------------------------------------------------------------
+Thu Jan  3 10:16:44 2002                        Michael Jennings (mej)
+
+Make sure to include debian/ directory in source tarball.
+----------------------------------------------------------------------
