@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.6 2001/08/01 03:28:22 mej Exp $
+# $Id: Prod.pm,v 1.7 2001/08/02 19:45:17 mej Exp $
 #
 
 package Avalon::Prod;
@@ -104,6 +104,7 @@ make_build_dir
     if (!chdir($builddir)) {
         &fatal_error("Unable to chdir to build directory -- $!\n");
     }
+    dprint "Chose build directory $builddir\n";
     return $builddir;
 }
 
@@ -125,9 +126,7 @@ make_log_dir
     if (!(-d $logdir || mkdir($logdir, 0755))) {
         &fatal_error("Unable to create log directory -- $!\n");
     }
-    if (!chdir($logdir)) {
-        &fatal_error("Unable to chdir to log directory -- $!\n");
-    }
+    dprint "Chose log directory $logdir\n";
     return $logdir;
 }
 
@@ -438,7 +437,6 @@ parse_product_entry
     # variable for the current package, see if it has a value for the parent product
     # of that package.  If not, try the parent product of that product, and continue
     # going back through the product hierarchy until we find a value or run out or products.
-    dprint "Checking product variables for $pkg:  ", join(' ', @allvars), "\n";
     foreach $pkgvar (@allvars) {
         if (! $pkgs->{$name}{$pkgvar}) {
             my ($pkg, $val) = undef;

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.13 2001/08/01 03:28:22 mej Exp $
+# $Id: Util.pm,v 1.14 2001/08/02 19:45:17 mej Exp $
 #
 
 package Avalon::Util;
@@ -344,11 +344,16 @@ move_files
     my $fcnt = 0;
     my $addname = 0;
 
+    if (!scalar(@flist)) {
+        dprint "Errr, no files to move?\n";
+        return 0;
+    }
     if (-d $dest) {
         # We'll need to add the filename to the dest each time
         $dest .= '/' if ($dest !~ /\/$/);
         $addname = 1;
     }
+    dprint "Moving ", join(' ', @flist), " to $dest.\n";
     foreach my $f (@flist) {
         my $target;
 
@@ -376,12 +381,17 @@ copy_files
     my $fcnt = 0;
     my $addname = 0;
 
+    if (!scalar(@flist)) {
+        dprint "Errr, no files to copy?\n";
+        return 0;
+    }
     if (-d $dest) {
         # We'll need to add the filename to the dest each time
         $dest .= '/' if ($dest !~ /\/$/);
         $addname = 1;
     }
-    foreach my $f (grep(sub {print "$_\n"; -f $_}, @flist)) {
+    dprint "Copying ", join(' ', @flist), " to $dest.\n";
+    foreach my $f (grep(-f $_, @flist)) {
         my $target;
 
         if ($addname) {
@@ -395,7 +405,6 @@ copy_files
         }
         $fcnt++;
     }
-    dprint "Copied all $fcnt files to $dest.\n";
     return $fcnt;
 }
 

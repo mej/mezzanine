@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.150 2001/08/01 03:28:22 mej Exp $
+# $Id: buildtool,v 1.151 2001/08/02 19:45:17 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -80,7 +80,7 @@ complete_package
     my $pkg = $_[0];
 
     push @completed_pkgs, $pkg;
-    nprint "Package build for $pkg completed successfully.\n";
+    nprint "Package build for $pkg completed successfully.  (${\(&get_timestamp())})\n";
 }
 
 # What to do if a package fails
@@ -101,18 +101,18 @@ fail_package
 
 # Remove failed packages and packages we don't build from the list
 sub
-update_package_list(\@)
+update_package_list
 {
     my $parray = shift;
     my @p = @{$parray};
 
     @{$parray} = ();
     foreach my $pkg (@p) {
+        next if ($pkgs->{$pkg}{TYPE} eq "image");
         if (!grep($_ eq $pkg, @failed_pkgs)) {
             push @{$parray}, $pkg;
         }
     }
-    @{$parray} = grep($pkgs->{$_}{TYPE} ne "image", @{$parray});
     return (@{$parray});
 }
 
@@ -175,6 +175,7 @@ build_package_forked
                 select LOGFILE; $| = 1;
             }
             $err = &build_single_package($pkg);
+            &cleanup_build_tree(undef, $buildroot, $opt_clean) if ($err == AVALON_SUCCESS);
             close(LOGFILE) if ($GLOBAL_LOG);
             exit ($err);
         } elsif ($! !~ /No more processes/ && $! !~ /Resource temporarily unavailable/) {
@@ -308,25 +309,27 @@ sub
 parallel_build
 {
     my @packages = @_;
-    my ($pwd, $builddir, $logdir);
+    my ($pwd, $builddir, $logdir, $buildroot, $dummy);
     my (@children, @vars);
     my %child_pkg;
 
     # Create the directories for building this product
     $pwd = &getcwd();
     $builddir = &make_build_dir($pwd);
-    $logdir = &make_log_dir($pwd);
+    $logdir = &make_log_dir($builddir);
+    # Need to do this here for parallel builds because it's not parallel-safe.  Race condition. :(
+    &prepare_build_tree($dummy, $builddir, $buildroot);
 
     # Download all the packages.
     &download_packages(@packages);
-    &update_package_list(@packages);
+    &update_package_list(\@packages);
 
     qprint "$progname:  Beginning $num_cpus-way build of ${\(scalar(@packages))} packages.  (${\(&get_timestamp())})\n";
     for (; scalar(@packages) || scalar(@children);) {
         my ($pid, $line, $left, $failed, $bldg, $err);
 
         # As long as there are packages left to build or children left to wait on, we loop.
-        for (; scalar(@children) < $num_cpus;) {
+        for (; scalar(@packages) && (scalar(@children) < $num_cpus);) {
             my ($pkg, $logfile);
 
             # Spawn child processes until we fill up our allotment ($num_cpus)
@@ -363,14 +366,13 @@ parallel_build
         # Check to see how it existed
         if ($err == AVALON_SUCCESS) {
             # Yay! :-)
-            nprint "Child process $pid for package $pkg completed successfully.  (${\(&get_timestamp())})\n";
             &complete_package($pkg);
         } else {
             my @tmp;
             local *ERRLOG;
 
             # Doh, it failed.  Look through the log file to try and find the problem.
-            if (!open(ERRLOG, "$builddir/logs/$pkg.log")) {
+            if (!open(ERRLOG, "$logdir/$pkg.log")) {
                 &fail_package($pkg, "Child process returned $err but the log file is missing");
                 next;
             }
@@ -392,7 +394,8 @@ parallel_build
         }
         # End of loop.  Time to spawn the next child.
     }
-    qprint "$progname:  Parallel build complete.  (${\(&get_timestamp())})\n";
+    &cleanup_build_tree($builddir, $buildroot, $opt_clean);
+    return (scalar(@failed_pkgs) ? AVALON_PACKAGE_FAILED : AVALON_SUCCESS);
 }
 
 sub
@@ -402,10 +405,13 @@ build_product
     my $builddir;
 
     $builddir = &make_build_dir(&getcwd());
+    if (!chdir($builddir)) {
+        &fatal_error("Unable to chdir to build directory -- $!\n");
+    }
 
     # Download all the packages.
     &download_packages(@packages);
-    &update_package_list(@packages);
+    &update_package_list(\@packages);
 
     # Call build_package() for each package; we don't care how that works as long as it does. :-)
     foreach my $pkg (@packages) {
@@ -413,7 +419,7 @@ build_product
     }
 
     # Now we clean up.
-    #&cleanup($opt_clean);
+    &cleanup_build_tree($builddir, undef, $opt_clean);
     return (scalar(@failed_pkgs) ? AVALON_PACKAGE_FAILED : AVALON_SUCCESS);
 }
 
@@ -431,9 +437,9 @@ summarize_failures
     $nt = scalar(@packages);
     $nb = $nt - $ns - $nf;
 
-    if ($ns == $nt) {
+    if ($nf == 0) {
         $face = ":-)";
-    } elsif ($nf == $nt) {
+    } elsif ($ns == 0) {
         $face = ":-(";
     } elsif ($ns > $nf) {
         $face = ":-}";
@@ -444,7 +450,6 @@ summarize_failures
     }
 
     qprint "Build Summary:  $ns Successful    $nf Failed    $nb Not Built    $nt Total    $face\n";
-
     if ($nf) {
         foreach $pkg (@failed_pkgs) {
             if ($failure->{$pkg}{MESSAGE}) {
@@ -481,7 +486,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.150 $ created on $Date: 2001/08/01 03:28:22 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.151 $ created on $Date: 2001/08/02 19:45:17 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -531,7 +536,7 @@ main
     if (defined($opt_P)) {
         $num_cpus = &count_cpus();
         if ($opt_P) {
-            my ($mult, $add);
+            my ($mult, $add) = (1, 0);
 
             $opt_P =~ m/^(?:[Xx]([\d.]+))?([-+][\d.]+)?$/;
             ($mult, $add) = ($1, $2);
@@ -552,11 +557,7 @@ main
     $buildroot = ($ENV{BUILDROOT} ? $ENV{BUILDROOT} : "/var/tmp/buildtool.$$");
 
     if (! $opt_clean) {
-        if (scalar(@packages) > 1) {
-            $opt_clean = "root";
-        } else {
-            $opt_clean = "all";
-        }
+        $opt_clean = "build";
     }
     dprint "Cleaning:  $opt_clean\n";
 
@@ -598,8 +599,13 @@ main
     return AVALON_BAD_PRODUCT if (!scalar(@packages));
 
     dprint "Products to be built (", scalar(@packages), " packages):  ", join(" ", @products), "\n";
-    $ret = &build_product(@packages);
+    if ($num_cpus > 1) {
+        $ret = &parallel_build(@packages);
+    } else {
+        $ret = &build_product(@packages);
+    }
     &summarize_failures();
+    qprint "Build completed.  (${\(&get_timestamp())})\n";
     close($GLOBAL_LOG) if ($GLOBAL_LOG);
     return $ret;
 }

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.9 2001/08/01 03:28:22 mej Exp $
+# $Id: Build.pm,v 1.10 2001/08/02 19:45:17 mej Exp $
 #
 
 package Avalon::Build;
@@ -116,7 +116,7 @@ prepare_build_tree(\$\$\$)
         $topdir = &getcwd() . "/build.avalon";
     }
     if (! $buildroot) {
-        $buildroot = "/var/tmp/avalon-buildroot.$$/$n";
+        $buildroot = "/var/tmp/avalon-buildroot.$$/$name";
     }
     dprint "$name | $topdir | $buildroot\n";
 
@@ -290,16 +290,26 @@ cleanup_build_tree
     if ($type =~ /no(ne)?/i) {
         return;
     } elsif ($type =~ /temp/i) {
-        @dirs = ("$topdir/BUILD", "$topdir/SOURCES", "$topdir/SPECS", $buildroot);
+        push(@dirs, "$topdir/BUILD", "$topdir/SOURCES", "$topdir/SPECS") if ($topdir);
+        push(@dirs, $buildroot) if ($buildroot);
     } elsif ($type =~ /rpm/i) {
-        @dirs = ("$topdir/BUILD", "$topdir/SOURCES", "$topdir/SRPMS", "$topdir/RPMS", "$topdir/SPECS");
+        push(@dirs, "$topdir/BUILD", "$topdir/SOURCES", "$topdir/SRPMS", "$topdir/RPMS", "$topdir/SPECS") if ($topdir);
     } elsif ($type =~ /(build)?root/) {
-        @dirs = ($buildroot);
+        push(@dirs, $buildroot) if ($buildroot);
+    } elsif ($type =~ /build/) {
+        push(@dirs, "$topdir/BUILD", "$topdir/SOURCES", "$topdir/SRPMS", "$topdir/RPMS", "$topdir/SPECS") if ($topdir);
+        push(@dirs, $buildroot) if ($buildroot);
+    } elsif ($type =~ /all/) {
+        push(@dirs, $topdir) if ($topdir);
+        push(@dirs, $buildroot) if ($buildroot);
     } else {
-        @dirs = ("$topdir/BUILD", "$topdir/SOURCES", "$topdir/SRPMS", "$topdir/RPMS", "$topdir/SPECS", $buildroot);
+        dprint "Unknown cleaning type \"$type\"\n";
+        return;
     }
-    foreach my $f (@dirs) {
-        &nuke_tree($f);
+    if (scalar(@dirs)) {
+        foreach my $f (@dirs) {
+            &nuke_tree($f) if (-e $f);
+        }
     }
 }
 
@@ -359,7 +369,7 @@ build_spm
 {
     my ($pkg, $topdir, $buildroot, $target_format) = @_;
     my $specfile;
-    my @tmp;
+    my (@tmp, @tmp2);
 
     if (! -d "F") {
         &show_backtrace();
@@ -375,8 +385,16 @@ build_spm
     }
     &copy_files($tmp[0], "$topdir/SPECS");
     $specfile = "$topdir/SPECS/" . &basename($tmp[0]);
-    @tmp = (&grepdir(sub {-f $_ && -s _}, "S"), &grepdir(sub {-f $_ && -s _}, "P"));
-    &copy_files(@tmp, "$topdir/SOURCES");
+    @tmp = &grepdir(sub {-f $_ && -s _}, "S");
+    @tmp2 = &grepdir(sub {-f $_ && -s _}, "P");
+    if (!scalar(@tmp)) {
+        @tmp = @tmp2;
+    } elsif (scalar(@tmp2)) {
+        push @tmp, @tmp2;
+    }
+    if (scalar(@tmp)) {
+        &copy_files(@tmp, "$topdir/SOURCES");
+    }
 
     return &build_topdir($specfile, $topdir, $buildroot, $target_format);
 }
@@ -479,6 +497,7 @@ sub
 build_srpm
 {
     my ($pkg, $module, $topdir, $buildroot, $target_format) = @_;
+    my $specfile;
 
     &prepare_build_tree($pkg, $topdir, $buildroot);
     # Explode SRPM here

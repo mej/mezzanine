@@ -1339,3 +1339,7 @@ Tue Jul 31 20:30:08 2001                        Michael Jennings (mej)
 Looks like builds are working now, and I've converted the parallel
 stuff.  We'll see how that goes tomorrow.
 ----------------------------------------------------------------------
+Thu Aug  2 12:47:16 2001                        Michael Jennings (mej)
+
+Now working a few small kinks out of the parallel build.
+----------------------------------------------------------------------
