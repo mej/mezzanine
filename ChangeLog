@@ -410,3 +410,9 @@ Made error messages shorter and less redundant.
 Merged RPM and SRPM info into new cache.  No more unnecessary rpm
 queries on startup.
 ----------------------------------------------------------------------
+Wed Apr  7 14:23:39 2004                        Michael Jennings (mej)
+
+Converted buildtool to use new init/option style.
+
+Added skeleton for new source code management (SCM) mechanism.
+----------------------------------------------------------------------

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.34 2004/03/14 15:42:07 mej Exp $
+# $Id: Build.pm,v 1.35 2004/04/07 18:24:40 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -262,12 +262,14 @@ install_hints($)
     local *HINTFILE;
 
     if (! $hints) {
+        dprint "No hint information provided.\n";
         return "";
     }
 
     if (-d $hints) {
         $hints = "$hints/" . &pkgvar_name();
         if (! -e $hints) {
+            dprintf("No hints file for package %s.\n", &pkgvar_name());
             return "";
         }
     }
@@ -284,6 +286,7 @@ install_hints($)
     close(HINTFILE);
 
     # Install hints.
+    dprintf("Installing hints:  %s\n", join(' ', @hint_packages));
     return &install_deps(join(' ', @hint_packages));
 }
 
@@ -295,8 +298,10 @@ install_deps($)
     my $inst;
 
     if (! $deps) {
+        dprint "Nothing to do.\n";
         return "";
     }
+    dprint "Installing the following:  $deps\n";
 
     if (&pkgvar_instroot()) {
         $inst = "chroot " . &pkgvar_instroot() . ' ';

@@ -23,8 +23,10 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.180 2004/04/05 02:29:42 mej Exp $
+# $Id: buildtool,v 1.181 2004/04/07 18:24:39 mej Exp $
 #
+
+use strict;
 
 # Include the Perl Modules we need
 use POSIX;
@@ -39,35 +41,26 @@ use Mezzanine::Pkg;
 use Mezzanine::Build;
 use Mezzanine::Prod;
 
-# Options variables
-our ($opt_h, $opt_d, $opt_v, $opt_q, $opt_Q, $opt_D, $opt_l, $opt_P,
-     $opt_t, $opt_C, $opt_U, $opt_T, $opt_L, $opt_s, $opt_i, $opt_H,
-     $opt_u, $opt_b, $opt_hi, $opt_ii, $opt_ir, $opt_ic, $opt_nocache,
-     $opt_clean);
-my @valid_opts = ("h|help", "v|version", "d|debug", "q|quiet",
-                  "Q|really-quiet|silent", "s|srcdir=s@",
-                  "p|prod|product|prodfile=s", "D|dir|tree=s",
-                  "l|log=s", "P|parallel:s", "t|target=s",
-                  "C|cflags=s", "T|tag=s", "nocache", "clean:s",
-                  "U|user=s", "L|location=s", "i|instroot|jail=s",
-                  "H|hints=s", "hi|hint-installer=s",
-                  "ii|instroot-init=s", "ir|instroot-reset=s",
-                  "ic|instroot-copy=s", "u|user=s", "b|buildtree=s");
-
-# Program variables
-my ($progname, $version, $author, $ret) = ("buildtool", "3.0", "Michael Jennings <mej\@eterm.org>", MEZZANINE_SUCCESS);
-
 my $GLOBAL_LOG = 0;  # Overall log file for product build
 my $verbosity = 2;  # Logging verbosity
-my $global_user;  # Build user
+my $global_user;  # Repository userid
 my $global_tree;  # Repository to use
 my $global_tag;  # Tag to get packages with
 my $buildtree_layout = "mej";  # The layout style to use for the build tree.
+my $prod = "";
+my $failure;
+my @failed_pkgs;
+my @completed_pkgs;
+my $num_cpus;
 
 # RPM/SRPM cache data.
 my $rpm_cache;
 my ($CFG_RPMCACHE_NAME, $CFG_RPMCACHE_PATH, $CFG_RPMCACHE_MTIME, $CFG_RPMCACHE_SIBLINGS) = (0, 1, 2, 3);
 
+# Build results cache data.
+my $build_cache;
+my ($CFG_BUILD_NAME, $CFG_BUILD_TIMESTAMP, $CFG_BUILD_RESULT,
+    $CFG_BUILD_TOPDIR, $CFG_BUILD_LOGFILE) = (0, 1, 2, 3, 4);
 
 # Print usage information
 sub
@@ -76,7 +69,7 @@ print_usage_info
     my ($leader, $underbar);
 
     print "\n";
-    $leader = "$progname $version Usage Information";
+    $leader = "$PROGNAME $VERSION Usage Information";
     $underbar = $leader;
     $underbar =~ s/./-/g;
     print "$leader\n$underbar\n";
@@ -93,7 +86,7 @@ print_usage_info
     print "    -P --parallel [expr]             Parallelize the build process based on the number of CPU's\n";
     print "    -t --target <arch>               Tell rpm to build for a particular target architecture\n";
     print "    -C --cflags <flags>              Specify the \$CFLAGS variable to use for building\n";
-    print "    -U --user <userid>               Specify a userid for the repository (overrides product files)\n";
+    print "    -U --repuser <userid>            Specify a userid for the repository (overrides product files)\n";
     print "    -T --tag <tag>                   Specify a tag to use (overrides all product files)\n";
     print "    -L --location <location_spec>    Specify where packages should be placed (as in product file)\n";
     print "    -s --srcdir <dir>                (Re)build all packages under <dir>\n";
@@ -226,7 +219,7 @@ scan_rpm_dirs
     nprint "Updating state information....\n";
     $topdir = &pkgvar_topdir();
 
-    $rpm_cache = Mezzanine::Config->new("$progname/rpm_cache.cdf");
+    $rpm_cache = Mezzanine::Config->new("$PROGNAME/rpm_cache.cdf");
 
     # Pre-scan all the binary RPM's for future use.  We need to know what SRPM
     # each binary came from, because some (lame) packages change the base name.
@@ -244,7 +237,7 @@ scan_rpm_dirs
         $path = &dirname($rpm);
         $aref = $rpm_cache->get($rpmfile);
 
-        if ($opt_nocache) {
+        if ($OPTION{"nocache"}) {
             dprint "Ignoring any cache info for $rpm.\n";
         } elsif (ref($aref) eq "ARRAY") {
             my @statinfo;
@@ -334,7 +327,6 @@ build_single_package
         $outfiles = &pkgvar_filename();
     } elsif (&is_build_needed()) {
         # Build the source
-        &pkgvar_target($target);
         if ($pkgs->{$pkg}{"INSTROOT"}) {
             $ENV{"HOME"} = &pkgvar_buildroot();
             &pkgvar_instroot($pkgs->{$pkg}{"INSTROOT"});
@@ -508,7 +500,7 @@ download_packages
     my ($line, $err, $msg);
 
     nprint "Downloading packages, please wait..." if (! &debug_get());
-    foreach $pkg (@packages) {
+    foreach my $pkg (@packages) {
         my ($files, $tag);
 
         $err = 0;
@@ -673,7 +665,7 @@ parallel_build
     }
 
 
-    if (! $opt_nocache) {
+    if (! $OPTION{"nocache"}) {
         &scan_rpm_dirs();
     }
 
@@ -681,13 +673,13 @@ parallel_build
     &download_packages(@packages);
     &update_package_list(\@packages);
 
-    qprint "$progname:  Beginning $num_cpus-way build of ${\(scalar(@packages))} packages.  (${\(&get_timestamp())})\n";
+    qprint "$PROGNAME:  Beginning $num_cpus-way build of ${\(scalar(@packages))} packages.  (${\(&get_timestamp())})\n";
     for (; scalar(@packages) || scalar(@children);) {
-        my ($pid, $line, $left, $failed, $bldg, $err);
+        my ($pid, $line, $left, $failed, $bldg, $err, $pkg);
 
         # As long as there are packages left to build or children left to wait on, we loop.
         for (; scalar(@packages) && (scalar(@children) < $num_cpus);) {
-            my ($pkg, $logfile, $save_builddir);
+            my ($logfile, $save_builddir);
 
             # Spawn child processes until we fill up our allotment ($num_cpus)
             $pkg = shift @packages;
@@ -719,8 +711,8 @@ parallel_build
         foreach my $pid (@children) {
             $line .= "$child_pkg{$pid} ($pid)    ";
         }
-        nprint "$progname:  Currently building:  $line\n";
-        nprint "$progname:  ${\(scalar(@completed_pkgs))} packages completed (${\(scalar(@failed_pkgs))} failed), "
+        nprint "$PROGNAME:  Currently building:  $line\n";
+        nprint "$PROGNAME:  ${\(scalar(@completed_pkgs))} packages completed (${\(scalar(@failed_pkgs))} failed), "
             . "${\(scalar(@children))} building, ${\(scalar(@packages))} in queue.\n";
 
         # This loop waits until one of our immediate children dies before continuing.
@@ -769,7 +761,7 @@ parallel_build
                 chomp($line = $tmp[$#tmp]);
 
                 # Record that the package failed.
-                if ($line =~ /^$progname:  Error:  Package \S+ failed:  (.*)$/) {
+                if ($line =~ /^$PROGNAME:  Error:  Package \S+ failed:  (.*)$/) {
                     &fail_package($pkg, $1);
                 } else {
                     $line = "Couldn't find error in log" if (! $line);
@@ -791,7 +783,7 @@ sub
 build_product
 {
     my @packages = @_;
-    my $builddir;
+    my ($builddir, $logdir);
 
     # Create the directories for building this product
     if ($buildtree_layout eq "orc") {
@@ -809,7 +801,7 @@ build_product
         &pkgvar_topdir($builddir);
     }
 
-    if (! $opt_nocache) {
+    if (! $OPTION{"nocache"}) {
         &scan_rpm_dirs();
     }
 
@@ -869,7 +861,7 @@ summarize_failures
 
     qprint "Build Summary:  $ns Successful    $nf Failed    $nb Not Built    $nt Total    $face\n";
     if ($nf) {
-        foreach $pkg (@failed_pkgs) {
+        foreach my $pkg (@failed_pkgs) {
             if ($failure->{$pkg}{MESSAGE}) {
                 eprint "Package \"$pkg\" failed:  $failure->{$pkg}{MESSAGE}.\n";
             } else {
@@ -883,46 +875,45 @@ summarize_failures
 sub
 main
 {
-    my $srcdir;
+    my ($srcdir, $ret);
+    my @orig_argv = @ARGV;
 
-    #
-    # Initialization
-    #
-    umask 022;
+    &mezz_init("buildtool", "3.0", "help|h", "version|v", "debug|d",
+               "quiet|q", "silent|really-quiet|Q", "srcdir|s=s@",
+               "prod|p|prodfile|product=s", "dir|D|tree=s", "log|l=s",
+               "parallel|P:s", "target|t=s", "cflags|C=s", "tag|T=s",
+               "nocache", "clean:s", "repuser|U=s", "location|L=s",
+               "instroot|i|jail=s", "hints|H=s",
+               "hintinstaller|hint-installer|hi=s", "instroot-init|ii=s",
+               "instroot-reset|ir=s", "instroot-copy|ic=s",
+               "user|u=s", "buildtree|b=s");
+    if ($OPTION{"version"}) {
+        &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
+                       'CVS Revision $Revision: 1.181 $ created on $Date: 2004/04/07 18:24:39 $ by $Author: mej $ ');
+    }
+    if ($OPTION{"help"}) {
+	&print_usage_info();
+    }
     open(STDIN, "</dev/null");
     open(STDERR, ">&STDOUT");
-    Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
-    Getopt::Long::GetOptions(@valid_opts);
-
-    #
-    # Options Handling
-    #
-    if ($opt_v) {
-        &print_version($progname, $version, $author,
-                       'CVS Revision $Revision: 1.180 $ created on $Date: 2004/04/05 02:29:42 $ by $Author: mej $ ');
-        # Never returns
-    }
-    if ($opt_h) {
-	&print_usage_info();   # Never returns
-    }
 
     # Set basic options
-    &debug_set($opt_d);
-    if ($opt_Q) {
+    &debug_set($OPTION{"debug"});
+    if ($OPTION{"silent"}) {
         $verbosity = 0;
-    } elsif ($opt_q) {
+    } elsif ($OPTION{"quiet"}) {
         $verbosity = 1;
     }
-    $global_user = $opt_U;
-    $global_tree = $opt_D;
-    $global_tag = $opt_T;
-    $buildtree_layout = (($opt_b) ? ($opt_b) : ("mej"));
-    &pkgvar_cleanup((($opt_clean) ? ($opt_clean) : ("temp")));
-    &pkgvar_target($opt_t);
+    $global_user = $OPTION{"repuser"};
+    $global_tree = $OPTION{"dir"};
+    $global_tag = $OPTION{"tag"};
+    $buildtree_layout = (($OPTION{"buildtree"}) ? ($OPTION{"buildtree"}) : ("mej"));
+    &pkgvar_cleanup((($OPTION{"clean"}) ? ($OPTION{"clean"}) : ("temp")));
+    &pkgvar_target($OPTION{"target"});
 
     # Open log file, if any.
-    if ($opt_l) {
-        my $log_filename = $opt_l;
+    if ($OPTION{"log"}) {
+        my $log_filename = $OPTION{"log"};
 
         if (-e $log_filename) {
             rename($log_filename, "$log_filename.prev");
@@ -937,24 +928,25 @@ main
         }
     }
     select STDOUT; $| = 1;
+    nprintf("$PROGNAME $VERSION:  %s [%s]\n", join(' ', @orig_argv), &get_timestamp());
 
     # Handle hint file/directory specification
-    if ($opt_H) {
-        $ENV{"MEZZANINE_HINTS"} = $opt_H;
+    if ($OPTION{"hints"}) {
+        $ENV{"MEZZANINE_HINTS"} = $OPTION{"hints"};
     }
     &set_hints_info($ENV{"MEZZANINE_HINTS"});
-    if ($opt_hi) {
+    if ($OPTION{'hintinstaller'}) {
         # Override installer from command line.
-        &set_hints_info("$opt_hi\%");
+        &set_hints_info("$OPTION{hintinstaller}\%");
     }
 
     # Figure out parallelization stuff
-    if (defined($opt_P)) {
+    if (defined($OPTION{"parallel"})) {
         $num_cpus = &count_cpus();
-        if ($opt_P) {
+        if ($OPTION{"parallel"}) {
             my ($mult, $add) = (1, 0);
 
-            $opt_P =~ m/^(?:[Xx]([\d.]+))?([-+][\d.]+)?$/;
+            $OPTION{"parallel"} =~ m/^(?:[Xx]([\d.]+))?([-+][\d.]+)?$/;
             ($mult, $add) = ($1, $2);
             $num_cpus = $num_cpus * ($mult ? $mult : 1) + ($add ? $add : 0);
         }
@@ -964,12 +956,12 @@ main
     dprint "Using $num_cpus parallel process(es).\n";
 
     # Try to parse the product name we were given into a name or a name-version combo
-    if ($opt_p) {
-        $prod = $opt_p;
-    } elsif (!scalar(@opt_s)) {
-        $prod = $prodname = &basename(&getcwd());
+    if ($OPTION{"prod"}) {
+        $prod = $OPTION{"prod"};
+    } elsif (!scalar(@{$OPTION{"srcdir"}})) {
+        $prod = &basename(&getcwd());
     }
-    if (scalar(@opt_s) && ! $prod) {
+    if (scalar(@{$OPTION{"srcdir"}}) && ! $prod) {
         # If we don't have a product name, but we do have one or more
         # SRPM directories to look at, we need to auto-generated the
         # prod file.  NOTE:  This must happen *before* the instroot
@@ -978,10 +970,10 @@ main
     }
 
     # Handle specification of a global value for the LOCATIONS product
-    # variable.  This must happen after $prod is set but before $opt_s
+    # variable.  This must happen after $prod is set but before $OPTION{"srcdir"}
     # is handled.
-    if ($opt_L) {
-        my $locations = $opt_L;
+    if ($OPTION{"location"}) {
+        my $locations = $OPTION{"location"};
 
         if (-d $locations) {
             $locations = '/.*/=' . $locations;
@@ -999,14 +991,15 @@ main
     }
 
     # Set the build user if needed.  This must happen after $prod is
-    # set but before $opt_s is handled.
-    if ($opt_u) {
-        &assign_product_variable($prod, "BUILDUSER", $opt_u);
+    # set but before $OPTION{"srcdir"} is handled.
+    if ($OPTION{"user"}) {
+        &assign_product_variable($prod, "BUILDUSER", $OPTION{"user"});
     }
 
     # Figure out the installroot stuff.
-    if ($opt_i) {
-        my ($instroot, $instroot_init, $instroot_reset, $instroot_copy) = ($opt_i, $opt_ii, $opt_ir, $opt_ic);
+    if ($OPTION{"instroot"}) {
+        my ($instroot, $instroot_init, $instroot_reset, $instroot_copy)
+            = ($OPTION{"instroot"}, $OPTION{"instroot-init"}, $OPTION{"instroot-reset"}, $OPTION{"instroot-copy"});
 
         # If we have $MEZZANINE_INSTROOT_SOURCE_RSYNC and we don't have the options,
         # automagically fill the commands in appropriately.  If needed, authentication
@@ -1037,9 +1030,9 @@ main
     }
 
     # *Now* we can look at our SRPM directories.
-    if (scalar(@opt_s)) {
+    if (scalar(@{$OPTION{"srcdir"}})) {
         # This must happen *after* the instroot stuff above.
-        foreach my $srcdir (@opt_s) {
+        foreach my $srcdir (@{$OPTION{"srcdir"}}) {
             my @pkg_list;
 
             @pkg_list = &grepdir(sub {((-f $_ || -d $_) && (&basename($_) !~ /^\./))}, $srcdir);
@@ -1056,34 +1049,14 @@ main
     # Set the buildroot for the overall build.
     &pkgvar_buildroot($ENV{"MEZZANINE_BUILDROOT"});
 
-    #
-    # Signal handling
-    #
-    $SIG{HUP} = 'IGNORE';
-    $SIG{INT} = \&handle_signal;
-    $SIG{TERM} = \&handle_signal;
-    $SIG{QUIT} = \&handle_fatal_signal;
-    $SIG{ILL} = \&handle_fatal_signal;
-    $SIG{ABRT} = \&handle_fatal_signal;
-    $SIG{FPE} = \&handle_fatal_signal;
-    $SIG{SEGV} = \&handle_fatal_signal;
-    $SIG{BUS} = \&handle_fatal_signal;
-    $SIG{TSTP} = 'IGNORE';
-    $SIG{TTIN} = 'IGNORE';
-    $SIG{TTOU} = 'IGNORE';
-
-    #
-    # Environment modifications
-    #
-    $ENV{"LANG"} = "C" if (! $ENV{"LANG"});
     if ($ENV{"MEZZANINE_MAKE"}) {
         $ENV{"MAKE"} = $ENV{"MEZZANINE_MAKE"};
     } else {
         # Parallel product builds and make -jN don't get along well.
         $ENV{"MAKE"} = "make";
     }
-    if ($opt_C) {
-        $ENV{"CFLAGS"} = $opt_C;
+    if ($OPTION{"cflags"}) {
+        $ENV{"CFLAGS"} = $OPTION{"cflags"};
     } elsif ($ENV{"MEZZANINE_CFLAGS"}) {
         $ENV{"CFLAGS"} = $ENV{"MEZZANINE_CFLAGS"};
     } else {
