@@ -467,3 +467,7 @@ Fri Jun  4 13:15:28 2004                        Michael Jennings (mej)
 
 Lots of stuff here including building a directory full of SPM's.
 ----------------------------------------------------------------------
+Fri Jun  4 16:30:09 2004                        Michael Jennings (mej)
+
+Fixed mid-module import.
+----------------------------------------------------------------------

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RevCtl.pm,v 1.22 2004/06/04 17:16:40 mej Exp $
+# $Id: RevCtl.pm,v 1.23 2004/06/04 20:30:24 mej Exp $
 #
 
 package Mezzanine::RevCtl;
@@ -751,12 +751,16 @@ import_vendor_sources($)
         if (-r "CVS/Repository") {
             $module = &cat_file("CVS/Repository") . "/$module";
         }
+        if ((-r "CVS/Root") && (&revctl_repository() eq $ENV{"CVSROOT"})) {
+            &revctl_repository(&cat_file("CVS/Root"));
+        }
     } elsif (-d $module) {
         chdir($module);
     }
 
     if (! $tag) {
-        ($tag = &basename($module)) =~ tr/[a-z]/[A-Z]/;
+        $tag = &basename($module);
+        $tag =~ tr/[a-z]/[A-Z]/;
     } else {
         $tag =~ s/^-r //;
     }

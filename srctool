@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.40 2004/06/04 17:16:40 mej Exp $
+# $Id: srctool,v 1.41 2004/06/04 20:30:24 mej Exp $
 #
 
 use strict;
@@ -124,12 +124,26 @@ import_package
             }
             print "You requested local mode.  You will need to import the new tree by hand (mzimport $pkg).\n";
         } else {
+            my $module;
+
             chdir($tmpdir);
             $tag =~ tr/a-z/A-Z/;
             $tag =~ s/\./_/g;
             &revctl_rtag($tag);
             &revctl_exclusive(1);
-            $err = &import_vendor_sources();
+            if (-r "$pwd/CVS/Repository") {
+                my $tmp = &cat_file("$pwd/CVS/Repository");
+
+                chomp($tmp);
+                $module = "$tmp/$pkg";
+            }
+            if ((-r "CVS/Root") && (&revctl_repository() eq $ENV{"CVSROOT"})) {
+                my $tmp = &cat_file("CVS/Root");
+
+                chomp($tmp);
+                &revctl_repository($tmp);
+            }
+            $err = &import_vendor_sources($module);
             if ($err != MEZZANINE_SUCCESS) {
                 eprint "Import of $pkgfile failed.\n";
                 return $err;
@@ -673,7 +687,7 @@ main
                "path|P=s");
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.40 $ created on $Date: 2004/06/04 17:16:40 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.41 $ created on $Date: 2004/06/04 20:30:24 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();
