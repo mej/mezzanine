@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.11 2001/07/31 03:33:55 mej Exp $
+# $Id: Util.pm,v 1.12 2001/07/31 22:23:00 mej Exp $
 #
 
 package Avalon::Util;
@@ -182,14 +182,14 @@ fatal_error(@)
 sub
 dprintf(@)
 {
-    my @dbg;
     my ($f, $l, $s, $format);
 
     return if (! $debug);
     $format = shift;
-    @dbg = caller(1);
-    ($f, $l, $s) = @dbg[1, 2, 3];
+    (undef, undef, undef, $s) = caller(1);
+    (undef, $f, $l) = caller(0);
     $f =~ s/^.*\/([^\/]+)$/$1/;
+    $s =~ s/^\w+:://g;
     printf("[$f/$l/$s()] $format", @_);
 }
 

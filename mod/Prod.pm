@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Prod.pm,v 1.4 2001/07/31 03:33:55 mej Exp $
+# $Id: Prod.pm,v 1.5 2001/07/31 22:23:00 mej Exp $
 #
 
 package Avalon::Prod;
@@ -196,7 +196,7 @@ parse_product_entry
             $name = $inp[1];
             shift @inp;
         }
-        dprint "parse_product_entry():  Found type \"$type\" and name \"$name\"\n";
+        dprint "Found type \"$type\" and name \"$name\"\n";
         if ($type =~ /^prod/) {
             $type = "product";
         } elsif ($type =~ /^mod/) {
@@ -282,9 +282,9 @@ parse_product_entry
 
         # Recursively convert products into their component packages
         $prods->{$name}{PRODUCT} = $prod;
-        dprint "parse_product_entry():  Parent product of $name is $prod.\n";
+        dprint "Parent product of $name is $prod.\n";
         if (! &parse_prod_file($pname, $pver, $prod)) {
-            dprint "parse_product_entry():  parse_prod_file($pname, $pver, $prod) failed.\n";
+            dprint "parse_prod_file($pname, $pver, $prod) failed.\n";
             undef $prods->{$name}{PRODUCT};
             if ($type_guess) {
                 # If this was a guess, a potential infinite loop exists if we try
@@ -296,15 +296,15 @@ parse_product_entry
 
                 $line =~ s/^[^:]+://;
                 $tmp = &parse_product_entry($line, $prodname, $prodver);
-                dprint "parse_product_entry():  parse_product_entry(\"$line\", $prodname, $prodver) returned $tmp, so I will to.\n";
+                dprint "parse_product_entry(\"$line\", $prodname, $prodver) returned $tmp, so I will to.\n";
                 return $tmp;
             }
         }
-        dprint "parse_product_entry():  parse_prod_file($pname, $pver, $prod) succeeded, so I'm returning 1.\n";
+        dprint "parse_prod_file($pname, $pver, $prod) succeeded, so I'm returning 1.\n";
         return 1;
     }
 
-    dprint "parse_product_entry():  Module is $module, name is $name\n";
+    dprint "Module is $module, name is $name\n";
     # Add defaults for stuff that is required
     if ($type eq "module" || $type eq "image") {
         # Anything needed here?
@@ -374,29 +374,30 @@ parse_product_entry
     $pkgs->{$name}{TYPE} = $type;
     $pkgs->{$name}{MODULE} = $module;
     $pkgs->{$name}{FILENAME} = ($filename ? $filename : $module);
-    dprint "parse_product_entry():  New package:  $name (module $pkgs->{$name}{MODULE}, "
+    dprint "New package:  $name (module $pkgs->{$name}{MODULE}, "
         . "filename $pkgs->{$name}{FILENAME}) is a $pkgs->{$name}{TYPE}\n";
     foreach $pkgvar (keys %pkgvars) {
         if ($pkgvars{$pkgvar} !~ /^$/) {
             $pkgs->{$name}{$pkgvar} = $pkgvars{$pkgvar};
             xpush(@allvars, $pkgvar);
-            dprint "parse_product_entry():  Added variable $pkgvar to package $name with value \"$pkgs->{$name}{$pkgvar}\"\n";
+            dprint "Added variable $pkgvar to package $name with value \"$pkgs->{$name}{$pkgvar}\"\n";
         }
     }
     # Go through each propogated variable.  If there is no assigned value for that
     # variable for the current package, see if it has a value for the parent product
     # of that package.  If not, try the parent product of that product, and continue
     # going back through the product hierarchy until we find a value or run out or products.
+    dprint "Checking product variables for $pkg:  ", join(' ', @allvars), "\n";
     foreach $pkgvar (@allvars) {
         if (! $pkgs->{$name}{$pkgvar}) {
             my ($pkg, $val) = undef;
 
-            dprint "parse_product_entry():  No value for the variable $pkgvar for $name.\n";
+            dprint "No value for the variable $pkgvar for $name.\n";
             for ($pkg = $prod; $pkg; $pkg = $prods->{$pkg}{PRODUCT}) {
-                dprint "parse_product_entry():  Checking $pkg for $pkgvar\n";
+                dprint "Checking $pkg for $pkgvar\n";
                 if ($prods->{$pkg}{$pkgvar}) {
                     $val = $prods->{$pkg}{$pkgvar};
-                    dprint "parse_product_entry():  Found fallback value $val in product $pkg\n";
+                    dprint "Found fallback value $val in product $pkg\n";
                     last;
                 }
             }
@@ -409,7 +410,7 @@ parse_product_entry
     push @packages, $name;
     # Set the parent product name
     $pkgs->{$name}{PRODUCT} = ($prod ? $prod : "unknown-product");
-    dprint "parse_product_entry():  Parent product of $name set to $prod.  I'm done, returning 1.\n";
+    dprint "Parent product of $name set to $prod.  I'm done, returning 1.\n";
     return 1;
 }
 
@@ -427,10 +428,10 @@ parse_prod_file($$$)
     # First, find the product file and open it.
     dprint "parse_prod_file($prodname, ", ($prodver ? $prodver : ""), ", ", ($parent_prod ? $parent_prod : ""), ")\n";
     if (!($prodfile = &find_product_file($prodname, $prodver))) {
-        dprint "parse_prod_file():  find_product_file() failed.  Returning 0.\n";
+        dprint "find_product_file() failed.  Returning 0.\n";
         return 0;
     }
-    dprint "parse_prod_file():  Found product file \"$prodfile\"\n";
+    dprint "Found product file \"$prodfile\"\n";
     open(PROD, "$prodfile") || return 0;
 
     # Ignore everything until we encounter a product name
@@ -438,7 +439,7 @@ parse_prod_file($$$)
     @allvars = ();
     while (<PROD>) {
         chomp($line = $_);
-        dprint "parse_prod_file():  Parsing $prodfile:  \"$line\"\n";
+        dprint "Parsing $prodfile:  \"$line\"\n";
         $line =~ s/^\s*(.*\S)\s*$/$1/;  # Strip leading and trailing whitespace
         next if ($line =~ /^\#/ || $line !~ /\S/);
         next if ($skip_to_name && $line !~ /^name\s*:/i);
@@ -455,9 +456,9 @@ parse_prod_file($$$)
                 next if ($prodver && $line ne $prodver);
                 # Found it!
                 if ($prodver) {
-                    dprint "parse_prod_file():  Found product version match.  Time to parse the product.\n";
+                    dprint "Found product version match.  Time to parse the product.\n";
                 } else {
-                    dprint "parse_prod_file():  No product version given.  Using first entry:  $line\n";
+                    dprint "No product version given.  Using first entry:  $line\n";
                     $prodver = $line;
                 }
                 $prod = "$prodname-$prodver";
@@ -465,10 +466,10 @@ parse_prod_file($$$)
                 push @products, $prod;
                 if ($parent_prod) {
                     $prods->{$prod}{PRODUCT} = $parent_prod;
-                    dprint "parse_prod_file():  Parent product of $prod is $prods->{$prod}{PRODUCT}.\n";
+                    dprint "Parent product of $prod is $prods->{$prod}{PRODUCT}.\n";
                 } elsif ($prods->{$prodname}{PRODUCT}) {
                     $prods->{$prod}{PRODUCT} = $prods->{$prodname}{PRODUCT};
-                    dprint "parse_prod_file():  Parent product of $prod is $prods->{$prod}{PRODUCT}.\n";
+                    dprint "Parent product of $prod is $prods->{$prod}{PRODUCT}.\n";
                 }
                 next;
             } else {
@@ -476,25 +477,25 @@ parse_prod_file($$$)
                 last;
             }
         } else {
-            dprint "parse_prod_file():  Checking \"$line\" for product variables.\n";
+            dprint "Checking \"$line\" for product variables.\n";
             if ($line !~ /^(prod|mod|s?rpm|ima?ge?)/i && $line =~ /^([^ \t:]+)\s*:\s*(\S+.*)$/) {
                 my ($var, $val);
 
                 # The regexp above should only match var:value (a product variable)
                 ($var, $val) = ($1, $2);
                 $var = &get_var_name($var);
-                dprint "parse_prod_file():  Product variable for $prod:  $var -> $val\n";
+                dprint "Product variable for $prod:  $var -> $val\n";
                 $prods->{$prod}{$var} = $val;
             } elsif (!($skip_to_name || $skip_to_next_ver)) {
                 my $tmp;
 
-                dprint "parse_prod_file():  Calling parse_product_entry()...\n";
+                dprint "Calling parse_product_entry()...\n";
                 $tmp = &parse_product_entry($line, $prodname, $prodver);
-                dprint "parse_prod_file():  parse_product_entry() returned $tmp\n";
+                dprint "parse_product_entry() returned $tmp\n";
             }
         }
     }
-    dprint "parse_prod_file():  Closing file $prodfile and returning $found\n";
+    dprint "Closing file $prodfile and returning $found\n";
     close(PROD);
     return ($found);
 }

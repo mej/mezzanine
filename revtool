@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.73 2001/07/18 22:47:49 mej Exp $
+# $Id: revtool,v 1.74 2001/07/31 22:23:00 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -125,7 +125,6 @@ talk_to_cvs_server
 
     for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
         $err = 0;
-        dprint "About to run $cmd\n";
         if (!open(CMD, "$cmd 2>&1 |")) {
             eprint "Execution of \"$cmd\" failed -- $!";
             return AVALON_COMMAND_FAILED;
@@ -238,7 +237,7 @@ talk_to_cvs_server
             }
         }
         close(CMD);
-        dprint "Command returned $?\n";
+        dprint "\"$cmd\" returned $?\n" if ($?);
     }
     if ($err == 0 && $? != 0 && $type !~ /^query_r?diff$/) {
         eprint "An unknown error must have occured, because the command returned $?\n";
@@ -911,7 +910,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.73 $ created on $Date: 2001/07/18 22:47:49 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.74 $ created on $Date: 2001/07/31 22:23:00 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

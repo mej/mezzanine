@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.11 2001/07/31 03:33:55 mej Exp $
+# $Id: Pkg.pm,v 1.12 2001/07/31 22:23:00 mej Exp $
 #
 
 package Avalon::Pkg;
@@ -263,7 +263,7 @@ fetch_package
         return (AVALON_DUPLICATE, undef);
     }
 
-    $cmd = "revtool -l $cvsroot $tag $opts -g $filename";
+    $cmd = (&debug_get() ? "revtool -d" : "revtool") . " -l $cvsroot $tag $opts -g $filename";
     if (!open(REVTOOL, "$cmd 2>&1 |")) {
         return (AVALON_COMMAND_FAILED, "Execution of \"$cmd\" failed -- $!");
     }
