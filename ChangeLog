@@ -432,3 +432,7 @@ Added 2 new options, one of which should already work, for determining
 whether or not to retry broken builds or rebuild old successful
 builds.
 ----------------------------------------------------------------------
+Wed Apr 14 20:19:18 2004                        Michael Jennings (mej)
+
+Include spec file in post-build tree.
+----------------------------------------------------------------------

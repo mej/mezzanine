@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.37 2004/04/12 00:09:27 mej Exp $
+# $Id: Build.pm,v 1.38 2004/04/15 00:25:43 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -604,6 +604,7 @@ build_spm
     } elsif (scalar(@tmp) > 1) {
         return (MEZZANINE_BAD_MODULE, "Only one specfile/script dir allowed per package (@tmp)", undef);
     } else {
+        &copy_files($tmp[0], "$topdir/SPECS");
         &copy_files($tmp[0], "$instroot$topdir/SPECS");
         $specfile = "$topdir/SPECS/" . &basename($tmp[0]);
 
@@ -669,6 +670,7 @@ build_pdr
         return (MEZZANINE_BAD_MODULE, "Only one specfile/script dir allowed per package (@tmp)", undef);
     }
 
+    &copy_files($tmp[0], "$topdir/SPECS");
     &copy_files($tmp[0], "$instroot$topdir/SPECS");
     $specfile = "$topdir/SPECS/" . &basename($tmp[0]);
 
@@ -884,6 +886,12 @@ build_srpm
     }
     if (scalar(@specs) != 1) {
         wprint "Found ${\(scalar(@specs))} spec files in $pkg?!\n";
+    }
+
+    if ($instroot) {
+        &pkgvar_instroot("");
+        @tmp = &rpm_install();
+        &pkgvar_instroot($instroot);
     }
     @tmp = &rpm_install();
     if (($err = shift @tmp) != MEZZANINE_SUCCESS) {
