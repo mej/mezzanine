@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.147 2001/07/25 02:57:32 mej Exp $
+# $Id: buildtool,v 1.148 2001/07/27 21:27:18 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -164,7 +164,7 @@ download_packages
 }
 
 sub
-do_package_stage
+place_package
 {
     my ($path, $version, $release, $type);
     my @outfiles;
@@ -367,6 +367,47 @@ parallel_build
     qprint "$progname:  Parallel build complete.  (${\(&get_timestamp())})\n";
 }
 
+sub
+build_product
+{
+    my packages = @_;
+
+    # Create a build area for ourselves.
+    if (!mkdir("build.avalon", 0755)) {
+        &fatal_error("Unable to create build directory -- $!\n");
+    }
+    if (!chdir("build.avalon")) {
+        &fatal_error("Unable to chdir to build directory -- $!\n");
+    }
+
+    # Download all the packages.
+    &download_packages(@packages);
+
+    # Call build_package() for each package; we don't care how that happens yet.
+    foreach my $pkg (@packages) {
+        my ($module, $err, $msg, $outfiles);
+
+        if ($pkgs->{$pkg}{MODULE}) {
+            $module = $pkgs->{$pkg}{MODULE};
+        } elsif ($pkgs->{$pkg}{FILENAME}) {
+            $module = $pkgs->{$pkg}{FILENAME};
+        } else {
+            &fail_package($pkg, "I don't know what to build from!");
+            next;
+        }
+        ($err, $msg, $outfiles) = &build_package($module, &getcwd(), undef, $target);
+        if ($err != AVALON_SUCCESS) {
+            &fail_package($pkg, $msg);
+            next;
+        }
+        &place_package($pkg, $outfiles);
+    }
+
+    # Now we clean up.
+    #&cleanup($opt_clean);
+
+}
+
 # main() here is basically the same as main() in C
 sub
 main
@@ -391,7 +432,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.147 $ created on $Date: 2001/07/25 02:57:32 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.148 $ created on $Date: 2001/07/27 21:27:18 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -421,10 +462,21 @@ main
     }
     select STDOUT; $| = 1;
     $verbosity = ($opt_Q ? 0 : ($opt_q ? 1 : 2));
-    $target = $opt_t;
     $global_user = $opt_U;
     $global_tree = $opt_D;
     $global_tag = $opt_T;
+
+    # Target package format
+    if ($opt_t) {
+        if ($opt_t =~ /rpm/i) {
+            $target = "rpms";
+        } elsif ($opt_t =~ /deb/i) {
+            $target = "debs";
+        }
+    }
+    if (! $target) {
+        $target = "rpms";
+    }
 
     # Figure out parallelization stuff
     if (defined($opt_P)) {
@@ -497,9 +549,7 @@ main
     return AVALON_BAD_PRODUCT if (!scalar(@packages));
 
     dprint "Products to be built (", scalar(@packages), " packages):  ", join(" ", @products), "\n";
-    &download_packages(@packages);
-#    &cleanup($opt_clean);
-    return (scalar(@failed_pkgs)) ? AVALON_PACKAGE_FAILED : AVALON_SUCCESS;
+    return &build_product(@packages);
 }
 
 exit &main();

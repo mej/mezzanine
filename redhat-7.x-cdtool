@@ -5,7 +5,7 @@
 # Michael Jennings <mej@valinux.com>
 # 21 July 2000
 #
-# $Id: redhat-7.x-cdtool,v 1.13 2001/07/18 22:47:49 mej Exp $
+# $Id: redhat-7.x-cdtool,v 1.14 2001/07/27 21:27:18 mej Exp $
 #
 
 umask 022
@@ -39,6 +39,7 @@ CD2=va-redhat-${RH_VER}-cd2
 CD=va-redhat-${RH_VER}-cd
 EXTRAS=va-redhat-${RH_VER}-extras
 NET=va-redhat-${RH_VER}-net
+BUFFY=va-redhat-${RH_VER}-buffy
 RH_GOOP_DIR=/usr/lib/anaconda-runtime
 RH_KERNEL_GOOP=$RH_GOOP_DIR/buildinstall
 RH_PKGLIST_GOOP=$RH_GOOP_DIR/genhdlist
@@ -92,7 +93,7 @@ cd $BUILD_DIR/$NET
 $RH_PKGLIST_GOOP `pwd`
 
 cd $BUILD_DIR
-$RH_SPLIT_GOOP $NET i386 > tmp.list
+$RH_SPLIT_GOOP $NET i386 > $BUFFY/RH-VALE-${VA_VER}-packages.list
 
 NUM=1
 rm -f ${CD}*/RedHat/RPMS/*.rpm

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.6 2001/07/27 01:45:37 mej Exp $
+# $Id: Build.pm,v 1.7 2001/07/27 21:27:18 mej Exp $
 #
 
 package Avalon::Build;
@@ -519,22 +519,25 @@ build_package
     }
 
     if (-d $pkg) {
+        my @ret;
+
         # It's a directory.  That means it's some type of module.
         if (!chdir($pkg)) {
-            eprint "Unable to chdir into \"$pkg\" -- $!\n";
-            return AVALON_SYSTEM_ERROR;
+            return (AVALON_SYSTEM_ERROR, "Unable to chdir into \"$pkg\" -- $!", undef);
         }
         if (-d "F") {
             # Okay, there's an F/ directory.  I bet it's an SPM.
-            return &build_spm(".", $topdir, $buildroot, $target_format);
+            @ret = &build_spm(".", $topdir, $buildroot, $target_format);
         } elsif (-f "Makefile.avalon" && -s _) {
             # There's a custom Makefile.  It's a Custom Full Source Tree (FST).
-            return &build_cfst(".", $topdir, $buildroot, $target_format);
+            @ret = &build_cfst(".", $topdir, $buildroot, $target_format);
         } else {
             # If it's not either of the above, it better be a standard Full Source Tree (FST),
             # and it better conform to the proper assumptions or provide other instructions.
-            return &build_fst(".", $topdir, $buildroot, $target_format);
+            @ret = &build_fst(".", $topdir, $buildroot, $target_format);
         }
+        chdir($pwd);
+        return @ret;
     } elsif (-f _ && -s _) {
         # It's a file.  Must be a package file of some type.
         my $module;
@@ -550,18 +553,14 @@ build_package
         } elsif ($pkg =~ /\.(tar\.|t)(gz|Z|bz2)$/) {
             return &build_tarball($pkg, $module, $topdir, $buildroot, $target_format);
         } elsif ($pkg =~ /\.rpm$/) {
-            eprint "Alright...  Who's the wiseguy that told me to recompile \"$pkg,\" a binary RPM? :-P\n";
-            return AVALON_BAD_PACKAGE;
+            return (AVALON_BAD_PACKAGE, "Alright...  Who's the wiseguy that told me to recompile \"$pkg,\" a binary RPM? :-P", undef);
         } else {
-            eprint "I'm sorry, but I don't know how to build \"$pkg.\"\n";
-            return AVALON_BAD_PACKAGE;
+            return (AVALON_BAD_PACKAGE, "I'm sorry, but I don't know how to build \"$pkg.\"", undef);
         }
     } else {
         # Okay, it's neither a file nor a directory.  What the hell is it?
-        eprint "I'm sorry, but I can't figure out what to do with \"$pkg.\"\n";
-        return AVALON_BAD_PACKAGE;
+        return (AVALON_BAD_PACKAGE, "I'm sorry, but I can't figure out what to do with \"$pkg.\"", undef);
     }
-    return AVALON_SUCCESS;
 }
 
 ### Private functions
