@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.21 2004/01/26 20:46:10 mej Exp $
+# $Id: RPM.pm,v 1.22 2004/01/26 22:15:24 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -104,7 +104,8 @@ rpm_form_command
         }
     } else {
         if (! &pkgvar_command()) {
-            &pkgvar_command("/bin/rpm");
+            &pkgvar_command(((&file_user() == $UID) ? ("") : (sprintf("/bin/su -s /bin/sh %s -c", &pkgvar_get("builduser"))))
+                            . " /bin/sh -c \"/bin/rpm");
         }
     }
     $cmd = &pkgvar_command();
@@ -148,7 +149,6 @@ rpm_form_command
             &show_backtrace();
             &fatal_error("Bad call to rpm_form_command(\"build\")!\n");
         }
-        $cmd .= "\"";
     } elsif ($type eq "contents") {
         $cmd .= " -qlv -p " . &pkgvar_filename();
     } elsif ($type eq "install") {
@@ -164,6 +164,7 @@ rpm_form_command
             $cmd .= " -a";
         }
     }
+    $cmd .= "\"";
 
     dprint "Command:  $cmd\n";
     return $cmd;
@@ -282,7 +283,7 @@ parse_spec_file
             dprint "    $h -> $specdata->{HEADER}{$h}\n";
         }
     }
-    dprint "Returning $specdata\n";
+    #dprint "Returning $specdata\n";
     return $specdata;
 }
 

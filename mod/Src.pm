@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.14 2003/12/30 23:02:55 mej Exp $
+# $Id: Src.pm,v 1.15 2004/01/26 22:15:24 mej Exp $
 #
 
 package Mezzanine::Src;
@@ -225,7 +225,7 @@ convert_srpm_to_spm($)
     # Install the SRPM into the temporary directory
     &pkgvar_filename($pkgfile);
     $destdir = &getcwd() if ($destdir =~ /^\.\/?$/);
-    &pkgvar_parameters("--define \"_sourcedir $destdir/S\" --define \"_specdir $destdir/F\"");
+    &pkgvar_parameters("--define '_sourcedir $destdir/S' --define '_specdir $destdir/F'");
     ($err, $msg) = &package_install();
     &pkgvar_parameters("");
     if ($err != MEZZANINE_SUCCESS) {

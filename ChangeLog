@@ -287,3 +287,9 @@ Force ownership in created tarballs to root/root.
 
 Fixed -L option to work.
 ----------------------------------------------------------------------
+Mon Jan 26 17:14:42 2004                        Michael Jennings (mej)
+
+Fixed build as other user for SRPM's.
+
+Cleaned up some debugging output.
+----------------------------------------------------------------------

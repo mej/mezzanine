@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.170 2004/01/26 20:46:10 mej Exp $
+# $Id: buildtool,v 1.171 2004/01/26 22:15:24 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -228,6 +228,7 @@ build_single_package
             if (! -e $pkgs->{$pkg}{"INSTROOT"} && $pkgs->{$pkg}{"INSTROOT_INIT"}) {
                 my @output;
 
+                nprint "Initializing chroot jail, please wait.\n";
                 @output = &run_cmd($pkgs->{$pkg}{"INSTROOT_INIT"}, $pkgs->{$pkg}{"INSTROOT"}, "instroot-init:  ");
                 if ($output[0] != MEZZANINE_SUCCESS) {
                     wprint "Initialization of install root failed.\n";
@@ -235,6 +236,7 @@ build_single_package
             } elsif (-e $pkgs->{$pkg}{"INSTROOT"} && $pkgs->{$pkg}{"INSTROOT_RESET"}) {
                 my @output;
 
+                nprint "Resetting chroot jail, please wait.\n";
                 @output = &run_cmd($pkgs->{$pkg}{"INSTROOT_RESET"}, $pkgs->{$pkg}{"INSTROOT"}, "instroot-reset:  ");
                 if ($output[0] != MEZZANINE_SUCCESS) {
                     wprint "Reset of install root failed.\n";
@@ -242,13 +244,15 @@ build_single_package
             }
             if ($pkgs->{$pkg}{"BUILDUSER"}) {
                 &pkgvar_set("builduser", $pkgs->{$pkg}{"BUILDUSER"});
-                &file_owner($pkgs->{$pkg}{"BUILDUSER"}, $pkgs->{$pkg}{"BUILDGROUP"}, $pkgs->{$pkg}{"INSTROOT"});
+                &file_owner($pkgs->{$pkg}{"BUILDUSER"}, "", $pkgs->{$pkg}{"INSTROOT"});
+                dprintf("Building as %s (%lu:%lu)\n", &pkgvar_get("builduser"), $mz_uid, $mz_gid);
             }
         } else {
             &pkgvar_instroot("");
             if ($pkgs->{$pkg}{"BUILDUSER"}) {
                 &pkgvar_set("builduser", $pkgs->{$pkg}{"BUILDUSER"});
-                &file_owner($pkgs->{$pkg}{"BUILDUSER"}, $pkgs->{$pkg}{"BUILDGROUP"});
+                &file_owner($pkgs->{$pkg}{"BUILDUSER"});
+                dprintf("Building as %s (%lu:%lu)\n", &pkgvar_get("builduser"), $mz_uid, $mz_gid);
             }
         }
         ($err, $msg, $outfiles) = &build_package();
@@ -666,7 +670,7 @@ main
     #
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.170 $ created on $Date: 2004/01/26 20:46:10 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.171 $ created on $Date: 2004/01/26 22:15:24 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -770,13 +774,13 @@ main
         # info and other flags can be added to $MEZZANINE_INSTROOT_SOURCE_RSYNC.
         if ($ENV{"MEZZANINE_INSTROOT_SOURCE_RSYNC"}) {
             if (! $instroot_init) {
-                $instroot_init = "rsync -PHaz --delete --delete-after --exclude=/proc $ENV{MEZZANINE_INSTROOT_SOURCE_RSYNC}";
+                $instroot_init = "rsync -Haz --delete --delete-after --exclude=/proc $ENV{MEZZANINE_INSTROOT_SOURCE_RSYNC}";
             }
             if (! $instroot_reset) {
-                $instroot_reset = "rsync -PHaz --delete --delete-after --exclude=/proc $ENV{MEZZANINE_INSTROOT_SOURCE_RSYNC}";
+                $instroot_reset = "rsync -Haz --delete --delete-after --exclude=/proc $ENV{MEZZANINE_INSTROOT_SOURCE_RSYNC}";
             }
             if (! $instroot_copy) {
-                $instroot_copy = "rsync -PHa --delete --delete-after";
+                $instroot_copy = "rsync -Ha --delete --delete-after";
             }
         }
 

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.57 2004/01/26 20:46:10 mej Exp $
+# $Id: pkgtool,v 1.58 2004/01/26 22:15:24 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -103,7 +103,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.57 $ created on $Date: 2004/01/26 20:46:10 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.58 $ created on $Date: 2004/01/26 22:15:24 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -160,6 +160,7 @@ main
     if ($opt_u) {
         &pkgvar_set("builduser", $opt_u);
         &file_owner(&pkgvar_get("builduser"), "", &pkgvar_instroot());
+        dprintf("Building as %s (%lu:%lu)\n", &pkgvar_get("builduser"), $mz_uid, $mz_gid);
     }
 
     if (!&pkgvar_filename()) {

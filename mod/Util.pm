@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.24 2004/01/26 20:46:10 mej Exp $
+# $Id: Util.pm,v 1.25 2004/01/26 22:15:24 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -84,6 +84,7 @@ my $debug = 0;
 my $progname = "Mezzanine";
 my $mz_uid = $UID;
 my $mz_gid = $GID;
+$mz_gid =~ s/\s+.*$//;
 
 ### Initialize private global variables
 
@@ -192,6 +193,7 @@ file_user($)
     if (defined($_[0])) {
         $mz_uid = $_[0];
     }
+    dprint "UID:  $mz_uid\n";
     return $mz_uid;
 }
 
@@ -201,6 +203,7 @@ file_group($)
     if (defined($_[0])) {
         $mz_gid = $_[0];
     }
+    dprint "GID:  $mz_gid\n";
     return $mz_gid;
 }
 
@@ -245,6 +248,7 @@ file_owner($$$)
         }
         close(GROUP);
     }
+    dprint "UID:  $mz_uid     GID:  $mz_gid\n";
     return ($mz_uid, $mz_gid);
 }
 
@@ -406,8 +410,9 @@ mkdirhier($$)
     foreach $dir (@dirs) {
         $path .= "$dir/";
         if (! -d $path) {
-            dprint "mkdirhier() creating \"$path\"\n";
+            dprint "Creating \"$path\"\n";
             mkdir($path, $mask) || eprint("Unable to create $path -- $!\n");
+            dprint "chown $mz_uid:$mz_gid $path\n";
             chown($mz_uid, $mz_gid, $path);
         }
     }
@@ -456,7 +461,6 @@ move_files
     my $addname = 0;
 
     if (!scalar(@flist)) {
-        dprint "Errr, no files to move?\n";
         return 0;
     }
     if (-d $dest) {
@@ -483,6 +487,7 @@ move_files
         }
 
         # Set permissions on the target file appropriately.
+        dprint "chown $mz_uid:$mz_gid $target\n";
         chown($mz_uid, $mz_gid, $target) || dprint "chown($mz_uid, $mz_gid, $target) failed -- $!\n";
         chmod($mode, $target) || dprintf("chmod(%05o, $target) failed -- $!\n", $mode);
         $fcnt++;
@@ -501,7 +506,6 @@ copy_files
     my $addname = 0;
 
     if (!scalar(@flist)) {
-        dprint "Errr, no files to copy?\n";
         return 0;
     }
     if (-d $dest) {
@@ -528,6 +532,7 @@ copy_files
         }
 
         # Set permissions on the target file appropriately.
+        dprint "chown $mz_uid:$mz_gid $target\n";
         chown($mz_uid, $mz_gid, $target) || dprint "chown($mz_uid, $mz_gid, $target) failed -- $!\n";
         chmod($mode, $target) || dprintf("chmod(%05o, $target) failed -- $!\n", $mode);
         $fcnt++;
