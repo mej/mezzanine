@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.18 2000/05/18 03:36:32 mej Exp $
+# $Id: revtool,v 1.19 2000/05/19 04:40:36 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -143,7 +143,8 @@ commit_to_master
     my $cwd = `pwd`;
     my $file_list = join(" ", @_);
 
-    $cwd =~ s/[^\/]+\///;  # Remove all but the last part
+    $cwd =~ s/^\S+\/([^\/]+)$/$1/;  # Remove all but the last part
+    chomp($cwd);
     dprint "cwd is $cwd\n";
     open(LOGFILE, ">$logfile") || die("Cannot write to $logfile -- $!\n");
     dprint("Opened log file $logfile for commit log\n");
@@ -152,13 +153,10 @@ commit_to_master
     $fullname = $pw_info[6];
     printf LOGFILE "%-25s%45s\n\n", scalar localtime, ($fullname ? "$fullname ($username)" : "$username");
     close(LOGFILE);
-    print "Please edit your commit message now...\n";
-    system($ENV{"EDITOR"} ? $ENV{"EDITOR"} : "vi", $logfile);
-    open(LOGFILE, "<$logfile");
-    $module = &cat_file("CVS/Repository");
+    chomp($module = &cat_file("CVS/Repository"));
     dprint "Current directory is \"$cwd\", module name is \"$module\"\n";
     if (! -f "ChangeLog") {
-        if ($module =~ /^\s*$cwd\s*$/ || $cwd =~ /^\s*$module\s*$/) {
+        if ($module eq $cwd) {
             open(CL, ">ChangeLog");
             print "WARNING:  You have no ChangeLog here.  I have created one for you.\n";
             &add_new_files("ChangeLog");
@@ -168,6 +166,9 @@ commit_to_master
     } else {
         open(CL, ">>ChangeLog");
     }
+    print "Please edit your commit message now...\n";
+    system($ENV{"EDITOR"} ? $ENV{"EDITOR"} : "vi", $logfile);
+    open(LOGFILE, "<$logfile");
     while (<LOGFILE>) {
         print CL $_;
     }

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.14 2000/05/18 03:36:32 mej Exp $
+# $Id: buildtool,v 1.15 2000/05/19 04:40:36 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -160,30 +160,47 @@ mkdirhier
     dprint "Something went wrong in mkdirhier()!\n" if (! -d $_[0]);
 }
 
-# Parse product definition files recursively to establish
-# all the products we need to work with and what packages or
-# other products compose them.
+# Translate abbreviated variable names into their canonical forms
 sub
-parse_product_def
+get_var_name
 {
-    my $prod = $_[0];
+    my $var = $_[0];
 
-    open(PROD, "$proddir/${prod}.prod") || return 0;
+    $var =~ tr/[a-z]/[A-Z]/;
 
-    # For now, just skip the product information.  Eventually we might care, but not now.
-    # The first blank line signifies the end of the product information.
-    while (<PROD>) {
-        chomp($line = $_);
-        last if ($line =~ /^\s*$/);
+    # Commonly shortened variables are REVISION/TAG,
+    # VERSION, DATE, CVSROOT, SPECFILE, DIRS
+    if ($var =~ /^REV/ || $var =~ /^TAG/) {
+        $var = "REVISION";
+    } elsif ($var =~ /^REL/) {
+        $var = "RELEASE";
+    } elsif ($var =~ /^VER/) {
+        $var = "VERSION";
+    } elsif ($var =~ /^SPEC/) {
+        $var = "SPECFILE";
+    } elsif ($var =~ /^DIR/) {
+        $var = "DIRS";
+    } elsif ($var =~ /^LOC/) {
+        $var = "LOCATIONS";
     }
-    while (<PROD>) {
-        chomp($line = $_);
-        $line =~ s/^\s+//;
-        $line =~ s/\s+$//;
-        next if ($line !~ /\S/ || $line =~ /^\#/);  # Ignore blank lines and comment lines
-        undef %pkgvars;
-        undef $module;
-        @inp = split(/\s+/, $line);
+    return $var;
+}
+
+sub
+parse_product_entry
+{
+    my ($line, $prod) = @_;
+    my ($type, $name, $module, $filename);
+    my $type_guess = 0;
+
+    $line =~ s/^\s+//;
+    $line =~ s/\s+$//;
+    next if ($line !~ /\S/ || $line =~ /^\#/);  # Ignore blank lines and comment lines
+    undef %pkgvars;
+    undef $module;
+    undef $type;
+    @inp = split(/\s+/, $line);
+    if ($inp[0] =~ /^(prod|mod|srpm)[^:]*:/) {
         # Line begins with <type>:<name>, like "module:Eterm"
         ($type, $name) = split(":", shift @inp);
         $type =~ tr/[A-Z]/[a-z]/;
@@ -194,82 +211,154 @@ parse_product_def
         } elsif ($type =~ /^srpm/) {
             $type = "srpm";
         } else {
-            eprint "Unrecognized type \"$type\" for package $name.  I'll have to skip that one.\n";
-            next;
+            eprint "$type is not a valid package type.  I'll try to guess the correct one.\n";
+            $type = 0;
         }
-        if ($name =~ /\/.+$/) {
-            ($module = $name) =~ s/^([^\/]+)(.+)$/$1/;
-            $name =~ s/^(.*)\/([^\/]+)$/$2/;
-        }
-        dprint "Module is $module, name is $name\n";
-        if ($type eq "product") {
-            # Recursively convert products into their component packages
-            &parse_product_def($name);
+    }
+    if (! $type) {
+        # They didn't tell us the type, so let's guess educatedly.
+        $type_guess = 1;
+        ($name = shift @inp) =~ s/^[^:]*://;
+        if ($name =~ /\.src\.rpm/) {
+            # Name ends with .src.rpm.  That's an easy one.
+            $type = "srpm";
+        } elsif (-d "$basedir/$name") {
+            # If a directory exists in the basedir with that name, probably a module
+            $type = "module";
         } else {
-            # The rest of the line is whitespace-delimited sets of var=value
-            foreach $varval (@inp) {
-                ($var, $val) = split("=", $varval);
-                $var =~ tr/[a-z]/[A-Z]/;
-                # Common variables are REVISION/TAG, VERSION, DATE, CVSROOT, SPECFILE
-                if ($var =~ /^REV/ || $var =~ /^TAG/) {
-                    $var = "REVISION";
-                } elsif ($var =~ /^REL/) {
-                    $var = "RELEASE";
-                } elsif ($var =~ /^VER/) {
-                    $var = "VERSION";
-                } elsif ($var =~ /^SPEC/) {
-                    $var = "SPECFILE";
-                } elsif ($var =~ /^DIR/) {
-                    $var = "DIRECTORY";
-                }
-                $pkgvars{$var} = $val;
+            my @contents = ();
+
+            # Check to see if there is a product file for it
+            if (opendir(DIR, "$proddir")) {
+                @contents = readdir(DIR);
+                closedir(DIR);
             }
-            # Add defaults for stuff that is required
-            if ($type eq "module") {
-                if ($pkgvars{RELEASE} =~ /^head$/i) {
-                    undef $pkgvars{RELEASE};
-                }
-            } elsif ($type eq "srpm") {
-                $name =~ s/\.src\.rpm$//;
-                if (!defined $pkgvars{RELEASE}) {
-                    if ($name !~ /^\S+-[^-]+-[^-]+$/) {
-                        eprint "I wasn't given enough information about the $name package in ${prod}.prod.  For SRPM\n";
-                        eprint "packages, the version and release information must be specified as variables or\n";
-                        eprint "embedded in the package name.  I'm going to have to skip that one.\n";
-                        next;
-                    } else {
-                        ($tmp = $name) =~ s/^\S+-[^-]+-//;
-                        $name =~ s/-[^-]+$//;
-                        $pkgvars{RELEASE} = $tmp;
-                    }
-                }
-                if (!defined $pkgvars{VERSION}) {
-                    if ($name !~ /^\S+-[^-]+$/) {
-                        eprint "I wasn't given enough information about the $name package in ${prod}.prod.  For SRPM\n";
-                        eprint "packages, the version and release information must be specified as variables or\n";
-                        eprint "embedded in the package name.  I'm going to have to skip that one.\n";
-                        next;
-                    } else {
-                        ($tmp = $name) =~ s/^(\S+)-([^-]+)$/$2/;
-                        $name =~ s/^(\S+)-([^-]+)$/$1/;
-                        $pkgvars{VERSION} = $tmp;
-                    }
-                }
-                $filename = sprintf("%s$name-$pkgvars{VERSION}-$pkgvars{RELEASE}.src.rpm", ($module ? "$module/" : ""));
+            @contents = grep($_ =~ /^$name-?/ && $_ =~ /\.prod$/, @contents);
+            if ($#contents >= 0) {
+                $type = "product";
+                ($name = $contents[0]) =~ s/\.prod$//;
+            } else {
+                $type = "module";
             }
-            # Now that we've got the name/version/release in their final forms, set up the data structures.
-            $pkgs->{$name}{TYPE} = $type;
-            $pkgs->{$name}{MODULE} = ($module ? $module : $name);
-            $pkgs->{$name}{FILENAME} = ($filename ? $filename : $module);
-            dprint "New package:  $name is a $pkgs->{$name}{TYPE}\n";
-            foreach $pkgvar (keys %pkgvars) {
-                if ($pkgvars{$pkgvar} !~ /^$/) {
-                    $pkgs->{$name}{$pkgvar} = $pkgvars{$pkgvar};
-                    dprint "Added variable $pkgvar to package $name with value \"$pkgs->{$name}{$pkgvar}\"\n";
-                }
-            }
-            push @packages, $name;
         }
+    }
+    if ($type_guess) {
+        nprint "$progname:  Warning:  Since you didn't specify, I have guessed that \"$name\" is a $type.\n";
+        nprint "$progname:  If this is wrong, please specify its type in the product definition.\n";
+    }
+    if ($name =~ /\/.+$/) {
+        ($module = $name) =~ s/^([^\/]+)(.+)$/$1/;
+        $name =~ s/^(.*)\/([^\/]+)$/$2/;
+    } else {
+        $module = $name;
+    }
+    dprint "Module is $module, name is $name\n";
+    if ($type eq "product") {
+        # Recursively convert products into their component packages
+        if (! &parse_prod_file($name)) {
+            if ($type_guess) {
+                # If this was a guess, a potential infinite loop exists if we try
+                # to parse the product entry again.  So just punt at this point.
+                return 0;
+            } else {
+                $line =~ s/^[^:]+://;
+                return &parse_product_entry($line, $prod);
+            }
+        }
+    }
+    # The rest of the line is whitespace-delimited sets of var=value
+    foreach $varval (@inp) {
+        ($var, $val) = split("=", $varval);
+        $var = &get_var_name($var);
+        $pkgvars{$var} = $val;
+    }
+    # Add defaults for stuff that is required
+    if ($type eq "module") {
+        if ($pkgvars{REVISION} =~ /^head$/i) {
+            undef $pkgvars{REVISION};
+        }
+    } elsif ($type eq "srpm") {
+        $name =~ s/\.src\.rpm$//;
+        if (!defined $pkgvars{RELEASE}) {
+            if ($name !~ /^\S+-[^-]+-[^-]+$/) {
+                eprint "I wasn't given enough information about the $name package in ${prod}.prod.  For SRPM\n";
+                eprint "packages, the version and release information must be specified as variables or\n";
+                eprint "embedded in the package name.  I'm going to have to skip that one.\n";
+                next;
+            } else {
+                ($tmp = $name) =~ s/^\S+-[^-]+-//;
+                $name =~ s/-[^-]+$//;
+                $pkgvars{RELEASE} = $tmp;
+            }
+        }
+        if (!defined $pkgvars{VERSION}) {
+            if ($name !~ /^\S+-[^-]+$/) {
+                eprint "I wasn't given enough information about the $name package in ${prod}.prod.  For SRPM\n";
+                eprint "packages, the version and release information must be specified as variables or\n";
+                eprint "embedded in the package name.  I'm going to have to skip that one.\n";
+                next;
+            } else {
+                ($tmp = $name) =~ s/^(\S+)-([^-]+)$/$2/;
+                $name =~ s/^(\S+)-([^-]+)$/$1/;
+                $pkgvars{VERSION} = $tmp;
+            }
+        }
+        $filename = sprintf("%s$name-$pkgvars{VERSION}-$pkgvars{RELEASE}.src.rpm", ($module ? "$module/" : ""));
+    }
+    # Now that we've got the name/version/release in their final forms, set up the data structures.
+    $pkgs->{$name}{TYPE} = $type;
+    $pkgs->{$name}{MODULE} = $module;
+    $pkgs->{$name}{FILENAME} = ($filename ? $filename : $module);
+    dprint "New package:  $name is a $pkgs->{$name}{TYPE}\n";
+    foreach $pkgvar (keys %pkgvars) {
+        if ($pkgvars{$pkgvar} !~ /^$/) {
+            $pkgs->{$name}{$pkgvar} = $pkgvars{$pkgvar};
+            dprint "Added variable $pkgvar to package $name with value \"$pkgs->{$name}{$pkgvar}\"\n";
+        }
+    }
+    if (!defined $pkgs->{$name}{STAGES}) {
+        $pkgs->{$name}{STAGES} = "scebpia";
+    }
+    push @packages, $name;
+    if ($prod) {
+        $pkgs->{$name}{PRODUCT} = $prod;
+    }
+    return 1;
+}
+
+# Parse product definition files recursively to establish
+# all the products we need to work with and what packages or
+# other products compose them.
+sub
+parse_prod_file
+{
+    my $prod = $_[0];
+
+    open(PROD, "$proddir/${prod}.prod") || return 0;
+
+    # Read and parse the product information
+    while (<PROD>) {
+        chomp($line = $_);
+        next if ($line =~ /^\#/);
+        if ($line =~ /^name:/i) {
+            # Official name for the product
+            ($prod = $line) =~ s/^[^:]+:\s*//;
+            push @products, $prod;
+            dprint "Product name is now $prod\n";
+        } elsif ($line =~ /^([^:]+):(.*)$/) {
+            my ($var, $val);
+
+            ($var, $val) = ($1, $2);
+            $var = &get_var_name($var);
+            dprint "Product variable for $prod:  $var -> $val\n";
+            $prods->{$prod}{$var} = $val;
+        } else {
+            last;
+        }
+    }
+    while (<PROD>) {
+        chomp($line = $_);
+        &parse_product_entry($line, $prod);  # Ignore return value
     }
     close(PROD);
     return 1;
@@ -383,7 +472,7 @@ build_rpms
     } elsif ($#spec_errors != -1) {
         $msg = sprintf("The spec file contains the following errors:  \"%s\"", join("\" \"", @spec_errors));
     }
-    return ($err, $msg, $srpm);
+    return ($err >> 8, $msg, $srpm);
 }
 
 #
@@ -429,6 +518,10 @@ do_bootstrap_stage
         }
     }
     foreach $pkg (@p) {
+        if ($pkgs->{$pkg}{STAGES} !~ /s/) {
+            nprint "$progname:  Skipping bootstrap stage for the \"$pkg\" package.\n";
+            next;
+        }
         nprint "$progname:  Starting bootstrap stage for the \"$pkg\" package....\n";
         $filename = $pkgs->{$pkg}{FILENAME};
         if ($pkgs->{$pkg}{CVSROOT}) {
@@ -469,18 +562,21 @@ do_bootstrap_stage
 sub
 do_compose_stage
 {
-    my ($specfile, $target, $pn, $dir, $err, $line);
-    my @contents;
-    my @tmp;
+    my ($specfile, $target, $pn, $dir, $err, $line, $sf);
+    my (@contents, @tmp, @dirs, @sfiles);
     my @p = @packages;
 
     qprint "$progname:  Entering the compose stage.  (${\(&get_timestamp())})\n";
     # No compose stage for SRPM's since they're *already* SRPM's....
     foreach $pkg (grep $pkgs->{$_}{TYPE} eq "module", @p) {
+        if ($pkgs->{$pkg}{STAGES} !~ /c/) {
+            nprint "$progname:  Skipping compose stage for the \"$pkg\" package.\n";
+            next;
+        }
         nprint "$progname:  Starting compose stage for the \"$pkg\" package....\n";
 
         # The first step is to examine the module directory to find
-        # the names of the vendor source directory and the spec file.
+        # the names of the vendor source files/directories and the spec file.
         if (! chdir($pkgs->{$pkg}{MODULE})) {
             &fail_package($pkg, "compose", "Could not chdir into $pkgs->{$pkg}{MODULE} -- $!");
             next;
@@ -510,44 +606,79 @@ do_compose_stage
                 next;
             }
         }
-        if ($pkgs->{$pkg}{DIRECTORY} && -d $pkgs->{$pkg}{DIRECTORY}) {
-            # If they gave us the directory name, and it exists as a directory, use it
-            $dir = $pkgs->{$pkg}{DIRECTORY};
+
+        undef @dirs;
+        if ($pkgs->{$pkg}{DIRS}) {
+            # If they gave us the directory name(s), use them
+            @dirs = split(",", $pkgs->{$pkg}{DIRS});
         } else {
-            # First choice:  The only directory not named CVS/SCCS/RCS/BitKeeper in the module
-            @tmp = grep($_ !~ /^(CVS|SCCS|RCS|BitKeeper)$/ && -d $_, @contents);
-            if ($#tmp != 0) {
-                # Second choice:  The only directory that starts with the package name
-                @tmp = grep($_ =~ /^$pkg/ && -d $_, @tmp);
-                if ($#tmp != 0) {
-                    # We're screwed.  Give up.
-                    &fail_package($pkg, "compose", "Unable to determine vendor source directory");
-                }
-            }
-            $dir = $tmp[0];
+            # If not, assume any unhidden directory in the module
+            # which is not named CVS/SCCS/RCS/BitKeeper
+            @dirs = grep($_ !~ /^(CVS|SCCS|RCS|BitKeeper)$/ && $_ !~ /^\./ && -d $_, @contents);
+        }
+        dprint "Source directories:  ", join(" ", @dirs), "\n" if ($#dirs >= 0);
+
+        if ($pkgs->{$pkg}{SFILES}) {
+            @sfiles = split(",", $pkgs->{$pkg}{SFILES});
+        } else {
+            @sfiles = ();
+        }
+        dprint "Additional source files:  ", join(" ", @sfiles), "\n" if ($#sfiles >= 0);
+
+        if ($#dirs == -1 && $#sfiles == -1) {
+            nprint "$progname:  Warning:  $pkg has no sources at all?  Are you sure?\n";
         }
 
-        # tar that bad boy up.
-        $cmd = "tar --exclude CVS --exclude RCS --exclude BitKeeper --exclude SCCS -zcf "
-                . "$builddir/SOURCES/${pkg}-$pkgs->{$pkg}{VERSION}.tar.gz $dir";
-        if (!open(CMD, "$cmd 2>&1 |")) {
-            &fail_package($pkg, "compose", "Execution of \"$cmd\" failed -- $!");
-            next;
-        }
-        $err = 0;
-        while (<CMD>) {
-            chomp($line = $_);
-            nprint "tar output -> $line\n";
-            if ($line !~ /^$/) {
-                # Any output from this command is an error.
-                $err = 1;
+        foreach $dir (@dirs) {
+            my ($sdir, $sfile) = split(":", $dir);
+            my $zip;
+
+            # If we weren't given the archive filename, take our best guess.  If
+            # it doesn't work, oh well.  They should've helped us out.
+            if (! $sfile) {
+                $sfile = "$sdir.tar.gz";
+            }
+            if ($pkgs->{$pkg}{TAR}) {
+                $cmd = $pkgs->{$pkg}{TAR};
+                $cmd =~ s/\%d/$sdir/;
+                $cmd =~ s/\%f/$sfile/;
+            } else {
+                if ($pkgs->{$pkg}{ZIP}) {
+                    $zip = "--use-compress-program=$pkgs->{$pkg}{ZIP}";
+                } elsif ($sfile =~ /(gz|Z)$/) {
+                    $zip = "--use-compress-program=gzip";
+                } elsif ($sfile =~ /\.bz2$/) {
+                    $zip = "--use-compress-program=bzip2";
+                }
+                $cmd = "tar --exclude CVS --exclude RCS --exclude BitKeeper --exclude SCCS"
+                        . "\"$zip\" -cf $builddir/SOURCES/$sfile $sdir";
+            }
+            dprint "Creating $sfile from $sdir:  $cmd\n";
+            if (!open(CMD, "$cmd 2>&1 |")) {
+                &fail_package($pkg, "compose", "Execution of \"$cmd\" failed -- $!");
+                next;
+            }
+            $err = 0;
+            while (<CMD>) {
+                chomp($line = $_);
+                nprint "tar output -> $line\n";
+            }
+            close(CMD);
+            dprint "\"$cmd\" returned $?\n";
+            if ($?) {
+                &fail_package($pkg, "compose", "Creation of vendor source tarball $sfile from $sdir failed");
+                next;
             }
         }
-        close(CMD);
-        dprint "\"$cmd\" returned $?\n";
-        if ($err || $?) {
-            &fail_package($pkg, "compose", "Creation of vendor source tarball failed");
-            next;
+
+        foreach $sf (@sfiles) {
+            my $rc;
+
+            $rc = system("cp $sf $builddir/SOURCES/") >> 8;
+            if ($rc) {
+                &fail_package($pkg, "compose", "Unable to copy $sf to $builddir/SOURCES/ -- $!");
+                $err = 1;
+            }
         }
 
         # Now build the new SRPM from the new vendor source tarball and the spec file.
@@ -588,6 +719,10 @@ do_explode_stage
 
     foreach $pkg (@p) {
         undef @manifest;
+        if ($pkgs->{$pkg}{STAGES} !~ /e/ && $pkgs->{$pkg}{STAGES} !~ /x/) {
+            nprint "$progname:  Skipping explode stage for the \"$pkg\" package.\n";
+            next;
+        }
         nprint "$progname:  Starting explode stage for the \"$pkg\" package....\n";
         $rpm = ($pkgs->{$pkg}{RPMCMD} ? $pkgs->{$pkg}{RPMCMD} : "rpm");
 
@@ -694,6 +829,10 @@ do_build_stage
     qprint "$progname:  Entering the build stage.  (${\(&get_timestamp())})\n";
 
     foreach $pkg (@p) {
+        if ($pkgs->{$pkg}{STAGES} !~ /b/) {
+            nprint "$progname:  Skipping build stage for the \"$pkg\" package.\n";
+            next;
+        }
         nprint "$progname:  Starting build stage for the \"$pkg\" package....\n";
 
         # Check for a target SRPM that is newer than the original SRPM and the
@@ -746,6 +885,10 @@ do_package_stage
     }
     
     foreach $pkg (@p) {
+        if ($pkgs->{$pkg}{STAGES} !~ /p/) {
+            nprint "$progname:  Skipping package accumulation stage for the \"$pkg\" package.\n";
+            next;
+        }
         nprint "$progname:  Starting package accumulation stage for the \"$pkg\" package....\n";
         $version = $pkgs->{$pkg}{VERSION};
         $release = $pkgs->{$pkg}{RELEASE};
@@ -802,6 +945,10 @@ do_iso_stage
 
     qprint "$progname:  Entering the ISO image stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (@p) {
+        if ($pkgs->{$pkg}{STAGES} !~ /i/) {
+            nprint "$progname:  Skipping ISO image stage for the \"$pkg\" package.\n";
+            next;
+        }
         nprint "$progname:  Starting ISO image stage for the \"$pkg\" package....\n";
 
         nprint "$progname:  ISO image stage for \"$pkg\" is complete.\n";
@@ -816,6 +963,10 @@ do_cleanup_stage
 
     qprint "$progname:  Entering the cleanup stage.  (${\(&get_timestamp())})\n";
     foreach $pkg (@p) {
+        if ($pkgs->{$pkg}{STAGES} !~ /a/) {
+            nprint "$progname:  Skipping cleanup stage for the \"$pkg\" package.\n";
+            next;
+        }
         nprint "$progname:  Starting cleanup stage for the \"$pkg\" package....\n";
 
         nprint "$progname:  Cleanup stage for \"$pkg\" is complete.\n";
@@ -888,14 +1039,18 @@ main
     }
 
     # Parse the product definition files to figure out what the heck we need to build. :)
-    if (! &parse_product_def($prod)) {
-        # FIXME:  Eventually this should fall back on treating it like a module
-        eprint "$prod does not seem to be a product.  Perhaps you made a typo?\n";
-        return;
+    if (! &parse_prod_file($prod)) {
+        if (! &parse_product_entry($prod)) {
+            eprint "$prod does not seem to be a valid product or product entry.\n";
+            eprint "Perhaps you made a typo?\n";
+            return;
+        }
     }
 
-    &build_process();
-    &summarize_failures();
+    if ($opt_b ne "Z") {  # -dbZ, a.k.a. How To Debug the Parser :-)
+        &build_process();
+        &summarize_failures();
+    }
 }
 
 BEGIN {

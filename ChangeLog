@@ -135,3 +135,19 @@ Wed May 17 20:43:39 2000                        Michael Jennings (mej)
 Some additions in error handling for robustness in the face of
 stupidity.
 ----------------------------------------------------------------------
+Thu May 18 21:39:35 2000                        Michael Jennings (mej)
+
+Okay.  Lots of changes here.  Theoretically, the backend work is in
+place for handling multiple source tarballs, additional non-tarball
+sources, and product variables.  You should also be able to specify
+a product file entry on the command line, and buildtool will Do the
+Right Thing(tm).  Plus, if a particular package falls into a certain
+set of criteria, buildtool will attempt to make reasonable guesses as
+to its type without you having to specify (e.g., if it ends in
+".src.rpm").  I also added support for several new package variables,
+including the ability to have a package skip stages, and to specify
+the "tar" and "gzip" commands to be used to build the vendor source
+packages.
+
+I also fixed a minor issue revtool had with ChangeLog creation.
+----------------------------------------------------------------------
