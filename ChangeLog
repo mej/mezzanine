@@ -771,3 +771,8 @@ imgtool is the replacement for the old script Craig and I hacked
 together for doing base images.  I've successfully created a base
 image tarball with this.
 ----------------------------------------------------------------------
+Mon Aug 28 18:12:32 2000                        Michael Jennings (mej)
+
+Added a --tag option to ease building everything based on a particular
+tag.
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.99 2000/08/23 21:55:39 mej Exp $
+# $Id: buildtool,v 1.100 2000/08/29 01:12:58 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -113,7 +113,8 @@ print_usage_info
     print "    -P --parallel [expr]             Parallelize the build process based on the number of CPU's\n";
     print "    -t --target <arch>               Tell rpm to build for a particular target architecture\n";
     print "    -C --cflags <flags>              Specify the \$CFLAGS variable to use for building\n";
-    print "       --tree <repository>           Specify the repository to use (overrides product files)\n";
+    print "       --tree <repository>           Specify the repository to use (overrides all product files)\n";
+    print "       --tag <tag>                   Specify a tag to use (overrides all product files)\n";
     print "\n";
     print "The stages and their abbreviations (for use with the -b option) are:\n";
     print "  bootstrap (s), compose (c), explode (e), build (b), package accumulation (p), ISO image (i), cleanup (a)\n\n";
@@ -1140,14 +1141,16 @@ do_bootstrap_stage
         }
         nprint "$progname:  Starting bootstrap stage for the \"$pkg\" package....\n";
         $filename = $pkgs->{$pkg}{FILENAME};
-        if ($opt_tree) {
-            $cvsroot = "-D $opt_tree";
+        if ($global_tree) {
+            $cvsroot = "-D $global_tree";
         } elsif ($pkgs->{$pkg}{CVSROOT}) {
             $cvsroot = "-D $pkgs->{$pkg}{CVSROOT}";
         } else {
             $cvsroot = "";
         }
-        if ($pkgs->{$pkg}{REVISION}) {
+        if ($global_tag) {
+            $tag = "-t $global_tag";
+        } elsif ($pkgs->{$pkg}{REVISION}) {
             ($tag = $pkgs->{$pkg}{REVISION}) =~ s/^([^:]+):([^:]+)$/$2/;
             $tag = "-t $tag";
         } else {
@@ -1837,14 +1840,15 @@ main
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "b|build=s", "p|product|package=s",
                    "q|quiet", "Q|really-quiet|silent", "D|dir=s", "f|force", "l|log=s",
-                   "P|parallel:s", "t|target=s", "C|cflags=s", "B|startbuild=s", "tree=s");
+                   "P|parallel:s", "t|target=s", "C|cflags=s", "B|startbuild=s", "tree=s",
+                   "tag=s");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.99 $ created on $Date: 2000/08/23 21:55:39 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.100 $ created on $Date: 2000/08/29 01:12:58 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -1877,7 +1881,9 @@ main
     }
     select STDOUT; $| = 1;
     $verbosity = ($opt_Q ? 0 : ($opt_q ? 1 : 2));
-    $target = ($opt_t ? $opt_t : 0);
+    $target = ($opt_t ? $opt_t : undef);
+    $global_tree = ($opt_tree ? $opt_tree : undef);
+    $global_tag = ($opt_tag ? $opt_tag : undef);
     $start_stage = ($opt_B ? $opt_B : "s");
     if (index("Zscexbpia", $start_stage) == -1) {
         eprint "Bad start stage \"$start_stage\".  Assuming \"s\".\n";
