@@ -1,0 +1,398 @@
+########################################################################
+#           Creating and Maintaining Avalon Product Files
+#
+#  Written by:  Michael Jennings
+#
+#  $Id: product_files.txt,v 1.1 2001/02/07 08:37:36 mej Exp $
+#
+########################################################################
+
+Product files are the glue that takes hundreds of individual,
+unrelated packages and creates coherent, useful products out of them.
+Their format is intended to be simple enough to facilitate easy
+creation and maintenance while remaining powerful enough to compensate
+for endless package irregularities and future expansion needs.  In
+this document, we will discuss the creation and ongoing maintenance of
+a simple product file, along with some coverage of the more obscure
+features and capabilities.
+
+1.  PRODUCT FILE BASICS
+-----------------------
+
+The product file is a plain text file which is parsed line by line.
+Besides comment lines, there are two basic types of lines which can
+appear in a product file.  The first type is a product-level variable.
+Product-level variables denote information about the product itself
+and provide fallbacks for individual package variables.  The other
+type is a reference to a component package.
+
+1.1.  Product-Level Variables
+-----------------------------
+
+Generally speaking, product-level variables are found at the top of
+each product file.  In fact, at least two such variables must appear
+before anything else will matter.  While parsing a product file,
+Avalon searches first for a product name, then a product version.  It
+ignores everything until it finds the product name and version for
+which is it looking.  Therefore, excluding comments, the first lines
+in any product file should appear as follows:
+
+name:     myproduct
+version:  1.0.1
+
+Of course you should change "myproduct" and "1.0.1" to match the
+actual name and version for your product, but those two lines tell
+Avalon it's looking at the right information.  Note that whitespace
+before or after the ':' is acceptable, but the keywords "name" and
+"version" must appear at the beginning of the line with no leading
+whitespace.  In fact, leading whitespace is universally bad in product
+files.
+
+Once Avalon encounters a name/version pair that match what it's
+looking for, it will parse every non-comment line up until the next
+name or version it encounters, or until the end of the file.  This
+permits a single product file to define multiple versions of a
+product.  It also allows a single product file to contain multiple
+products; however, this means that the filename won't match the
+product name, thus requiring Avalon to go digging, and is discouraged
+for that very reason.
+
+All other product-level variables are of a similar form to the name
+and version lines; i.e.:
+
+<keyword>:<value>
+
+Note that whitespace surrounding the ':' is ignored, but all other
+whitespace is preserved when assigning <value> to the variable
+<keyword>.
+
+Any valid package variable keyword is also valid as a product-level
+variable, because the primary purpose of product-level variables is to
+provide default (a.k.a., fallback) values for package variables within
+a given product.  The "Package Variables" section contains a list of
+recognized package variables.  The variables most often found at the
+product level are CVSROOT, LOCATIONS, and REVISION/TAG.
+
+1.2  Component Packages
+-----------------------
+
+Every line in the product file that is neither a comment/blank line
+nor a product variable is assumed to define a component package.  A
+component package is any individual entity which helps to comprise a
+product.  Currently 5 types of components are recognized:
+sub-products, modules, source RPM's, binary RPM's, and media images.
+The keywords for these component types are product, module, srpm, rpm,
+and image, respectively.
+
+A "product" is simply anything for which there is a product file, or a
+portion of a product file, that defines it in terms of its
+components.  Often, individual packages of other types (module or
+srpm) are given their own product files for simplicity and
+maintainability.
+
+A "module" is a directory tree which is stored in unarchived form in
+the master repository.  In Avalon 1.x, all packages maintained within
+the build system are kept as modules.
+
+Both "srpm" and "rpm" packages are stored in package set directories,
+one directory for each type (source and binary) containing all
+packages of that type per project.  All packages not maintained within
+the build system should be kept as srpm packages, with the exception
+of those which cannot properly build; these should be kept as binary
+packages, but their corresponding source packages should be committed
+to the master repository as well for reference purposes.
+
+The "image" package type is really a special case of the "module"
+type.  Images are basically directory hierarchies stored in revision
+control which are used to build CD's, web sites, etc.  Only images go
+through the ISO stage, which is where ISO image files for CD's are
+generated.
+
+The basic syntax for a component package is:
+
+<type>:<modulename>/<name> <var>=<value> <var>=<value> ...
+
+In theory, the only part of this line which is required is <name>.  If
+you omit the component type (one of the 5 keywords above), Avalon will
+try to guess the correct value from the other information you
+supplied.  For example, if <name> is "somepackage-1.0-1.src.rpm," this
+is obviously an srpm package, and Avalon will recognize this.  Also,
+in the case of a "module" component, the name of the module will
+almost always match the name of the package (<name>), and therefore
+can be omitted along with the corresponding '/'.  And of course there
+can be as many or as few package variables as required.
+
+The following examples help illustrate some of the possible
+combinations of package definitions.  Note that none of these have
+package variables; those will be covered in the next section.
+
+# A sub-product.  Version 3.0 of the "elvis" product
+product:elvis-3.0
+# A source RPM for valen 2.1 from the contrib-rh module
+srpm:contrib-rh/valen-2.1-3.src.rpm
+# A source RPM for zathras 0.7.1, this time letting Avalon assume
+# the package type to be "srpm"
+contrib-rh/zathras-0.7.1-1.src.rpm
+# A binary RPM.  Again, Avalon knows it's a binary RPM from the
+# filename.
+bin-rh/messup-0.0.1-7.i586.rpm
+# A simple module for the package morestuff
+module:morestuff
+# A module for the package "somepkg" but stored in a module called
+# "oddname"
+module:oddname/somepkg
+
+1.3  Package Variables
+----------------------
+
+One of the most flexible aspects of product file design is the concept
+of variables, both at the package and product levels.  These variable
+names can be anything at all (excluding Perl metacharacters) but by
+convention consist of uppercase letters.  (Lowercase letters are
+converted to uppercase as the variable is read from the product file.)
+
+Each component package line can have zero or more package variables.
+Each package variable has the following form:
+
+<var>=<value>
+
+Note that there can be no whitespace anywhere in the value for a
+product variable, nor can there be any whitespace surrounding the '='
+between the variable name and its value.  At some point in the future
+quoting may be supported, but it isn't yet.
+
+Generally speaking, a package should only require two or three package
+variables at most if it is listed on a component line.  Any package
+requiring a significant number of variables, or variables with large
+values, should probably be given its own product file.
+
+The examples below show some component package lines which illustrate
+some of the uses of product variables.  A complete examination of all
+currently-recognized product variables will follow.
+
+# A sub-product.  Version 3.0 of the "elvis" product
+product:elvis version=3.0
+# A source RPM for valen 2.1 from the contrib-rh module
+srpm:contrib-rh/valen ver=2.1 rel=3 tag=head
+# A source RPM for zathras 0.7.1, this time letting Avalon assume
+# the package type to be "srpm"
+contrib-rh/zathras-0.7.1-1.src.rpm tag=VA-REDHAT-7-0-1
+# A binary RPM.  Again, Avalon knows it's a binary RPM from the
+# filename.
+bin-rh/messup-0.0.1-7.i586.rpm tag=head
+# A simple module for the package morestuff
+module:morestuff    tag=MORESTUFF-1-3
+
+
+2.  BUILD VARIABLES
+-------------------
+
+Earlier sections have discussed the general syntax of product files,
+and specifically of the variables that allow for very flexible
+customization of packages and their attributes.  This section will
+outline each of the variables which are presently supported by Avalon
+along with their syntax, shortcuts, and proper usage.
+
+2.1.  Specifying build targets:  ARCH
+-------------------------------------
+
+The ARCH variable allows the passing of a comma-separated list of
+architectures to the package build process.  Binary packages will be
+built for each platform in the list.
+
+Example:  arch=i386,i586,i686
+
+2.2.  El Torito Boot Images:  BOOTIMG
+-------------------------------------
+
+The BOOTIMG variable specifies a relative path within an image module
+to a bootable floppy disk image.  If this variable is defined for a
+particular image, Avalon will create a bootable CD using the floppy
+disk image specified.
+
+Example:  bootimg=images/bootcd.img
+
+2.3.  Compilation Flags:  CFLAGS
+--------------------------------
+
+Some packages require compilation flags which differ from the norm,
+often because those packages are broken or poorly-engineered.  Rather
+than owning the package for a simple cosmetic change, the CFLAGS
+variable provides a work-around in most of these cases.  Spaces
+between compiler options should be replaced with ampersands.
+
+Example:  cflags=-O2&-D_GNU_SOURCE
+
+2.4.  Repository Path:  CVSROOT
+-------------------------------
+
+Almost every product should provide a default repository path with an
+anonymous login.  Not providing one is frowned upon.  Note that this
+is almost always done as a product-level variable.
+
+Example:  cvsroot:  :pserver:anonymous@cvs.engr.valinux.com:/cvs/valinux
+
+2.5.  Product Information:  DESCRIPTION
+---------------------------------------
+
+The DESCRIPTION variable serves as a brief product summary.  It also
+ends up in the comment field on the CD image, if there is one.  This
+will be a product variable since it will most definitely contain
+spaces.
+
+Example:  description:  RedHat Linux with VA Linux Enhancements
+
+2.6.  Making CD's from Images:  ISO
+-----------------------------------
+
+Image modules for which you want CD's created must specify the
+filename for the ISO image to create using the ISO variable.
+
+Example:  iso=vana-2.0.iso
+
+2.7.  Labelling CD's:  LABEL
+----------------------------
+
+The default label for CD images is the product name and version.  If
+you wish to specify your own, use the LABEL variable.
+
+Example:  label=RH/VALE
+
+2.8.  Placing Packages into Image Trees:  LOCATIONS
+---------------------------------------------------
+
+
+2.9.  Forcing RPM into Submission:  MACROS
+------------------------------------------
+
+The MACROS variable is much like the CFLAGS variable, in that it is
+used almost exclusively to fix broken packages without owning them
+outright.  The difference is that instead of specifying compiler
+flags, the MACROS variable creates or overrides rpm macros.  The macro
+name is separated from its value by a colon; multiple macro
+definitions may be given by placing commas between definitions.
+
+Example:  macros=release_version:6.2,release_name:Piglet
+
+2.10.  The Round-About Way, Part 1:  MODULE
+-------------------------------------------
+
+Section 1.2 describes how to specify the module name for a component
+package.  The MODULE variable can be used to accomplish the same task
+in cases where clarity would be better served this way.  In general,
+however, this round-about way of specifying the module name is
+discouraged.
+
+Example:  module=oldkernel
+
+2.11.  The Round-About Way, Part 2:  RELEASE
+--------------------------------------------
+
+As with the MODULE variable, the RELEASE variable can be used to force
+a particular release number for a package file.  As a rule, don't use
+it.
+
+Example:  release=4
+
+2.12.  Getting What You Want:  REVISION
+---------------------------------------
+
+Often a particular tag or revision is required for a product, not just
+whatever the latest incarnation happens to be.  The REVISION variable
+specifies a revision number or tag to use when obtaining the package
+from the master repository.  If you specify a value of "head" for this
+variable, it will forceably turn off any previously-defined tags (such
+as may be defined as a product variable).
+
+Example:  revision=VA-REDHAT-6-2-3
+
+2.13.  Calling Syntax, Part 1:  RPMCMD
+--------------------------------------
+
+The RPMCMD variable alters the command used when running "rpm" to
+build or install packages.  Its value is passed directly to pkgtool.
+Altering this value can be dangerous, so don't use this variable if
+you don't grok the code that refers to it.
+
+Example:  rpmcmd=rpm4
+
+2.14.  Defining Source Files:  SRCS
+-----------------------------------
+
+Avalon has certain default rules when building a package from a full
+source tree.  Assume that directories named "CVS", "BitKeeper", "RCS",
+or "SCCS", and any directories or files whose names begin with a dot
+will be ignored.  After those exclusions, any directories inside the
+module are treated as vendor source directories which should be tarred
+up into a .tar.gz (or tar.bz2, depending on the spec file) file with
+the same name as the directory.  Likewise, any files whose names do
+not end in .spec (or .spec.in) are assumed to be additional vendor
+source files.
+ 
+If your package does not fit the above default assumptions, you will
+need to tell Avalon how to override the defaults using package
+variables.  The SRCS variable consists of a comma-separated list of
+source file definitions.  Each definition contains one or more source
+files/directories separated by ampersands, and at most one tarball,
+which will be followed by a colon if it is present.  If a tarball is
+present, it will be created from all the source files and directories
+listed in its source definition.  If no tarball is present, the source
+file(s) are interpreted as separate sources and are simply copied into
+place.  Note that wildcards are valid for source files/directories.
+
+Example:  srcs=etc&usr&README:VAmoo_cow-1.0.0.tar.bz2,moo_cow.init&*.1
+
+2.15.  Build Stage Participation:  STAGES
+-----------------------------------------
+
+The STAGES variable determines in which of the build stages a package
+participates.  This is usually determined automatically by type, so
+don't set this unless you are fully aware of the implications.  Valid
+values are strings of one or more of the following letters, each of
+which represents one of the stages:  scebpia.
+
+Example:  stages=scpa
+
+2.16.  Generating Patches from Tags:  TAGFILE
+---------------------------------------------
+
+By default, Avalon looks at the spec file when obtaining a list of
+tags for a particular module from which to generate patches.  The
+TAGFILE variable overrides that default.  The file specified *must*
+have all tags present.
+
+Example:  tagfile=ChangeLog
+
+2.17.  Calling Syntax, Part 2:  TAR
+-----------------------------------
+
+The TAR variable alters the command used for creating tarballs.
+Unlike the other calling syntax modifiers, TAR can take up to 2
+parameters.  %f is the list of source files/directories/wildcards,
+separated by spaces.  %t is the path and filename for the tarball.
+Do not define this variable without including at least %t, and don't
+use it at all unless you really need to.
+
+Example:  tar:  gtar -zcvf %t %f
+
+2.18.  The Round-About Way, Part 3:  VERSION
+--------------------------------------------
+
+The VERSION variable specifies the version of a package or product.
+It should only be used for versions which don't conform to standard
+conventions.
+
+Example:  version=1.0.1
+
+2.19.  Calling Syntax, Part 3:  ZIP
+-----------------------------------
+
+The ZIP variable specifies the compression program to use.  It must
+accept the -d and -c switches (a la gzip and bzip2) as it is used with
+the --use-compress-program option to GNU tar.  Avalon automatically
+detects the proper compression program to use based on the filename,
+so if its algorithm proves insufficient, fix the algorithm rather than
+using this variable if at all possible.
+
+Example:  zip=gnuzip
+
