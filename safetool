@@ -2,14 +2,18 @@
 
 LOGFILE=/var/tmp/safetool.log
 
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
 CMD_LINE="$@"
 CMD=`basename $0`
+TSTAMP=`date`
 echo "safetool ($$):  $0 $CMD_LINE" >> $LOGFILE
 chmod 666 $LOGFILE
 
-if [ "$CMD" = "strip" ]; then
-  exit 0
-fi
+# Unfortunately, this makes the OS binaries CD too big for the CD. :(
+#
+#if [ "$CMD" = "strip" ]; then
+#  exit 0
+#fi
 
 if [ "`whoami`" = "root" ]; then
   echo $CMD_LINE | grep /tmp >/dev/null 2>&1
