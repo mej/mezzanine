@@ -21,10 +21,11 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Config.pm,v 1.2 2004/04/05 02:29:42 mej Exp $
+# $Id: Config.pm,v 1.3 2004/04/20 02:57:37 mej Exp $
 #
 
 package Mezzanine::Config;
+use strict;
 use Mezzanine::Util;
 
 BEGIN {
@@ -47,7 +48,6 @@ use vars ('@EXPORT_OK');
 ### Private global variables
 
 ### Initialize exported package variables
-our %mzconfig_data = ();
 
 # Constants
 
@@ -78,37 +78,49 @@ load($)
     }
 
     if (substr($filename, -4, 4) eq ".cdf" && -s $filename) {
-        $mzconfig_data{"__FILENAME"} = $filename;
-        &load_config_cdf($mzconfig_data{"__FILENAME"});
+        $self->{"__FILENAME"} = $filename;
+        &load_config_cdf($self);
     } elsif (-s "$filename.cdf") {
-        $mzconfig_data{"__FILENAME"} = "$filename.cdf";
-        &load_config_cdf($mzconfig_data{"__FILENAME"});
+        $self->{"__FILENAME"} = "$filename.cdf";
+        &load_config_cdf($self);
     } elsif (substr($filename, -4, 4) eq ".xml" && -s $filename) {
-        $mzconfig_data{"__FILENAME"} = $filename;
-        &load_config_xml($mzconfig_data{"__FILENAME"});
+        $self->{"__FILENAME"} = $filename;
+        &load_config_xml($self);
     } elsif (-s "$filename.xml") {
-        $mzconfig_data{"__FILENAME"} = "$filename.xml";
-        &load_config_xml($mzconfig_data{"__FILENAME"});
+        $self->{"__FILENAME"} = "$filename.xml";
+        &load_config_xml($self);
     } elsif (-s $filename) {
-        $mzconfig_data{"__FILENAME"} = $filename;
-        &load_config_vars($mzconfig_data{"__FILENAME"});
+        $self->{"__FILENAME"} = $filename;
+        &load_config_vars($self);
     } else {
-        $mzconfig_data{"__FILENAME"} = $filename;
+        $self->{"__FILENAME"} = $filename;
     }
 }
 
 sub
 save()
 {
-    $filename = $mzconfig_data{"__FILENAME"};
+    my $self = shift;
+    my $filename;
+
+    $filename = $self->{"__FILENAME"};
 
     if (substr($filename, -4, 4) eq ".xml") {
-        &save_config_xml($mzconfig_data{"__FILENAME"});
+        &save_config_xml($self);
     } elsif (substr($filename, -4, 4) eq ".cdf") {
-        &save_config_cdf($mzconfig_data{"__FILENAME"});
+        &save_config_cdf($self);
     } else {
-        &save_config_vars($mzconfig_data{"__FILENAME"});
+        &save_config_vars($self);
     }
+}
+
+sub
+save_as($)
+{
+    my ($self, $filename) = @_;
+
+    $self->{"__FILENAME"} = $filename;
+    return $self->save();
 }
 
 sub
@@ -116,7 +128,16 @@ keys()
 {
     my $self = shift;
 
-    return @{$mzconfig_data{"__KEYS"}};
+    return grep { substr($_, 0, 2) ne "__" } @{$self->{"__KEYS"}};
+}
+
+sub
+has_key($)
+{
+    my $self = shift;
+    my $key = shift;
+
+    return exists($self->{$key});
 }
 
 sub
@@ -125,7 +146,7 @@ get($)
     my $self = shift;
     my $key = shift;
 
-    return $mzconfig_data{$key};
+    return ((exists($self->{$key})) ? ($self->{$key}) : (undef));
 }
 
 sub
@@ -134,111 +155,90 @@ set($)
     my $self = shift;
     my $key = shift;
 
-    if (!exists($mzconfig_data{$key})) {
-        # Create an anonymous subroutine which matches the given key
-        # as an "accessor" member function to the Mezzanine::Config class.
-        no strict "refs";
-        *$key = sub {
-            shift;
-            if (@_) {
-                $mzconfig_data{$key} = shift;
-            }
-            return $mzconfig_data{$key};
-        };
-    }
-    return ($mzconfig_data{$key} = $_[0]);
+    return ($self->{$key} = $_[0]);
 }
 
 ### Private functions
 
 sub
-load_config_cdf($)
+load_config_cdf()
 {
-    my $filename = shift;
+    my $self = shift;
     local *CFG;
 
-    if (!open(CFG, $filename)) {
-        eprint "Unable to open $filename -- $!\n";
+    if (!open(CFG, $self->{"__FILENAME"})) {
+        eprint "Unable to open $self->{__FILENAME} -- $!\n";
         return;
     }
     while (<CFG>) {
         my @inp;
         my $key;
+        my $line;
 
         chomp($line = $_);
         @inp = split(':', $line);
         $key = shift @inp;
-        xpush @{$mzconfig_data{"__KEYS"}}, $key;
-        @{$mzconfig_data{$key}} = @inp;
-
-        # Create an anonymous subroutine which matches the given key
-        # as an "accessor" member function to the Mezzanine::Config class.
-        no strict "refs";
-        *$key = sub {
-            shift;
-            if (@_) {
-                $mzconfig_data{$key} = shift;
-            }
-            return $mzconfig_data{$key};
-        };
+        xpush @{$self->{"__KEYS"}}, $key;
+        @{$self->{$key}} = @inp;
     }
     close(CFG);
 }
 
 sub
-save_config_cdf($)
+save_config_cdf()
 {
-    my $filename = shift;
+    my $self = shift;
     local *CFG;
 
-    if (!open(CFG, ">$filename")) {
-        eprint "Unable to open $filename -- $!\n";
+    if (!open(CFG, ">$self->{__FILENAME}")) {
+        eprint "Unable to open $self->{__FILENAME} -- $!\n";
         return;
     }
-        foreach my $key (sort(grep { substr($_, 0, 2) ne "__" } keys(%mzconfig_data))) {
-            print CFG "$key:", join(':', @{$mzconfig_data{$key}}), "\n";
+        foreach my $key (sort(grep { substr($_, 0, 2) ne "__" } keys(%{$self}))) {
+            print CFG "$key:", join(':', @{$self->{$key}}), "\n";
         }
     close(CFG);
 }
 
 sub
-load_config_xml($)
+load_config_xml()
 {
-    my $filename = shift;
+    my $self = shift;
     local *CFG;
 
 }
 
 sub
-save_config_xml($)
+save_config_xml()
 {
-    my $filename = shift;
+    my $self = shift;
     local *CFG;
 
-    if (!open(CFG, ">$filename")) {
-        eprint "Unable to open $filename -- $!\n";
+    if (!open(CFG, ">$self->{__FILENAME}")) {
+        eprint "Unable to open $self->{__FILENAME} -- $!\n";
         return;
     }
     close(CFG);
 }
 
 sub
-load_config_vars($)
+load_config_vars()
 {
-    my $filename = shift;
+    my $self = shift;
     local *CFG;
 
-    if (!open(CFG, $filename)) {
-        eprint "Unable to open $filename -- $!\n";
+    if (!open(CFG, $self->{"__FILENAME"})) {
+        eprint "Unable to open $self->{__FILENAME} -- $!\n";
         return;
     }
     while (<CFG>) {
         my ($key, $value);
+        my $line;
 
         chomp($line = $_);
         ($key, $value) = split(/ = /, $line, 2);
-        xpush @{$mzconfig_data{"__KEYS"}}, $key;
-        $mzconfig_data{$key} = $value;
+        xpush @{$self->{"__KEYS"}}, $key;
+        $self->{$key} = $value;
 
         # Create an anonymous subroutine which matches the given key
         # as an "accessor" member function to the Mezzanine::Config class.
@@ -246,27 +246,27 @@ load_config_vars($)
         *$key = sub {
             shift;
             if (@_) {
-                $mzconfig_data{$key} = shift;
+                $self->{$key} = shift;
             }
-            return $mzconfig_data{$key};
+            return $self->{$key};
         };
     }
     close(CFG);
 }
 
 sub
-save_config_vars($)
+save_config_vars()
 {
-    my $filename = shift;
+    my $self = shift;
     local *CFG;
 
-    if (!open(CFG, ">$filename")) {
-        eprint "Unable to open $filename -- $!\n";
+    if (!open(CFG, ">$self->{__FILENAME}")) {
+        eprint "Unable to open $self->{__FILENAME} -- $!\n";
         return;
     }
 
-    foreach my $key (sort(grep { substr($_, 0, 2) ne "__" } keys(%mzconfig_data))) {
-        print CFG "$key = $mzconfig_data{$key}\n";
+    foreach my $key (sort(grep { substr($_, 0, 2) ne "__" } keys(%{$self}))) {
+        print CFG "$key = $self->{$key}\n";
     }
     close(CFG);
 }

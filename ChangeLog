@@ -436,3 +436,12 @@ Wed Apr 14 20:19:18 2004                        Michael Jennings (mej)
 
 Include spec file in post-build tree.
 ----------------------------------------------------------------------
+Mon Apr 19 22:56:06 2004                        Michael Jennings (mej)
+
+Moved config hash to object hash to allow multiple simultaneous config
+objects to exist independently.
+
+Removed unused member functions based on key names.  Too hairy.
+
+Enabled configuration file for buildtool.
+----------------------------------------------------------------------

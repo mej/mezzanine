@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.182 2004/04/12 00:09:26 mej Exp $
+# $Id: buildtool,v 1.183 2004/04/20 02:57:37 mej Exp $
 #
 
 use strict;
@@ -58,10 +58,15 @@ my $num_built = 0;
 my $rpm_cache;
 my ($CFG_RPMCACHE_NAME, $CFG_RPMCACHE_PATH, $CFG_RPMCACHE_MTIME, $CFG_RPMCACHE_SIBLINGS) = (0, 1, 2, 3);
 
-# Build results cache data.
-my $build_cache;
-my ($CFG_BUILD_NAME, $CFG_BUILD_TIMESTAMP, $CFG_BUILD_RESULT,
-    $CFG_BUILD_TOPDIR, $CFG_BUILD_LOGFILE) = (0, 1, 2, 3, 4);
+# Configuration data.
+my $config;
+my @config_vars = ("DEBUG", "VERBOSITY", "TARGET", "BUILDTREE_LAYOUT",
+                   "CLEAN", "LOGFILE", "HINTS", "HINT_INSTALLER",
+                   "PARALLELIZE", "LOCATIONS", "BUILDUSER",
+                   "INSTROOT", "INSTROOT_INIT", "INSTROOT_COPY",
+                   "INSTROOT_RESET", "INSTROOT_SOURCE_RSYNC",
+                   "BUILDROOT", "TMPDIR", "MAKE", "MFLAGS", "CFLAGS",
+                   "PATH", "RETRY", "REBUILD", "PRODUCTS", "LOGDIR");
 
 # Print usage information
 sub
@@ -101,7 +106,9 @@ print_usage_info
     print "       --ic --instroot-copy <cmd>    Command used to copy chroot jail\n";
     print "       --nocache                     Do not scan the cache (use with care)\n";
     print "       --retry                       Retry packages which have previously failed to build\n";
+    print "       --rebuild                     Rebuild previously successful packages for verification\n";
     print "       --clean                       Clean up RPM and buildroot directories when done\n";
+    print "       --savecfg --save-config       Preserve current settings for future use\n";
     print "\n";
     exit(MEZZANINE_SUCCESS);
 }
@@ -916,37 +923,45 @@ main
                "instroot|i|jail=s", "hints|H=s",
                "hintinstaller|hint-installer|hi=s", "instroot-init|ii=s",
                "instroot-reset|ir=s", "instroot-copy|ic=s",
-               "user|u=s", "buildtree|b=s", "retry", "rebuild");
+               "user|u=s", "buildtree|b=s", "retry", "rebuild",
+               "savecfg|save-config");
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.182 $ created on $Date: 2004/04/12 00:09:26 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.183 $ created on $Date: 2004/04/20 02:57:37 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
     }
     open(STDIN, "</dev/null");
     open(STDERR, ">&STDOUT");
+    $config = Mezzanine::Config->new("build/config");
+    if (!scalar($config->keys())) {
+        $OPTION{"savecfg"} = 1;
+    }
 
     # Set basic options
-    &debug_set($OPTION{"debug"});
+    if (defined($OPTION{"debug"})) {
+        $config->set("DEBUG", $OPTION{"debug"});
+    }
+    &debug_set($config->set("DEBUG", $OPTION{"debug"} || $config->get("DEBUG") || 0));
+    $verbosity = $config->get("VERBOSITY") || 2;
     if ($OPTION{"silent"}) {
         $verbosity = 0;
     } elsif ($OPTION{"quiet"}) {
         $verbosity = 1;
     }
+    $config->set("VERBOSITY", $verbosity);
     $global_user = $OPTION{"repuser"};
     $global_tree = $OPTION{"dir"};
     $global_tag = $OPTION{"tag"};
-    $buildtree_layout = (($OPTION{"buildtree"}) ? ($OPTION{"buildtree"}) : ("mej"));
-    &pkgvar_cleanup((($OPTION{"clean"}) ? ($OPTION{"clean"}) : ("temp")));
-    if ($buildtree_layout ne "mej") {
-        &pkgvar_cleanup($buildtree_layout);
-    }
-    &pkgvar_target($OPTION{"target"});
+    $buildtree_layout = $config->set("BUILDTREE_LAYOUT", $OPTION{"buildtree"} || $config->get("BUILDTREE_LAYOUT") || "mej");
+    $config->set("CLEAN", &pkgvar_cleanup($OPTION{"clean"} || $config->get("CLEAN") || $config->get("BUILDTREE_LAYOUT")));
+    $config->set("TARGET", &pkgvar_target($OPTION{"target"} || $config->get("TARGET") || ""));
 
     # Open log file, if any.
-    if ($OPTION{"log"}) {
-        my $log_filename = $OPTION{"log"};
+    $config->set("LOGFILE", $OPTION{"log"} || $config->get("LOGFILE") || "");
+    if ($config->get("LOGFILE")) {
+        my $log_filename = $config->get("LOGFILE");
 
         if (-e $log_filename) {
             rename($log_filename, "$log_filename.prev");
@@ -964,16 +979,20 @@ main
     nprintf("$PROGNAME $VERSION:  %s [%s]\n", join(' ', @orig_argv), &get_timestamp());
 
     # Handle hint file/directory specification
-    if ($OPTION{"hints"}) {
-        $ENV{"MEZZANINE_HINTS"} = $OPTION{"hints"};
-    }
-    &set_hints_info($ENV{"MEZZANINE_HINTS"});
-    if ($OPTION{'hintinstaller'}) {
-        # Override installer from command line.
-        &set_hints_info("$OPTION{hintinstaller}\%");
+    $config->set("HINTS", $OPTION{"hints"} || $config->get("HINTS") || $ENV{"MEZZANINE_HINTS"} || "");
+    $config->set("HINT_INSTALLER", $OPTION{"hintinstaller"} || $config->get("HINT_INSTALLER") || "");
+    if ($config->get("HINTS")) {
+        if ($config->get("HINT_INSTALLER")) {
+            &set_hints_info(sprintf("%s%%%s", $config->get("HINT_INSTALLER"), $config->get("HINTS")));
+        } else {
+            &set_hints_info($config->get("HINTS"));
+        }
     }
 
     # Figure out parallelization stuff
+    if (!defined($OPTION{"parallel"} && $config->has_key("PARALLELIZE"))) {
+        $OPTION{"parallel"} = $config->get("PARALLELIZE");
+    }
     if (defined($OPTION{"parallel"})) {
         $num_cpus = &count_cpus();
         if ($OPTION{"parallel"}) {
@@ -983,6 +1002,7 @@ main
             ($mult, $add) = ($1, $2);
             $num_cpus = $num_cpus * ($mult ? $mult : 1) + ($add ? $add : 0);
         }
+        $config->set("PARALLELIZE", $OPTION{"parallel"});
     } else {
         $num_cpus = 1;
     }
@@ -991,10 +1011,9 @@ main
     # Try to parse the product name we were given into a name or a name-version combo
     if ($OPTION{"prod"}) {
         $prod = $OPTION{"prod"};
-    } elsif (!scalar(@{$OPTION{"srcdir"}})) {
+    } elsif (!defined($OPTION{"srcdir"}) || !scalar(@{$OPTION{"srcdir"}})) {
         $prod = &basename(&getcwd());
-    }
-    if (scalar(@{$OPTION{"srcdir"}}) && ! $prod) {
+    } else {
         # If we don't have a product name, but we do have one or more
         # SRPM directories to look at, we need to auto-generated the
         # prod file.  NOTE:  This must happen *before* the instroot
@@ -1005,8 +1024,8 @@ main
     # Handle specification of a global value for the LOCATIONS product
     # variable.  This must happen after $prod is set but before $OPTION{"srcdir"}
     # is handled.
-    if ($OPTION{"location"}) {
-        my $locations = $OPTION{"location"};
+    if ($config->set("LOCATIONS", $OPTION{"location"} || $config->get("LOCATIONS"))) {
+        my $locations = $config->get("LOCATIONS");
 
         if (-d $locations) {
             $locations = '/.*/=' . $locations;
@@ -1025,40 +1044,44 @@ main
 
     # Set the build user if needed.  This must happen after $prod is
     # set but before $OPTION{"srcdir"} is handled.
-    if ($OPTION{"user"}) {
-        &assign_product_variable($prod, "BUILDUSER", $OPTION{"user"});
+    if ($config->set("BUILDUSER", $OPTION{"user"} || $config->get("BUILDUSER"))) {
+        &assign_product_variable($prod, "BUILDUSER", $config->get("BUILDUSER"));
     }
 
     # Figure out the installroot stuff.
-    if ($OPTION{"instroot"}) {
-        my ($instroot, $instroot_init, $instroot_reset, $instroot_copy)
-            = ($OPTION{"instroot"}, $OPTION{"instroot-init"}, $OPTION{"instroot-reset"}, $OPTION{"instroot-copy"});
+    if ($config->set("INSTROOT", $OPTION{"instroot"} || $config->get("INSTROOT"))) {
+        my $instroot = $config->get("INSTROOT");
+        my $instroot_init = $config->set("INSTROOT_INIT", $OPTION{"instroot-init"} || $config->get("INSTROOT_INIT"));
+        my $instroot_reset = $config->set("INSTROOT_RESET", $OPTION{"instroot-reset"} || $config->get("INSTROOT_RESET"));
+        my $instroot_copy = $config->set("INSTROOT_COPY", $OPTION{"instroot-copy"} || $config->get("INSTROOT_COPY"));
 
         # If we have $MEZZANINE_INSTROOT_SOURCE_RSYNC and we don't have the options,
         # automagically fill the commands in appropriately.  If needed, authentication
         # info and other flags can be added to $MEZZANINE_INSTROOT_SOURCE_RSYNC.
-        if ($ENV{"MEZZANINE_INSTROOT_SOURCE_RSYNC"}) {
+        if ($config->set("INSTROOT_SOURCE_RSYNC", $config->get("INSTROOT_SOURCE_RSYNC") || $ENV{"MEZZANINE_INSTROOT_SOURCE_RSYNC"})) {
             if (! $instroot_init) {
-                $instroot_init = "rsync -Haz --delete --delete-after --exclude=/proc $ENV{MEZZANINE_INSTROOT_SOURCE_RSYNC}";
+                $instroot_init = $config->set("INSTROOT_INIT", sprintf("rsync -Haz --delete --delete-after --exclude=/proc %s",
+                                                                       $config->get("INSTROOT_SOURCE_RSYNC")));
             }
             if (! $instroot_reset) {
-                $instroot_reset = "rsync -Haz --delete --delete-after --exclude=/proc $ENV{MEZZANINE_INSTROOT_SOURCE_RSYNC}";
+                $instroot_reset = $config->set("INSTROOT_RESET", sprintf("rsync -Haz --delete --delete-after --exclude=/proc %s",
+                                                                         $config->get("INSTROOT_SOURCE_RSYNC")));
             }
             if (! $instroot_copy) {
-                $instroot_copy = "rsync -Ha --delete --delete-after";
+                $instroot_copy = $config->set("INSTROOT_RESET", "rsync -Ha --delete --delete-after");
             }
         }
 
         # Now set all the variables using fallbacks.
         ($instroot, $instroot_init, $instroot_reset, $instroot_copy)
             = &set_instroot_info($instroot, $instroot_init, $instroot_reset, $instroot_copy);
-        &assign_product_variable($prod, "INSTROOT", $instroot);
+        &assign_product_variable($prod, "INSTROOT", $config->set("INSTROOT", $instroot));
 
         # If we have $instroot_init, the other two are guaranteed to be set by fallbacks.
         if ($instroot_init) {
-            &assign_product_variable($prod, "INSTROOT_INIT", $instroot_init);
-            &assign_product_variable($prod, "INSTROOT_RESET", $instroot_reset);
-            &assign_product_variable($prod, "INSTROOT_COPY", $instroot_copy);
+            &assign_product_variable($prod, "INSTROOT_INIT", $config->set("INSTROOT_INIT", $instroot_init));
+            &assign_product_variable($prod, "INSTROOT_RESET", $config->set("INSTROOT_RESET", $instroot_reset));
+            &assign_product_variable($prod, "INSTROOT_COPY", $config->set("INSTROOT_COPY", $instroot_copy));
         }
     }
 
@@ -1072,7 +1095,6 @@ main
             foreach my $pkg (sort(@pkg_list)) {
                 my $prodfile_line;
 
-                #$prodfile_line = sprintf("%s NAME=%s-%04d", $pkg, &basename($pkg), int(rand(10000)));
                 $prodfile_line = $pkg;
                 &parse_product_entry($prodfile_line, $prod);
             }
@@ -1080,30 +1102,22 @@ main
     }
 
     # Set the buildroot for the overall build.
-    &pkgvar_buildroot($ENV{"MEZZANINE_BUILDROOT"});
+    &pkgvar_buildroot($config->set("BUILDROOT", $config->get("BUILDROOT") || $ENV{"MEZZANINE_BUILDROOT"}));
 
-    if ($ENV{"MEZZANINE_MAKE"}) {
-        $ENV{"MAKE"} = $ENV{"MEZZANINE_MAKE"};
-    } else {
-        # Parallel product builds and make -jN don't get along well.
-        $ENV{"MAKE"} = "make";
+    $ENV{"MAKE"} = $config->set("MAKE", $config->get("MAKE") || $ENV{"MEZZANINE_MAKE"} || "make");
+    $ENV{"CFLAGS"} = $config->set("CFLAGS", $OPTION{"cflags"} || $config->get("CFLAGS") || $ENV{"MEZZANINE_CFLAGS"} || "-O2 -march=pentium");
+    $ENV{"PATH"} = $config->set("PATH", $config->get("PATH") || $ENV{"MEZZANINE_PATH"}
+                                || "/usr/build/bin:/usr/local/build/bin:/usr/lib/qt-1.45/bin:/usr/lib/qt-2.1.0/bin"
+                                . ":/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/X11R6/bin:/usr/kerberos/sbin"
+                                . ":/usr/kerberos/bin:.");
+    # Don't hard code any RPATH's into binaries
+    delete $ENV{"LD_RUN_PATH"};
+    delete $ENV{"LD_LIBRARY_PATH"};
+
+    # Save configuration if needed.
+    if ($OPTION{"savecfg"}) {
+        $config->save();
     }
-    if ($OPTION{"cflags"}) {
-        $ENV{"CFLAGS"} = $OPTION{"cflags"};
-    } elsif ($ENV{"MEZZANINE_CFLAGS"}) {
-        $ENV{"CFLAGS"} = $ENV{"MEZZANINE_CFLAGS"};
-    } else {
-        $ENV{"CFLAGS"} = "-O2 -march=pentium";
-    }
-    if ($ENV{"MEZZANINE_PATH"}) {
-        $ENV{"PATH"} = $ENV{"MEZZANINE_PATH"};
-    } else {
-        $ENV{"PATH"} = "/usr/build/bin:/usr/local/build/bin:/usr/lib/qt-1.45/bin:/usr/lib/qt-2.1.0/bin"
-            . ":/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/X11R6/bin:/usr/kerberos/sbin"
-            . ":/usr/kerberos/bin:.";
-    }
-    delete $ENV{LD_RUN_PATH};  # Don't hard code any RPATH's into binaries
-    delete $ENV{LD_LIBRARY_PATH};  # Make glibc happy
 
     # Parse the product definition files to figure out what the heck we need to build. :)
     if ((substr($prod, 0, 8) ne "autoprod") && !&parse_prod_file($prod, 0, 0)) {
