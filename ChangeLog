@@ -542,3 +542,7 @@ This should fix the caching problems.  Also added an option for
 setting the root of the build tree (formerly only
 $MEZZANINE_BUILDDIR).
 ----------------------------------------------------------------------
+Thu Jul 22 17:02:48 2004                        Michael Jennings (mej)
+
+Treat "#BuildSuggests:" the same as BuildRequires and hints.
+----------------------------------------------------------------------

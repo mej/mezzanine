@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.30 2004/06/10 21:04:48 mej Exp $
+# $Id: RPM.pm,v 1.31 2004/07/22 21:04:28 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -199,7 +199,11 @@ parse_spec_file
     $specdata->{"DEFINES"}{"nil"} = "";
     while (<SPECFILE>) {
         chomp($line = $_);
-        next if ($line =~ /^\s*\#/ || $line =~ /^\s*$/);
+        if ($line =~ /^(\s*\#\s*BuildSuggests:)/) {
+            $line =~ s/$1/BuildRequires:/;
+        } elsif ($line =~ /^\s*\#/ || $line =~ /^\s*$/) {
+            next;
+        }
         $oldline = $line;
         $line = &replace_defines($oldline);
         $line =~ s/^\s+//;
