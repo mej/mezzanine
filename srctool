@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.48 2004/07/26 00:22:21 mej Exp $
+# $Id: srctool,v 1.49 2004/07/26 19:34:40 mej Exp $
 #
 
 use strict;
@@ -188,6 +188,9 @@ import_package()
         }
     } elsif ((! $pkgfile) || (-d $pkgfile)) {
         dprint "Importing FST.\n";
+        if ($pkgfile) {
+            $pkg = &basename($pkgfile);
+        }
         if (! $name || $name !~ /-/) {
             if (-t STDIN) {
                 my ($pname, $pver);
@@ -218,11 +221,6 @@ import_package()
             my $module;
             my $tmp;
 
-            if ($pkgfile) {
-                # Must be a directory.
-                chdir($pkgfile);
-            }
-
             ($tag = $name) =~ tr/a-z/A-Z/;
             $tag =~ s/\./_/g;
             $scm->propset("target_tag", $tag);
@@ -244,12 +242,17 @@ import_package()
             }
             if (defined($tmp) && length($tmp) > 1) {
                 $module = "$tmp/$pkg";
+            } else {
+                $module = $pkg;
             }
 
             if (! $scm->propget("repository")) {
                 $scm->detect_repository();
             }
 
+            if (-d $pkgfile) {
+                chdir($pkgfile);
+            }
             $err = $scm->imprt($module);
 
             # FIXME:  Needed?
@@ -812,7 +815,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.48 $ created on $Date: 2004/07/26 00:22:21 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.49 $ created on $Date: 2004/07/26 19:34:40 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();

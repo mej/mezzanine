@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: CVS.pm,v 1.8 2004/07/25 03:48:40 mej Exp $
+# $Id: CVS.pm,v 1.9 2004/07/26 19:34:40 mej Exp $
 #
 
 package Mezzanine::SCM::CVS;
@@ -288,12 +288,16 @@ detect_repository()
     if (-r "$path/CVS/Root") {
         my $tmp = &cat_file("$path/CVS/Root");
         chomp($tmp);
+        dprint "Found CVS/Root in '$path'.\n";
         $self->propset("repository", $tmp);
     } elsif ($ENV{"MEZZANINE_CVSROOT"}) {
+        dprint "Using environment variable \$MEZZANINE_CVSROOT.\n";
         $self->propset("repository", $ENV{"MEZZANINE_CVSROOT"});
     } elsif ($ENV{"CVSROOT"}) {
+        dprint "Using environment variable \$CVSROOT.\n";
         $self->propset("repository", $ENV{"CVSROOT"});
     } else {
+        dprint "Using fallback of /cvs\n";
         $self->propset("repository", "/cvs");
     }
     dprintf("Auto-detected repository as:  %s\n", $self->propget("repository"));
@@ -321,10 +325,12 @@ relative_path($)
         return $path;
     }
 
-    if ($path) {
+    if ($path && -e "$path/CVS/Repository") {
         $rel_dir = &cat_file("$path/CVS/Repository");
-    } else {
+    } elsif (-e "CVS/Repository") {
         $rel_dir = &cat_file("CVS/Repository");
+    } else {
+        $rel_dir = "";
     }
     chomp($rel_dir);
 
@@ -699,7 +705,7 @@ imprt()
 sub
 create_symlink_file(@)
 {
-    my $path = $_[0];
+    my ($self, $path) = @_;
     my $cnt;
     my %links;
     local *SYMLINKS;
@@ -757,8 +763,8 @@ parse_symlink_file(@)
                 eprint "Unable to symlink $link_from to $link_to -- $!\n";
             }
         }
+        close(SL);
     }
-    close(SL);
 }
 
 # Figure out where the ChangeLog file is (or should be).
