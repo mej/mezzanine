@@ -159,3 +159,14 @@ Thu May 18 22:37:09 2000                        Michael Jennings (mej)
 
 Exclude dotfiles from additional sources too.
 ----------------------------------------------------------------------
+Fri May 19 13:19:18 2000                        Michael Jennings (mej)
+
+Okay, first off, I fixed a bug that Walt found in buildtool.  The
+base, product, and build directories need to be absolute paths, not
+relative ones, if you're going to be building any module packages.
+
+Also, we had the misfortune of realizing that some packages have
+tarballs that explode into the current directory, or into multiple
+directories.   Ugh.  So I've had to change the syntax from what I
+told you last night.
+----------------------------------------------------------------------

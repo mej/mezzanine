@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.17 2000/05/19 05:29:55 mej Exp $
+# $Id: buildtool,v 1.18 2000/05/19 20:14:07 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -562,8 +562,8 @@ do_bootstrap_stage
 sub
 do_compose_stage
 {
-    my ($specfile, $target, $pn, $dir, $err, $line, $sf);
-    my (@contents, @tmp, @dirs, @sfiles);
+    my ($specfile, $target, $pn, $dir, $err, $line, $src, $tarball);
+    my (@contents, @tmp, @dirs, @sfiles, @srcs);
     my @p = @packages;
 
     qprint "$progname:  Entering the compose stage.  (${\(&get_timestamp())})\n";
@@ -607,77 +607,70 @@ do_compose_stage
             }
         }
 
-        undef @dirs;
-        if ($pkgs->{$pkg}{DIRS}) {
-            # If they gave us the directory name(s), use them
-            @dirs = split(",", $pkgs->{$pkg}{DIRS});
+        undef @srcs;
+        if ($pkgs->{$pkg}{SRCS}) {
+            @srcs = split(",", $pkgs->{$pkg}{SRCS});
         } else {
-            # If not, assume any unhidden directory in the module
-            # which is not named CVS/SCCS/RCS/BitKeeper
-            @dirs = grep($_ !~ /^(CVS|SCCS|RCS|BitKeeper)$/ && $_ !~ /^\./ && -d $_, @contents);
-        }
-        dprint "Source directories:  ", join(" ", @dirs), "\n" if ($#dirs >= 0);
+            my $fname;
 
-        if ($pkgs->{$pkg}{SFILES}) {
-            @sfiles = split(",", $pkgs->{$pkg}{SFILES});
-        } else {
-            @sfiles = grep($_ !~ /\.spec(\.in)?$/ && $_ !~ /^\./ && -f $_, @contents);
-        }
-        dprint "Additional source files:  ", join(" ", @sfiles), "\n" if ($#sfiles >= 0);
-
-        if ($#dirs == -1 && $#sfiles == -1) {
-            nprint "$progname:  Warning:  $pkg has no sources at all?  Are you sure?\n";
-        }
-
-        foreach $dir (@dirs) {
-            my ($sdir, $sfile) = split(":", $dir);
-            my $zip;
-
-            # If we weren't given the archive filename, take our best guess.  If
-            # it doesn't work, oh well.  They should've helped us out.
-            if (! $sfile) {
-                $sfile = "$sdir.tar.gz";
-            }
-            if ($pkgs->{$pkg}{TAR}) {
-                $cmd = $pkgs->{$pkg}{TAR};
-                $cmd =~ s/\%d/$sdir/;
-                $cmd =~ s/\%f/$sfile/;
-            } else {
-                if ($pkgs->{$pkg}{ZIP}) {
-                    $zip = "--use-compress-program=$pkgs->{$pkg}{ZIP}";
-                } elsif ($sfile =~ /(gz|Z)$/) {
-                    $zip = "--use-compress-program=gzip";
-                } elsif ($sfile =~ /\.bz2$/) {
-                    $zip = "--use-compress-program=bzip2";
+            foreach $fname (@contents) {
+                next if ($fname =~ /^(CVS|SCCS|RCS|BitKeeper)$/);
+                next if ($fname =~ /^\./);
+                next if ($fname =~ /\.spec(\.in)?$/);
+                if (-d $fname) {
+                    push @srcs, "$fname:$fname.tar.gz";
+                } else {
+                    push @srcs, $fname;
                 }
-                $cmd = "tar --exclude CVS --exclude RCS --exclude BitKeeper --exclude SCCS"
-                        . "\"$zip\" -cf $builddir/SOURCES/$sfile $sdir";
-            }
-            dprint "Creating $sfile from $sdir:  $cmd\n";
-            if (!open(CMD, "$cmd 2>&1 |")) {
-                &fail_package($pkg, "compose", "Execution of \"$cmd\" failed -- $!");
-                next;
-            }
-            $err = 0;
-            while (<CMD>) {
-                chomp($line = $_);
-                nprint "tar output -> $line\n";
-            }
-            close(CMD);
-            dprint "\"$cmd\" returned $?\n";
-            if ($?) {
-                &fail_package($pkg, "compose", "Creation of vendor source tarball $sfile from $sdir failed");
-                next;
             }
         }
 
-        foreach $sf (@sfiles) {
-            my $rc;
+        foreach $src (@srcs) {
+            my ($src_files, $tarball) = split(":", $src);
 
-            $rc = system("cp $sf $builddir/SOURCES/") >> 8;
-            if ($rc) {
-                &fail_package($pkg, "compose", "Unable to copy $sf to $builddir/SOURCES/ -- $!");
-                $err = 1;
+            $src_files =~ s/\&/ /g;
+            if ($tarball) {
+                my $zip;
+
+                if ($pkgs->{$pkg}{TAR}) {
+                    $cmd = $pkgs->{$pkg}{TAR};
+                    $cmd =~ s/\%f/$src_files/;
+                    $cmd =~ s/\%t/$builddir\/SOURCES\/$tarball/;
+                } else {
+                    if ($pkgs->{$pkg}{ZIP}) {
+                        $zip = "--use-compress-program=$pkgs->{$pkg}{ZIP}";
+                    } elsif ($sfile =~ /(gz|Z)$/) {
+                        $zip = "--use-compress-program=gzip";
+                    } elsif ($sfile =~ /\.bz2$/) {
+                        $zip = "--use-compress-program=bzip2";
+                    }
+                    $cmd = "tar --exclude CVS --exclude RCS --exclude BitKeeper --exclude SCCS"
+                            . "\"$zip\" -cf $builddir/SOURCES/$tarball $src_files";
+                }
+                dprint "Creating $tarball:  $cmd\n";
+                if (!open(CMD, "$cmd 2>&1 |")) {
+                    &fail_package($pkg, "compose", "Execution of \"$cmd\" failed -- $!");
+                    next;
+                }
+                $err = 0;
+                while (<CMD>) {
+                    chomp($line = $_);
+                    nprint "tar output -> $line\n";
+                }
+                close(CMD);
+                dprint "\"$cmd\" returned $?\n";
+                if ($?) {
+                    &fail_package($pkg, "compose", "Creation of vendor source tarball $tarball from failed");
+                    next;
+                }
+            } else {
+                my $rc;
+
+                $rc = system("cp $src_files $builddir/SOURCES/") >> 8;
+                if ($rc) {
+                    &fail_package($pkg, "compose", "Unable to copy $src_files to $builddir/SOURCES/ -- $!");
+                    $err = 1;
+                }
             }
         }
 
@@ -1072,13 +1065,14 @@ BEGIN {
     $verbosity = ($opt_Q ? 0 : ($opt_q ? 1 : 2));
     if ($opt_D) {
         $proddir = $opt_D;
-    } elsif ($ENV{PROD_DIR}) {
+    } elsif ($ENV{PROD_DIR} && $ENV{PROD_DIR} =~ /^\//) {
         $proddir = $ENV{PROD_DIR};
     } else {
-        $proddir = ".";
+        chomp($proddir = `pwd`);
+        $proddir .= "/products";
     }
     $opt_b = "p" if (! $opt_b);
-    $basedir = ($ENV{BASE_DIR} ? $ENV{BASE_DIR} : ".");
+    chomp($basedir = (($ENV{BASE_DIR} && $ENV{BASE_DIR} =~ /^\//) ? $ENV{BASE_DIR} : `pwd`));
     $builddir = ($ENV{BUILD_DIR} ? $ENV{BUILD_DIR} : "$basedir/build");
     $revtool = sprintf("revtool%s", ($opt_d ? " --debug" : ""));
     if ($opt_v) {
