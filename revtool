@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.42 2000/07/11 05:16:18 mej Exp $
+# $Id: revtool,v 1.43 2000/07/14 03:48:13 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -253,29 +253,35 @@ commit_to_master
     close(LOGFILE);
     chomp($module = &cat_file("CVS/Repository"));
     dprint "Current directory is \"$cwd\", module name is \"$module\"\n";
-    if (! -f "ChangeLog") {
-        if ($module eq $cwd) {
+    if (! $opt_x) {
+        if ($module ne $cwd) {
+            # We're not in the module directory.  Offer to cd to it.
+            $opt_x = 1;  # For now, just don't write the ChangeLog
+        }
+    }
+    if (! $opt_x) {  # This extra check will go away when the above section is fleshed out.
+        if (! -f "ChangeLog") {
             open(CL, ">ChangeLog");
             print "WARNING:  You have no ChangeLog here.  I have created one for you.\n";
             &add_new_files("ChangeLog");
         } else {
-            # We're not in the module directory.  Offer to cd to it.
+            open(CL, ">>ChangeLog");
+            if ($file_list !~ /^\s*$/ && $file_list !~ /ChangeLog/) {
+                $file_list = "$file_list ChangeLog";
+            }
         }
-    } else {
-        open(CL, ">>ChangeLog");
-        if ($file_list !~ /^\s*$/ && $file_list !~ /ChangeLog/) {
-            $file_list = "$file_list ChangeLog";
-        }
-    }
+    }        
     print "Please edit your commit message now...\n";
     system($ENV{"EDITOR"} ? $ENV{"EDITOR"} : "vi", $logfile);
-    open(LOGFILE, "<$logfile");
-    while (<LOGFILE>) {
-        print CL $_;
+    if (! $opt_x) {
+        open(LOGFILE, "<$logfile");
+        while (<LOGFILE>) {
+            print CL $_;
+        }
+        print CL "----------------------------------------------------------------------\n";
+        close(CL);
+        close(LOGFILE);
     }
-    print CL "----------------------------------------------------------------------\n";
-    close(CL);
-    close(LOGFILE);
     $cmd = sprintf("/bin/sh -c \"cvs $cvsroot commit %s -F $logfile $file_list\"", ($opt_t ? "-r $opt_t" : ""));
 
     for ($err = 0; (($err == -1) || ($tries == 0)); $tries++) {
@@ -1358,7 +1364,7 @@ BEGIN {
     }
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.42 $ created on $Date: 2000/07/11 05:16:18 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.43 $ created on $Date: 2000/07/14 03:48:13 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

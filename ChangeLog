@@ -655,3 +655,8 @@ was called, there were no packages left in the package list.  Rather
 than giving up, it just sat there spinning like crazy.  This fixes
 that. :-)
 ----------------------------------------------------------------------
+Thu Jul 13 20:55:23 2000                        Michael Jennings (mej)
+
+Allow the -x option to override the automatic ChangeLog creation.
+Some modules (namely the CD images) must not have ChangeLogs in them.
+----------------------------------------------------------------------
