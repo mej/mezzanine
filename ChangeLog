@@ -387,3 +387,7 @@ Tue Jun 13 16:44:09 2000                        Michael Jennings (mej)
 
 More fixes for the various failures we've got.
 ----------------------------------------------------------------------
+Tue Jun 13 16:48:22 2000                        Michael Jennings (mej)
+
+Set ISO file names so they don't conflict.
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.55 2000/06/13 23:33:36 mej Exp $
+# $Id: buildtool,v 1.56 2000/06/13 23:37:49 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -1563,7 +1563,10 @@ do_iso_stage
         if ($pkgs->{$pkg}{ISO}) {
             $iso = $pkgs->{$pkg}{ISO};
         } else {
-            $iso = "$prod.iso";
+            my $ver;
+
+            $ver = ($pkgs->{$pkg}{VERSION} ? "-$pkgs->{$pkg}{VERSION}" : "");
+            $iso = "$pkg$ver.iso";
         }
 
         $ignore = "-m CVS -m RCS -m BitKeeper -m SCCS -m .cvsignore";
@@ -1766,7 +1769,7 @@ main
     # Post-parse the options stuff
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.55 $ created on $Date: 2000/06/13 23:33:36 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.56 $ created on $Date: 2000/06/13 23:37:49 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
