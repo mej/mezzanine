@@ -399,3 +399,8 @@ Tue Jun 13 22:38:55 2000                        Michael Jennings (mej)
 
 A couple fixes.
 ----------------------------------------------------------------------
+Wed Jun 14 13:44:16 2000                        Michael Jennings (mej)
+
+More documentation.  I've covered the existing features of revtool,
+and I'm starting on the buildtool part.
+----------------------------------------------------------------------

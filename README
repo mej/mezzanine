@@ -4,7 +4,7 @@
 #  Written by:  Michael Jennings
 #               Ted T'so
 #
-#  $Id: README,v 1.5 2000/06/14 05:28:27 mej Exp $
+#  $Id: README,v 1.6 2000/06/14 20:34:05 mej Exp $
 #
 ########################################################################
 
@@ -185,9 +185,108 @@ Examples:
 
   (Note:  The -r option works in the exact same way.)
 
-2.3.  
+  To add "Makefile.am," remove "Makefile" and "Makefile.in," and
+  commit:
+     revtool -p --add-list Makefile.am --rem-list "Makefile Makefile.in"
+
+2.3.  Committing New Changes to the Master Server
+-------------------------------------------------
+
+Even though you may alter files on your local machine, no one else can
+see your changes until you upload (a.k.a. "push" or "commit") them to
+the master server.  This operation is called a "put" in revtool-
+speak.  You must also realize that adding or removing files (as shown
+above) must be accompanied by (or followed by) a "put" in order to
+make the change permanent.
+
+Part of your responsibility when making changes to the master
+repository is documenting the changes you've made and why they were
+made.  This is the purpose of a "change log" or a "commit log."  This
+document is updated each time a put operation is performed.
+
+When you perform a put, the editor of your choice (as determined by
+the $EDITOR environment variable) is opened and contains a template
+change log entry.  This template contains date/time stamp with your
+userid (and name if available).  Go to the last line of this template
+and type a description of the changes you're uploading.  Your
+description should be brief but as accurate and complete as possible.
+This message will be automatically appended to the ChangeLog file just
+before revtool uploads your changes.
+
+By default, the "-p" and "--put" options IGNORE any filenames that
+might appear on the command line.  This is so that additions and
+removals may be easily combined with puts ("-ap" or "-rp") that commit
+the entire module, not just the added/removed files.  If you want a
+particular put to only operate on the specified files, add the "-x" or
+"--exclusive" option ("-xp").  Also note that puts should be done from
+the top directory of the module to which you are making changes.
+
+Examples:
+
+  To upload your changes in the current module to the master server:
+     revtool -p
+
+  To commit only your changes to the README file:
+     revtool -xp README
+
+2.4.  Querying the Master Server
+--------------------------------
+
+2.5.  Creating Modules for New Packages
+---------------------------------------
+
+2.6.  Tagging Sources
+---------------------
+
+
 3.  BUILDING PRODUCTS
 ---------------------
+
+The most common task the average user will want to perform with this
+system is to build products.  In corporate terms, a product is any
+piece of work that actually ships to customers.  The build system, on
+the other hand, defines a product as a collection of packages and
+other products which form a coherent whole.  The program which manages
+the process of building products, buildtool, has yet another
+definition.  A product, according to buildtool, is anything that has a
+.prod file in the products directory.  The .prod file describes a
+product in terms of its components and how they fit together.
+
+The average user, however, will not need to know how product files
+work or what their contents mean.  All they'll need to know is what
+product, and what version of that product, they wish to build.  In
+general, it should be easy to look at the *.prod files in the products
+directory and tell which one names the product you wish to build.  For
+example, if you want to build the Web CD, try finding a product file
+named "webcd" or "web-cd."  (The actual filename would end in ".prod,"
+of course, but we'll ignore that part for the sake of discussion.)
+
+If you can't find the product you're looking for, it may not be in the
+build system yet.  Feel free to ask one of the build system
+maintainers for assistance.
+
+The purpose of buildtool is to provide a consistent interface to the
+end user for building products while simultaneously simplifying the
+management and organization of product development in a revision
+controlled environment.  In other words, the end user shouldn't have
+to care how the rpm command works or what the proper syntax is for
+mkhybrid.  Likewise, the people who maintain the products and packages
+behind the scenes should have a system which allows them to build
+products in a flexible manner but still enforces good design and
+proper change management.
+
+To this end, the syntax for buildtool is designed to be very simple
+for the average user to employ while still being sufficiently powerful
+for the power user to get done what needs to be done as efficiently as
+possible.  This section will discuss buildtool syntax, starting with
+the basics and finishing with the more powerful stuff.  Casual users
+may want to stop before getting to the complicated parts.
+
+3.1.  Running a Simple Build
+----------------------------
+
+
+
 
 4.  PACKAGE MAINTAINER'S GUIDE
 ------------------------------
