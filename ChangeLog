@@ -679,3 +679,16 @@ Fri Oct 29 16:37:23 2004                        Michael Jennings (mej)
 
 Copyright: -> License: (jbj is a fascist bastard)  ;-P
 ----------------------------------------------------------------------
+Sun Jan  2 20:22:16 2005                        Michael Jennings (mej)
+
+Copyright: -> License: in templates.
+
+New template for web-based packages (horde, tikiwiki, etc.).
+
+perlpkg now avoids packages which require Meta, a horrible evil
+worthless abomination of perl modules which royally cornholes
+everything it touches.
+
+Allow abbreviations and CVS-like synonyms for keyword expansion mode
+specification in addition to the old "source" and "binary" options.
+----------------------------------------------------------------------

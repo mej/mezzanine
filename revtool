@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.88 2004/07/28 21:40:21 mej Exp $
+# $Id: revtool,v 1.89 2005/01/03 01:34:49 mej Exp $
 #
 
 use strict;
@@ -99,7 +99,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.88 $ created on $Date: 2004/07/28 21:40:21 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.89 $ created on $Date: 2005/01/03 01:34:49 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
@@ -192,6 +192,21 @@ main
         $mode = "init";
     } elsif ($OPTION{"login"}) {
         $mode = "login";
+    }
+
+    # Support common aliases for keyword modes.
+    if ($OPTION{"keyword"} eq "s") {
+        $OPTION{"keyword"} = "source";
+    } elsif ($OPTION{"keyword"} eq "b") {
+        $OPTION{"keyword"} = "binary";
+    } elsif ($OPTION{"keyword"} eq "kv") {
+        $OPTION{"keyword"} = "source";
+    } elsif ($OPTION{"keyword"} eq "n") {
+        $OPTION{"keyword"} = "none";
+    } elsif ($OPTION{"keyword"} eq "o") {
+        $OPTION{"keyword"} = "none";
+    } elsif ($OPTION{"keyword"} eq "d") {
+        $OPTION{"keyword"} = "default";
     }
 
     $scm->propset(

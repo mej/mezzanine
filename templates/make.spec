@@ -2,7 +2,7 @@ Summary: @SUMMARY@
 Name: @NAME@
 Version: @VERSION@
 Release: @RELEASE@
-Copyright: @LICENSE@
+License: @LICENSE@
 Group: @GROUP@
 Source: @TARBALL@
 Packager: @PACKAGER@

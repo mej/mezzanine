@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: perlpkg,v 1.3 2004/10/19 19:35:35 mej Exp $
+# $Id: perlpkg,v 1.4 2005/01/03 01:34:49 mej Exp $
 #
 
 use strict;
@@ -171,6 +171,9 @@ build(@)
             next;
         } elsif (&basename($file) =~ /^perl-[\d\.]+\.(t|tar\.)(gz|bz2?)$/) {
             print $SAVE_STDOUT "${depth_str}Something requires newer Perl (", &basename($file), "); aborting!\n";
+            next;
+        } elsif (&basename($file) =~ /^Meta-[\d\.]+\.(t|tar\.)(gz|bz2?)$/) {
+            print $SAVE_STDOUT "${depth_str}Something requires the evil Meta package (", &basename($file), "); aborting!\n";
             next;
         } elsif (!($update) && $distributions{$file}{"INSTALLED"}) {
             print $SAVE_STDOUT "${depth_str}Skipping installed package $file\n";
@@ -345,7 +348,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.3 $ created on $Date: 2004/10/19 19:35:35 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.4 $ created on $Date: 2005/01/03 01:34:49 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;

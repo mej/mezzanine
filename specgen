@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: specgen,v 1.7 2004/10/19 19:35:35 mej Exp $
+# $Id: specgen,v 1.8 2005/01/03 01:34:49 mej Exp $
 #
 
 use strict;
@@ -373,6 +373,7 @@ watch_install(\%)
     my ($tmpdir, $savecwd, $buildroot, $err, $msg, $outfiles);
     my @filelist;
     my %replace_paths = (
+                         "/var/www" -> "%{webroot}",
                          "/usr/bin" => "%{_bindir}",
                          "/usr/sbin" => "%{_sbindir}",
                          "/usr/libexec" => "%{_libexecdir}",
@@ -450,7 +451,7 @@ main
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.7 $ created on $Date: 2004/10/19 19:35:35 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.8 $ created on $Date: 2005/01/03 01:34:49 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || !scalar(@ARGV)) {
 	&print_usage_info();
     }
@@ -474,6 +475,13 @@ main
             } elsif (-f $OPTION{"template"}) {
                 $template->file(&basename($OPTION{"template"}));
                 $template->directory(&dirname($OPTION{"template"}));
+            } else {
+                my $tmp = $OPTION{"template"};
+
+                if (substr($tmp, -5, 5) ne ".spec") {
+                    $tmp .= ".spec";
+                }
+                $template->file($tmp);
             }
         }
         if (! $template->file()) {

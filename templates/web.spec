@@ -1,3 +1,5 @@
+%define webroot /var/www
+
 Summary: @SUMMARY@
 Name: @NAME@
 Version: @VERSION@
@@ -8,7 +10,7 @@ Source: @TARBALL@
 Packager: @PACKAGER@
 Vendor: @VENDOR@
 Distribution: @DISTRIBUTION@
-Prefix: %{_prefix}
+Prefix: %{webroot}
 BuildRoot: /var/tmp/%{name}-%{version}-%{release}-root
 
 %description
@@ -17,22 +19,21 @@ BuildRoot: /var/tmp/%{name}-%{version}-%{release}-root
 %prep
 %setup -q @SETUP@
 
-%build
-CFLAGS="@CFLAGS@"
-CXXFLAGS="@CXXFLAGS@"
-export CFLAGS CXXFLAGS
-
-%configure %{?acflags}
-%{__make} %{?mflags}
-
 %install
-%{__make} install DESTDIR=$RPM_BUILD_ROOT %{?mflags_install}
+cd ..
+%{__mkdir_p} $RPM_BUILD_ROOT%{webroot}/
+%{__cp} -a %{name}* $RPM_BUILD_ROOT%{webroot}/%{name}
+#(
+#    cd $RPM_BUILD_ROOT%{webroot}/%{name}
+#    find . -type d -print | xargs chmod 0550
+#    find . \! -type d -print | xargs chmod 0440
+#)
 
 %clean
 test "x$RPM_BUILD_ROOT" != "x" && rm -rf $RPM_BUILD_ROOT
 
 %files
-%defattr(-, root, root)
+%defattr(0440, apache, apache, 0550)
 %doc @DOCFILES@
 @INSTFILES@
 
