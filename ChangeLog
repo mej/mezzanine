@@ -749,3 +749,9 @@ Fixed some symlink-handling bugs in the CVS module.
 I expect to have caused some problems, so please test this one, but
 don't get rid of your 1.8-0.19 RPM just yet. :-)
 ----------------------------------------------------------------------
+Sat May  7 01:23:58 2005                        Michael Jennings (mej)
+
+Added local mode to perlpkg providing the ability to bypass CPAN and
+package locally-stored CPAN distribution files.  By request from
+Maarten Stolte <m.stolte@datadevil.demon.nl>.
+----------------------------------------------------------------------
