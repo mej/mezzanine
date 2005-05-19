@@ -323,6 +323,11 @@ identify_package_type
              ? (" ($pkg_vars{subtype}{$filename})")
              : ("")
             ));
+    if (wantarray()) {
+        return ($pkg_vars{"type"}{$filename}, $pkg_vars{"subtype"}{$filename});
+    } else {
+        return $pkg_vars{"type"}{$filename};
+    }
 }
 
 ### Private functions

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.24 2005/02/04 02:42:48 mej Exp $
+# $Id: Src.pm,v 1.25 2005/05/19 21:22:32 mej Exp $
 #
 
 package Mezzanine::Src;
@@ -45,7 +45,7 @@ BEGIN {
     @EXPORT = ('$WORK_DIR', '&find_files', '&find_subdirs',
                '&install_spm_files', '&create_temp_space',
                '&clean_temp_space', '&convert_srpm_to_spm',
-               '&convert_srpm_to_pdr');
+               '&convert_srpm_to_pdr', '&find_keepers');
 
     %EXPORT_TAGS = ( );
 
@@ -69,6 +69,7 @@ sub find_subdirs($);
 sub install_spm_files($);
 sub convert_srpm_to_spm($$);
 sub convert_srpm_to_pdr($$);
+sub find_keepers(@);
 
 # Private functions
 
@@ -151,12 +152,28 @@ sub
 convert_srpm_to_spm($)
 {
     my ($pkgfile, $destdir) = @_;
-    my ($err, $msg, $rpmcmd, $spec, $specdata);
-    my (@srcs, @patches, @tmp);
+    my ($err, $msg, $rpmcmd, $spec, $specdata, $tmp);
+    my (@srcs, @patches, @tmp, @keepers);
 
-    # Install the SRPM into the temporary directory
     &pkgvar_filename($pkgfile);
     $destdir = &getcwd() if ($destdir =~ /^\.\/?$/);
+    $tmp = &pkgvar_get("keep_files");
+    if ($tmp && (ref($tmp) eq "ARRAY")) {
+        @keepers = @{$tmp};
+    }
+    if (scalar(@keepers)) {
+        foreach my $dir ("F", "P", "S") {
+            foreach my $filename (@keepers) {
+                if ((-d $dir) && (-f "$dir/$filename")) {
+                    if (&move_files("$dir/$filename", "$dir/$filename.mezz_keep") != 1) {
+                        wprint "Unable to backup $filename -- $!\n";
+                    }
+                }
+            }
+        }
+    }
+
+    # Install the SRPM into the temporary directory
     &pkgvar_parameters("--define '_sourcedir $destdir/S' --define '_specdir $destdir/F'");
     ($err, $msg) = &package_install();
     &pkgvar_parameters("");
@@ -183,7 +200,9 @@ convert_srpm_to_spm($)
         return MEZZANINE_SPEC_ERRORS;
     } elsif (exists($specdata->{"HEADER"}{"epoch"})) {
         wprintf("Epoch of %s present!\n", $specdata->{"HEADER"}{"epoch"});
-        return MEZZANINE_SPEC_ERRORS;
+        if (! &pkgvar_get("allow_epoch")) {
+            return MEZZANINE_SPEC_ERRORS;
+        }
     }
 
     @srcs = values %{$specdata->{SOURCE}};
@@ -200,9 +219,43 @@ convert_srpm_to_spm($)
             return MEZZANINE_FILE_OP_FAILED;
         }
     }
-    &limit_files(&basename($spec), "$destdir/F");
-    &limit_files(@srcs, "$destdir/S");
-    &limit_files(@patches, "$destdir/P");
+
+    # Restore kept files from backups.
+    if (scalar(@keepers)) {
+        my @new_keepers;
+
+        #dprintf("Restoring kept files:  %s\n", join(", ", @keepers));
+        foreach my $dir ("$destdir/F", "$destdir/P", "$destdir/S") {
+            foreach my $filename (@keepers) {
+                if ((-d $dir) && (-f "$dir/$filename.mezz_keep")) {
+                    if (-f "$dir/$filename") {
+                        if (&checksum_file("$dir/$filename") == &checksum_file("$dir/$filename.mezz_keep")) {
+                            dprint "$filename and $filename.mezz_keep are identical.  Removing backup.\n";
+                            &nuke_tree("$dir/$filename.mezz_keep");
+                        } elsif (&move_files("$dir/$filename", "$dir/$filename.mezz_new") != 1) {
+                            wprint "Unable to rename $filename -- $!\n";
+                        } else {
+                            dprint "Saved new $filename as $filename.mezz_new.\n";
+                            push @new_keepers, "$filename.mezz_new";
+                        }
+                    }
+                    if (&move_files("$dir/$filename.mezz_keep", "$dir/$filename") != 1) {
+                        wprint "Unable to restore $filename -- $!\n";
+                        push @new_keepers, "$filename.mezz_keep";
+                    } else {
+                        dprint "Moved $dir/$filename.mezz_keep to $dir/$filename\n";
+                        push @new_keepers, $filename;
+                    }
+                }
+            }
+        }
+        @keepers = @new_keepers;
+        #dprintf("Now keeping:  %s\n", join(", ", @new_keepers));
+    }
+
+    &limit_files(&basename($spec), @keepers, "$destdir/F");
+    &limit_files(@srcs, @keepers, "$destdir/S");
+    &limit_files(@patches, @keepers, "$destdir/P");
     return MEZZANINE_SUCCESS;
 }
 
@@ -224,6 +277,98 @@ convert_srpm_to_pdr($)
         return MEZZANINE_COMMAND_FAILED;
     }
     return MEZZANINE_SUCCESS;
+}
+
+sub
+find_keepers(@)
+{
+    my @keep_files = @_;
+    my ($pkgtype, $specdata);
+    my @keepers;
+
+    dprint &print_args(@_);
+
+    # Find spec file.
+    if (! &pkgvar_instructions()) {
+        $pkgtype = &identify_package_type();
+        if ($pkgtype eq "SPM") {
+            my @specs;
+
+            @specs = &grepdir(sub { $_ =~ /\.spec(\.in)?$/ && &basename($_) !~ /^\./ }, "F");
+            &pkgvar_instructions($specs[0]);
+        } elsif ($pkgtype eq "PDR") {
+            @specs = &grepdir(sub { $_ =~ /\.spec(\.in)?$/ && &basename($_) !~ /^\./ }, ".");
+            &pkgvar_instructions($specs[0]);
+        } else {
+            # FIXME:  What to do?
+            return @keepers;
+        }
+    }
+
+    $specdata = &parse_spec_file();
+    if (! $specdata) {
+        # Couldn't parse the spec. :(
+        wprintf("Unable to parse spec file %s.  Not keeping any files.\n", &pkgvar_instructions());
+        return @keepers;
+    }
+
+    foreach my $filespec (@keep_files) {
+        dprint "Handling filespec:  $filespec\n";
+
+        if (substr($filespec, 0, 1) eq 'F') {
+            push @keepers, &basename(&pkgvar_instructions());
+        } elsif (substr($filespec, 0, 1) eq 'S') {
+            if (ref($specdata->{"SOURCES"}) eq "ARRAY") {
+                if ($filespec eq 'S') {
+                    push @keepers, map { $specdata->{"SOURCE"}{$_} } @{$specdata->{"SOURCES"}};
+                } elsif ($filespec =~ /^S(\d+)\+$/) {
+                    my $num = $1;
+
+                    push @keepers, map { $specdata->{"SOURCE"}{$_} } grep { $_ >= $num } @{$specdata->{"SOURCES"}};
+                } elsif ($filespec =~ /^S(\d+)-(\d+)$/) {
+                    my ($low, $high) = ($1, $2);
+
+                    push @keepers, map { $specdata->{"SOURCE"}{$_} }
+                                       grep { ($_ >= $low) && ($_ <= $high) } @{$specdata->{"SOURCES"}};
+                } elsif ($filespec =~ /^S(\d+)$/) {
+                    my $num = $1;
+
+                    if ($specdata->{"SOURCE"}{$num}) {
+                        push @keepers, $specdata->{"SOURCE"}{$num};
+                    }
+                } else {
+                    wprint "Unable to parse for keeping:  $filespec\n";
+                }
+            }
+        } elsif (substr($filespec, 0, 1) eq 'P') {
+            if (ref($specdata->{"PATCHES"}) eq "ARRAY") {
+                if ($filespec eq 'P') {
+                    push @keepers, map { $specdata->{"PATCH"}{$_} } @{$specdata->{"PATCHES"}};
+                } elsif ($filespec =~ /^P(\d+)\+$/) {
+                    my $num = $1;
+
+                    push @keepers, map { $specdata->{"PATCH"}{$_} } grep { $_ >= $num } @{$specdata->{"PATCHES"}};
+                } elsif ($filespec =~ /^P(\d+)-(\d+)$/) {
+                    my ($low, $high) = ($1, $2);
+
+                    push @keepers, map { $specdata->{"PATCH"}{$_} }
+                                       grep { ($_ >= $low) && ($_ <= $high) } @{$specdata->{"PATCHES"}};
+                } elsif ($filespec =~ /^P(\d+)$/) {
+                    my $num = $1;
+
+                    if ($specdata->{"PATCH"}{$num}) {
+                        push @keepers, $specdata->{"PATCH"}{$num};
+                    }
+                } else {
+                    wprint "Unable to parse for keeping:  $filespec\n";
+                }
+            }
+        } else {
+            wprint "Unable to parse for keeping:  $filespec\n";
+        }
+    }
+    dprintf("Keeping:  \"%s\"\n", join("\", \"", @keepers));
+    return @keepers;
 }
 
 ### Private functions

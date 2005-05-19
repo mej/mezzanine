@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.50 2005/02/04 02:42:48 mej Exp $
+# $Id: Util.pm,v 1.51 2005/05/19 21:22:32 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -56,10 +56,11 @@ BEGIN {
                '&grepdir', '&limit_files', '&str_trim', '&xpush',
                '&cat_file', '&parse_rpm_name', '&should_ignore',
                '&trunc_file', '&touch_file', '&newest_file',
-               '&run_cmd', '&run_mz_cmd', '&MEZZANINE_SUCCESS',
-               '&MEZZANINE_FATAL_ERROR', '&MEZZANINE_SYNTAX_ERROR',
-               '&MEZZANINE_SYSTEM_ERROR', '&MEZZANINE_COMMAND_FAILED',
-               '&MEZZANINE_DUPLICATE', '&MEZZANINE_FILE_NOT_FOUND',
+               '&checksum_file', '&run_cmd', '&run_mz_cmd',
+               '&MEZZANINE_SUCCESS', '&MEZZANINE_FATAL_ERROR',
+               '&MEZZANINE_SYNTAX_ERROR', '&MEZZANINE_SYSTEM_ERROR',
+               '&MEZZANINE_COMMAND_FAILED', '&MEZZANINE_DUPLICATE',
+               '&MEZZANINE_FILE_NOT_FOUND',
                '&MEZZANINE_FILE_OP_FAILED', '&MEZZANINE_UNSUPPORTED',
                '&MEZZANINE_ACCESS_DENIED', '&MEZZANINE_BAD_ADDITION',
                '&MEZZANINE_BAD_LOG_ENTRY', '&MEZZANINE_BAD_LOGIN',
@@ -140,6 +141,7 @@ sub should_ignore($);
 sub trunc_file($);
 sub touch_file($);
 sub newest_file($);
+sub checksum_file($);
 sub handle_alarm_for_subcommand(@);
 
 ### Module cleanup
@@ -1024,6 +1026,25 @@ newest_file(@)
     dprintf("\"$newest_name\" is newest with mtime of %s.\n",
             POSIX::strftime("%Y-%m-%d %H:%M:%S", localtime($newest_time)));
     return $newest_name;
+}
+
+# Generate System V file checksum.
+sub
+checksum_file($)
+{
+    my $filename = shift;
+    my $contents;
+    local *FILE;
+
+    if (!open(FILE, $filename)) {
+        return 0;
+    }
+    $contents = join("", <FILE>);
+    close(FILE);
+
+    $contents = unpack("%32C*", $contents) % 65535;
+    dprintf("Got checksum %d for file %s\n", $contents, $filename);
+    return $contents;
 }
 
 # Generic wrapper to grab command output

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.56 2005/02/04 02:42:48 mej Exp $
+# $Id: srctool,v 1.57 2005/05/19 21:22:32 mej Exp $
 #
 
 use strict;
@@ -72,9 +72,10 @@ print_usage_info
     print "    -n --name <name>                 Specify the name of a package (-i) or patch (-a)\n";
     print "    -D --dir <repository>            Specify the repository to use\n";
     print "    -L --local                       Local mode; do not talk to the master server\n";
-    print "    -f --flat --pdr                  Import as a PDR (all files in top dir) rather than an SPM\n";
+    print "    -f --flat --pdr                  Import as PDR (all files in top dir) instead of SPM\n";
     print "    -R --path --relpath <repo path>  Import into repository at specified path\n";
     print "    -P --protocol <proto>            SCM protocol to use (e.g., \"cvs\", \"svn\")\n";
+    print "    -k --keep <type>                 Preserve files by type (merge/sync, types F,P,S)\n";
     print "       --move                        Move/rename file(s)\n";
     print "       --savecfg                     Preserve current settings for future use\n";
     print "\n";
@@ -541,16 +542,30 @@ merge_file($$)
             eprint "Unable to chdir into $pkg -- $!\n";
             return MEZZANINE_SYSTEM_ERROR;
         }
+        &pkgvar_name(&basename($pkg));
     } else {
         $pkg = &basename(&getcwd());
+        &pkgvar_name($pkg);
+        &pkgvar_filename(".");
     }
 
     dprint "Merging $new_file ($type) into $pkg\n";
     if ($type eq 'R') {
         # Merge in new files from an SRPM.
         if ($import_as_pdr) {
+            &pkgvar_set("keep_files", undef);
             &convert_srpm_to_pdr($new_file, ".");
         } else {
+            # Preserve files as requested.
+            if ($config->get("KEEP_FILES") =~ /[FPS]/) {
+                my @keep_files;
+
+                @keep_files = split(/[^-\+0-9FPS]+/, $config->get("KEEP_FILES"));
+                @keep_files = &find_keepers(@keep_files);
+                &pkgvar_set("keep_files", \@keep_files);
+            } else {
+                &pkgvar_set("keep_files", undef);
+            }
             &convert_srpm_to_spm($new_file, ".");
         }
         if ($local_mode) {
@@ -784,11 +799,12 @@ main
                "import|i", "prepare|p", "merge|m", "resync|r",
                "patch|apply|a", "move|mv", "name|n=s", "clean|c",
                "repository|dir|D=s", "local|L", "flat|pdr|f",
-               "path|relpath|R=s", "protocol|P=s", "savecfg!");
+               "path|relpath|R=s", "protocol|P=s", "keep|k=s",
+               "savecfg!");
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.56 $ created on $Date: 2005/02/04 02:42:48 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.57 $ created on $Date: 2005/05/19 21:22:32 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();
@@ -833,6 +849,7 @@ main
 
     $local_mode = $config->set("LOCAL_MODE", $local_mode || 0);
     $config->set("REPOSITORY", $OPTION{"repository"} || $config->get("REPOSITORY"));
+    $config->set("KEEP_FILES", uc($OPTION{"keep"}) || uc($config->get("KEEP_FILES")));
 
     # Save configuration if needed.
     if ($OPTION{"savecfg"}) {

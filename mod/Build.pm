@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.46 2005/02/04 02:42:48 mej Exp $
+# $Id: Build.pm,v 1.47 2005/05/19 21:22:32 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -990,28 +990,39 @@ build_tarball
 sub
 build_package
 {
-    my ($pwd, $pkg);
+    my ($pwd, $pkg, $pkgtype);
     my @ret = ();
 
     dprint &print_args(@_);
 
     $pwd = &getcwd();
     $pkg = &pkgvar_filename();
+    $pkgtype = &pkgvar_type() || "";
 
-    if (-d $pkg) {
+    if (($pkgtype eq "FST") || ($pkgtype eq "CFST") || ($pkgtype eq "SPM")
+        || ($pkgtype eq "PDR") || (-d $pkg)) {
         # It's a directory.  That means it's some type of module.
         if (!chdir($pkg)) {
             @ret = (MEZZANINE_SYSTEM_ERROR, "Unable to chdir into \"$pkg\" -- $!", undef);
         }
-        if (-d "F") {
+        if (($pkgtype eq "SPM") || (-d "F")) {
             # Okay, there's an F/ directory.  I bet it's an SPM.
             @ret = &build_spm();
-        } elsif (-f "Makefile.mezz" && -s _) {
+        } elsif (($pkgtype eq "CFST") || (-f "Makefile.mezz" && -s _)) {
             # There's a custom Makefile.  It's a Custom Full Source Tree (FST).
             @ret = &build_cfst();
         } else {
             my @specs = &grepdir(sub {$_ =~ /\.spec(\.in)?$/ && &basename($_) !~ /^\./}, ".");
 
+            if (scalar(@specs) > 1) {
+                my @tmp = grep { substr($_, -5, 5) eq ".spec" } @specs;
+
+                # If we have more than one spec, one could be a .spec.in,
+                # so see if we have exactly one *.spec and use that.
+                if (scalar(@specs) == 1) {
+                    @specs = @tmp;
+                }
+            }
             if (scalar(@specs) == 1) {
                 # There's a spec file.  Make sure we have all sources.
                 &pkgvar_instructions(&basename($specs[0]));

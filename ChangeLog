@@ -755,3 +755,23 @@ Added local mode to perlpkg providing the ability to bypass CPAN and
 package locally-stored CPAN distribution files.  By request from
 Maarten Stolte <m.stolte@datadevil.demon.nl>.
 ----------------------------------------------------------------------
+Thu May 19 17:11:08 2005                        Michael Jennings (mej)
+
+New feature:  Keep files during mzmerge.  When merging in an SRPM from
+an upstream/alternate source, it's often frustrating to lose any
+personal/custom patches, spec file changes, etc. from your previous
+work and have to recreate them somewhat blindly (or avoid using
+mzmerge altogether).  Now you can tell mzmerge to keep certain old
+files around using the -k/--keep option.  The value passed in with -k
+is a list of files types to keep:  F for spec file, S for sources, and
+P for patches (just like the SPM directory structure).  You can also
+specify source/patch numbers or ranges, such as P1000-1003 (keep
+patches 1000 through 1003) or S5+ (keep sources numbered 5 and
+higher).  Example:  mzmerge -k "F,P1000+" ../foo.src.rpm will merge in
+the new SRPM while preserving the old spec file (and naming the new
+one foo.spec.mezz_new) and any patch numbered 1000 or higher.  This
+will be especially helpful for the kernel packages.
+
+I also "fixed" the spec file parser.  The spec file is now passed
+through rpm's eval first to properly evaluate macros and %if's.
+----------------------------------------------------------------------
