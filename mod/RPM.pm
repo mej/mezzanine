@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.35 2005/05/19 21:22:32 mej Exp $
+# $Id: RPM.pm,v 1.36 2005/05/23 13:39:25 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -195,7 +195,8 @@ parse_spec_file
     }
     $contents = join("", <SPECFILE>);
     close(SPECFILE);
-    if (!open(SPECFILE, "-|", "/bin/rpm", "-E", $contents)) {
+
+    if (!defined(open(SPECFILE, "-|") || exec("/bin/rpm", "--eval", $contents))) {
         wprint "Unable to pre-process spec file $specfile -- $!\n";
         undef $specdata;
         return 0;

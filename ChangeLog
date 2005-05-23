@@ -775,3 +775,7 @@ will be especially helpful for the kernel packages.
 I also "fixed" the spec file parser.  The spec file is now passed
 through rpm's eval first to properly evaluate macros and %if's.
 ----------------------------------------------------------------------
+Mon May 23 09:39:05 2005                        Michael Jennings (mej)
+
+Slight syntax changes to work with older versions of perl and rpm.
+----------------------------------------------------------------------
