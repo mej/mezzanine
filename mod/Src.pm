@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.25 2005/05/19 21:22:32 mej Exp $
+# $Id: Src.pm,v 1.26 2005/05/25 16:14:56 mej Exp $
 #
 
 package Mezzanine::Src;
@@ -120,13 +120,11 @@ install_spm_files($)
     dprint "Installing SPM files to $dir.\n";
     @srcs = &find_files("S");
     @patches = &find_files("P");
-    @tmp = grep { $_ =~ /\.spec(\.in)?$/ } &find_files("F");
-    if (scalar(@tmp) != 1) {
-	my $n = scalar(@tmp);
-	&fatal_error("$n spec files?!\n");
+    $spec = &find_spec_file(&pkgvar_name(), "F");
+    if (! $spec) {
+        eprint "No spec file found.\n";
+        return 0;
     }
-    $spec = $tmp[0];
-    undef @tmp;
     push @tmp, @srcs if (scalar(@srcs));
     push @tmp, @patches if (scalar(@patches));
 
@@ -290,15 +288,15 @@ find_keepers(@)
 
     # Find spec file.
     if (! &pkgvar_instructions()) {
+        my $spec;
+
         $pkgtype = &identify_package_type();
         if ($pkgtype eq "SPM") {
-            my @specs;
-
-            @specs = &grepdir(sub { $_ =~ /\.spec(\.in)?$/ && &basename($_) !~ /^\./ }, "F");
-            &pkgvar_instructions($specs[0]);
+            $spec = &find_spec_file(&pkgvar_name(), "F");
+            &pkgvar_instructions($spec);
         } elsif ($pkgtype eq "PDR") {
-            @specs = &grepdir(sub { $_ =~ /\.spec(\.in)?$/ && &basename($_) !~ /^\./ }, ".");
-            &pkgvar_instructions($specs[0]);
+            $spec = &find_spec_file(&pkgvar_name(), ".");
+            &pkgvar_instructions($spec);
         } else {
             # FIXME:  What to do?
             return @keepers;

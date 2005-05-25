@@ -292,8 +292,6 @@ identify_package_type
     } elsif ($filename =~ /\.(tar\.|t)?(gz|bz|bz2|Z)$/) {
         $pkg_vars{"type"}{$filename} = $pkg_vars{"subtype"}{$filename} = "tar";
     } elsif ((-d $filename) || ($filename eq &basename(&getcwd()))) {
-        my @specs;
-
         dprint "$filename is a directory.\n";
         if (($filename ne &basename(&getcwd)) && (-d $filename)) {
             chdir($filename);
@@ -301,14 +299,14 @@ identify_package_type
         if (-s "Makefile.mezz") {
             $pkg_vars{"type"}{$filename} = "CFST";
         } else {
-            @specs = &grepdir(sub { $_ =~ /\.spec(\.in)?$/ && &basename($_) !~ /^\./ }, ".");
-            dprintf("Found %d specs in \".\"\n", scalar(@specs));
-            if (scalar(@specs)) {
+            my $spec;
+
+            $spec = &find_spec_file(&pkgvar_name(), ".");
+            if ($spec && ($spec !~ m|^\./F/|)) {
                 $pkg_vars{"type"}{$filename} = "PDR";
             } elsif (-d "F") {
-                @specs = &grepdir(sub { $_ =~ /\.spec(\.in)?$/ && &basename($_) !~ /^\./ }, "F");
-                dprintf("Found %d specs in \"F/\"\n", scalar(@specs));
-                if (scalar(@specs)) {
+                $spec = &find_spec_file(&pkgvar_name(), "F");
+                if ($spec) {
                     $pkg_vars{"type"}{$filename} = "SPM";
                 }
             }

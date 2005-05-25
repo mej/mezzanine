@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.57 2005/05/19 21:22:32 mej Exp $
+# $Id: srctool,v 1.58 2005/05/25 16:14:56 mej Exp $
 #
 
 use strict;
@@ -311,13 +311,11 @@ prepare_tree($$)
     if (&pkgvar_type() eq "PDR") {
         $params = "--define '_topdir $pkgdir' --define '_builddir $pkgdir/$WORK_DIR' "
             . "--define '_sourcedir $pkgdir' --define '_specdir $pkgdir'";
-        @tmp = &grepdir(sub { $_ =~ /\.spec(\.in)?$/ }, ".");
-        if (scalar(@tmp) != 1) {
-            eprintf("Found %d spec files:  \"%s\".\n", scalar(@tmp),
-                    join("\", \"", @tmp));
+        $spec = &find_spec_file(&pkgvar_name(), $pkgdir);
+        if (! $spec) {
+            eprint "No spec file found in $pkgdir.\n";
             return MEZZANINE_INVALID_PACKAGE;
         }
-        $spec = $tmp[0];
     } else {
         # Create the RPM build tree
         $tmpdir = &create_temp_space($pkg, "build");
@@ -372,19 +370,18 @@ gen_patch($$)
         # Redo the spec file to comment out
         # the patch we're about to regenerate.
         if (! &pkgvar_instructions()) {
-            my @tmp;
+            my $spec;
 
             if (&pkgvar_type() eq "PDR") {
-                @tmp = &grepdir(sub {$_ =~ /\.spec(\.in)?$/}, ".");
+                $spec = &find_spec_file(&pkgvar_name(), ".");
             } else {
-                @tmp = &grepdir(sub {$_ =~ /\.spec(\.in)?$/}, "F");
+                $spec = &find_spec_file(&pkgvar_name(), "F");
             }
-            if (scalar(@tmp) != 1) {
-                eprintf("Found %d spec files:  \"%s\".\n", scalar(@tmp),
-                        join("\", \"", @tmp));
+            if (! $spec) {
+                eprint "No spec file found for $pkg.\n";
                 return MEZZANINE_INVALID_PACKAGE;
             }
-            &pkgvar_instructions($tmp[0]);
+            &pkgvar_instructions($spec);
         }
         dprint "Disabling patch $patch to regenerate.\n";
         if (! &disable_patch($patch)) {
@@ -804,7 +801,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.57 $ created on $Date: 2005/05/19 21:22:32 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.58 $ created on $Date: 2005/05/25 16:14:56 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();

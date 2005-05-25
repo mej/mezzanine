@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.47 2005/05/19 21:22:32 mej Exp $
+# $Id: Build.pm,v 1.48 2005/05/25 16:14:56 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -607,15 +607,13 @@ build_spm
     $topdir = &pkgvar_topdir();
     $instroot = &pkgvar_instroot();
 
-    @tmp = &grepdir(sub {/\.spec(\.in)?$/ && -f $_ && -s _ && &basename($_) !~ /^\./}, "F");
-    if (!scalar(@tmp)) {
+    $specfile = &find_spec_file(&pkgvar_name(), "F");
+    if (! $specfile) {
         return (MEZZANINE_MISSING_FILES, "@{[getcwd()]} does not seem to contain build instructions", undef);
-    } elsif (scalar(@tmp) > 1) {
-        return (MEZZANINE_BAD_MODULE, "Only one specfile/script dir allowed per package (@tmp)", undef);
     } else {
-        &copy_files($tmp[0], "$topdir/SPECS");
-        &copy_files($tmp[0], "$instroot$topdir/SPECS");
-        $specfile = "$topdir/SPECS/" . &basename($tmp[0]);
+        &copy_files($specfile, "$topdir/SPECS");
+        &copy_files($specfile, "$instroot$topdir/SPECS");
+        $specfile = "$topdir/SPECS/" . &basename($specfile);
 
         &pkgvar_instructions($instroot . $specfile);
         &parse_spec_file();
@@ -680,16 +678,13 @@ build_pdr
     $topdir = &pkgvar_topdir();
     $instroot = &pkgvar_instroot();
 
-    @tmp = &grepdir(sub {/\.spec(\.in)?$/ && -f $_ && -s _ && &basename($_) !~ /^\./}, ".");
-    if (!scalar(@tmp)) {
+    $specfile = &find_spec_file(&pkgvar_name(), "F");
+    if (! $specfile) {
         return (MEZZANINE_MISSING_FILES, "@{[getcwd()]} does not seem to contain build instructions", undef);
-    } elsif (scalar(@tmp) > 1) {
-        return (MEZZANINE_BAD_MODULE, "Only one specfile/script dir allowed per package (@tmp)", undef);
     }
-
-    &copy_files($tmp[0], "$topdir/SPECS");
-    &copy_files($tmp[0], "$instroot$topdir/SPECS");
-    $specfile = "$topdir/SPECS/" . &basename($tmp[0]);
+    &copy_files($specfile, "$topdir/SPECS");
+    &copy_files($specfile, "$instroot$topdir/SPECS");
+    $specfile = "$topdir/SPECS/" . &basename($specfile);
 
     &pkgvar_instructions($instroot . $specfile);
     if (! $specdata || (&basename($specdata->{"SPECFILE"}) ne &basename($specfile))) {
@@ -1012,20 +1007,11 @@ build_package
             # There's a custom Makefile.  It's a Custom Full Source Tree (FST).
             @ret = &build_cfst();
         } else {
-            my @specs = &grepdir(sub {$_ =~ /\.spec(\.in)?$/ && &basename($_) !~ /^\./}, ".");
+            my $spec = &find_spec_file(&pkgvar_name(), ".");
 
-            if (scalar(@specs) > 1) {
-                my @tmp = grep { substr($_, -5, 5) eq ".spec" } @specs;
-
-                # If we have more than one spec, one could be a .spec.in,
-                # so see if we have exactly one *.spec and use that.
-                if (scalar(@specs) == 1) {
-                    @specs = @tmp;
-                }
-            }
-            if (scalar(@specs) == 1) {
+            if ($spec) {
                 # There's a spec file.  Make sure we have all sources.
-                &pkgvar_instructions(&basename($specs[0]));
+                &pkgvar_instructions(&basename($spec));
                 &parse_spec_file();
 
                 if ($specdata && $specdata->{"SOURCES"} && scalar(@{$specdata->{"SOURCES"}})) {
@@ -1048,8 +1034,7 @@ build_package
                     dprint "Not PDR:  No sources found in spec.\n";
                 }
             } else {
-                dprintf("Not PDR:  Found %d spec files.\n",
-                        scalar(@specs));
+                dprint "Not PDR:  No spec file found.\n";
             }
 
             if (!scalar(@ret)) {

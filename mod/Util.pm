@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.51 2005/05/19 21:22:32 mej Exp $
+# $Id: Util.pm,v 1.52 2005/05/25 16:14:56 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -54,13 +54,13 @@ BEGIN {
                '&get_temp_dir', '&create_temp_space',
                '&clean_temp_space', '&basename', '&dirname',
                '&grepdir', '&limit_files', '&str_trim', '&xpush',
-               '&cat_file', '&parse_rpm_name', '&should_ignore',
-               '&trunc_file', '&touch_file', '&newest_file',
-               '&checksum_file', '&run_cmd', '&run_mz_cmd',
-               '&MEZZANINE_SUCCESS', '&MEZZANINE_FATAL_ERROR',
-               '&MEZZANINE_SYNTAX_ERROR', '&MEZZANINE_SYSTEM_ERROR',
-               '&MEZZANINE_COMMAND_FAILED', '&MEZZANINE_DUPLICATE',
-               '&MEZZANINE_FILE_NOT_FOUND',
+               '&cat_file', '&parse_rpm_name', '&find_spec_file',
+               '&should_ignore', '&trunc_file', '&touch_file',
+               '&newest_file', '&checksum_file', '&run_cmd',
+               '&run_mz_cmd', '&MEZZANINE_SUCCESS',
+               '&MEZZANINE_FATAL_ERROR', '&MEZZANINE_SYNTAX_ERROR',
+               '&MEZZANINE_SYSTEM_ERROR', '&MEZZANINE_COMMAND_FAILED',
+               '&MEZZANINE_DUPLICATE', '&MEZZANINE_FILE_NOT_FOUND',
                '&MEZZANINE_FILE_OP_FAILED', '&MEZZANINE_UNSUPPORTED',
                '&MEZZANINE_ACCESS_DENIED', '&MEZZANINE_BAD_ADDITION',
                '&MEZZANINE_BAD_LOG_ENTRY', '&MEZZANINE_BAD_LOGIN',
@@ -137,6 +137,7 @@ sub xpush(\@; @);
 sub limit_files(@ $);
 sub cat_file($);
 sub parse_rpm_name($);
+sub find_spec_file($$);
 sub should_ignore($);
 sub trunc_file($);
 sub touch_file($);
@@ -938,6 +939,78 @@ parse_rpm_name($)
 
     $rpm =~ m/^(\S+)-([^-]+)-([^-]+)\.([^\.]+)\.rpm$/;
     return ($1, $2, $3, $4);
+}
+
+# Find spec file
+sub
+find_spec_file($$)
+{
+    my ($pkgname, $dir, $recurse) = @_;
+    my ($spec_count, $spec_in_count);
+    my (@spec_ins, @specs);
+
+    if (! $dir) {
+        $dir = ".";
+    }
+
+    if (-d $dir) {
+        if ($recurse) {
+            find({ "wanted" => sub { /\.spec(?:\.in)?$/ && push @specs, $_; }, "no_chdir" => 1 }, $dir);
+        } else {
+            @specs = &grepdir(sub { /\.spec(?:\.in)?$/ }, $dir);
+        }
+        @specs = sort @specs;
+    }
+
+    if (scalar(@specs) == 0) {
+        dprint "No spec files found for $pkgname in $dir!\n";
+        return undef;
+    } elsif (scalar(@specs) == 1) {
+        dprint "Found single spec file for $pkgname in $dir:  $specs[0]\n";
+        return $specs[0];
+    }
+
+    # First, see which are *.spec and which are *.spec.in
+    @spec_ins = grep { substr($_, -3, 3) eq ".in" } @specs;
+    $spec_in_count = scalar(@spec_ins);
+    @specs = grep { substr($_, -3, 3) ne ".in" } @specs;
+    $spec_count = scalar(@specs);
+
+    if ($spec_count == 0) {
+        # No *.spec files, so use *.spec.in.
+        @specs = @spec_ins;
+        $spec_count = $spec_count_in;
+        @spec_ins = ();
+        $spec_count_in = 0;
+    }
+
+    if ($spec_count == 1) {
+        dprint "Found primary spec file for $pkgname in $dir:  $specs[0]\n";
+        return $specs[0];
+    }
+
+    # Didn't work.  We still have too many.
+    if ($pkgname) {
+        my @pkg_specs;
+
+        # See if there's a package name match.
+        @pkg_specs = grep { /^$pkgname/ } @specs;
+        if (scalar(@pkg_specs)) {
+            # If we have some, focus on those.
+            @specs = @pkg_specs;
+            if (scalar(@specs) == 1) {
+                dprint "Found single package spec file for $pkgname in $dir:  $specs[0]\n";
+                return $specs[0];
+            }
+        }
+
+        if (scalar(@specs) > 1) {
+            # Still have too many.  What to do next?
+        }
+    }
+    dprintf("Found %d spec file(s) for $pkgname in $dir:  %s\n",
+            join(", ", @specs));
+    return $specs[0];
 }
 
 sub

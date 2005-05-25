@@ -779,3 +779,7 @@ Mon May 23 09:39:05 2005                        Michael Jennings (mej)
 
 Slight syntax changes to work with older versions of perl and rpm.
 ----------------------------------------------------------------------
+Wed May 25 12:20:32 2005                        Michael Jennings (mej)
+
+Unified and improved the spec file search.
+----------------------------------------------------------------------

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.36 2005/05/23 13:39:25 mej Exp $
+# $Id: RPM.pm,v 1.37 2005/05/25 16:14:56 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -31,6 +31,7 @@ BEGIN {
     use strict;
     use Exporter   ();
     #use POSIX ('&geteuid');
+    use File::Find;
     use Mezzanine::Util;
     use Mezzanine::PkgVars;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
