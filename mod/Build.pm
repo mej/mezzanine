@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.48 2005/05/25 16:14:56 mej Exp $
+# $Id: Build.pm,v 1.49 2005/06/10 12:52:47 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -678,7 +678,7 @@ build_pdr
     $topdir = &pkgvar_topdir();
     $instroot = &pkgvar_instroot();
 
-    $specfile = &find_spec_file(&pkgvar_name(), "F");
+    $specfile = &find_spec_file(&pkgvar_name(), ".");
     if (! $specfile) {
         return (MEZZANINE_MISSING_FILES, "@{[getcwd()]} does not seem to contain build instructions", undef);
     }
