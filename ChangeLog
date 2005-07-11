@@ -787,3 +787,14 @@ Fri Jun 10 08:58:35 2005                        Michael Jennings (mej)
 
 Minor typo fix.
 ----------------------------------------------------------------------
+Mon Jul 11 19:52:00 2005                        Michael Jennings (mej)
+
+Rename SCM object propset/propget routines to (permanently) avoid
+conflict with SCM systems.
+
+Fixed bug where default TARGET insisted on attempting to build DEB's.
+
+Fall back on internal spec file parser if "rpm --eval" fails.
+
+Added 2 new specgen templates for kernel modules.
+----------------------------------------------------------------------

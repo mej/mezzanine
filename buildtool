@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.203 2005/02/04 02:42:48 mej Exp $
+# $Id: buildtool,v 1.204 2005/07/11 23:56:35 mej Exp $
 #
 
 use strict;
@@ -611,8 +611,8 @@ download_packages
 
 	# Set the proper REPOSITORY and tag for the checkout.
         if ($global_tree) {
-            $package_scm = Mezzanine::SCM->new($scm->propget("type"));
-            $package_scm->propset("repository", $scm->propget("repository"));
+            $package_scm = Mezzanine::SCM->new($scm->scmobj_propget("type"));
+            $package_scm->scmobj_propset("repository", $scm->scmobj_propget("repository"));
         } elsif ($pkgs->{$pkg}{"REPOSITORY"}) {
             $package_scm = Mezzanine::SCM->auto_detect($pkgs->{$pkg}{"REPOSITORY"});
             if ($package_scm) {
@@ -622,10 +622,10 @@ download_packages
                 if (scalar(@tmp) && defined($tmp[0])) {
                     $package_scm->compose_repository_path(@tmp);
                 } else {
-                    $package_scm->propset("repository", $pkgs->{$pkg}{"REPOSITORY"});
+                    $package_scm->scmobj_propset("repository", $pkgs->{$pkg}{"REPOSITORY"});
                 }
-            } elsif ($scm && $scm->propget("repository")) {
-                $package_scm->propset("repository", $scm->propget("repository"));
+            } elsif ($scm && $scm->scmobj_propget("repository")) {
+                $package_scm->scmobj_propset("repository", $scm->scmobj_propget("repository"));
             } else {
                 # FIXME:  What to do??
             }
@@ -640,9 +640,9 @@ download_packages
             $package_scm->compose_repository_path(@tmp);
         }
         if ($global_tag) {
-            $package_scm->propset("source_tag", $global_tag);
+            $package_scm->scmobj_propset("source_tag", $global_tag);
         } elsif ($pkgs->{$pkg}{"TAG"}) {
-            $package_scm->propset("source_tag", $pkgs->{$pkg}{"TAG"});
+            $package_scm->scmobj_propset("source_tag", $pkgs->{$pkg}{"TAG"});
         }
 
         nprint "$pkg..." if (! &debug_get());
@@ -1072,7 +1072,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.203 $ created on $Date: 2005/02/04 02:42:48 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.204 $ created on $Date: 2005/07/11 23:56:35 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
@@ -1142,13 +1142,13 @@ main
         if ($scm) {
             my @tmp;
 
-            $config->set("DEFAULT_SCM", $scm->propget("type"));
+            $config->set("DEFAULT_SCM", $scm->scmobj_propget("type"));
             @tmp = $scm->parse_repository_path($global_tree);
             if (scalar(@tmp) && defined($tmp[0])) {
                 dprintf("Parsed repository path into:  \"%s\"\n", join("\", \"", @tmp));
                 $scm->compose_repository_path(@tmp);
             } else {
-                eprintf("Parse error on %s repository $global_tree\n", $scm->propget("type"));
+                eprintf("Parse error on %s repository $global_tree\n", $scm->scmobj_propget("type"));
                 $global_tree = undef;
             }
         } else {

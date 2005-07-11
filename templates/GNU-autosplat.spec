@@ -29,7 +29,7 @@ export CFLAGS CXXFLAGS
 %{__make} install DESTDIR=$RPM_BUILD_ROOT %{?mflags_install}
 
 %clean
-test "x$RPM_BUILD_ROOT" != "x" && rm -rf $RPM_BUILD_ROOT
+test "x$RPM_BUILD_ROOT" != "x/" && rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-, root, root)

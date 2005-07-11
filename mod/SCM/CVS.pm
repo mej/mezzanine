@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: CVS.pm,v 1.11 2005/02/04 02:42:48 mej Exp $
+# $Id: CVS.pm,v 1.12 2005/07/11 23:56:36 mej Exp $
 #
 
 package Mezzanine::SCM::CVS;
@@ -142,7 +142,7 @@ can_handle($)
 }
 
 sub
-propget($)
+scmobj_propget($)
 {
     my ($self, @keys) = @_;
     my @values;
@@ -164,7 +164,7 @@ propget($)
 }
 
 sub
-propset($$)
+scmobj_propset($$)
 {
     my ($self, %pairs) = @_;
     my $final;
@@ -293,18 +293,18 @@ detect_repository()
         my $tmp = &cat_file("$path/CVS/Root");
         chomp($tmp);
         dprint "Found CVS/Root in '$path'.\n";
-        $self->propset("repository", $tmp);
+        $self->scmobj_propset("repository", $tmp);
     } elsif ($ENV{"MEZZANINE_CVSROOT"}) {
         dprint "Using environment variable \$MEZZANINE_CVSROOT.\n";
-        $self->propset("repository", $ENV{"MEZZANINE_CVSROOT"});
+        $self->scmobj_propset("repository", $ENV{"MEZZANINE_CVSROOT"});
     } elsif ($ENV{"CVSROOT"}) {
         dprint "Using environment variable \$CVSROOT.\n";
-        $self->propset("repository", $ENV{"CVSROOT"});
+        $self->scmobj_propset("repository", $ENV{"CVSROOT"});
     } else {
         dprint "Using fallback of /cvs\n";
-        $self->propset("repository", "/cvs");
+        $self->scmobj_propset("repository", "/cvs");
     }
-    dprintf("Auto-detected repository as:  %s\n", $self->propget("repository"));
+    dprintf("Auto-detected repository as:  %s\n", $self->scmobj_propget("repository"));
 }
 
 sub
@@ -317,13 +317,13 @@ relative_path($)
     # FIXME:  I'm not sure how this should work with a path given,
     #         so at present it may not work at all that way.
     dprint &print_args(@_);
-    $save_repo = $self->propget("repository");
+    $save_repo = $self->scmobj_propget("repository");
     $self->detect_repository($path);
-    if ($save_repo && ($save_repo ne $self->propget("repository"))) {
+    if ($save_repo && ($save_repo ne $self->scmobj_propget("repository"))) {
         # We can't use the current directory for CVS info because the repository
         # we were asked to use and the repository used by the directory we're in
         # do not match.  Just return what we were given and hope for the best.
-        $self->propset("repository", $save_repo);
+        $self->scmobj_propset("repository", $save_repo);
         dprintf("The current directory is unusable for repository information.  Using path %s\n",
                 ((defined($path)) ? ($path) : ("<undef>")));
         return $path;
@@ -622,14 +622,14 @@ sync(@)
     }
 
     # Save previous values, then redirect output to @output.
-    $handle_output = $self->propget("handle_output");
-    $saved_output = $self->propget("saved_output");
-    $self->propset("handle_output", 0);
-    $self->propset("saved_output", \@output);
+    $handle_output = $self->scmobj_propget("handle_output");
+    $saved_output = $self->scmobj_propget("saved_output");
+    $self->scmobj_propset("handle_output", 0);
+    $self->scmobj_propset("saved_output", \@output);
     $err = $self->get();
     if ($err != MEZZANINE_SUCCESS) {
-        $self->propset("handle_output", $handle_output);
-        $self->propset("saved_output", $saved_output);
+        $self->scmobj_propset("handle_output", $handle_output);
+        $self->scmobj_propset("saved_output", $saved_output);
         my_print($self, @output);
         my_eprint($self, "Unable to sync repository to working copy in $dir.  (See above error(s).)\n");
         return $err;
@@ -1052,15 +1052,15 @@ get_standard_tag_params()
     }
 
     foreach my $type ("branch", "revision", "tag", "date") {
-        if (uc($self->propget("source_$type")) eq "HEAD") {
-            $self->propset("source_$type", "");
+        if (uc($self->scmobj_propget("source_$type")) eq "HEAD") {
+            $self->scmobj_propset("source_$type", "");
         }
-        if (uc($self->propget("target_$type")) eq "HEAD") {
-            $self->propset("target_$type", "");
+        if (uc($self->scmobj_propget("target_$type")) eq "HEAD") {
+            $self->scmobj_propset("target_$type", "");
         }
-        if (($self->propget("target_$type")) && !($self->propget("source_$type"))) {
-            $self->propset(
-                           "source_$type" => $self->propget("target_$type"),
+        if (($self->scmobj_propget("target_$type")) && !($self->scmobj_propget("source_$type"))) {
+            $self->scmobj_propset(
+                           "source_$type" => $self->scmobj_propget("target_$type"),
                            "target_$type" => ""
                           );
         }
@@ -1097,10 +1097,10 @@ my_print
     my ($self, @msgs) = @_;
 
     #dprint &print_args(@_);
-    if ($self->propget("handle_output")) {
+    if ($self->scmobj_propget("handle_output")) {
         print @msgs;
     } else {
-        push @{$self->propget("saved_output")}, @msgs;
+        push @{$self->scmobj_propget("saved_output")}, @msgs;
     }
 }
 
@@ -1111,10 +1111,10 @@ my_eprint
     my ($self, @msgs) = @_;
 
     #dprint &print_args(@_);
-    if ($self->propget("handle_output")) {
+    if ($self->scmobj_propget("handle_output")) {
         eprint @msgs;
     } else {
-        push @{$self->propget("saved_output")}, "Error:  ", @msgs;
+        push @{$self->scmobj_propget("saved_output")}, "Error:  ", @msgs;
     }
 }
 
@@ -1134,13 +1134,13 @@ talk_to_server($@)
     $cmd = join(' ', @params);
 
     # Allow for preserving of output for client.
-    $output = $self->propget("handle_output");
+    $output = $self->scmobj_propget("handle_output");
     if (! $output) {
         my $aref;
 
-        $aref = $self->propget("saved_output");
+        $aref = $self->scmobj_propget("saved_output");
         if ((! $aref) || (!ref($aref)) || (ref($aref) ne "ARRAY")) {
-            $self->propset("saved_output", []);
+            $self->scmobj_propset("saved_output", []);
         }
     }
 

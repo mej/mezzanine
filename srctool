@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.58 2005/05/25 16:14:56 mej Exp $
+# $Id: srctool,v 1.59 2005/07/11 23:56:35 mej Exp $
 #
 
 use strict;
@@ -136,10 +136,10 @@ import_package()
 
             $tag =~ tr/a-z/A-Z/;
             $tag =~ s/\./_/g;
-            $scm->propset("target_tag", $tag);
+            $scm->scmobj_propset("target_tag", $tag);
             ($tag = $pkg) =~ tr/a-z/A-Z/;
-            $scm->propset("source_tag", $tag);
-            $scm->propset("use_standard_ignore", 0);
+            $scm->scmobj_propset("source_tag", $tag);
+            $scm->scmobj_propset("use_standard_ignore", 0);
 
             chdir($pwd);
             if ($OPTION{"path"} && -d $OPTION{"path"}) {
@@ -160,7 +160,7 @@ import_package()
                 $module = $pkg;
             }
 
-            if (! $scm->propget("repository")) {
+            if (! $scm->scmobj_propget("repository")) {
                 $scm->detect_repository();
             }
 
@@ -181,8 +181,8 @@ import_package()
                 eprint "Import of $pkgfile failed.\n";
                 return $err;
             }
-            $scm->propset("source_tag", "");
-            $scm->propset("target_tag", "");
+            $scm->scmobj_propset("source_tag", "");
+            $scm->scmobj_propset("target_tag", "");
             chdir($pwd);
         }
         if ($tmpdir) {
@@ -227,10 +227,10 @@ import_package()
 
             ($tag = $name) =~ tr/a-z/A-Z/;
             $tag =~ s/\./_/g;
-            $scm->propset("target_tag", $tag);
+            $scm->scmobj_propset("target_tag", $tag);
             $tag =~ s/-[^-]*$//;
-            $scm->propset("source_tag", $tag);
-            $scm->propset("use_standard_ignore", 0);
+            $scm->scmobj_propset("source_tag", $tag);
+            $scm->scmobj_propset("use_standard_ignore", 0);
 
             if ($OPTION{"path"} && -d "$pwd/$OPTION{path}") {
                 # Relative path exists, so parse in terms of
@@ -256,7 +256,7 @@ import_package()
                 $module = $pkg;
             }
 
-            if (! $scm->propget("repository")) {
+            if (! $scm->scmobj_propget("repository")) {
                 $scm->detect_repository();
             }
 
@@ -266,8 +266,8 @@ import_package()
             $err = $scm->imprt($module);
 
             # FIXME:  Needed?
-            $scm->propset("source_tag", "");
-            $scm->propset("target_tag", "");
+            $scm->scmobj_propset("source_tag", "");
+            $scm->scmobj_propset("target_tag", "");
 
             if ($err != MEZZANINE_SUCCESS) {
                 eprintf("Import of %s failed.\n", (($pkgfile) ? ($pkgfile) : (".")));
@@ -631,16 +631,16 @@ clean_package
     }
 
     print "Cleaning and resyncing $pkg, please wait....\n";
-    $scm->propset("handle_output", 0);
+    $scm->scmobj_propset("handle_output", 0);
     $err = $scm->get();
     if ($err != MEZZANINE_SUCCESS) {
-        print @{$scm->propget("saved_output")};
+        print @{$scm->scmobj_propget("saved_output")};
         eprint "Unable to clean $pkg.  (See above error(s).)\n";
         return $err;
     }
-    push @output, @{$scm->propget("saved_output")};
-    $scm->propset("handle_output", 1);
-    $scm->propset("saved_output", "");
+    push @output, @{$scm->scmobj_propget("saved_output")};
+    $scm->scmobj_propset("handle_output", 1);
+    $scm->scmobj_propset("saved_output", "");
     @nukem = grep(/^\?/, @output);
     push @nukem, grep(/skipping directory/, @output);
     find({ "wanted" => sub { (($_ =~ /^\.\#/) || ($_ =~ /\~$/)) && push @nukem, $_ }, "no_chdir" => 1 }, ".");
@@ -691,8 +691,8 @@ sync_package
     }
 
     print "Syncing $pkg...\n";
-    $scm->propset("handle_output", 0);
-    $scm->propset("saved_output", \@output);
+    $scm->scmobj_propset("handle_output", 0);
+    $scm->scmobj_propset("saved_output", \@output);
     $err = $scm->get();
     if ($err != MEZZANINE_SUCCESS) {
         print @output;
@@ -772,8 +772,8 @@ move_package_files
     my (@output, @add, @rm);
 
     $target = pop(@flist);
-    $scm->propset("handle_output", 0);
-    $scm->propset("saved_output", \@output);
+    $scm->scmobj_propset("handle_output", 0);
+    $scm->scmobj_propset("saved_output", \@output);
 
     $err = $scm->move(@flist, $target);
     if ($err != MEZZANINE_SUCCESS) {
@@ -801,7 +801,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.58 $ created on $Date: 2005/05/25 16:14:56 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.59 $ created on $Date: 2005/07/11 23:56:35 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();
@@ -839,7 +839,7 @@ main
 
     if ($OPTION{"local"}) {
         if ($scm) {
-            $scm->propset("command", "/bin/true");
+            $scm->scmobj_propset("command", "/bin/true");
         }
         $local_mode = 1;
     }
@@ -854,7 +854,7 @@ main
     }
 
     if ($scm) {
-        $scm->propset("repository", $config->get("REPOSITORY"));
+        $scm->scmobj_propset("repository", $config->get("REPOSITORY"));
     }
 
     if ($0 =~ /mzimport$/ || $OPTION{"import"}) {

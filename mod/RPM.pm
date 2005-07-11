@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.37 2005/05/25 16:14:56 mej Exp $
+# $Id: RPM.pm,v 1.38 2005/07/11 23:56:36 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -179,6 +179,7 @@ parse_spec_file
 {
     my $specfile = &pkgvar_instructions();
     my ($line, $oldline, $stage, $pkg, $contents);
+    my @specfile_lines;
     local *SPECFILE;
 
     undef $specdata;
@@ -194,20 +195,28 @@ parse_spec_file
         undef $specdata;
         return 0;
     }
-    $contents = join("", <SPECFILE>);
+    @specfile_lines = <SPECFILE>;
     close(SPECFILE);
 
+    $contents = join("", @specfile_lines);
     if (!defined(open(SPECFILE, "-|") || exec("/bin/rpm", "--eval", $contents))) {
         wprint "Unable to pre-process spec file $specfile -- $!\n";
-        undef $specdata;
-        return 0;
+    } else {
+        my @tmp = <SPECFILE>;
+
+        close(SPECFILE);
+        if (scalar(@tmp) > 10) {
+            @specfile_lines = @tmp;
+        } else {
+            wprint "Pre-processing spec file $specfile failed; using internal parser.\n";
+        }
     }
 
     $stage = 0;
     $specdata->{"SPECFILE"} = $specfile;
     $specdata->{"DEFINES"}{"nil"} = "";
-    while (<SPECFILE>) {
-        chomp($line = $_);
+    foreach my $line (@specfile_lines) {
+        chomp($line);
         if ($line =~ /^(\s*\#\s*BuildSuggests:)/) {
             $line =~ s/$1/BuildRequires:/;
         } elsif ($line =~ /^\s*\#/ || $line =~ /^\s*$/) {
@@ -287,7 +296,6 @@ parse_spec_file
             push @{$specdata->{$stage}}, $line;
         }
     }
-    close(SPECFILE);
 
     @{$specdata->{"SOURCES"}} = sort {$a <=> $b} keys %{$specdata->{"SOURCE"}};
     @{$specdata->{"PATCHES"}} = sort {$a <=> $b} keys %{$specdata->{"PATCH"}};

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.49 2005/06/10 12:52:47 mej Exp $
+# $Id: Build.pm,v 1.50 2005/07/11 23:56:35 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -580,11 +580,15 @@ build_topdir
 
         &pkgvar_target("rpms");
         ($err, $msg, $outfiles) = &build_rpms_from_topdir();
-        if ($err) {
-            return ($err, $msg, $outfiles);
-        }
-        &pkgvar_target("debs");
-        return &build_debs_from_topdir();
+        return ($err, $msg, $outfiles);
+
+        # FIXME:  Use this when we actually support DEB's as a target.
+        #
+        #if ($err) {
+        #    return ($err, $msg, $outfiles);
+        #}
+        #&pkgvar_target("debs");
+        #return &build_debs_from_topdir();
     }
 }
 

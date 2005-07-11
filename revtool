@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 #
 # revtool -- Source Code Revision Control Tool
 # 
@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.89 2005/01/03 01:34:49 mej Exp $
+# $Id: revtool,v 1.90 2005/07/11 23:56:35 mej Exp $
 #
 
 use strict;
@@ -99,7 +99,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.89 $ created on $Date: 2005/01/03 01:34:49 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.90 $ created on $Date: 2005/07/11 23:56:35 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
@@ -209,7 +209,7 @@ main
         $OPTION{"keyword"} = "default";
     }
 
-    $scm->propset(
+    $scm->scmobj_propset(
                   "repository" => $OPTION{"dir"},
                   "keyword_expansion" => $OPTION{"keyword"},
                   "recursion" => $OPTION{"recurse"},
@@ -220,11 +220,11 @@ main
                  );
     if (defined($OPTION{"exclusive"})) {
         if ($mode eq "import") {
-            $scm->propset("use_standard_ignore", !$OPTION{"exclusive"});
+            $scm->scmobj_propset("use_standard_ignore", !$OPTION{"exclusive"});
         } elsif (scalar(@ARGV)) {
-            $scm->propset("args_only", $OPTION{"exclusive"});
+            $scm->scmobj_propset("args_only", $OPTION{"exclusive"});
         } else {
-            $scm->propset("update_changelog", !$OPTION{"exclusive"});
+            $scm->scmobj_propset("update_changelog", !$OPTION{"exclusive"});
         }
     }
 
@@ -245,8 +245,8 @@ main
     } elsif ($mode eq "log") {
         $scm->log(@ARGV);
     } elsif ($mode eq "tag") {
-        if ((! $scm->propget("source_tag")) || (!length($scm->propget("source_tag")))) {
-            $scm->propset("source_tag", (shift @ARGV));
+        if ((! $scm->scmobj_propget("source_tag")) || (!length($scm->scmobj_propget("source_tag")))) {
+            $scm->scmobj_propset("source_tag", (shift @ARGV));
         }
         $scm->tag(@ARGV);
     } else {
@@ -261,7 +261,7 @@ main
                 @ARGV = ();
             }
         }
-        if (($mode eq "get") || ($mode eq "merge") || ($scm->propget("reset"))) {
+        if (($mode eq "get") || ($mode eq "merge") || ($scm->scmobj_propget("reset"))) {
             if ($OPTION{"merge"}) {
                 $retval = $scm->merge(@ARGV);
             } else {
