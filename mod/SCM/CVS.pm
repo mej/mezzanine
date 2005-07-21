@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: CVS.pm,v 1.13 2005/07/21 17:40:47 mej Exp $
+# $Id: CVS.pm,v 1.14 2005/07/21 17:50:46 mej Exp $
 #
 
 package Mezzanine::SCM::CVS;
@@ -794,7 +794,7 @@ tag()
 
     push @params, (($self->{"recursion"}) ? ("-R") : ("-l")), "-F";
     if ($self->{"source_branch"}) {
-        push @params, "-b", $self->{"source_branch"};
+        push @params, "-B", "-b", $self->{"source_branch"};
     } elsif ($self->{"source_tag"}) {
         push @params, $self->{"source_tag"};
     } else {

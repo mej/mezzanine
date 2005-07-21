@@ -803,3 +803,7 @@ Thu Jul 21 13:40:07 2005                        Michael Jennings (mej)
 A few minor CVS-related bugfixes related to missing keyword options
 and branch tagging.
 ----------------------------------------------------------------------
+Thu Jul 21 13:50:25 2005                        Michael Jennings (mej)
+
+One last little tweak, and I'm calling this 1.8 final.
+----------------------------------------------------------------------
