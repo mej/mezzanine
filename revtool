@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.90 2005/07/11 23:56:35 mej Exp $
+# $Id: revtool,v 1.91 2005/07/21 17:40:47 mej Exp $
 #
 
 use strict;
@@ -99,7 +99,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.90 $ created on $Date: 2005/07/11 23:56:35 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.91 $ created on $Date: 2005/07/21 17:40:47 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
@@ -185,7 +185,7 @@ main
     } elsif ($OPTION{"merge"}) {
         $mode = "merge";
     } elsif ($OPTION{"branch"}) {
-        $mode = "branch";
+        $mode = "tag";
     } elsif ($OPTION{"reset"}) {
         $mode = "reset";
     } elsif ($OPTION{"init"}) {
@@ -195,7 +195,9 @@ main
     }
 
     # Support common aliases for keyword modes.
-    if ($OPTION{"keyword"} eq "s") {
+    if (! $OPTION{"keyword"}) {
+        $OPTION{"keyword"} = "auto";
+    } elsif ($OPTION{"keyword"} eq "s") {
         $OPTION{"keyword"} = "source";
     } elsif ($OPTION{"keyword"} eq "b") {
         $OPTION{"keyword"} = "binary";
@@ -248,7 +250,11 @@ main
         if ((! $scm->scmobj_propget("source_tag")) || (!length($scm->scmobj_propget("source_tag")))) {
             $scm->scmobj_propset("source_tag", (shift @ARGV));
         }
-        $scm->tag(@ARGV);
+        if ($OPTION{"branch"}) {
+            $retval = $scm->branch(@ARGV);
+        } else {
+            $retval = $scm->tag(@ARGV);
+        }
     } else {
         if ($OPTION{"add"}) {
             $scm->add(@ARGV);

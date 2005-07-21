@@ -798,3 +798,8 @@ Fall back on internal spec file parser if "rpm --eval" fails.
 
 Added 2 new specgen templates for kernel modules.
 ----------------------------------------------------------------------
+Thu Jul 21 13:40:07 2005                        Michael Jennings (mej)
+
+A few minor CVS-related bugfixes related to missing keyword options
+and branch tagging.
+----------------------------------------------------------------------

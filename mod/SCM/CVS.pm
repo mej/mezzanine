@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: CVS.pm,v 1.12 2005/07/11 23:56:36 mej Exp $
+# $Id: CVS.pm,v 1.13 2005/07/21 17:40:47 mej Exp $
 #
 
 package Mezzanine::SCM::CVS;
@@ -792,10 +792,14 @@ tag()
         return MEZZANINE_SUCCESS;
     }
 
-    if (! $self->{"source_tag"}) {
+    push @params, (($self->{"recursion"}) ? ("-R") : ("-l")), "-F";
+    if ($self->{"source_branch"}) {
+        push @params, "-b", $self->{"source_branch"};
+    } elsif ($self->{"source_tag"}) {
+        push @params, $self->{"source_tag"};
+    } else {
         return MEZZANINE_INVALID_TAG;
     }
-    push @params, (($self->{"recursion"}) ? ("-R") : ("-l")), "-F", $self->{"source_tag"};
     return $self->talk_to_server("tag", @params, @files);
 }
 
@@ -803,7 +807,9 @@ sub
 branch()
 {
     my ($self, @files) = @_;
-    return $self->tag("-b", @files);
+    $self->scmobj_propset("source_branch", $self->{"source_tag"});
+    $self->scmobj_propset("source_tag", "");
+    return $self->tag(@files);
 }
 
 sub
