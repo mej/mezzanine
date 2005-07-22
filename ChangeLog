@@ -807,3 +807,8 @@ Thu Jul 21 13:50:25 2005                        Michael Jennings (mej)
 
 One last little tweak, and I'm calling this 1.8 final.
 ----------------------------------------------------------------------
+Fri Jul 22 10:16:42 2005                        Michael Jennings (mej)
+
+Now that 1.8 is out the door, here's the beginning of the 1.9 tree
+with Subversion support.  This is a work in progress, so use caution.
+----------------------------------------------------------------------
