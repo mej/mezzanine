@@ -1,9 +1,9 @@
-# $Id: mezzanine.spec,v 1.135 2005/07/22 14:17:30 mej Exp $
+# $Id: mezzanine.spec,v 1.136 2005/07/26 22:27:31 mej Exp $
 
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
 Version: 1.9
-Release: 0.1
+Release: 0.2
 License: BSD
 Group: Development/Tools
 URL: http://www.kainx.org/mezzanine/

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.91 2005/07/21 17:40:47 mej Exp $
+# $Id: revtool,v 1.92 2005/07/26 22:27:31 mej Exp $
 #
 
 use strict;
@@ -99,7 +99,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.91 $ created on $Date: 2005/07/21 17:40:47 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.92 $ created on $Date: 2005/07/26 22:27:31 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
@@ -232,7 +232,7 @@ main
 
     if ($OPTION{"login"}) {
         $scm->login();
-        return if ($mode eq "login");
+        return MEZZANINE_SUCCESS if ($mode eq "login");
     }
     if ($mode eq "import") {
         $scm->imprt(@ARGV);
@@ -257,12 +257,12 @@ main
         }
     } else {
         if ($OPTION{"add"}) {
-            $scm->add(@ARGV);
+            $retval = $scm->add(@ARGV);
             if (! $OPTION{"exclusive"}) {
                 @ARGV = ();
             }
         } elsif ($OPTION{"remove"}) {
-            $scm->remove(@ARGV);
+            $retval = $scm->remove(@ARGV);
             if (! $OPTION{"exclusive"}) {
                 @ARGV = ();
             }

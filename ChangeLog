@@ -812,3 +812,8 @@ Fri Jul 22 10:16:42 2005                        Michael Jennings (mej)
 Now that 1.8 is out the door, here's the beginning of the 1.9 tree
 with Subversion support.  This is a work in progress, so use caution.
 ----------------------------------------------------------------------
+Tue Jul 26 18:24:30 2005                        Michael Jennings (mej)
+
+Fixed mzstat, mzinfo, mzblame, mzdiff, and mzadd for Subversion.  Also
+fixed some undefined return values in revtool.
+----------------------------------------------------------------------

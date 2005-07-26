@@ -21,11 +21,11 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Subversion.pm,v 1.5 2005/07/22 14:17:30 mej Exp $
+# $Id: Subversion.pm,v 1.6 2005/07/26 22:27:31 mej Exp $
 #
 
 package Mezzanine::SCM::Subversion;
-use Cwd 'abs_path';
+use Cwd;
 use Mezzanine::Util;
 use Mezzanine::SCM::Global;
 
@@ -86,12 +86,6 @@ my %DEFAULT_VALUES = (
                       # Internal data
                       "saved_output" => []
                      );
-my %KEYWORD_EXPANSION = (
-                         "binary" => "-kb",
-                         "source" => "-kkv",
-                         "none" => "-ko",
-                         "default" => "-ko"
-                        );
 
 sub
 new($)
@@ -430,44 +424,59 @@ add(@)
         return MEZZANINE_BAD_ADDITION;
     }
 
-    # Set up our parameters.
-    #if ($self->{"keyword_expansion"} eq "auto") {
-    #    push @params, $KEYWORD_EXPANSION{&get_file_type($files[0])};
-    #} elsif ($self->{"keyword_expansion"}) {
-    #    push @params, $KEYWORD_EXPANSION{$self->{"keyword_expansion"}};
-    #} else {
-    #    push @params, $KEYWORD_EXPANSION{"default"};
+    # Find all the directories so we can add them first.
+    #for (my $i = 0; $i < scalar(@files); $i++) {
+    #    if (-d $files[$i]) {
+    #        # It's a directory.  Put it in the dirs list.
+    #        push @dirs, $files[$i];
+    #        &find({ "no_chdir" => 1, "wanted" => sub { ($_ ne $files[$i]) && -d $_ && push @dirs, $_ } }, $files[$i]);
+    #        splice(@files, $i, 1);
+    #        $i--;
+    #    }
     #}
 
-    # Find all the directories so we can add them first.
-    for (my $i = 0; $i < scalar(@files); $i++) {
-        if (-d $files[$i]) {
-            # It's a directory.  Put it in the dirs list.
-            push @dirs, $files[$i];
-            &find({ "no_chdir" => 1, "wanted" => sub { ($_ ne $files[$i]) && -d $_ && push @dirs, $_ } }, $files[$i]);
-            splice(@files, $i, 1);
-            $i--;
-        }
-    }
+    #dprintf("Adding dirs:  \"%s\"\n", join("\", \"", @dirs));
+    #if (scalar(@dirs)) {
+    #    $err = $self->talk_to_server("mkdir", @params, @dirs);
+    #    if ($err != MEZZANINE_SUCCESS) {
+    #        return $err;
+    #    }
+    #}
 
-    dprintf("Adding dirs:  \"%s\"\n", join("\", \"", @dirs));
-    if (scalar(@dirs)) {
-        $err = $self->talk_to_server("mkdir", @params, @dirs);
+    #foreach my $dir (@dirs) {
+    #    xpush @files, &grepdir(sub { -f $_ && -s _ }, $dir);
+    #}
+    #dprintf("Adding files:  \"%s\"\n", join("\", \"", @files));
+
+    #if (scalar(@files)) {
+        if (! $self->{"recursion"}) {
+            push @params, "-N";
+        }
+        $err = $self->talk_to_server("add", @params, @files);
         if ($err != MEZZANINE_SUCCESS) {
             return $err;
         }
-    }
 
-    foreach my $dir (@dirs) {
-        xpush @files, &grepdir(sub { -f $_ && -s _ }, $dir);
-    }
-    dprintf("Adding files:  \"%s\"\n", join("\", \"", @files));
+        # Set up our parameters.
+        @params = ("propset", "--force", "svn:keywords", "Id URL HeadURL Author Date Rev Revision");
+        if ($self->{"recursion"}) {
+            push @params, "-R";
+        }
 
-    if (scalar(@files)) {
-        return $self->talk_to_server("add", @params, @files);
-    } else {
+        if ($self->{"keyword_expansion"} eq "auto") {
+            my @source_files;
+
+            @source_files = grep { (-f $_) && (&get_file_type($_) eq "source") } @files;
+            return $self->talk_to_server("propset", @params, @source_files);
+        } elsif ($self->{"keyword_expansion"} eq "source") {
+            my @source_files;
+
+            @source_files = grep { -f $_ } @files;
+            return $self->talk_to_server("propset", @params, @source_files);
+        }
+    #} else {
         return MEZZANINE_SUCCESS;
-    }
+    #}
 }
 
 sub
@@ -657,7 +666,7 @@ sub
 diff(@)
 {
     my ($self, @files) = @_;
-    my @params = ("diff", "-Nu");
+    my @params = ("diff", "--notice-ancestry");
 
     dprint &print_args(@_);
     push @params, $self->get_standard_tag_params(0);
@@ -675,10 +684,7 @@ annotate(@)
 
     dprint &print_args(@_);
 
-    push @params, "-f", $self->get_standard_tag_params(0);
-    if (! $self->{"recursion"}) {
-        push @params, "-N";
-    }
+    push @params, $self->get_standard_tag_params(0);
     return $self->talk_to_server("annotate", @params, @files);
 }
 
@@ -686,11 +692,11 @@ sub
 info(@)
 {
     my ($self, @files) = @_;
-    my @params = ("status", "-v");
+    my @params = ("info");
 
     dprint &print_args(@_);
-    if (! $self->{"recursion"}) {
-        push @params, "-N";
+    if ($self->{"recursion"}) {
+        push @params, "-R";
     }
     return $self->talk_to_server("info", @params, @files);
 }
@@ -699,8 +705,15 @@ sub
 status(@)
 {
     my ($self, @files) = @_;
+    my @params = ("status");
 
     dprint &print_args(@_);
+    if (! $self->{"local_mode"}) {
+        push @params, "-u";
+    }
+    if (! $self->{"recursion"}) {
+        push @params, "-N";
+    }
     return $self->talk_to_server("stat", @params, @files);
 }
 
@@ -1047,17 +1060,7 @@ get_standard_tag_params()
     my $option = "-r";
     my @params;
 
-    if ($merge) {
-        $option = "-j";
-    }
-
     foreach my $type ("branch", "revision", "tag", "date") {
-        if (uc($self->scmobj_propget("source_$type")) eq "HEAD") {
-            $self->scmobj_propset("source_$type", "");
-        }
-        if (uc($self->scmobj_propget("target_$type")) eq "HEAD") {
-            $self->scmobj_propset("target_$type", "");
-        }
         if (($self->scmobj_propget("target_$type")) && !($self->scmobj_propget("source_$type"))) {
             $self->scmobj_propset(
                            "source_$type" => $self->scmobj_propget("target_$type"),
