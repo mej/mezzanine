@@ -817,3 +817,12 @@ Tue Jul 26 18:24:30 2005                        Michael Jennings (mej)
 Fixed mzstat, mzinfo, mzblame, mzdiff, and mzadd for Subversion.  Also
 fixed some undefined return values in revtool.
 ----------------------------------------------------------------------
+Wed Aug 31 15:24:18 2005                        Michael Jennings (mej)
+
+Thanks to a brilliant suggestion from Jim Perrin <jperrin@gmail.com>,
+there's now a Makefile to aid in bootstrapping the build/install of
+mezzanine from CVS on a system that doesn't already have it.  I have
+no idea why I didn't think of that before....
+
+Also some cleanups and new kernel spec templates.
+----------------------------------------------------------------------

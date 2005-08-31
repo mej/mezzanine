@@ -1,8 +1,11 @@
+%{!?kernel_mod_path: %define kernel_mod_path /lib/modules}
 %if %{!?kernel_version:1}0
-%define kernel_version %( KVER=`uname -r` ; if test -d /lib/modules/$KVER ; then echo $KVER ; else KVER_CNT=`ls -1d /lib/modules/???* 2>/dev/null | wc -l` ; if test "x$KVER_CNT" != "x" -a $KVER_CNT -eq 1 ; then echo `basename /lib/modules/???*` ; else KVER=`ls -1d /lib/modules/???* 2>/dev/null | sort -r | head -1` ; fi ; fi ; if test "x$KVER" = "x" ; then echo "NONE" ; fi )
+    %{expand: %%define kernel_version %( set -x ; KVER_CNT=`ls -1d %{kernel_mod_path}/???* 2>/dev/null | wc -l` ; if test "x$KVER_CNT" != "x" ; then if test $KVER_CNT -eq 1 ; then KVER=`basename %{kernel_mod_path}/???*` ; elif test -d %{kernel_mod_path}/`uname -r` ; then KVER=`uname -r` ; else KVER=`basename $(ls -1d %{kernel_mod_path}/???* 2>/dev/null | sort -r | head -1)` ; fi ; fi ; if test "x$KVER" = "x" ; then echo "NONE" ; else echo $KVER ; fi )}
 %endif
-
-%define kernel_module_release_string %(echo "%{kernel_version}" | sed 's/-/./g')
+%if %{!?kernel_source:1}0
+    %{expand: %%define kernel_source %( set -x ; for DIR in %{kernel_mod_path}/%{kernel_version}/build /usr/src/{%{kernel_version},linux-2.6,linux}; do if test -d $DIR ; then KSRC="$DIR" ; break ; fi ; done ; if test "x$KSRC" = "x" ; then echo "NONE" ; else echo $KSRC ; fi )}
+%endif
+%{expand: %%define kernel_module_release_string %(echo "%{kernel_version}" | sed 's/-/./g')}
 
 Summary: @SUMMARY@
 Name: @NAME@

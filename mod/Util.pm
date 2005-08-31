@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.52 2005/05/25 16:14:56 mej Exp $
+# $Id: Util.pm,v 1.53 2005/08/31 19:25:41 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -341,10 +341,11 @@ sub
 dprintf(@)
 {
     my ($f, $l, $s, $format);
+    my @params = @_;
 
     return if (! $debug);
-    $format = shift;
-    if (!scalar(@_)) {
+    $format = shift @params;
+    if (!scalar(@params)) {
         return dprint($format);
     }
     (undef, undef, undef, $s) = caller(1);
@@ -358,19 +359,19 @@ dprintf(@)
     $f = "" if (!defined($f));
     $l = "" if (!defined($l));
     $format = "" if (!defined($format));
-    for (my $i = 0; $i < scalar(@_); $i++) {
-        if (!defined($_[$i])) {
-            wprint "Undefined value passed to dprintf() parameter $i from $f line $l.\n";
-            $_[$i] = "0";
+    for (my $i = 0; $i < scalar(@params); $i++) {
+        if (!defined($params[$i])) {
+            $params[$i] = "<undef>";
         }
     }
-    printf("[$f/$l/$s] $format", @_);
+    printf("[$f/$l/$s] $format", @params);
 }
 
 sub
 dprint(@)
 {
     my ($f, $l, $s);
+    my @params = @_;
 
     return if (! $debug);
     (undef, undef, undef, $s) = caller(1);
@@ -384,7 +385,12 @@ dprint(@)
     $f = "" if (!defined($f));
     $l = "" if (!defined($l));
     $s = "" if (!defined($s));
-    print "[$f/$l/$s] ", @_;
+    for (my $i = 0; $i < scalar(@params); $i++) {
+        if (!defined($params[$i])) {
+            $params[$i] = "<undef>";
+        }
+    }
+    print "[$f/$l/$s] ", @params;
 }
 
 # Print an error
@@ -890,15 +896,10 @@ limit_files(@ $)
 sub
 str_trim(\$)
 {
-    my $str_ref = shift;
-
-    if (ref($str_ref)) {
-        ${$str_ref} =~ s/^\s*(.*)\s*$/$1/g;
-        return ${$str_ref};
-    } else {
-        $str_ref =~ s/^\s*(.*)\s*$/$1/g;
-        return $str_ref;
-    }
+    # Use $_[0] because it acts like pass-by-reference.
+    $_[0] =~ s/^\s+//;
+    $_[0] =~ s/\s+$//;
+    return $_[0];
 }
 
 # Exclusive push.  Only push if the item(s) aren't already in the list
