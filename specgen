@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: specgen,v 1.9 2005/02/04 02:42:48 mej Exp $
+# $Id: specgen,v 1.10 2005/08/31 22:25:46 mej Exp $
 #
 
 use strict;
@@ -104,6 +104,21 @@ prompt_user($$)
     chomp($response);
 
     return (($response) ? ($response) : ($default));
+}
+
+sub
+get_tarball($)
+{
+    my $tarball = shift;
+    my $msg;
+
+    print "Downloading $tarball...\n";
+    $msg = &fetch_url($tarball);
+    if (! -e $msg) {
+        eprint "Unable to fetch $tarball:  $msg.\n";
+        return undef;
+    }
+    return $msg;
 }
 
 sub
@@ -468,7 +483,7 @@ main
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.9 $ created on $Date: 2005/02/04 02:42:48 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.10 $ created on $Date: 2005/08/31 22:25:46 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || !scalar(@ARGV)) {
 	&print_usage_info();
     }
@@ -506,7 +521,17 @@ main
         }
         $template->find($template->directory());
         $package{"TEMPLATE"} = $template;
+
+        # Make sure we have our package; download it if not.
+        if (! -s $pkg) {
+            $pkg = &get_tarball($pkg);
+            if ((! $pkg) || (! -s $pkg)) {
+                next;
+            }
+        }
         $package{"TARBALL"} = $pkg;
+
+        # Get to it.
         &parse_tarball_name(\%package);
         &scan_package(\%package);
         if ($interactive) {

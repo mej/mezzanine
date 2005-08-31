@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.53 2005/08/31 19:25:41 mej Exp $
+# $Id: Util.pm,v 1.54 2005/08/31 22:25:46 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -32,6 +32,9 @@ use Getopt::Long;
 use File::Find;
 use File::Copy;
 use File::stat;
+use URI;
+use LWP::UserAgent;
+use HTTP::Request;
 use vars '$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS',
     '$debug', '$PROGNAME', '$VERSION', '$mz_uid', '$mz_gid', '%OPTION';
 
@@ -57,7 +60,7 @@ BEGIN {
                '&cat_file', '&parse_rpm_name', '&find_spec_file',
                '&should_ignore', '&trunc_file', '&touch_file',
                '&newest_file', '&checksum_file', '&run_cmd',
-               '&run_mz_cmd', '&MEZZANINE_SUCCESS',
+               '&run_mz_cmd', '&fetch_url', '&MEZZANINE_SUCCESS',
                '&MEZZANINE_FATAL_ERROR', '&MEZZANINE_SYNTAX_ERROR',
                '&MEZZANINE_SYSTEM_ERROR', '&MEZZANINE_COMMAND_FAILED',
                '&MEZZANINE_DUPLICATE', '&MEZZANINE_FILE_NOT_FOUND',
@@ -143,6 +146,7 @@ sub trunc_file($);
 sub touch_file($);
 sub newest_file($);
 sub checksum_file($);
+sub fetch_url($);
 sub handle_alarm_for_subcommand(@);
 
 ### Module cleanup
@@ -1217,6 +1221,76 @@ run_mz_cmd($$$)
     } else {
         return $err;
     }
+}
+
+sub
+fetch_url($)
+{
+    my ($url, $dest) = @_;
+    my ($uri, $user_agent, $response, $coderef, $filehandle);
+
+    # Local anonymous subroutine to handle chunks of data as they come in.
+    $coderef = sub {
+        my ($data_chunk, $response, $protocol) = @_;
+
+        if (! $filehandle) {
+            dprintf("Response was:  %s\n", $response->status_line());
+
+            dprintf("Response Headers:  %s\n",
+                    join(", ", map {
+                                    sprintf("%s -> \"%s\"", $_, $response->header($_));
+                                   } $response->header_field_names()));
+
+            $url = $response->request()->uri();
+            dprint "Final URL was:  $url\n";
+
+            if (! $dest) {
+                $dest = &basename($uri->path());
+            }
+            if (!open($filehandle, ">$dest")) {
+                die("Unable to write to $dest -- $!");
+            }
+        }
+
+        #dprintf("Writing %d bytes to %s\n", length($data_chunk), $dest);
+        print $filehandle $data_chunk;
+    };
+
+    # Create a URI object from the URL given.
+    $uri = URI->new($url);
+    if (! $uri) {
+        return "Unable to create URI object from $url";
+    }
+
+    # Create the useragent, and make sure we can handle the given URL.
+    $user_agent = LWP::UserAgent->new("agent" => "$PROGRAM/$VERSION", "env_proxy" => 1, "timeout" => 30);
+    if (! $user_agent->is_protocol_supported($uri->scheme())) {
+        return "Unsupported method:  " . $uri->scheme();
+    }
+
+    dprint "Calling useragent GET method on $url\n";
+    $response = $user_agent->get($url, ":content_cb" => $coderef);
+    dprint "Back from GET.\n";
+    dprintf("Response was:  %s\n", $response->status_line());
+
+    if ($response->is_redirect()) {
+        # Too many redirects; bail out.
+        return "Too many redirects";
+    } elsif ($response->is_error()) {
+        return $response->status_line();
+    }
+
+    if ($filehandle) {
+        close($filehandle);
+    }
+    
+    if ($response->header("X-Die")) {
+        if ($dest && -e $dest) {
+            &nuke_tree($dest);
+        }
+        return $response->header("X-Die");
+    }
+    return $dest;
 }
 
 ### Private functions

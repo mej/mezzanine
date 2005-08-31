@@ -826,3 +826,10 @@ no idea why I didn't think of that before....
 
 Also some cleanups and new kernel spec templates.
 ----------------------------------------------------------------------
+Wed Aug 31 18:24:55 2005                        Michael Jennings (mej)
+
+specgen can now download files from URL's!  So instead of having to
+wget that tarball yourself, just run:
+
+specgen http://www.spanky.org/download/foo-1.0.tar.gz
+----------------------------------------------------------------------
