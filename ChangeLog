@@ -833,3 +833,10 @@ wget that tarball yourself, just run:
 
 specgen http://www.spanky.org/download/foo-1.0.tar.gz
 ----------------------------------------------------------------------
+Thu Sep  8 13:15:43 2005                                           mej
+
+Added -A/--args option to pkgtool (mzbuild) to allow passing of
+arbitrary parameters to, e.g., rpmbuild.
+
+Example:  mzbuild -A "--define 'with_selinux 1'"
+----------------------------------------------------------------------

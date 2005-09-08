@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.67 2005/02/04 02:42:48 mej Exp $
+# $Id: pkgtool,v 1.68 2005/09/08 17:17:19 mej Exp $
 #
 
 use strict;
@@ -74,6 +74,7 @@ print_usage_info
     print "    -t --target <type>               Specify the package target type\n";
     print "    -a --arch <architecture>         Specify the architecture(s) for which to build\n";
     print "    -P --program <cmd>               Specify the package management program to be used\n";
+    print "    -A --args <arg>                  Specify additional options to pass to program\n";
     print "    -R --rcfile <rcfile>             Specify an alternate rpmrc file\n";
     print "    -D --dir <directory>             Specify \"directory\" as the full path to the module\n";
     print "    -r --root <dir>                  Specify the build/install root (depending on mode)\n";
@@ -98,14 +99,14 @@ main
                "sources|o:s", "package|p=s", "specfile|s|scripts=s",
                "module|m=s", "target|t=s", "arch|a=s", "program|P=s",
                "rcfile|R=s", "tar=s", "zip=s", "destdir|D=s",
-               "root|r=s", "hints|H=s",
+               "root|r=s", "hints|H=s", "args|A=s@",
                "depinstaller|dep-installer|hint-installer|hi|di=s",
                "user|u=s", "allow-epoch!", "savecfg|save-config");
 
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.67 $ created on $Date: 2005/02/04 02:42:48 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.68 $ created on $Date: 2005/09/08 17:17:19 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || (!scalar(@ARGV) && !scalar(%OPTION) && &basename($0) !~ /^mz/)) {
         &print_usage_info();
     }
@@ -149,6 +150,9 @@ main
             $pkg_file = &pkgvar_filename($OPTION{"module"});
         }
         &pkgvar_topdir($OPTION{"module"});
+    }
+    if ($OPTION{"args"} && (ref($OPTION{"args"}) eq "ARRAY")) {
+        &pkgvar_parameters(join(' ', @{$OPTION{"args"}}));
     }
     &pkgvar_architecture($OPTION{"arch"});
     $config->set("TARGET", &pkgvar_target($OPTION{"target"} || $config->get("TARGET") || ""));
