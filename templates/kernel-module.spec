@@ -17,6 +17,7 @@ Source: @TARBALL@
 Packager: @PACKAGER@
 Vendor: @VENDOR@
 Distribution: @DISTRIBUTION@
+Requires: %{kernel_mod_path}/%{kernel_version}
 Prefix: %{_prefix}
 BuildRoot: /var/tmp/%{name}-%{version}-%{release}-root
 

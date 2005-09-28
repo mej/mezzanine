@@ -28,7 +28,7 @@ Summary: @SUMMARY@
 Release: @RELEASE@
 License: @LICENSE@
 Group: System Environment/Kernel
-Requires: kernel = %{kernel_version}
+Requires: %{kernel_mod_path}/%{kernel_version}
 
 %description kmod
 @DESCRIPTION@
