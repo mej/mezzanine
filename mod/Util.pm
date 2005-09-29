@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.54 2005/08/31 22:25:46 mej Exp $
+# $Id: Util.pm,v 1.55 2005/09/29 21:52:52 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -1233,6 +1233,7 @@ fetch_url($)
     $coderef = sub {
         my ($data_chunk, $response, $protocol) = @_;
 
+        print '.';
         if (! $filehandle) {
             dprintf("Response was:  %s\n", $response->status_line());
 
@@ -1290,6 +1291,7 @@ fetch_url($)
         }
         return $response->header("X-Die");
     }
+    print "done.\n";
     return $dest;
 }
 

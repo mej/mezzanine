@@ -844,3 +844,13 @@ Wed Sep 28 19:04:22 2005                        Michael Jennings (mej)
 
 Minor kernel package template fixes.
 ----------------------------------------------------------------------
+Thu Sep 29 17:51:15 2005                        Michael Jennings (mej)
+
+Added SCons template for specgen.
+
+Use URL for source tarball if available.
+
+Print progress .'s while downloading package.
+
+Use %{name} and %{version} in generated spec files whenever possible.
+----------------------------------------------------------------------

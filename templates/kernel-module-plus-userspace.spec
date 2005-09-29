@@ -13,7 +13,7 @@ Version: @VERSION@
 Release: @RELEASE@
 License: @LICENSE@
 Group: System Environment/Kernel
-Source: @TARBALL@
+Source: @TARBALL_URL@
 Packager: @PACKAGER@
 Vendor: @VENDOR@
 Distribution: @DISTRIBUTION@

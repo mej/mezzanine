@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: specgen,v 1.10 2005/08/31 22:25:46 mej Exp $
+# $Id: specgen,v 1.11 2005/09/29 21:52:52 mej Exp $
 #
 
 use strict;
@@ -112,10 +112,10 @@ get_tarball($)
     my $tarball = shift;
     my $msg;
 
-    print "Downloading $tarball...\n";
+    print "Downloading $tarball...";
     $msg = &fetch_url($tarball);
     if (! -e $msg) {
-        eprint "Unable to fetch $tarball:  $msg.\n";
+        eprint "\nUnable to fetch $tarball:  $msg.\n";
         return undef;
     }
     return $msg;
@@ -271,6 +271,8 @@ scan_package(\%)
             $template->file("imake.spec");
         } elsif (grep { $_ =~ /^makefile\.pro$/i } @filelist) {
             $template->file("qmake.spec");
+        } elsif (grep { $_ =~ /^SConstruct$/i } @filelist) {
+            $template->file("scons.spec");
         } elsif (grep { $_ =~ /^makefile$/i } @filelist) {
             $template->file("make.spec");
         }
@@ -344,6 +346,23 @@ confirm_info(\%)
                      "CFLAGS", "CXXFLAGS", "DOCFILES") {
         $href->{$key} = &prompt_user($key, $href->{$key});
     }
+}
+
+sub
+replace_macros(\% @)
+{
+    my ($href, @keys) = @_;
+    my %replacements = (
+                        "$href->{NAME}" => "%{name}",
+                        "$href->{VERSION}" => "%{version}"
+                       );
+
+    foreach my $key (@keys) {
+        foreach my $repl (keys(%replacements)) {
+            $href->{$key} =~ s/\Q$repl\E/$replacements{$repl}/eg;
+        }
+    }
+    return $href;
 }
 
 sub
@@ -483,7 +502,7 @@ main
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.10 $ created on $Date: 2005/08/31 22:25:46 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.11 $ created on $Date: 2005/09/29 21:52:52 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || !scalar(@ARGV)) {
 	&print_usage_info();
     }
@@ -524,10 +543,13 @@ main
 
         # Make sure we have our package; download it if not.
         if (! -s $pkg) {
+            $package{"TARBALL_URL"} = $pkg;
             $pkg = &get_tarball($pkg);
             if ((! $pkg) || (! -s $pkg)) {
                 next;
             }
+        } else {
+            $package{"TARBALL_URL"} = &basename($pkg);
         }
         $package{"TARBALL"} = $pkg;
 
@@ -538,6 +560,7 @@ main
             &confirm_info(\%package);
         }
         &copy_tarball(\%package);
+        &replace_macros(\%package, "DOCFILES", "INSTFILES", "SETUP", "TARBALL", "TARBALL_URL");
         if (! &create_spec_file(\%package)) {
             $errors++;
             next;

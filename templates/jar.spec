@@ -4,7 +4,7 @@ Version: @VERSION@
 Release: @RELEASE@
 License: @LICENSE@
 Group: @GROUP@
-Source: @TARBALL@
+Source: @TARBALL_URL@
 Packager: @PACKAGER@
 Vendor: @VENDOR@
 Distribution: @DISTRIBUTION@
