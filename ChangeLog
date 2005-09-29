@@ -854,3 +854,7 @@ Print progress .'s while downloading package.
 
 Use %{name} and %{version} in generated spec files whenever possible.
 ----------------------------------------------------------------------
+Thu Sep 29 17:53:18 2005                        Michael Jennings (mej)
+
+Oops.
+----------------------------------------------------------------------
