@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.68 2005/09/08 17:17:19 mej Exp $
+# $Id: pkgtool,v 1.69 2005/10/17 20:01:55 mej Exp $
 #
 
 use strict;
@@ -106,7 +106,7 @@ main
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.68 $ created on $Date: 2005/09/08 17:17:19 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.69 $ created on $Date: 2005/10/17 20:01:55 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || (!scalar(@ARGV) && !scalar(%OPTION) && &basename($0) !~ /^mz/)) {
         &print_usage_info();
     }
@@ -170,6 +170,20 @@ main
             &pkgvar_filename(shift @ARGV);
         } else {
             &pkgvar_filename(".");
+        }
+    }
+
+    if ((! -e &pkgvar_filename()) || (index(&pkgvar_filename(), "://") >= 0)) {
+        my $fname = &pkgvar_filename();
+        my $tmp;
+
+        # It's a URL, so download it.
+        print "Downloading $fname";
+        $tmp = &fetch_url($fname);
+        if (-e $tmp) {
+            &pkgvar_filename($tmp);
+        } else {
+            &fatal_error("Unable to fetch $fname -- $tmp\n");
         }
     }
 

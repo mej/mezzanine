@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.204 2005/07/11 23:56:35 mej Exp $
+# $Id: buildtool,v 1.205 2005/10/17 20:01:55 mej Exp $
 #
 
 use strict;
@@ -1072,7 +1072,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.204 $ created on $Date: 2005/07/11 23:56:35 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.205 $ created on $Date: 2005/10/17 20:01:55 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
@@ -1188,7 +1188,8 @@ main
         }
         $config->set("PARALLELIZE", $OPTION{"parallel"});
     } else {
-        $num_processes = 1;
+        $num_processes = 0;
+        $config->set("PARALLELIZE", 0);
     }
     dprint "Using $num_processes parallel process(es).\n";
 
@@ -1351,7 +1352,7 @@ main
 
     dprint "Products to be built (", scalar(@packages), " packages):  ", join(" ", @products), "\n";
 
-    if ($num_processes > 1) {
+    if ($num_processes >= 1) {
         $ret = &parallel_build(@packages);
     } else {
         $ret = &build_product(@packages);

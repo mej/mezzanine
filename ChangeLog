@@ -862,3 +862,7 @@ Mon Oct 17 13:45:34 2005                        Michael Jennings (mej)
 
 Allow nuke_tree() to take multiple parameters.
 ----------------------------------------------------------------------
+Mon Oct 17 16:01:22 2005                        Michael Jennings (mej)
+
+Allow mzbuild to accept URL's instead of having to wget them first.
+----------------------------------------------------------------------
