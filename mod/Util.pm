@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.55 2005/09/29 21:52:52 mej Exp $
+# $Id: Util.pm,v 1.56 2005/10/17 17:45:48 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -576,29 +576,30 @@ mkdirhier($$)
 sub
 nuke_tree($)
 {
-    my $path = $_[0];
     my @files;
     local *DIR;
 
-    if ($path =~ /^([^\0\`]+)$/) {
-        $path = $1;
-    } else {
-        return;
-    }
-    if ((-d $path) && !(-l $path)) {
-        opendir(DIR, $path) || return 0;
-        @files = readdir(DIR);
-        closedir(DIR);
-        foreach my $f (@files) {
-            if ($f ne "." && $f ne "..") {
-                &nuke_tree("$path/$f");
-            }
+    foreach my $path (@_) {
+        if ($path && ($path =~ /^([^\0\`]+)$/)) {
+            $path = $1;
+        } else {
+            next;
         }
-        #dprint "Removing directory $path\n";
-        rmdir $path || return 0;
-    } else {
-        #dprint "Unlinking $path\n";
-        unlink($path) || return 0;
+        if ((-d $path) && !(-l $path)) {
+            opendir(DIR, $path) || return 0;
+            @files = readdir(DIR);
+            closedir(DIR);
+            foreach my $f (@files) {
+                if ($f ne "." && $f ne "..") {
+                    &nuke_tree("$path/$f");
+                }
+            }
+            #dprint "Removing directory $path\n";
+            rmdir $path || return 0;
+        } else {
+            #dprint "Unlinking $path\n";
+            unlink($path) || return 0;
+        }
     }
     return 1;
 }
@@ -1187,6 +1188,7 @@ run_cmd($$$)
     # It won't hurt to always reset.
     alarm(0);
     $SIG{"ALRM"} = "IGNORE";
+    $CMD_TIMEOUT = 0;
 
     $err = $? >> 8;
     dprint "\"$cmd\" returned $err\n";

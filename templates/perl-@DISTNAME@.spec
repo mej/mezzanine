@@ -3,14 +3,14 @@ Name: @MODULE@
 Version: @VERSION@
 Release: 1.@VENDORSUFFIX@
 Group: Development/Libraries
+License: Artistic
+URL: http://search.cpan.org/search?mode=module&query=@MODULENAME@
+Source: @DISTFILE@
 Packager: @PACKAGER@
 Vendor: @VENDOR@
 Distribution: @DISTRIBUTION@
-URL: http://search.cpan.org/search?mode=module&query=@MODULENAME@
-License: Artistic
-BuildRoot: %{_tmppath}/%{name}-%{version}-root
-Source: @DISTFILE@
 BuildArch: @BUILDARCH@
+BuildRoot: %{_tmppath}/%{name}-%{version}-root
 
 %description
 This package contains the @MODULENAME@ Perl module.

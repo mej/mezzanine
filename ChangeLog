@@ -858,3 +858,7 @@ Thu Sep 29 17:53:18 2005                        Michael Jennings (mej)
 
 Oops.
 ----------------------------------------------------------------------
+Mon Oct 17 13:45:34 2005                        Michael Jennings (mej)
+
+Allow nuke_tree() to take multiple parameters.
+----------------------------------------------------------------------
