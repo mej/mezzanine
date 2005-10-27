@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.38 2005/07/11 23:56:36 mej Exp $
+# $Id: RPM.pm,v 1.39 2005/10/27 22:03:20 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -44,7 +44,7 @@ BEGIN {
     @EXPORT = ('$specdata', '&rpm_form_command', '&parse_spec_file',
                '&disable_patch', '&enable_patch', '&rpm_install',
                '&rpm_show_contents', '&rpm_query', '&rpm_build',
-               '&rpm_compare_versions');
+               '&rpm_compare_versions', '&rpm_get_installed');
 
     %EXPORT_TAGS = ( );
 
@@ -72,6 +72,7 @@ sub rpm_show_contents();
 sub rpm_query($);
 sub rpm_build();
 sub rpm_compare_versions($$);
+sub rpm_get_installed();
 
 # Private functions
 sub add_define($$);
@@ -95,7 +96,8 @@ rpm_form_command
         if (! &pkgvar_command()) {
             if (&pkgvar_instroot()) {
                 &pkgvar_command("chroot " . &pkgvar_instroot()
-                                . ((&file_user() == $UID) ? ("") : (sprintf(" /bin/su -s /bin/sh %s -c", &pkgvar_get("builduser"))))
+                                . ((&file_user() == $UID) ? ("") : (sprintf(" /bin/su -s /bin/sh %s -c",
+                                                                            &pkgvar_get("builduser"))))
                                 . " /bin/sh -c \"/usr/bin/rpmbuild");
             } else {
                 &pkgvar_command("/bin/sh -c \"/usr/bin/rpmbuild");
@@ -161,6 +163,8 @@ rpm_form_command
     } elsif ($type eq "query") {
         if (&pkgvar_filename()) {
             $cmd .= " -p " . &pkgvar_filename();
+        } elsif (&pkgvar_name()) {
+            $cmd .= ' ' . &pkgvar_name();
         } else {
             $cmd .= " -a";
         }
@@ -466,10 +470,18 @@ rpm_query
     local *RPM;
 
     if ($query_type eq "d") {
-        &pkgvar_parameters("-q --qf '[Contains:  %{FILENAMES}\n][Provides:  %{PROVIDES}\n]"
-                           . "[Requires:  %{REQUIRENAME} %{REQUIREFLAGS:depflags} %{REQUIREVERSION}\n]'");
+        &pkgvar_parameters("-q --qf '[Contains:  %{FILENAMES}\\n][Provides:  %{PROVIDES}\\n]"
+                           . "[Requires:  %{REQUIRENAME} %{REQUIREFLAGS:depflags} %{REQUIREVERSION}\\n]'");
     } elsif ($query_type eq "s") {
-        &pkgvar_parameters("-q --qf 'Source:  %{SOURCERPM}\n'");
+        &pkgvar_parameters("-q --qf 'Source:  %{SOURCERPM}\\n'");
+    } elsif ($query_type eq "a") {
+        &pkgvar_parameters("-q --qf '[%{NAME}\\n]'");
+    } elsif ($query_type eq "abiscan") {
+        &pkgvar_parameters("-q --qf '[Contains:  %{FILENAMES}\\n]"
+                           . "[Provides:  %{PROVIDENAME} %{PROVIDEFLAGS:depflags} %{PROVIDEVERSION}\\n]"
+                           . "[Requires:  %{REQUIRENAME} %{REQUIREFLAGS:depflags} %{REQUIREVERSION}\\n]"
+                           . "[Conflicts:  %{CONFLICTNAME} %{CONFLICTFLAGS:depflags} %{CONFLICTVERSION}\\n]"
+                           . "[Obsoletes:  %{OBSOLETENAME} %{OBSOLETEFLAGS:depflags} %{OBSOLETEVERSION}\\n]\\n'");
     } else {
         return (MEZZANINE_SYNTAX_ERROR, "Unrecognized query type \"$query_type\"\n");
     }
@@ -681,6 +693,27 @@ rpm_compare_versions($$)
         return (($v2 =~ /^(snap|pre|alpha|beta|rc)/) ? (1) : (-1));
     }
     return 0;
+}
+
+sub
+rpm_get_installed()
+{
+    my ($err, @output) = &rpm_query("a");
+
+    if ($err) {
+        eprint "Unable to list installed packages -- $! (error $err)\n";
+        return undef;
+    }
+
+    for (my $i = 0; $i < scalar(@output); $i++) {
+        chomp($output[$i]);
+        if ($output[$i] && ($output[$i] =~ /^([^\0\`\;]+)$/)) {
+            $output[$i] = $1;
+        } else {
+            splice(@output, $i, 1);
+        }
+    }
+    return @output;
 }
 
 ### Private functions

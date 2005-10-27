@@ -866,3 +866,9 @@ Mon Oct 17 16:01:22 2005                        Michael Jennings (mej)
 
 Allow mzbuild to accept URL's instead of having to wget them first.
 ----------------------------------------------------------------------
+Thu Oct 27 18:00:44 2005                        Michael Jennings (mej)
+
+Initial (VERY incomplete) work on "abiscan," a tool for scanning
+platform ABI's, cataloging binary-level dependencies, and gauging
+binary compatibility.
+----------------------------------------------------------------------

@@ -1,9 +1,9 @@
-# $Id: mezzanine.spec,v 1.140 2005/10/17 20:01:55 mej Exp $
+# $Id: mezzanine.spec,v 1.141 2005/10/27 22:03:20 mej Exp $
 
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
 Version: 1.9
-Release: 0.6
+Release: 0.7
 License: BSD
 Group: Development/Tools
 URL: http://www.kainx.org/mezzanine/
@@ -49,7 +49,7 @@ mkdir -p $RPM_BUILD_ROOT%{_bindir}
 mkdir -p $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine/templates
 mkdir -p $RPM_BUILD_ROOT%{_mandir}/man1
 
-for i in *tool pkgsort perlpkg specgen ; do
+for i in abiscan *tool pkgsort perlpkg specgen ; do
     install -m 755 $i $RPM_BUILD_ROOT%{_bindir}/
 done
 
@@ -65,6 +65,9 @@ done
 
 (
     cd $RPM_BUILD_ROOT%{_bindir}
+    for i in abi abiscan ; do
+        ln -s abiscan mz$i
+    done
     for i in get co put ci info add new rm purge rtag tag reset login ann annotate blame diff stat status log init ; do
         ln -s revtool mz$i
         echo ".so revtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/mz$i.1
