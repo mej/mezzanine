@@ -43,7 +43,7 @@ This package contains the %{name} kernel module for the
 %{__make} %{?mflags}
 
 %install
-%{__makeinstall} %{?mflags_install} MODDIR=$RPM_BUILD_ROOT/lib/modules/%{kernel_version}
+%{makeinstall} %{?mflags_install} MODDIR=$RPM_BUILD_ROOT/lib/modules/%{kernel_version}
 
 %post kmod
 /sbin/depmod -aq
