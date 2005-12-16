@@ -1,4 +1,4 @@
-%define webroot /var/www
+%{!?webroot: %define webroot /srv/www}
 
 Summary: @SUMMARY@
 Name: @NAME@
@@ -11,6 +11,7 @@ Packager: @PACKAGER@
 Vendor: @VENDOR@
 Distribution: @DISTRIBUTION@
 Prefix: %{webroot}
+BuildArch: noarch
 BuildRoot: /var/tmp/%{name}-%{version}-%{release}-root
 
 %description
