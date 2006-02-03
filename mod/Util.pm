@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.56 2005/10/17 17:45:48 mej Exp $
+# $Id: Util.pm,v 1.57 2006/02/03 19:54:51 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -799,6 +799,11 @@ create_temp_space($$$)
     }
     dprint "Creating $type temp space in $dir.\n";
     &nuke_tree($dir);
+
+    if ($type eq "nameonly") {
+        return $dir;
+    }
+
     &mkdirhier($dir) || return "";
     if ($type eq "SPM") {
 	@dirlist = ("S", "P", "F");
@@ -1266,7 +1271,7 @@ fetch_url($)
     }
 
     # Create the useragent, and make sure we can handle the given URL.
-    $user_agent = LWP::UserAgent->new("agent" => "$PROGRAM/$VERSION", "env_proxy" => 1, "timeout" => 30);
+    $user_agent = LWP::UserAgent->new("agent" => "$PROGNAME/$VERSION", "env_proxy" => 1, "timeout" => 30);
     if (! $user_agent->is_protocol_supported($uri->scheme())) {
         return "Unsupported method:  " . $uri->scheme();
     }

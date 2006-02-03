@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.205 2005/10/17 20:01:55 mej Exp $
+# $Id: buildtool,v 1.206 2006/02/03 19:54:50 mej Exp $
 #
 
 use strict;
@@ -104,6 +104,7 @@ print_usage_info
     print "    -u --user <userid>               Build packages as <userid> instead of current user\n";
     print "    -b --buildtree <style>           Use the specified layout for the build tree\n";
     print "       --di --dep-installer <prog>   Specify the mechanism used to install build dependencies\n";
+    print "       --is --instroot-src <path>    Path to clean source for chroot jail (replaces next 3 opts)\n";
     print "       --ii --instroot-init <cmd>    Command used to initialize chroot jail\n";
     print "       --ir --instroot-reset <cmd>   Command used to reset chroot jail\n";
     print "       --ic --instroot-copy <cmd>    Command used to copy chroot jail\n";
@@ -1065,14 +1066,14 @@ main
                "nocache", "clean:s", "repuser|U=s", "location|L=s",
                "instroot|i|jail=s", "hints|H=s",
                "depinstaller|dep-installer|hint-installer|hi|di=s",
-               "instroot-init|ii=s", "instroot-reset|ir=s",
-               "instroot-copy|ic=s", "user|u=s", "buildtree|b=s",
-               "builddir=s", "retry", "rebuild", "allow-epoch!",
-               "savecfg!");
+               "instroot-src|is=s", "instroot-init|ii=s",
+               "instroot-reset|ir=s", "instroot-copy|ic=s",
+               "user|u=s", "buildtree|b=s", "builddir=s", "retry",
+               "rebuild", "allow-epoch!", "savecfg!");
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.205 $ created on $Date: 2005/10/17 20:01:55 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.206 $ created on $Date: 2006/02/03 19:54:50 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
@@ -1234,48 +1235,26 @@ main
     }
 
     # Figure out the installroot stuff.
-    if ($config->set("INSTROOT", $OPTION{"instroot"} || $config->get("INSTROOT"))) {
-        my $instroot = $config->get("INSTROOT");
-        my $instroot_init = $config->set("INSTROOT_INIT", $OPTION{"instroot-init"} || $config->get("INSTROOT_INIT"));
-        my $instroot_reset = $config->set("INSTROOT_RESET", $OPTION{"instroot-reset"} || $config->get("INSTROOT_RESET"));
-        my $instroot_copy = $config->set("INSTROOT_COPY", $OPTION{"instroot-copy"} || $config->get("INSTROOT_COPY"));
+    $config->set("INSTROOT", $OPTION{"instroot"} || $config->get("INSTROOT"));
+    $config->set("INSTROOT_SOURCE_RSYNC", $OPTION{"instroot-src"} || $config->get("INSTROOT_SOURCE_RSYNC"));
+    $config->set("INSTROOT_INIT", $OPTION{"instroot-init"} || $config->get("INSTROOT_INIT"));
+    $config->set("INSTROOT_RESET", $OPTION{"instroot-reset"} || $config->get("INSTROOT_RESET"));
+    $config->set("INSTROOT_COPY", $OPTION{"instroot-copy"} || $config->get("INSTROOT_COPY"));
+    if ($config->get("INSTROOT") || $config->get("INSTROOT_SOURCE_RSYNC")) {
+        my ($instroot, $instroot_src, $instroot_init, $instroot_reset, $instroot_copy);
 
-        # If we're building in parallel, the INSTROOT value is our source.
-        if ($num_processes > 1) {
+        if ($num_processes >= 1) {
+            # If we're building in parallel, the INSTROOT value is our source.
             $config->set("INSTROOT_SOURCE_RSYNC", $config->get("INSTROOT"));
+        } elsif ((! $config->get("INSTROOT"))
+                 || ($config->get("INSTROOT") eq $config->get("INSTROOT_SOURCE_RSYNC"))) {
+            # If we're building serially, make sure to avoid crapping in the source chroot jail.
+            $config->set("INSTROOT", &create_temp_space("", "nameonly"));
         }
 
-        # If we have $MEZZANINE_INSTROOT_SOURCE_RSYNC and we don't have the options,
-        # automagically fill the commands in appropriately.  If needed, authentication
-        # info and other flags can be added to $MEZZANINE_INSTROOT_SOURCE_RSYNC.
-        if ($config->get("INSTROOT_SOURCE_RSYNC")) {
-            if ($config->get("INSTROOT_SOURCE_RSYNC") !~ /\/$/) {
-                $config->set("INSTROOT_SOURCE_RSYNC", $config->get("INSTROOT_SOURCE_RSYNC") . '/');
-            }
-            if (! $instroot_init) {
-                $instroot_init = $config->set("INSTROOT_INIT", sprintf("rsync -Haz --delete --delete-after --exclude=/proc %s",
-                                                                       $config->get("INSTROOT_SOURCE_RSYNC")));
-            }
-            if (! $instroot_reset) {
-                $instroot_reset = $config->set("INSTROOT_RESET", sprintf("rsync -Haz --delete --delete-after --exclude=/proc %s",
-                                                                         $config->get("INSTROOT_SOURCE_RSYNC")));
-            }
-            if (! $instroot_copy) {
-                $instroot_copy = $config->set("INSTROOT_COPY", "rsync -Ha --delete --delete-after");
-            }
-        }
-
-        # Make sure the INIT and RESET commands end in a /, lest the rsync not work.
-        if (($instroot_init =~ /rsync/i) && ($instroot_init !~ /\/$/)) {
-            $instroot_init .= '/';
-        }
-        if (($instroot_reset =~ /rsync/i) && ($instroot_reset !~ /\/$/)) {
-            $instroot_reset .= '/';
-        }
-
-        # Now set all the variables using fallbacks.
-        ($instroot, $instroot_init, $instroot_reset, $instroot_copy)
-            = &set_instroot_info($instroot, $instroot_init, $instroot_reset, $instroot_copy);
+        ($instroot, $instroot_src, $instroot_init, $instroot_reset, $instroot_copy)
+            = &set_instroot_info($config->get("INSTROOT"), $config->get("INSTROOT_SOURCE_RSYNC"),
+                                 $config->get("INSTROOT_INIT"), $config->get("INSTROOT_RESET"), $config->get("INSTROOT_COPY"));
         &assign_product_variable($prod, "INSTROOT", $config->set("INSTROOT", $instroot));
 
         # If we have $instroot_init, the other two are guaranteed to have been set by set_instroot_info().

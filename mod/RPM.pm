@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.39 2005/10/27 22:03:20 mej Exp $
+# $Id: RPM.pm,v 1.40 2006/02/03 19:54:51 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -128,7 +128,18 @@ rpm_form_command
         }
     } elsif ($type eq "install" || $type eq "buildpkglist") {
         if (&pkgvar_instroot()) {
-            $cmd .= " --root='" . &pkgvar_instroot() . "'";
+            if (-x (&pkgvar_instroot() . "/bin/rpm")) {
+                # The version of RPM in the chroot may not match the system one,
+                # so try to use the one in the chroot if it's there.
+                $cmd = "chroot " . &pkgvar_instroot() . ' ' . $cmd;
+
+                # Warn if the target file doesn't exist in the chroot.
+                if (&pkgvar_filename() && (! -e (&pkgvar_instroot() . '/' . &pkgvar_filename()))) {
+                    wprintf("%s does not exist under %s.\n", &pkgvar_filename(), &pkgvar_instroot());
+                }
+            } else {
+                $cmd .= " --root='" . &pkgvar_instroot() . "'";
+            }
         }
     }
     if (&pkgvar_parameters()) {

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.59 2005/07/11 23:56:35 mej Exp $
+# $Id: srctool,v 1.60 2006/02/03 19:54:50 mej Exp $
 #
 
 use strict;
@@ -801,7 +801,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.59 $ created on $Date: 2005/07/11 23:56:35 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.60 $ created on $Date: 2006/02/03 19:54:50 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();
@@ -855,6 +855,25 @@ main
 
     if ($scm) {
         $scm->scmobj_propset("repository", $config->get("REPOSITORY"));
+    }
+
+    for (my $i = 0; $i < scalar(@flist); $i++) {
+        my $fname = $flist[$i];
+
+        if ((! -e $fname) || (index($fname, "://") >= 0)) {
+            my $tmp;
+
+            # It's a URL, so download it.
+            print "Downloading $fname...";
+            $tmp = &fetch_url($fname);
+            if (-e $tmp) {
+                $flist[$i] = $tmp;
+            } else {
+                eprint "Unable to fetch $fname -- $tmp.\n";
+                splice(@flist, $i, 1);
+                $i--;
+            }
+        }
     }
 
     if ($0 =~ /mzimport$/ || $OPTION{"import"}) {

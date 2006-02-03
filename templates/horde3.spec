@@ -5,9 +5,9 @@ Name: @NAME@
 Version: @VERSION@
 Release: @RELEASE@
 License: @LICENSE@
-Group: @GROUP@
+Group: Applications/Internet
 URL: http://www.horde.org/
-Source: @TARBALL_URL@
+Source: ftp://ftp.horde.org/pub/%{name}/%{name}-h3-%{version}.tar.gz
 Packager: @PACKAGER@
 Vendor: @VENDOR@
 Distribution: @DISTRIBUTION@

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.50 2005/07/11 23:56:35 mej Exp $
+# $Id: Build.pm,v 1.51 2006/02/03 19:54:51 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -72,7 +72,7 @@ my @my_dirs = ();
 ### Function prototypes
 sub count_cpus();
 sub set_hints_info($);
-sub set_instroot_info($$$$);
+sub set_instroot_info($$$$$);
 sub prepare_build_tree($$$);
 sub install_hints();
 sub install_deps($);
@@ -139,24 +139,51 @@ set_hints_info($)
 
 # Set up instroot info
 sub
-set_instroot_info($$$$)
+set_instroot_info($$$$$)
 {
-    my ($instroot, $instroot_init, $instroot_reset, $instroot_copy) = @_;
+    my ($instroot, $instroot_src, $instroot_init, $instroot_reset, $instroot_copy) = @_;
 
     if (! $instroot) {
-        return ("", "", "", "");
+        return ("", "", "", "", "");
     }
 
     &pkgvar_instroot($instroot);
 
-    # Set INSTROOT_* using fallbacks.
+    # If we have $MEZZANINE_INSTROOT_SOURCE_RSYNC and we don't have the options,
+    # automagically fill the commands in appropriately.  If needed, authentication
+    # info and other flags can be added to $MEZZANINE_INSTROOT_SOURCE_RSYNC.
+    if ($instroot_src) {
+        if ($instroot_src !~ /\/$/) {
+            $instroot_src .= '/';
+        }
+        if (! $instroot_init) {
+            $instroot_init = "rsync -Ha --delete --delete-after --exclude=/proc $instroot_src";
+        }
+        if (! $instroot_reset) {
+            $instroot_reset = "rsync -Ha --delete --delete-after --exclude=/proc $instroot_src";
+        }
+        if (! $instroot_copy) {
+            $instroot_copy = "rsync -Ha --delete --delete-after";
+        }
+    }
+
+    # Make sure the INIT and RESET commands end in a /, lest the rsync not work.
+    if ($instroot_init && ($instroot_init =~ /rsync/i) && (substr($instroot_init, -1, 1) ne '/')) {
+        $instroot_init .= '/';
+    }
+    if ($instroot_reset && ($instroot_reset =~ /rsync/i) && (substr($instroot_reset, -1, 1) ne '/')) {
+        $instroot_reset .= '/';
+    }
+
+    # Fill in any commands we're missing based on what we have.
     if (! $instroot_reset && $instroot_init) {
         $instroot_reset = $instroot_init;
     }
     if (! $instroot_copy && $instroot_init) {
         $instroot_copy = $instroot_init;
     }
-    return ($instroot, $instroot_init, $instroot_reset, $instroot_copy);
+    dprint "Using install root $instroot with source $instroot_src.\n";
+    return ($instroot, $instroot_src, $instroot_init, $instroot_reset, $instroot_copy);
 }
 
 # Create the RPM build directories, the buildroot, and the RPM config files
@@ -928,6 +955,7 @@ build_srpm
         &pkgvar_instroot("");
         @tmp = &rpm_install();
         &pkgvar_instroot($instroot);
+        &copy_files(&pkgvar_filename(), &pkgvar_instroot() . '/' . &pkgvar_filename());
     }
     @tmp = &rpm_install();
     if (($err = shift @tmp) != MEZZANINE_SUCCESS) {

@@ -880,3 +880,13 @@ Fri Dec 16 17:44:52 2005                        Michael Jennings (mej)
 
 Fixed web template and added horde3 template.
 ----------------------------------------------------------------------
+Fri Feb  3 14:49:44 2006                        Michael Jennings (mej)
+
+Allow for chroot jail imaging info on the command line and in
+non-parallel builds.
+
+Use /bin/rpm from chroot jail whenever possible in case the jail's
+version doesn't match the host's version.
+
+Allow URL's in parameters passed to srctool (mzimport, mzmerge, etc.)
+----------------------------------------------------------------------
