@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.57 2006/02/03 19:54:51 mej Exp $
+# $Id: Util.pm,v 1.58 2006/02/16 19:10:02 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -52,9 +52,9 @@ BEGIN {
                '&eprint', '&wprintf', '&wprint', '&handle_signal',
                '&handle_fatal_signal', '&install_signal_handlers',
                '&handle_warning', '&show_backtrace', '&print_args',
-               '&int_to_bytes', '&mkdirhier', '&nuke_tree',
-               '&move_files', '&copy_files', '&copy_tree',
-               '&get_temp_dir', '&create_temp_space',
+               '&examine_object', '&int_to_bytes', '&mkdirhier',
+               '&nuke_tree', '&move_files', '&copy_files',
+               '&copy_tree', '&get_temp_dir', '&create_temp_space',
                '&clean_temp_space', '&basename', '&dirname',
                '&grepdir', '&limit_files', '&str_trim', '&xpush',
                '&cat_file', '&parse_rpm_name', '&find_spec_file',
@@ -123,6 +123,7 @@ sub install_signal_handlers();
 sub handle_warning(@);
 sub show_backtrace();
 sub print_args(@);
+sub examine_object(@);
 sub int_to_bytes($);
 sub mkdirhier($$);
 sub nuke_tree($);
@@ -510,6 +511,86 @@ print_args(@)
         }
     }
     return "Args:  \"" . join("\", \"", @args) . "\"\n";
+}
+
+# Recursively descend a variable for debugging.
+sub
+examine_object(@)
+{
+    my ($item, $buffer, $indent, $indent_step) = @_;
+
+    # Set default parameters.
+    if (!defined($buffer)) {
+        $buffer = "";
+    }
+    if (!defined($indent)) {
+        $indent = 0;
+    }
+    if (!defined($indent_step)) {
+        $indent_step = 4;
+    }
+
+    # Figure out what type it is first.
+    if (!defined($item)) {
+        $buffer .= "UNDEF";
+    } elsif (ref($item)) {
+        my $type = ref($item);
+
+        if ($type eq "SCALAR") {
+            $buffer .= "SCALAR REF $item {\n" . (' ' x ($indent + $indent_step));
+            $buffer = &examine_object(${$item}, $buffer, $indent + $indent_step, $indent_step);
+            $buffer .= "\n" . (' ' x $indent) . '}';
+        } elsif ($type eq "ARRAY") {
+            $buffer .= "ARRAY REF $item {\n";
+            for (my $i = 0; $i < scalar(@{$item}); $i++) {
+                $buffer .= (' ' x ($indent + $indent_step)) . "$i:  ";
+                $buffer = &examine_object($item->[$i], $buffer, $indent + $indent_step, $indent_step) . "\n";
+            }
+            $buffer .= (' ' x $indent) . '}';
+        } elsif ($type eq "HASH") {
+            $buffer .= "HASH REF $item {\n";
+            foreach my $key (sort(keys(%{$item}))) {
+                $buffer .= (' ' x ($indent + $indent_step));
+                $buffer = &examine_object($key, $buffer, $indent + $indent_step, $indent_step) . " => ";
+                $buffer = &examine_object($item->{$key}, $buffer, $indent + $indent_step, $indent_step) . "\n";
+            }
+            $buffer .= (' ' x $indent) . '}';
+        } elsif ($type eq "CODE") {
+            $buffer .= "CODE REF $item";
+        } elsif ($type eq "REF") {
+            $buffer .= "REF REF $item {\n" . (' ' x ($indent + $indent_step));
+            $buffer = &examine_object(${$item}, $buffer, $indent + $indent_step, $indent_step);
+            $buffer .= "\n" . (' ' x $indent) . '}';
+        } elsif ($type eq "GLOB") {
+            $buffer .= "GLOB REF $item";
+        } elsif ($type eq "LVALUE") {
+            $buffer .= "LVALUE REF $item";
+        #} elsif ($type eq "Regexp") {
+        } else {
+            # Some object type.
+            $buffer .= ref($item) . " REF $item {\n" . (' ' x ($indent + $indent_step));
+            if (UNIVERSAL::isa($item, "CODE")) {
+                $item = \&{$item};
+            } elsif (UNIVERSAL::isa($item, "REF")) {
+                $item = \${$item};
+            } elsif (UNIVERSAL::isa($item, "HASH")) {
+                $item = \%{$item};
+            } elsif (UNIVERSAL::isa($item, "ARRAY")) {
+                $item = \@{$item};
+            } elsif (UNIVERSAL::isa($item, "SCALAR")) {
+                $item = \${$item};
+            } else {
+                $item = \"UNKNOWN";  #"
+            }
+            $buffer = &examine_object($item, $buffer, $indent + $indent_step, $indent_step);
+            $buffer .= "\n" . (' ' x $indent) . '}';
+        }
+    } elsif ($item =~ /^\d+$/) {
+        $buffer .= $item;
+    } else {
+        $buffer .= sprintf("\"%s\" (%d)", $item, length($item));
+    }
+    return $buffer;
 }
 
 # Convert an integer to a bytes term.

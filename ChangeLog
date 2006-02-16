@@ -890,3 +890,7 @@ version doesn't match the host's version.
 
 Allow URL's in parameters passed to srctool (mzimport, mzmerge, etc.)
 ----------------------------------------------------------------------
+Thu Feb 16 14:10:03 2006                        Michael Jennings (mej)
+
+Added data object introspection routine.
+----------------------------------------------------------------------
