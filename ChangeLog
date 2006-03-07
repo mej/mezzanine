@@ -894,3 +894,9 @@ Thu Feb 16 14:10:03 2006                        Michael Jennings (mej)
 
 Added data object introspection routine.
 ----------------------------------------------------------------------
+Tue Mar  7 06:22:48 2006                        Michael Jennings (mej)
+
+Only handle URL's where appropriate.
+
+Allow for merge file type specification along with URL for mzmerge.
+----------------------------------------------------------------------

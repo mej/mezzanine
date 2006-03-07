@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.60 2006/02/03 19:54:50 mej Exp $
+# $Id: srctool,v 1.61 2006/03/07 11:24:28 mej Exp $
 #
 
 use strict;
@@ -80,6 +80,37 @@ print_usage_info
     print "       --savecfg                     Preserve current settings for future use\n";
     print "\n";
     exit(MEZZANINE_SUCCESS);
+}
+
+# Download any URL's we were given as files.
+sub
+download_files(@)
+{
+    my @flist = @_;
+
+    for (my $i = 0; $i < scalar(@flist); $i++) {
+        my $fname = $flist[$i];
+        my $ftype = '';
+
+        if ($fname =~ /^([SPRF]:)(.*)$/) {
+            ($ftype, $fname) = ($1, $2);
+        }
+        if ((! -e $fname) || (index($fname, "://") >= 0)) {
+            my $tmp;
+
+            # It's a URL, so download it.
+            print "Downloading $fname...";
+            $tmp = &fetch_url($fname);
+            if (-e $tmp) {
+                $flist[$i] = "$ftype$tmp";
+            } else {
+                eprint "Unable to fetch $fname -- $tmp.\n";
+                splice(@flist, $i, 1);
+                $i--;
+            }
+        }
+    }
+    return @flist;
 }
 
 # Import a package
@@ -801,7 +832,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.60 $ created on $Date: 2006/02/03 19:54:50 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.61 $ created on $Date: 2006/03/07 11:24:28 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();
@@ -857,30 +888,12 @@ main
         $scm->scmobj_propset("repository", $config->get("REPOSITORY"));
     }
 
-    for (my $i = 0; $i < scalar(@flist); $i++) {
-        my $fname = $flist[$i];
-
-        if ((! -e $fname) || (index($fname, "://") >= 0)) {
-            my $tmp;
-
-            # It's a URL, so download it.
-            print "Downloading $fname...";
-            $tmp = &fetch_url($fname);
-            if (-e $tmp) {
-                $flist[$i] = $tmp;
-            } else {
-                eprint "Unable to fetch $fname -- $tmp.\n";
-                splice(@flist, $i, 1);
-                $i--;
-            }
-        }
-    }
-
     if ($0 =~ /mzimport$/ || $OPTION{"import"}) {
         $command = "import";
         if ($OPTION{"flat"}) {
             $import_as_pdr = 1;
         }
+        @flist = &download_files(@flist);
         if (scalar(@flist)) {
             foreach my $f (@flist) {
                 my $err;
@@ -912,6 +925,7 @@ main
         if ($OPTION{"flat"}) {
             $import_as_pdr = 1;
         }
+        @flist = &download_files(@flist);
         foreach my $f (@flist) {
             if (-d $f) {
                 $pkg = $f;
