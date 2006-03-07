@@ -900,3 +900,7 @@ Only handle URL's where appropriate.
 
 Allow for merge file type specification along with URL for mzmerge.
 ----------------------------------------------------------------------
+Tue Mar  7 07:10:04 2006                        Michael Jennings (mej)
+
+Add routine for file uploads via POST.  Still needs debugging.
+----------------------------------------------------------------------

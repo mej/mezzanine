@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.58 2006/02/16 19:10:02 mej Exp $
+# $Id: Util.pm,v 1.59 2006/03/07 12:09:58 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -60,10 +60,11 @@ BEGIN {
                '&cat_file', '&parse_rpm_name', '&find_spec_file',
                '&should_ignore', '&trunc_file', '&touch_file',
                '&newest_file', '&checksum_file', '&run_cmd',
-               '&run_mz_cmd', '&fetch_url', '&MEZZANINE_SUCCESS',
-               '&MEZZANINE_FATAL_ERROR', '&MEZZANINE_SYNTAX_ERROR',
-               '&MEZZANINE_SYSTEM_ERROR', '&MEZZANINE_COMMAND_FAILED',
-               '&MEZZANINE_DUPLICATE', '&MEZZANINE_FILE_NOT_FOUND',
+               '&run_mz_cmd', '&fetch_url', '&post_file',
+               '&MEZZANINE_SUCCESS', '&MEZZANINE_FATAL_ERROR',
+               '&MEZZANINE_SYNTAX_ERROR', '&MEZZANINE_SYSTEM_ERROR',
+               '&MEZZANINE_COMMAND_FAILED', '&MEZZANINE_DUPLICATE',
+               '&MEZZANINE_FILE_NOT_FOUND',
                '&MEZZANINE_FILE_OP_FAILED', '&MEZZANINE_UNSUPPORTED',
                '&MEZZANINE_ACCESS_DENIED', '&MEZZANINE_BAD_ADDITION',
                '&MEZZANINE_BAD_LOG_ENTRY', '&MEZZANINE_BAD_LOGIN',
@@ -148,6 +149,7 @@ sub touch_file($);
 sub newest_file($);
 sub checksum_file($);
 sub fetch_url($);
+sub post_file(@);
 sub handle_alarm_for_subcommand(@);
 
 ### Module cleanup
@@ -1381,6 +1383,51 @@ fetch_url($)
     }
     print "done.\n";
     return $dest;
+}
+
+sub
+post_file(@)
+{
+    my $url = shift;
+    my $file = shift;
+    my %params = @_;
+    my %post_map;
+    my ($user_agent, $response);
+
+    # Check for an HTTP URL.
+    if ($url !~ m,^https?://,) {
+        return "Unsupported URL $url";
+    }
+
+    # Create the useragent
+    $user_agent = LWP::UserAgent->new("agent" => "$PROGNAME/$VERSION", "env_proxy" => 1, "timeout" => 30);
+
+    # Create the file upload hash.
+    foreach my $key (keys(%params)) {
+        if ($params{$key} eq '**FILE**') {
+            $params{$key} = [ $file ];
+        }
+    }
+    %post_map = (
+                 'Content_Type' => 'form-data',
+                 'Content' => \%params
+                );
+
+    # Post the file.
+    dprint "Calling useragent POST method on $url\n";
+    $response = $user_agent->post($url, %post_map);
+    dprint "Back from POST.\n";
+    dprintf("Response was:  %s\n", $response->status_line());
+
+    if ($response->is_redirect()) {
+        # Too many redirects; bail out.
+        return "Too many redirects";
+    } elsif ($response->is_error()) {
+        return $response->status_line();
+    } elsif ($response->header("X-Die")) {
+        return $response->header("X-Die");
+    }
+    return '';
 }
 
 ### Private functions
