@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.60 2006/03/14 04:22:00 mej Exp $
+# $Id: Util.pm,v 1.61 2006/03/14 04:24:03 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -34,6 +34,7 @@ use File::Copy;
 use File::stat;
 use URI;
 use LWP::UserAgent;
+use HTTP::Cookies;
 use HTTP::Request;
 use vars '$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS',
     '$debug', '$PROGNAME', '$VERSION', '$mz_uid', '$mz_gid', '%OPTION';
@@ -151,6 +152,7 @@ sub checksum_file($);
 sub fetch_url($);
 sub post_file(@);
 sub handle_alarm_for_subcommand(@);
+sub find_cookie_jar($);
 
 ### Module cleanup
 END {
@@ -1355,6 +1357,7 @@ fetch_url($)
 
     # Create the useragent, and make sure we can handle the given URL.
     $user_agent = LWP::UserAgent->new("agent" => "$PROGNAME/$VERSION", "env_proxy" => 1, "timeout" => 30);
+    &find_cookie_jar($user_agent);
     if (! $user_agent->is_protocol_supported($uri->scheme())) {
         return "Unsupported method:  " . $uri->scheme();
     }
@@ -1402,6 +1405,7 @@ post_file(@)
     # Create the useragent
     $user_agent = LWP::UserAgent->new("agent" => "$PROGNAME/$VERSION", "env_proxy" => 1, "timeout" => 30);
     push @{$user_agent->requests_redirectable()}, 'POST';
+    &find_cookie_jar($user_agent);
 
     # Create the file upload hash.
     foreach my $key (keys(%params)) {
@@ -1415,10 +1419,10 @@ post_file(@)
                 );
 
     # Post the file.
-    dprint "Calling useragent POST method on $url\n";
+    dprintf("Calling useragent POST method on $url:  %s\n", &examine_object(\%post_map));
     $response = $user_agent->post($url, %post_map);
-    dprint "Back from POST.\n";
     dprintf("Response was:  %s\n", $response->status_line());
+    dprintf("Content:\n----\n%s\n----\n", $response->content());
 
     if ($response->is_redirect()) {
         # Too many redirects; bail out.
@@ -1437,6 +1441,47 @@ sub
 handle_alarm_for_subcommand(@)
 {
     $CMD_TIMEOUT = 1;
+}
+
+sub
+find_cookie_jar($)
+{
+    my $user_agent = shift;
+    my $cookie_file;
+
+    foreach my $var ("MEZZANINE_COOKIE_JAR", "COOKIE_JAR", "COOKIES") {
+        if (exists($ENV{$var}) && -r $ENV{$var}) {
+            $cookie_file = $ENV{$var};
+            last;
+        }
+    }
+    if (! $cookie_file) {
+        foreach my $path ('.', "$ENV{HOME}/.netscape", "$ENV{HOME}/.mozilla", "$ENV{HOME}/.mozilla/firefox/*") {
+            foreach my $fname (glob("$path/cookies.txt")) {
+                if ($fname && -r $fname) {
+                    $cookie_file = $fname;
+                    last;
+                }
+            }
+            if ($cookie_file) {
+                last;
+            }
+        }
+    }
+
+    if ($cookie_file) {
+        eval {
+            use HTTP::Cookies::Netscape;
+
+            dprint "Using cookie jar $cookie_file.\n";
+            $user_agent->cookie_jar(HTTP::Cookies::Netscape->new('file' => $cookie_file));
+        };
+        if ($@) {
+            dprint "Unable to load Netscape cookie module.  Falling back on LWP cookie jar.\n";
+            $user_agent->cookie_jar(HTTP::Cookies->new('file' => $cookie_file));
+        }
+    }
+    return $cookie_file;
 }
 
 1;
