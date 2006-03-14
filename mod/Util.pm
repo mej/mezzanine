@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.59 2006/03/07 12:09:58 mej Exp $
+# $Id: Util.pm,v 1.60 2006/03/14 04:22:00 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -1401,6 +1401,7 @@ post_file(@)
 
     # Create the useragent
     $user_agent = LWP::UserAgent->new("agent" => "$PROGNAME/$VERSION", "env_proxy" => 1, "timeout" => 30);
+    push @{$user_agent->requests_redirectable()}, 'POST';
 
     # Create the file upload hash.
     foreach my $key (keys(%params)) {
