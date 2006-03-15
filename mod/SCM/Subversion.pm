@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Subversion.pm,v 1.6 2005/07/26 22:27:31 mej Exp $
+# $Id: Subversion.pm,v 1.7 2006/03/15 05:31:50 mej Exp $
 #
 
 package Mezzanine::SCM::Subversion;
@@ -321,7 +321,13 @@ get(@)
     }
 
     if (!scalar(@files)) {
-        push @files, '.';
+        if (($self->can_handle('.') != MZSCM_CAN_HANDLE)
+            && ($self->{"repository"})
+            && ($self->can_handle($self->{"repository"}) == MZSCM_CAN_HANDLE)) {
+            push @files, $self->{"repository"};
+        } else {
+            push @files, '.';
+        }
     }
 
     # Figure out which files/modules exist and update those.  Checkout the rest.

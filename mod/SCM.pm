@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: SCM.pm,v 1.4 2004/06/24 23:31:43 mej Exp $
+# $Id: SCM.pm,v 1.5 2006/03/15 05:31:50 mej Exp $
 #
 
 package Mezzanine::SCM;
@@ -83,6 +83,9 @@ new($)
     my $type = shift;
 
     dprint &print_args($proto, $class, $type, @_);
+    if (!defined($type)) {
+        $type = $proto;
+    }
     if (! $type) {
         return Mezzanine::SCM::auto_detect(undef, ".");
     } elsif (lc($type) eq "cvs" && grep { $_ eq "CVS" } @SCM_MODULE_LIST) {
@@ -102,8 +105,11 @@ auto_detect($)
     my $will;
 
     dprint &print_args(@_);
-    if (!ref($self)) {
+    if (!ref($self) && (! $path)) {
         $path = $self;
+    }
+    if (! $path) {
+        $path = '.';
     }
     foreach my $mod (@SCM_MODULE_LIST) {
         my $ret;
