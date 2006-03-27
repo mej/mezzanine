@@ -917,3 +917,7 @@ Wed Mar 15 00:31:28 2006                        Michael Jennings (mej)
 If somebody (like me) mistakenly specifies a subversion repository
 with -D to mzget, don't crap out.  Do the right thing.
 ----------------------------------------------------------------------
+Mon Mar 27 14:51:37 2006                        Michael Jennings (mej)
+
+Fix cookie module check.
+----------------------------------------------------------------------

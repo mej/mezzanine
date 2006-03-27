@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.61 2006/03/14 04:24:03 mej Exp $
+# $Id: Util.pm,v 1.62 2006/03/27 19:51:39 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -1471,7 +1471,7 @@ find_cookie_jar($)
 
     if ($cookie_file) {
         eval {
-            use HTTP::Cookies::Netscape;
+            require HTTP::Cookies::Netscape || die("Not found.");
 
             dprint "Using cookie jar $cookie_file.\n";
             $user_agent->cookie_jar(HTTP::Cookies::Netscape->new('file' => $cookie_file));
