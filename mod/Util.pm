@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.62 2006/03/27 19:51:39 mej Exp $
+# $Id: Util.pm,v 1.63 2006/04/04 20:51:26 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -53,9 +53,10 @@ BEGIN {
                '&eprint', '&wprintf', '&wprint', '&handle_signal',
                '&handle_fatal_signal', '&install_signal_handlers',
                '&handle_warning', '&show_backtrace', '&print_args',
-               '&examine_object', '&int_to_bytes', '&mkdirhier',
-               '&nuke_tree', '&move_files', '&copy_files',
-               '&copy_tree', '&get_temp_dir', '&create_temp_space',
+               '&untaint', '&is_tainted', '&examine_object',
+               '&int_to_bytes', '&mkdirhier', '&nuke_tree',
+               '&move_files', '&copy_files', '&copy_tree',
+               '&get_temp_dir', '&create_temp_space',
                '&clean_temp_space', '&basename', '&dirname',
                '&grepdir', '&limit_files', '&str_trim', '&xpush',
                '&cat_file', '&parse_rpm_name', '&find_spec_file',
@@ -125,6 +126,8 @@ sub install_signal_handlers();
 sub handle_warning(@);
 sub show_backtrace();
 sub print_args(@);
+sub untaint($);
+sub is_tainted($);
 sub examine_object(@);
 sub int_to_bytes($);
 sub mkdirhier($$);
@@ -478,6 +481,10 @@ handle_warning(@)
     if ($_[0] !~ /^Name \"\S+::opt_\w+\" used only once/) {
         dprint @_;
     }
+    if ($_[0] =~ /^Deep recursion/) {
+        &show_backtrace();
+        &fatal_error("Aborting program due to excessive recursion.\n");
+    }
 }
 BEGIN {
     # Take care of this ASAP at load time....
@@ -517,11 +524,54 @@ print_args(@)
     return "Args:  \"" . join("\", \"", @args) . "\"\n";
 }
 
+# Untaint a variable based on a regular expression.
+sub
+untaint(@) {
+    my @ret;
+
+    while (scalar(@_)) {
+        my $var_ref = shift;
+        my $regexp;
+
+        if (!ref($_[0]) || (ref($_[0]) eq "Regexp")) {
+            $regexp = $_[0];
+            shift;
+        } else {
+            $regexp = qr/^([^\`]*)$/;
+        }
+        if (ref($var_ref) eq "SCALAR") {
+            if (${$var_ref} =~ $regexp) {
+                ${$var_ref} = $1;
+                push @ret, ${$var_ref};
+            } else {
+                eprint "Unable to untaint \"$var_ref\":  $regexp does not match.\n";
+                push @ret, '';
+            }
+        } else {
+            eprintf("Invalid reference passed to untaint():  %s %s\n", ref($var_ref), $var_ref);
+            push @ret, undef;
+        }
+    }
+    if (wantarray()) {
+        return @ret;
+    } else {
+        return $ret[0];
+    }
+}
+
+# Check whether or not a particular variable is tainted.
+sub
+is_tainted($) {
+    # "Borrowed" from the perlsec man page.
+    return ! eval { eval("#" . substr($_[0], 0, 0)); 1 };
+}
+
 # Recursively descend a variable for debugging.
 sub
 examine_object(@)
 {
     my ($item, $buffer, $indent, $indent_step) = @_;
+    my $tainted;
 
     # Set default parameters.
     if (!defined($buffer)) {
@@ -533,6 +583,11 @@ examine_object(@)
     if (!defined($indent_step)) {
         $indent_step = 4;
     }
+    if (&is_tainted($item)) {
+        $tainted = ' *TAINTED*';
+    } else {
+        $tainted = '';
+    }
 
     # Figure out what type it is first.
     if (!defined($item)) {
@@ -541,18 +596,18 @@ examine_object(@)
         my $type = ref($item);
 
         if ($type eq "SCALAR") {
-            $buffer .= "SCALAR REF $item {\n" . (' ' x ($indent + $indent_step));
+            $buffer .= "SCALAR REF $item$tainted {\n" . (' ' x ($indent + $indent_step));
             $buffer = &examine_object(${$item}, $buffer, $indent + $indent_step, $indent_step);
             $buffer .= "\n" . (' ' x $indent) . '}';
         } elsif ($type eq "ARRAY") {
-            $buffer .= "ARRAY REF $item {\n";
+            $buffer .= "ARRAY REF $item$tainted {\n";
             for (my $i = 0; $i < scalar(@{$item}); $i++) {
                 $buffer .= (' ' x ($indent + $indent_step)) . "$i:  ";
                 $buffer = &examine_object($item->[$i], $buffer, $indent + $indent_step, $indent_step) . "\n";
             }
             $buffer .= (' ' x $indent) . '}';
         } elsif ($type eq "HASH") {
-            $buffer .= "HASH REF $item {\n";
+            $buffer .= "HASH REF $item$tainted {\n";
             foreach my $key (sort(keys(%{$item}))) {
                 $buffer .= (' ' x ($indent + $indent_step));
                 $buffer = &examine_object($key, $buffer, $indent + $indent_step, $indent_step) . " => ";
@@ -560,19 +615,19 @@ examine_object(@)
             }
             $buffer .= (' ' x $indent) . '}';
         } elsif ($type eq "CODE") {
-            $buffer .= "CODE REF $item";
+            $buffer .= "CODE REF $item$tainted";
         } elsif ($type eq "REF") {
-            $buffer .= "REF REF $item {\n" . (' ' x ($indent + $indent_step));
+            $buffer .= "REF REF $item$tainted {\n" . (' ' x ($indent + $indent_step));
             $buffer = &examine_object(${$item}, $buffer, $indent + $indent_step, $indent_step);
             $buffer .= "\n" . (' ' x $indent) . '}';
         } elsif ($type eq "GLOB") {
-            $buffer .= "GLOB REF $item";
+            $buffer .= "GLOB REF $item$tainted";
         } elsif ($type eq "LVALUE") {
-            $buffer .= "LVALUE REF $item";
+            $buffer .= "LVALUE REF $item$tainted";
         #} elsif ($type eq "Regexp") {
         } else {
             # Some object type.
-            $buffer .= ref($item) . " REF $item {\n" . (' ' x ($indent + $indent_step));
+            $buffer .= ref($item) . " REF $item$tainted {\n" . (' ' x ($indent + $indent_step));
             if (UNIVERSAL::isa($item, "CODE")) {
                 $item = \&{$item};
             } elsif (UNIVERSAL::isa($item, "REF")) {
@@ -581,8 +636,6 @@ examine_object(@)
                 $item = \%{$item};
             } elsif (UNIVERSAL::isa($item, "ARRAY")) {
                 $item = \@{$item};
-            } elsif (UNIVERSAL::isa($item, "SCALAR")) {
-                $item = \${$item};
             } else {
                 $item = \"UNKNOWN";  #"
             }
@@ -590,9 +643,9 @@ examine_object(@)
             $buffer .= "\n" . (' ' x $indent) . '}';
         }
     } elsif ($item =~ /^\d+$/) {
-        $buffer .= $item;
+        $buffer .= "$item$tainted";
     } else {
-        $buffer .= sprintf("\"%s\" (%d)", $item, length($item));
+        $buffer .= sprintf("\"%s\" (%d)%s", $item, length($item), $tainted);
     }
     return $buffer;
 }
@@ -1232,6 +1285,7 @@ run_cmd($$$)
     if (ref($params)) {
         my $tmp = "";
 
+        dprintf("Command parameters:  %s\n", &examine_object($params));
         foreach my $param (@{$params}) {
             if ($param =~ /\'/) {
                 $param =~ s,\',\'\"\'\"\',g;

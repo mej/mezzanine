@@ -921,3 +921,9 @@ Mon Mar 27 14:51:37 2006                        Michael Jennings (mej)
 
 Fix cookie module check.
 ----------------------------------------------------------------------
+Tue Apr  4 16:50:40 2006                        Michael Jennings (mej)
+
+Flag tainted objects in &examine_object().
+
+Added a routine to untaint variables based on a regexp.
+----------------------------------------------------------------------
