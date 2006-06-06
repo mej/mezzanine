@@ -43,8 +43,8 @@ BEGIN {
                '&create_changelog_footer', '&edit_changelog_message',
                '&create_changelog_entry',
                '&create_changelog_entry_brief', '&append_changelog',
-               '&MZSCM_CANNOT_HANDLE', '&MZSCM_CAN_HANDLE',
-               '&MZSCM_WILL_HANDLE');
+               '&get_changelog_entry', '&MZSCM_CANNOT_HANDLE',
+               '&MZSCM_CAN_HANDLE', '&MZSCM_WILL_HANDLE');
 
     %EXPORT_TAGS = ( );
 
@@ -311,6 +311,27 @@ append_changelog()
     }
     close(LOGFILE);
     return "";
+}
+
+sub
+get_changelog_entry($)
+{
+    my $log = shift;
+    my $author;
+
+    dprint &print_args(@_);
+    if ($log && -e $log) {
+        local *LOGFILE;
+
+        # If it exists on the filesystem, it's a file.  Extract message.
+        if (open(LOGFILE, $log)) {
+            $log = join("", <LOGFILE>);
+            close(LOGFILE);
+        }
+    }
+
+    $author = &create_changelog_author("");
+    return &create_changelog_entry($log, $author, "");
 }
 
 1;

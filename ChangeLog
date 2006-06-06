@@ -927,3 +927,11 @@ Flag tainted objects in &examine_object().
 
 Added a routine to untaint variables based on a regexp.
 ----------------------------------------------------------------------
+Mon Jun  5 21:27:29 2006                        Michael Jennings (mej)
+
+Added new RPM query format for abiscan.
+
+Refactored changelog message to be an SCM object property.
+
+Corrected Subversion "move" implementation to use "svn move".
+----------------------------------------------------------------------

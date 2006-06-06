@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Subversion.pm,v 1.7 2006/03/15 05:31:50 mej Exp $
+# $Id: Subversion.pm,v 1.8 2006/06/06 01:29:58 mej Exp $
 #
 
 package Mezzanine::SCM::Subversion;
@@ -67,6 +67,7 @@ my %DEFAULT_VALUES = (
                       "file_type" => "auto",
                       "keyword_expansion" => "auto",
                       "update_changelog" => 1,
+                      "changelog_message" => "",
                       "args_only" => 0,
                       "use_standard_ignore" => 1,
                       "prune_tree" => 1,
@@ -357,24 +358,13 @@ get(@)
 sub
 put($@)
 {
-    my ($self, $log, @files) = @_;
+    my ($self, @files) = @_;
     my ($author, $entry);
     my @params = ("commit");
 
     dprint &print_args(@_);
 
-    if ($log && -e $log) {
-        local *LOGFILE;
-
-        # If it exists on the filesystem, it's a file.  Extract message.
-        if (open(LOGFILE, $log)) {
-            $log = join("", <LOGFILE>);
-            close(LOGFILE);
-        }
-    }
-
-    $author = &create_changelog_author("");
-    $entry = &create_changelog_entry($log, $author, "");
+    $entry = &get_changelog_entry($self->{"changelog_message"});
     if (!defined($entry)) {
         return MEZZANINE_BAD_LOG_ENTRY;
     }
@@ -430,59 +420,34 @@ add(@)
         return MEZZANINE_BAD_ADDITION;
     }
 
-    # Find all the directories so we can add them first.
-    #for (my $i = 0; $i < scalar(@files); $i++) {
-    #    if (-d $files[$i]) {
-    #        # It's a directory.  Put it in the dirs list.
-    #        push @dirs, $files[$i];
-    #        &find({ "no_chdir" => 1, "wanted" => sub { ($_ ne $files[$i]) && -d $_ && push @dirs, $_ } }, $files[$i]);
-    #        splice(@files, $i, 1);
-    #        $i--;
-    #    }
-    #}
+    if (! $self->{"recursion"}) {
+        push @params, "-N";
+    }
+    $err = $self->talk_to_server("add", @params, @files);
+    if ($err != MEZZANINE_SUCCESS) {
+        return $err;
+    }
 
-    #dprintf("Adding dirs:  \"%s\"\n", join("\", \"", @dirs));
-    #if (scalar(@dirs)) {
-    #    $err = $self->talk_to_server("mkdir", @params, @dirs);
-    #    if ($err != MEZZANINE_SUCCESS) {
-    #        return $err;
-    #    }
-    #}
+    # Set up our parameters.
+    @params = ("propset", "--force", "svn:keywords", "Id URL HeadURL Author Date Rev Revision");
+    if ($self->{"recursion"}) {
+        push @params, "-R";
+    }
 
-    #foreach my $dir (@dirs) {
-    #    xpush @files, &grepdir(sub { -f $_ && -s _ }, $dir);
-    #}
-    #dprintf("Adding files:  \"%s\"\n", join("\", \"", @files));
+    if ($self->{"keyword_expansion"} eq "auto") {
+        my @source_files;
 
-    #if (scalar(@files)) {
-        if (! $self->{"recursion"}) {
-            push @params, "-N";
-        }
-        $err = $self->talk_to_server("add", @params, @files);
-        if ($err != MEZZANINE_SUCCESS) {
-            return $err;
-        }
-
-        # Set up our parameters.
-        @params = ("propset", "--force", "svn:keywords", "Id URL HeadURL Author Date Rev Revision");
-        if ($self->{"recursion"}) {
-            push @params, "-R";
-        }
-
-        if ($self->{"keyword_expansion"} eq "auto") {
-            my @source_files;
-
-            @source_files = grep { (-f $_) && (&get_file_type($_) eq "source") } @files;
-            return $self->talk_to_server("propset", @params, @source_files);
-        } elsif ($self->{"keyword_expansion"} eq "source") {
-            my @source_files;
-
-            @source_files = grep { -f $_ } @files;
+        @source_files = grep { (-f $_) && (&get_file_type($_) eq "source") } @files;
+        if (scalar(@source_files)) {
             return $self->talk_to_server("propset", @params, @source_files);
         }
-    #} else {
-        return MEZZANINE_SUCCESS;
-    #}
+    } elsif ($self->{"keyword_expansion"} eq "source") {
+        my @source_files;
+
+        @source_files = grep { -f $_ } @files;
+        return $self->talk_to_server("propset", @params, @source_files);
+    }
+    return MEZZANINE_SUCCESS;
 }
 
 sub
@@ -493,6 +458,7 @@ remove()
 
     dprint &print_args(@_);
     if ($self->{"local_mode"}) {
+        &nuke_tree(@files);
         dprint "Local mode active.  Not performing remove() operation.\n";
         return MEZZANINE_SUCCESS;
     }
@@ -511,74 +477,52 @@ sub
 move(@)
 {
     my ($self, @flist) = @_;
-    my ($target, $err, $done);
-    my (@output, @add, @rm);
+    my ($target, $err);
+    my @params = ("move", "--force");
 
     $target = pop(@flist);
 
-    if ((scalar(@flist) == 1) && (-d $flist[0])) {
-        if (&copy_tree($flist[0], $target) < 1) {
-            my_eprint($self, "Error moving files.\n");
-            return MEZZANINE_SYSTEM_ERROR;
-        }
+    if ($self->{"local_mode"}) {
+        if ((scalar(@flist) == 1) && (-d $flist[0])) {
+            if (&copy_tree($flist[0], $target) < 1) {
+                my_eprint($self, "Error moving files.\n");
+                return MEZZANINE_SYSTEM_ERROR;
+            }
 
-        # Get rid of any metadata files/directories in the new copy.
-        @rm = $self->find_metadata($target);
-        foreach my $dir (@rm) {
-            dprint "Removing metadata $dir.\n";
-            &nuke_tree($dir);
-        }
-    } else {
-        if ((scalar(@flist) > 1) && (! -d $target)) {
-            # When moving multiple files, the target must be a directory.
-            # It's not there, so create it for the user.
-            if (&mkdirhier($target) != MEZZANINE_SUCCESS) {
-                my_eprint($self, "Unable to create $target -- $!\n");
+            # Get rid of any metadata files/directories in the new copy.
+            @rm = $self->find_metadata($target);
+            foreach my $dir (@rm) {
+                dprint "Removing metadata $dir.\n";
+                &nuke_tree($dir);
+            }
+        } else {
+            if ((scalar(@flist) > 1) && (! -d $target)) {
+                # When moving multiple files, the target must be a directory.
+                # It's not there, so create it for the user.
+                if (&mkdirhier($target) != MEZZANINE_SUCCESS) {
+                    my_eprint($self, "Unable to create $target -- $!\n");
+                    return MEZZANINE_SYSTEM_ERROR;
+                }
+            }
+
+            if (&copy_files(@flist, $target) < scalar(@flist)) {
+                my_eprint($self, "Error moving files.\n");
                 return MEZZANINE_SYSTEM_ERROR;
             }
         }
-
-        if (&copy_files(@flist, $target) < scalar(@flist)) {
-            my_eprint($self, "Error moving files.\n");
-            return MEZZANINE_SYSTEM_ERROR;
-        }
-    }
-
-    if ($self->{"local_mode"}) {
         my_print($self, "Files have been moved, but no contact was made with the respository.  Run \"mzsync\" when ready.\n");
         return MEZZANINE_SUCCESS;
     }
-
-    @rm = @flist;
-    if (-d $target) {
-        if ((scalar(@rm) == 1) && (-d $rm[0])) {
-            push @add, $target;
-        } else {
-            $target .= '/' if ($target !~ /\/$/);
-            foreach my $f (@flist) {
-                push @add, $target . &basename($f);
-            }
+    if ($self->{"changelog_message"}) {
+        push @params, "-m", &get_changelog_entry($self->{"changelog_message"});
+    }
+    foreach my $file (@flist) {
+        $err = $self->talk_to_server("move", @params, @files);
+        if ($err != MEZZANINE_SUCCESS) {
+            last;
         }
-    } else {
-        push @add, $target;
     }
-
-    $err = $self->remove(@rm);
-    if ($err != MEZZANINE_SUCCESS) {
-        my_eprint($self, "Unable to remove files from repository.  (See above error(s).)\n");
-        return $err;
-    }
-
-    $err = $self->add(@add);
-    if ($err != MEZZANINE_SUCCESS && $err != MEZZANINE_DUPLICATE) {
-        my_eprint($self, "Unable to add files/directories to repository.  (See above error(s).)\n");
-        return $err;
-    }
-
-    my_print($self, "Removed files:  " . join(" ", @rm) . "\n");
-    my_print($self, "Added files:  " . join(" ", @add) . "\n");
-    my_print($self, "Move complete.  Your changes will not be finalized until you 'mzput' them.\n");
-    return MEZZANINE_SUCCESS;
+    return $err;
 }
 
 # Sync SCM state with your current working copy.
@@ -871,7 +815,8 @@ imprt()
         if (! $self->{"use_standard_ignore"}) {
             push @params, '-I!';
         }
-        push @params, "-m", sprintf("Import of %s", &basename($module));
+        push @params, "-m", (($self->{"changelog_message"}) ? ($self->{"changelog_message"})
+                                                            : (sprintf("Import of %s", &basename($module))));
         push @params, $module, $vendor_tag, $release_tag;
 
         if ($self->{"local_mode"}) {

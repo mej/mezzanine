@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.40 2006/02/03 19:54:51 mej Exp $
+# $Id: RPM.pm,v 1.41 2006/06/06 01:29:58 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -480,14 +480,19 @@ rpm_query
     my (@results);
     local *RPM;
 
-    if ($query_type eq "d") {
+    if (($query_type eq "d") || ($query_type eq "reqprov")) {
         &pkgvar_parameters("-q --qf '[Contains:  %{FILENAMES}\\n][Provides:  %{PROVIDES}\\n]"
                            . "[Requires:  %{REQUIRENAME} %{REQUIREFLAGS:depflags} %{REQUIREVERSION}\\n]'");
     } elsif ($query_type eq "s") {
         &pkgvar_parameters("-q --qf 'Source:  %{SOURCERPM}\\n'");
     } elsif ($query_type eq "a") {
         &pkgvar_parameters("-q --qf '[%{NAME}\\n]'");
-    } elsif ($query_type eq "abiscan") {
+    } elsif ($query_type eq "reqprovall") {
+        &pkgvar_parameters("-q --qf '[%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}::CONTAINS::%{FILENAMES}\\n]"
+                           . "[%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}::PROVIDES::%{PROVIDENAME}::"
+                           . "%{PROVIDEFLAGS:depflags}::%{PROVIDEVERSION}\\n][%{NAME}-%{VERSION}-%{RELEASE}"
+                           . ".%{ARCH}::REQUIRES::%{REQUIRENAME}::%{REQUIREFLAGS:depflags}::%{REQUIREVERSION}\\n]'");
+    } elsif ($query_type eq "depscan") {
         &pkgvar_parameters("-q --qf '[Contains:  %{FILENAMES}\\n]"
                            . "[Provides:  %{PROVIDENAME} %{PROVIDEFLAGS:depflags} %{PROVIDEVERSION}\\n]"
                            . "[Requires:  %{REQUIRENAME} %{REQUIREFLAGS:depflags} %{REQUIREVERSION}\\n]"

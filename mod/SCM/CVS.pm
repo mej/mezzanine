@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: CVS.pm,v 1.14 2005/07/21 17:50:46 mej Exp $
+# $Id: CVS.pm,v 1.15 2006/06/06 01:29:58 mej Exp $
 #
 
 package Mezzanine::SCM::CVS;
@@ -65,6 +65,7 @@ my %DEFAULT_VALUES = (
                       "file_type" => "auto",
                       "keyword_expansion" => "auto",
                       "update_changelog" => 1,
+                      "changelog_message" => "",
                       "args_only" => 0,
                       "use_standard_ignore" => 1,
                       "prune_tree" => 1,
@@ -403,24 +404,13 @@ get(@)
 sub
 put($@)
 {
-    my ($self, $log, @files) = @_;
-    my ($author, $entry);
+    my ($self, @files) = @_;
+    my $entry;
     my @params = ("commit");
 
     dprint &print_args(@_);
 
-    if ($log && -e $log) {
-        local *LOGFILE;
-
-        # If it exists on the filesystem, it's a file.  Extract message.
-        if (open(LOGFILE, $log)) {
-            $log = join("", <LOGFILE>);
-            close(LOGFILE);
-        }
-    }
-
-    $author = &create_changelog_author("");
-    $entry = &create_changelog_entry($log, $author, "");
+    $entry = &get_changelog_entry($self->{"changelog_message"});
     if (!defined($entry)) {
         return MEZZANINE_BAD_LOG_ENTRY;
     }
@@ -890,7 +880,8 @@ imprt()
         if (! $self->{"use_standard_ignore"}) {
             push @params, '-I!';
         }
-        push @params, "-m", sprintf("Import of %s", &basename($module));
+        push @params, "-m", (($self->{"changelog_message"}) ? ($self->{"changelog_message"})
+                                                            : (sprintf("Import of %s", &basename($module))));
         push @params, $module, $vendor_tag, $release_tag;
 
         if ($self->{"local_mode"}) {
