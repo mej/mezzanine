@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.63 2006/04/04 20:51:26 mej Exp $
+# $Id: Util.pm,v 1.64 2006/06/06 21:52:20 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -533,7 +533,7 @@ untaint(@) {
         my $var_ref = shift;
         my $regexp;
 
-        if (!ref($_[0]) || (ref($_[0]) eq "Regexp")) {
+        if (defined($_[0]) && (!ref($_[0]) || (ref($_[0]) eq "Regexp"))) {
             $regexp = $_[0];
             shift;
         } else {
@@ -544,7 +544,7 @@ untaint(@) {
                 ${$var_ref} = $1;
                 push @ret, ${$var_ref};
             } else {
-                eprint "Unable to untaint \"$var_ref\":  $regexp does not match.\n";
+                eprintf("Unable to untaint %s \"%s\":  $regexp does not match.\n", $var_ref, ${$var_ref});
                 push @ret, '';
             }
         } else {

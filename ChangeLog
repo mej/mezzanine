@@ -935,3 +935,7 @@ Refactored changelog message to be an SCM object property.
 
 Corrected Subversion "move" implementation to use "svn move".
 ----------------------------------------------------------------------
+Tue Jun  6 17:52:18 2006                        Michael Jennings (mej)
+
+Fix untaint() function.
+----------------------------------------------------------------------
