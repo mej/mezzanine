@@ -943,3 +943,11 @@ Tue Sep 26 15:32:39 2006                        Michael Jennings (mej)
 
 Turn on taint checking for specgen.
 ----------------------------------------------------------------------
+Tue Sep 26 16:11:16 2006                        Michael Jennings (mej)
+
+Better checking for instroot paths when installing files.
+
+More robust execution of rpm --eval subcommand.
+
+Check basenames, not full paths, when looking for .#* and *~.
+----------------------------------------------------------------------

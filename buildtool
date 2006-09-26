@@ -23,12 +23,13 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.206 2006/02/03 19:54:50 mej Exp $
+# $Id: buildtool,v 1.207 2006/09/26 20:13:30 mej Exp $
 #
 
 use strict;
 
 # Include the Perl Modules we need
+use Cwd '&abs_path';
 use POSIX;
 use Getopt::Long;
 use File::Find;
@@ -678,8 +679,8 @@ place_package_files
     $instroot = $pkgs->{$pkg}{"INSTROOT"};
     if ($instroot) {
         foreach my $file (split(' ', $outfiles)) {
-            if (-e "$instroot$file") {
-                &move_files("$instroot$file", "$file");
+            if ((-e "$instroot$file") && (&abs_path($file) ne &abs_path("$instroot$file"))) {
+                &move_files("$instroot$file", $file);
             }
         }
     }
@@ -1073,7 +1074,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.206 $ created on $Date: 2006/02/03 19:54:50 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.207 $ created on $Date: 2006/09/26 20:13:30 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();

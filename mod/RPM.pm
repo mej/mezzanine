@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.41 2006/06/06 01:29:58 mej Exp $
+# $Id: RPM.pm,v 1.42 2006/09/26 20:13:30 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -193,10 +193,11 @@ sub
 parse_spec_file
 {
     my $specfile = &pkgvar_instructions();
-    my ($line, $oldline, $stage, $pkg, $contents);
+    my ($line, $oldline, $stage, $pkg, $contents, $pid);
     my @specfile_lines;
     local *SPECFILE;
 
+    dprint "Parsing spec file $specfile.\n";
     undef $specdata;
 
     if (! $specfile) {
@@ -214,12 +215,27 @@ parse_spec_file
     close(SPECFILE);
 
     $contents = join("", @specfile_lines);
-    if (!defined(open(SPECFILE, "-|") || exec("/bin/rpm", "--eval", $contents))) {
-        wprint "Unable to pre-process spec file $specfile -- $!\n";
-    } else {
-        my @tmp = <SPECFILE>;
 
+    dprint "Attempting to launch rpm --eval to parse spec file contents.\n";
+    $pid = open(SPECFILE, "-|");
+    if (!defined($pid)) {
+        wprint "Unable to pre-process spec file $specfile -- $!\n";
+    } elsif ($pid == 0) {
+        exec("/bin/rpm", "--eval", $contents);
+        &fatal_error("Unable to exec /bin/rpm -- $!\n");
+    } else {
+        my @tmp;
+
+        dprint "Child process $pid launched; reading from child's STDOUT.\n";
+        #while (<SPECFILE>) {
+        #    my $line = $_;
+
+        #    dprint "eval-> $line";
+        #    push @tmp, $line;
+        #}
+        @tmp = <SPECFILE>;
         close(SPECFILE);
+        dprintf("Got %d lines back from rpm --eval.\n", scalar(@tmp));
         if (scalar(@tmp) > 10) {
             @specfile_lines = @tmp;
         } else {
@@ -227,6 +243,7 @@ parse_spec_file
         }
     }
 
+    dprint "Internal parser reading spec file.\n";
     $stage = 0;
     $specdata->{"SPECFILE"} = $specfile;
     $specdata->{"DEFINES"}{"nil"} = "";
@@ -263,7 +280,7 @@ parse_spec_file
             my ($var, $value) = ($1, $2);
 
             $var = lc($var);
-            dprint "Header:  $var -> $value\n";
+            #dprint "Header:  $var -> $value\n";
 
             # Aliases
             if ($var eq "copyright") {
