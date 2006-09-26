@@ -939,3 +939,7 @@ Tue Jun  6 17:52:18 2006                        Michael Jennings (mej)
 
 Fix untaint() function.
 ----------------------------------------------------------------------
+Tue Sep 26 15:32:39 2006                        Michael Jennings (mej)
+
+Turn on taint checking for specgen.
+----------------------------------------------------------------------
