@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: specgen,v 1.12 2006/09/26 19:32:05 mej Exp $
+# $Id: specgen,v 1.13 2006/10/03 22:04:57 mej Exp $
 #
 
 use strict;
@@ -103,7 +103,7 @@ prompt_user($$)
     $response = <STDIN>;
     chomp($response);
 
-    return (($response) ? ($response) : ($default));
+    return (($response) ? (&untaint(\$response)) : ($default));
 }
 
 sub
@@ -498,11 +498,21 @@ main
     my $errors = 0;
     my %package;
 
+    # For taint checks
+    delete @ENV{("IFS", "CDPATH", "ENV", "BASH_ENV")};
+    $ENV{"PATH"} = "/bin:/usr/bin:/sbin:/usr/sbin";
+    foreach my $shell ("/bin/bash", "/usr/bin/ksh", "/bin/ksh", "/bin/sh", "/sbin/sh") {
+        if (-f $shell) {
+            $ENV{"SHELL"} = $shell;
+            last;
+        }
+    }
+
     &mezz_init("specgen", "0.1", "help|h", "version|v", "debug|d!", "template|t=s", "interactive|i");
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.12 $ created on $Date: 2006/09/26 19:32:05 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.13 $ created on $Date: 2006/10/03 22:04:57 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || !scalar(@ARGV)) {
 	&print_usage_info();
     }
@@ -516,11 +526,18 @@ main
     foreach my $pkg (@ARGV) {
         my $template = new Mezzanine::Template;
 
+        # Untaint package.
+        $pkg = &untaint(\$pkg);
+        if (! $pkg) {
+            next;
+        }
+
         # Initialize hash.
         %package = %package_start;
 
         # Create template object for new spec file.
         if ($OPTION{"template"}) {
+            $OPTION{"template"} = &untaint(\$OPTION{"template"});
             if (-d $OPTION{"template"}) {
                 $template->directory($OPTION{"template"});
             } elsif (-f $OPTION{"template"}) {

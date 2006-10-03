@@ -951,3 +951,7 @@ More robust execution of rpm --eval subcommand.
 
 Check basenames, not full paths, when looking for .#* and *~.
 ----------------------------------------------------------------------
+Tue Oct  3 18:04:58 2006                        Michael Jennings (mej)
+
+Taint fixes brought to light by specgen going -T.
+----------------------------------------------------------------------

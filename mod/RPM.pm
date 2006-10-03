@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.42 2006/09/26 20:13:30 mej Exp $
+# $Id: RPM.pm,v 1.43 2006/10/03 22:04:58 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -185,7 +185,7 @@ rpm_form_command
     $cmd .= "\"";
 
     dprint "Command:  $cmd\n";
-    return $cmd;
+    return &untaint(\$cmd, qr/^(.*)$/s);
 }
 
 # Parse spec file
@@ -215,6 +215,7 @@ parse_spec_file
     close(SPECFILE);
 
     $contents = join("", @specfile_lines);
+    $contents = &untaint(\$contents, qr/^(.*)$/s);  # Anything goes; no risk here.
 
     dprint "Attempting to launch rpm --eval to parse spec file contents.\n";
     $pid = open(SPECFILE, "-|");

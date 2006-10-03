@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: SCM.pm,v 1.5 2006/03/15 05:31:50 mej Exp $
+# $Id: SCM.pm,v 1.6 2006/10/03 22:04:58 mej Exp $
 #
 
 package Mezzanine::SCM;
@@ -58,6 +58,7 @@ BEGIN {
             my $modname = &basename($module);
 
             $modname =~ s/\.pm$//;
+            $modname = &untaint(\$modname, qr/^(\w+)$/);
             next if ($modname eq "Global");
             if (!scalar(grep { $_ eq $modname } @SCM_MODULE_LIST)) {
                 dprint "$modname not loaded.  Loading.\n";

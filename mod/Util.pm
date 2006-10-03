@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.64 2006/06/06 21:52:20 mej Exp $
+# $Id: Util.pm,v 1.65 2006/10/03 22:04:58 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -808,6 +808,7 @@ copy_files(@)
     my $fcnt = 0;
     my $addname = 0;
 
+    dprintf("Copy params:  %s | %s\n", &examine_object($dest), &examine_object(\@flist));
     if (!scalar(@flist)) {
         # Nothing to do!
         return 0;
@@ -1013,6 +1014,7 @@ grepdir(& $)
         $dir = "";
     }
     @files = grep(&$func($_ = ($dir . $_)), readdir(DIR));
+    @files = map { &untaint(\$_); } @files;
     closedir(DIR);
     return @files;
 }
@@ -1104,7 +1106,7 @@ find_spec_file($$)
 
     if (-d $dir) {
         if ($recurse) {
-            find({ "wanted" => sub { /\.spec(?:\.in)?$/ && push @specs, $_; }, "no_chdir" => 1 }, $dir);
+            find({ "wanted" => sub { /\.spec(?:\.in)?$/ && push @specs, &untaint(\$_); }, "no_chdir" => 1 }, $dir);
         } else {
             @specs = &grepdir(sub { /\.spec(?:\.in)?$/ }, $dir);
         }
