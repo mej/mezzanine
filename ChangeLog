@@ -955,3 +955,10 @@ Tue Oct  3 18:04:58 2006                        Michael Jennings (mej)
 
 Taint fixes brought to light by specgen going -T.
 ----------------------------------------------------------------------
+Fri Oct  6 22:17:57 2006                        Michael Jennings (mej)
+
+Trying to import packages whose names begin with numbers would fail
+because the vendor/release tags (and any other CVS tag) are forbidden
+to begin with a number.  So the SCM::CVS module now strips leading
+non-letter characters from tags.
+----------------------------------------------------------------------

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: CVS.pm,v 1.15 2006/06/06 01:29:58 mej Exp $
+# $Id: CVS.pm,v 1.16 2006/10/07 02:18:59 mej Exp $
 #
 
 package Mezzanine::SCM::CVS;
@@ -784,8 +784,10 @@ tag()
 
     push @params, (($self->{"recursion"}) ? ("-R") : ("-l")), "-F";
     if ($self->{"source_branch"}) {
+        $self->{"source_branch"} =~ s/^[^a-zA-Z]+//;
         push @params, "-B", "-b", $self->{"source_branch"};
     } elsif ($self->{"source_tag"}) {
+        $self->{"source_tag"} =~ s/^[^a-zA-Z]+//;
         push @params, $self->{"source_tag"};
     } else {
         return MEZZANINE_INVALID_TAG;
@@ -863,11 +865,13 @@ imprt()
         }
         $vendor_tag =~ tr/[a-z]/[A-Z]/;
         $vendor_tag =~ s/[^-_A-Z0-9]/_/g;
+        $vendor_tag =~ s/^[^a-zA-Z]+//;
         if (! $release_tag) {
             $release_tag = $vendor_tag;
         }
         $release_tag =~ tr/[a-z]/[A-Z]/;
         $release_tag =~ s/[^-_A-Z0-9]/_/g;
+        $release_tag =~ s/^[^a-zA-Z]+//;
 
         $self->create_symlink_file();
         #return MEZZANINE_INVALID_TAG if (! &check_tags($module));
