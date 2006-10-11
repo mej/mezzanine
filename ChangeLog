@@ -962,3 +962,7 @@ because the vendor/release tags (and any other CVS tag) are forbidden
 to begin with a number.  So the SCM::CVS module now strips leading
 non-letter characters from tags.
 ----------------------------------------------------------------------
+Wed Oct 11 17:53:35 2006                        Michael Jennings (mej)
+
+Cosmetic tweak of debugging output.
+----------------------------------------------------------------------

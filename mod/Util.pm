@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.65 2006/10/03 22:04:58 mej Exp $
+# $Id: Util.pm,v 1.66 2006/10/11 21:53:43 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -808,7 +808,7 @@ copy_files(@)
     my $fcnt = 0;
     my $addname = 0;
 
-    dprintf("Copy params:  %s | %s\n", &examine_object($dest), &examine_object(\@flist));
+    #dprintf("Copy params:  %s | %s\n", &examine_object($dest), &examine_object(\@flist));
     if (!scalar(@flist)) {
         # Nothing to do!
         return 0;
