@@ -966,3 +966,9 @@ Wed Oct 11 17:53:35 2006                        Michael Jennings (mej)
 
 Cosmetic tweak of debugging output.
 ----------------------------------------------------------------------
+Thu Feb 22 20:48:32 2007                        Michael Jennings (mej)
+
+Fixed horde3 package template.
+
+Fixed permissions problem with chrooted builds.
+----------------------------------------------------------------------
