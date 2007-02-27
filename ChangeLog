@@ -972,3 +972,7 @@ Fixed horde3 package template.
 
 Fixed permissions problem with chrooted builds.
 ----------------------------------------------------------------------
+Tue Feb 27 16:30:05 2007                        Michael Jennings (mej)
+
+Fix copyright years.
+----------------------------------------------------------------------

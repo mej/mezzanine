@@ -2,7 +2,7 @@
 #
 # pkgtool -- Tool for generating source/patch files from a source code repository
 # 
-# Copyright (C) 2001, Michael Jennings
+# Copyright (C) 2001-2007, Michael Jennings
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgtool,v 1.69 2005/10/17 20:01:55 mej Exp $
+# $Id: pkgtool,v 1.70 2007/02/27 21:29:36 mej Exp $
 #
 
 use strict;
@@ -106,7 +106,7 @@ main
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.69 $ created on $Date: 2005/10/17 20:01:55 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.70 $ created on $Date: 2007/02/27 21:29:36 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || (!scalar(@ARGV) && !scalar(%OPTION) && &basename($0) !~ /^mz/)) {
         &print_usage_info();
     }

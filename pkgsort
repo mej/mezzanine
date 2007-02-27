@@ -2,7 +2,7 @@
 #
 # pkgsort -- Tool for sorting packages
 # 
-# Copyright (C) 2001, Michael Jennings
+# Copyright (C) 2001-2007, Michael Jennings
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgsort,v 1.26 2004/06/04 17:16:40 mej Exp $
+# $Id: pkgsort,v 1.27 2007/02/27 21:29:36 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -867,14 +867,14 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.26 $ created on $Date: 2004/06/04 17:16:40 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.27 $ created on $Date: 2007/02/27 21:29:36 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
         $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
         print "\n";
 	print "$progname $version by Michael Jennings <mej\@eterm.org>\n";
-        print "Copyright (c) 2001, Michael Jennings\n";
+        print "Copyright (c) 2001-2007, Michael Jennings\n";
         print "  ($rcs_info)\n";
         print "\n";
 	return MEZZANINE_SUCCESS;

@@ -1,6 +1,6 @@
 # Mezzanine RPM Perl Module
 # 
-# Copyright (C) 2001, Michael Jennings
+# Copyright (C) 2001-2007, Michael Jennings
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.43 2006/10/03 22:04:58 mej Exp $
+# $Id: RPM.pm,v 1.44 2007/02/27 21:29:36 mej Exp $
 #
 
 package Mezzanine::RPM;

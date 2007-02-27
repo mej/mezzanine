@@ -1,6 +1,6 @@
 # Mezzanine Tar Perl Module
 # 
-# Copyright (C) 2001, Michael Jennings
+# Copyright (C) 2001-2007, Michael Jennings
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Tar.pm,v 1.3 2003/12/30 23:02:55 mej Exp $
+# $Id: Tar.pm,v 1.4 2007/02/27 21:29:36 mej Exp $
 #
 
 package Mezzanine::Tar;

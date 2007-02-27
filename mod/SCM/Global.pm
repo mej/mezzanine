@@ -1,6 +1,6 @@
 # Mezzanine Global SCM Perl Module
 # 
-# Copyright (C) 2001-2004, Michael Jennings
+# Copyright (C) 2001-2007, Michael Jennings
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to

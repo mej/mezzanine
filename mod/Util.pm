@@ -1,6 +1,6 @@
 # Mezzanine Utilities Perl Module
 # 
-# Copyright (C) 2001-2004, Michael Jennings
+# Copyright (C) 2001-2007, Michael Jennings
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.67 2007/02/23 01:48:55 mej Exp $
+# $Id: Util.pm,v 1.68 2007/02/27 21:29:36 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -262,7 +262,7 @@ print_version($$$$)
     $rcs_info =~ s/\$\s*Author: (\S+) \$ /$1/;
     print "\n";
     print "$progname $version by $author\n";
-    print "Copyright (c) 2000-2004, $author\n";
+    print "Copyright (c) 2000-2007, $author\n";
     print "  ($rcs_info)\n";
     print "\n";
     exit MEZZANINE_SUCCESS;

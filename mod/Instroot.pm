@@ -1,6 +1,6 @@
 # Mezzanine Instroot Perl Module
 # 
-# Copyright (C) 2004, Michael Jennings
+# Copyright (C) 2004-2007, Michael Jennings
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Instroot.pm,v 1.4 2004/07/29 17:58:49 mej Exp $
+# $Id: Instroot.pm,v 1.5 2007/02/27 21:29:36 mej Exp $
 #
 
 package Mezzanine::Instroot;
