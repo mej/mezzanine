@@ -1,4 +1,4 @@
-# $Id: mezzanine.spec,v 1.147 2007/02/23 01:48:55 mej Exp $
+# $Id: mezzanine.spec,v 1.148 2007/02/27 22:46:50 mej Exp $
 
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
@@ -83,6 +83,9 @@ done
     for i in prod pbuild prodbuild ; do
         ln -s buildtool mz$i
         echo ".so buildtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/mz$i.1
+    done
+    for i in repo repo{scan,closure,compare,comp,diff,add,rm,remove,merge} ; do
+        ln -s pkgrepotool mz$i
     done
 )
 

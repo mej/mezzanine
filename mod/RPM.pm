@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.44 2007/02/27 21:29:36 mej Exp $
+# $Id: RPM.pm,v 1.45 2007/02/27 22:46:50 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -748,6 +748,31 @@ rpm_get_installed()
         }
     }
     return @output;
+}
+
+# Scan one or more directories for RPM files.
+sub
+rpm_scan_files(@)
+{
+    my @dirs = @_;
+    my $scan;
+
+    foreach my $dir (@dirs) {
+        my @rpm_files;
+
+        dprint "Scanning $dir for RPM files.\n";
+        @rpm_files = &grepdir(sub { /\.(?:\w+)\.rpm$/ }, $dir);
+        foreach my $file (@rpm_files) {
+            my %pkg;
+
+            dprint "Looking at $file.\n";
+            $pkg{"PATH"} = $file;
+            $pkg{"ORIGIN"} = &dirname($file);
+            @pkg{("NAME", "VERSION", "RELEASE", "ARCH")} = &parse_rpm_name($file);
+            $scan->{$dir}{$file} = \%pkg;
+        }
+    }
+    return $scan;
 }
 
 ### Private functions

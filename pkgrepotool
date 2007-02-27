@@ -1,0 +1,154 @@
+#!/usr/bin/perl -Tw
+#
+# pkgrepotool -- Tool for managing package repositories
+# 
+# Copyright (C) 2007, Michael Jennings
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies of the Software, its documentation and marketing & publicity
+# materials, and acknowledgment shall be given in the documentation, materials
+# and software packages that this Software was used.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+# $Id: pkgrepotool,v 1.1 2007/02/27 22:46:50 mej Exp $
+#
+
+use strict;
+
+# Include the Perl Modules we need
+use POSIX;
+use Mezzanine::Util;
+use Mezzanine::Config;
+use Mezzanine::PkgVars;
+use Mezzanine::Pkg;
+
+# Configuration data.
+my $config;
+my @config_vars = ("DEBUG");
+
+# Print usage information
+sub
+print_usage_info
+{
+    my ($leader, $underbar);
+
+    print "\n";
+    $leader = "$PROGNAME $VERSION Usage Information";
+    $underbar = $leader;
+    $underbar =~ s/./-/g;
+    print "$leader\n$underbar\n";
+    print "\n";
+    print "  Syntax:   pkgrepotool [ options ]\n";
+    print "\n";
+    print "    -h --help                        Show this usage information\n";
+    print "    -d --debug                       Turn on debugging\n";
+    print "    -v --version                     Show version and copyright\n";
+    #print "                                     \n";
+    print "       --savecfg                     Preserve current settings for future use\n";
+    print "\n";
+    exit(MEZZANINE_SUCCESS);
+}
+
+# main() here is basically the same as main() in C
+sub
+main
+{
+    my ($err, $msg, $mode, $scan);
+
+    # For taint checks
+    delete @ENV{("IFS", "CDPATH", "ENV", "BASH_ENV")};
+    $ENV{"PATH"} = "/bin:/usr/bin:/sbin:/usr/sbin";
+    foreach my $shell ("/bin/bash", "/usr/bin/ksh", "/bin/ksh", "/bin/sh", "/sbin/sh") {
+        if (-f $shell) {
+            $ENV{"SHELL"} = $shell;
+            last;
+        }
+    }
+
+    $err = 0;
+    &mezz_init("pkgrepotool", "1.0", "help|h", "version|v", "debug|d!", "savecfg|save-config!",
+               "scan|s", "closure|C", "add|a", "remove|r", "compare|c", "merge|m",
+               "new!", "old!", "interactive|i!", "test|t!",
+               "dirs|directories|D=s@", "metadata|M=s@");
+
+    if ($OPTION{"version"}) {
+        # Do not edit this.  It is updated automatically by CVS when you commit.
+        &print_version($PROGNAME, $VERSION, "Michael Jennings",
+                       'CVS Revision $Revision: 1.1 $ created on $Date: 2007/02/27 22:46:50 $ by $Author: mej $ ');
+    } elsif ($OPTION{"help"} || (!scalar(@ARGV) && !scalar(%OPTION) && &basename($0) !~ /^mz/)) {
+        &print_usage_info();
+    }
+    $config = Mezzanine::Config->new("repo/config");
+    if (!scalar($config->keys())) {
+        $OPTION{"savecfg"} = 1;
+    }
+
+    if (defined($OPTION{"debug"}) && !($OPTION{"debug"})) {
+        &debug_set($config->set("DEBUG", 0));
+    } else {
+        &debug_set($config->set("DEBUG", $OPTION{"debug"} || $config->get("DEBUG") || 0));
+    }
+
+    if (($0 =~ /scan$/) || ($OPTION{"scan"})) {
+        $mode = "scan";
+    } elsif (($0 =~ /closure$/) || ($OPTION{"closure"})) {
+        $mode = "closure";
+    } elsif (($0 =~ /add$/) || ($OPTION{"add"})) {
+        $mode = "add";
+    } elsif (($0 =~ /(rm|remove)$/) || ($OPTION{"remove"})) {
+        $mode = "remove";
+    } elsif (($0 =~ /compare$/) || ($OPTION{"compare"})) {
+        $mode = "compare";
+    } elsif (($0 =~ /merge$/) || ($OPTION{"merge"})) {
+        $mode = "merge";
+    } else {
+        &fatal_error("Nothing to do!\n");
+    }
+
+    # Save configuration if needed.
+    if ($OPTION{"savecfg"}) {
+        $config->save();
+    }
+
+    if (! $OPTION{"dirs"} || !ref($OPTION{"dirs"}) || (ref($OPTION{"dirs"}) ne "ARRAY")) {
+        if (scalar(@ARGV)) {
+            @{$OPTION{"dirs"}} = @ARGV;
+        } else {
+            @{$OPTION{"dirs"}} = ();
+        }
+    }
+
+    if ($mode =~ /^(scan|closure|compare|merge)$/) {
+        $scan = &rpm_scan_files(@{$OPTION{"dirs"}});
+    }
+
+    if ($mode eq "scan") {
+        foreach my $dir (sort(keys(%{$scan}))) {
+            foreach my $pkg (sort(keys(%{$scan->{$dir}}))) {
+                print "$dir:  $pkg\n";
+            }
+        }
+    } elsif ($mode eq "closure") {
+    } elsif ($mode eq "add") {
+    } elsif ($mode eq "remove") {
+    } elsif ($mode eq "compare") {
+    } elsif ($mode eq "merge") {
+    } else {
+    }
+    return $err;
+}
+
+exit &main();

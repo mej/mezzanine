@@ -976,3 +976,8 @@ Tue Feb 27 16:30:05 2007                        Michael Jennings (mej)
 
 Fix copyright years.
 ----------------------------------------------------------------------
+Tue Feb 27 17:46:42 2007                        Michael Jennings (mej)
+
+New tool -- pkgrepotool -- for managing package repositories.  Lots to
+come here; it's nowhere near done yet. :)
+----------------------------------------------------------------------
