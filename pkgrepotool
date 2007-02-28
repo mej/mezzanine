@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgrepotool,v 1.1 2007/02/27 22:46:50 mej Exp $
+# $Id: pkgrepotool,v 1.2 2007/02/28 00:53:48 mej Exp $
 #
 
 use strict;
@@ -34,10 +34,89 @@ use Mezzanine::Util;
 use Mezzanine::Config;
 use Mezzanine::PkgVars;
 use Mezzanine::Pkg;
+use Mezzanine::RPM;
 
 # Configuration data.
 my $config;
-my @config_vars = ("DEBUG");
+my @config_vars = ("DEBUG", "DIRS");
+
+# Get only the newest packages
+sub
+filter_newest($)
+{
+    my $scan = $_[0];
+
+    foreach my $dir (sort(keys(%{$scan}))) {
+        my %pkgs;
+
+        # Build hash of package name -> array of RPM's
+        foreach my $pkg (sort(keys(%{$scan->{$dir}}))) {
+            push @{$pkgs{$scan->{$dir}{$pkg}{"NAME"}}}, $pkg;
+        }
+
+        # For each unique package, pick only the newest one.
+        foreach my $pkg (sort(keys(%pkgs))) {
+            my @rpms = reverse(&rpm_sort(@{$pkgs{$pkg}}));
+
+            shift @rpms;
+            foreach my $rpm (@rpms) {
+                delete $scan->{$dir}{$rpm};
+            }
+        }
+    }
+    return $scan;
+}
+
+# Get only the oldest packages
+sub
+filter_oldest($)
+{
+    my $scan = $_[0];
+
+    foreach my $dir (sort(keys(%{$scan}))) {
+        my %pkgs;
+
+        # Build hash of package name -> array of RPM's
+        foreach my $pkg (sort(keys(%{$scan->{$dir}}))) {
+            push @{$pkgs{$scan->{$dir}{$pkg}{"NAME"}}}, $pkg;
+        }
+
+        # For each unique package, pick only the oldest one.
+        foreach my $pkg (sort(keys(%pkgs))) {
+            my @rpms = &rpm_sort(@{$pkgs{$pkg}});
+
+            shift @rpms;
+            foreach my $rpm (@rpms) {
+                delete $scan->{$dir}{$rpm};
+            }
+        }
+    }
+    return $scan;
+}
+
+# Get only old packages (exact opposite of newest)
+sub
+filter_old($)
+{
+    my $scan = $_[0];
+
+    foreach my $dir (sort(keys(%{$scan}))) {
+        my %pkgs;
+
+        # Build hash of package name -> array of RPM's
+        foreach my $pkg (sort(keys(%{$scan->{$dir}}))) {
+            push @{$pkgs{$scan->{$dir}{$pkg}{"NAME"}}}, $pkg;
+        }
+
+        # For each unique package, pick only the old one.
+        foreach my $pkg (sort(keys(%pkgs))) {
+            my @rpms = reverse(&rpm_sort(@{$pkgs{$pkg}}));
+
+            delete $scan->{$dir}{shift @rpms};
+        }
+    }
+    return $scan;
+}
 
 # Print usage information
 sub
@@ -67,6 +146,7 @@ sub
 main
 {
     my ($err, $msg, $mode, $scan);
+    my @dirlist;
 
     # For taint checks
     delete @ENV{("IFS", "CDPATH", "ENV", "BASH_ENV")};
@@ -81,13 +161,13 @@ main
     $err = 0;
     &mezz_init("pkgrepotool", "1.0", "help|h", "version|v", "debug|d!", "savecfg|save-config!",
                "scan|s", "closure|C", "add|a", "remove|r", "compare|c", "merge|m",
-               "new!", "old!", "interactive|i!", "test|t!",
+               "newest", "old", "oldest", "interactive|i!", "test|t!",
                "dirs|directories|D=s@", "metadata|M=s@");
 
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.1 $ created on $Date: 2007/02/27 22:46:50 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.2 $ created on $Date: 2007/02/28 00:53:48 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || (!scalar(@ARGV) && !scalar(%OPTION) && &basename($0) !~ /^mz/)) {
         &print_usage_info();
     }
@@ -118,27 +198,35 @@ main
         &fatal_error("Nothing to do!\n");
     }
 
+    @dirlist = split(':', $config->get("DIRS"));
+    if ($OPTION{"dirs"} && ref($OPTION{"dirs"}) && (ref($OPTION{"dirs"}) eq "ARRAY")) {
+        @dirlist = @{$OPTION{"dirs"}};
+    } elsif (scalar(@ARGV)) {
+        @dirlist = @ARGV;
+    }
+    $config->set("DIRS", join(':', @dirlist));
+    dprint "Using directory list:  ", join(', ', @dirlist), "\n";
+
     # Save configuration if needed.
     if ($OPTION{"savecfg"}) {
         $config->save();
     }
 
-    if (! $OPTION{"dirs"} || !ref($OPTION{"dirs"}) || (ref($OPTION{"dirs"}) ne "ARRAY")) {
-        if (scalar(@ARGV)) {
-            @{$OPTION{"dirs"}} = @ARGV;
-        } else {
-            @{$OPTION{"dirs"}} = ();
-        }
-    }
-
     if ($mode =~ /^(scan|closure|compare|merge)$/) {
-        $scan = &rpm_scan_files(@{$OPTION{"dirs"}});
+        $scan = &rpm_scan_files(@dirlist);
+        if ($OPTION{"newest"}) {
+            &filter_newest($scan);
+        } elsif ($OPTION{"oldest"}) {
+            &filter_oldest($scan);
+        } elsif ($OPTION{"old"}) {
+            &filter_old($scan);
+        }
     }
 
     if ($mode eq "scan") {
         foreach my $dir (sort(keys(%{$scan}))) {
             foreach my $pkg (sort(keys(%{$scan->{$dir}}))) {
-                print "$dir:  $pkg\n";
+                print "$pkg\n";
             }
         }
     } elsif ($mode eq "closure") {

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.45 2007/02/27 22:46:50 mej Exp $
+# $Id: RPM.pm,v 1.46 2007/02/28 00:53:48 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -44,7 +44,8 @@ BEGIN {
     @EXPORT = ('$specdata', '&rpm_form_command', '&parse_spec_file',
                '&disable_patch', '&enable_patch', '&rpm_install',
                '&rpm_show_contents', '&rpm_query', '&rpm_build',
-               '&rpm_compare_versions', '&rpm_get_installed');
+               '&rpm_compare_versions', '&rpm_get_installed',
+               '&rpm_scan_files', '&rpm_sort');
 
     %EXPORT_TAGS = ( );
 
@@ -73,6 +74,8 @@ sub rpm_query($);
 sub rpm_build();
 sub rpm_compare_versions($$);
 sub rpm_get_installed();
+sub rpm_scan_files(@);
+sub rpm_sort(@);
 
 # Private functions
 sub add_define($$);
@@ -660,33 +663,7 @@ rpm_compare_versions($$)
             $v2 =~ m/^([a-z]+)/;
             $s2 = $1;
 
-            # Some strings require special handling.
-            if ($v1 eq "snap") {
-                $ival1 = 1;
-            } elsif ($v1 eq "pre") {
-                $ival1 = 2;
-            } elsif ($v1 eq "alpha") {
-                $ival1 = 3;
-            } elsif ($v1 eq "beta") {
-                $ival1 = 4;
-            } elsif ($v1 eq "rc") {
-                $ival1 = 5;
-            }
-            if ($v2 eq "snap") {
-                $ival2 = 1;
-            } elsif ($v2 eq "pre") {
-                $ival2 = 2;
-            } elsif ($v2 eq "alpha") {
-                $ival2 = 3;
-            } elsif ($v2 eq "beta") {
-                $ival2 = 4;
-            } elsif ($v2 eq "rc") {
-                $ival2 = 5;
-            }
-            if ($ival1 != $ival2) {
-                # If the values are different, compare them.
-                return ($ival1 - $ival2);
-            } elsif ($s1 ne $s2) {
+            if ($s1 ne $s2) {
                 # Two arbitrary strings that differ.  Compare those normally.
                 return ($s1 <=> $s2);
             }
@@ -722,9 +699,9 @@ rpm_compare_versions($$)
 
     # We've reached the end of one of the strings.
     if (length($v1)) {
-        return (($v1 =~ /^(snap|pre|alpha|beta|rc)/) ? (-1) : (1));
+        return 1;
     } elsif (length($v2)) {
-        return (($v2 =~ /^(snap|pre|alpha|beta|rc)/) ? (1) : (-1));
+        return -1;
     }
     return 0;
 }
@@ -762,7 +739,7 @@ rpm_scan_files(@)
 
         dprint "Scanning $dir for RPM files.\n";
         @rpm_files = &grepdir(sub { /\.(?:\w+)\.rpm$/ }, $dir);
-        foreach my $file (@rpm_files) {
+        foreach my $file (sort(@rpm_files)) {  # Sort only for debugging.
             my %pkg;
 
             dprint "Looking at $file.\n";
@@ -773,6 +750,45 @@ rpm_scan_files(@)
         }
     }
     return $scan;
+}
+
+# Sort RPM's in version order
+sub
+rpm_sort(@)
+{
+    my @rpm_list = @_;
+    my @tmp;
+
+    return sort {
+        my ($version_a, $version_b, $release_a, $release_b, $ret);
+
+        if (ref($a) && defined($a->{"VERSION"})) {
+            $version_a = $a->{"VERSION"};
+            $release_a = $a->{"RELEASE"};
+        } elsif (scalar(@tmp = &parse_rpm_name($a)) == 4) {
+            $version_a = $tmp[1];
+            $release_a = $tmp[2];
+        } else {
+            $version_a = 0;
+            $release_a = 0;
+        }
+        if (ref($b) && defined($b->{"VERSION"})) {
+            $version_b = $b->{"VERSION"};
+            $release_b = $b->{"RELEASE"};
+        } elsif (scalar(@tmp = &parse_rpm_name($b)) == 4) {
+            $version_b = $tmp[1];
+            $release_b = $tmp[2];
+        } else {
+            $version_b = 0;
+            $release_b = 0;
+        }
+
+        $ret = &rpm_compare_versions($version_a, $version_b);
+        if (! $ret) {
+            $ret = &rpm_compare_versions($release_a, $release_b);
+        }
+        return $ret;
+    } @rpm_list;
 }
 
 ### Private functions

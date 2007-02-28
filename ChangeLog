@@ -981,3 +981,7 @@ Tue Feb 27 17:46:42 2007                        Michael Jennings (mej)
 New tool -- pkgrepotool -- for managing package repositories.  Lots to
 come here; it's nowhere near done yet. :)
 ----------------------------------------------------------------------
+Tue Feb 27 19:54:19 2007                        Michael Jennings (mej)
+
+More repo tool work.
+----------------------------------------------------------------------
