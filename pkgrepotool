@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgrepotool,v 1.2 2007/02/28 00:53:48 mej Exp $
+# $Id: pkgrepotool,v 1.3 2007/02/28 19:22:20 mej Exp $
 #
 
 use strict;
@@ -38,7 +38,9 @@ use Mezzanine::RPM;
 
 # Configuration data.
 my $config;
-my @config_vars = ("DEBUG", "DIRS");
+
+my @config_vars = ("DEBUG", "DIRS", "INTERACTIVE", "NEWEST", "OLD",
+                   "OLDEST", "SCM", "SPAN", "TEST");
 
 # Get only the newest packages
 sub
@@ -118,6 +120,21 @@ filter_old($)
     return $scan;
 }
 
+# Merge all repositories into one
+sub
+span_dirs($)
+{
+    my $scan = $_[0];
+
+    foreach my $dir (keys(%{$scan})) {
+        foreach my $pkg (keys(%{$scan->{$dir}})) {
+            $scan->{'-'}{$pkg} = $scan->{$dir}{$pkg};
+        }
+        delete $scan->{$dir};
+    }
+    return $scan;
+}
+
 # Print usage information
 sub
 print_usage_info
@@ -135,6 +152,21 @@ print_usage_info
     print "    -h --help                        Show this usage information\n";
     print "    -d --debug                       Turn on debugging\n";
     print "    -v --version                     Show version and copyright\n";
+    print "    -s --scan                        Scan and list packages in repository\n";
+    print "    -a --add                         Add package(s) to one or more repos\n";
+    print "    -r --remove --rm                 Remove package(s) from one or more repos\n";
+    print "    -c --compare                     Compare repos\n";
+    print "    -m --merge                       Merge packages from one repo into others\n";
+    print "    -C --closure                     Verify repository dependency closure\n";
+    print "       --newest                      Select only the newest version of each package\n";
+    print "       --oldest                      Select only the oldest version of each package\n";
+    print "       --old                         Select only outdated packages\n";
+    print "    -i --interactive                 Prompt before taking action\n";
+    print "    -t --test                        Test only; do not take action\n";
+    print "    -S --scm                         Use Mezzanine SCM commands to add/remove\n";
+    print "       --span                        Treat all repositories as one\n";
+    print "    -D --directories --dirs <dirs>   Directories to use as repositories\n";
+    #print "    -M --metadata <type>             Metadata type to generate\n";
     #print "                                     \n";
     print "       --savecfg                     Preserve current settings for future use\n";
     print "\n";
@@ -160,14 +192,14 @@ main
 
     $err = 0;
     &mezz_init("pkgrepotool", "1.0", "help|h", "version|v", "debug|d!", "savecfg|save-config!",
-               "scan|s", "closure|C", "add|a", "remove|r", "compare|c", "merge|m",
-               "newest", "old", "oldest", "interactive|i!", "test|t!",
+               "scan|s", "closure|C", "add|a", "remove|rm|r", "compare|c", "merge|m",
+               "newest", "old", "oldest", "interactive|i!", "test|t!", "scm|S!", "span!",
                "dirs|directories|D=s@", "metadata|M=s@");
 
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.2 $ created on $Date: 2007/02/28 00:53:48 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.3 $ created on $Date: 2007/02/28 19:22:20 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || (!scalar(@ARGV) && !scalar(%OPTION) && &basename($0) !~ /^mz/)) {
         &print_usage_info();
     }
@@ -176,11 +208,15 @@ main
         $OPTION{"savecfg"} = 1;
     }
 
-    if (defined($OPTION{"debug"}) && !($OPTION{"debug"})) {
-        &debug_set($config->set("DEBUG", 0));
-    } else {
-        &debug_set($config->set("DEBUG", $OPTION{"debug"} || $config->get("DEBUG") || 0));
-    }
+    # Set config based on options
+    &debug_set(&bool_config_opt($config, "DEBUG", "debug"));
+    &bool_config_opt($config, "NEWEST", "newest");
+    &bool_config_opt($config, "OLDEST", "oldest");
+    &bool_config_opt($config, "OLD", "old");
+    &bool_config_opt($config, "INTERACTIVE", "interactive");
+    &bool_config_opt($config, "TEST", "test");
+    &bool_config_opt($config, "SCM", "scm");
+    &bool_config_opt($config, "SPAN", "span");
 
     if (($0 =~ /scan$/) || ($OPTION{"scan"})) {
         $mode = "scan";
@@ -198,11 +234,13 @@ main
         &fatal_error("Nothing to do!\n");
     }
 
+    # Get directory list from config, options, or command line.
     @dirlist = split(':', $config->get("DIRS"));
     if ($OPTION{"dirs"} && ref($OPTION{"dirs"}) && (ref($OPTION{"dirs"}) eq "ARRAY")) {
         @dirlist = @{$OPTION{"dirs"}};
     } elsif (scalar(@ARGV)) {
-        @dirlist = @ARGV;
+        @dirlist = grep { -d $_ } @ARGV;
+        @ARGV = grep { ! -d $_ } @ARGV;
     }
     $config->set("DIRS", join(':', @dirlist));
     dprint "Using directory list:  ", join(', ', @dirlist), "\n";
@@ -214,12 +252,16 @@ main
 
     if ($mode =~ /^(scan|closure|compare|merge)$/) {
         $scan = &rpm_scan_files(@dirlist);
+        if ($config->get("SPAN")) {
+            &span_dirs($scan);
+        }
+        if ($OPTION{"old"}) {
+            &filter_old($scan);
+        }
         if ($OPTION{"newest"}) {
             &filter_newest($scan);
         } elsif ($OPTION{"oldest"}) {
             &filter_oldest($scan);
-        } elsif ($OPTION{"old"}) {
-            &filter_old($scan);
         }
     }
 

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.46 2007/02/28 00:53:48 mej Exp $
+# $Id: RPM.pm,v 1.47 2007/02/28 19:22:20 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -32,6 +32,8 @@ BEGIN {
     use Exporter   ();
     #use POSIX ('&geteuid');
     use File::Find;
+    use File::Listing 'parse_dir';
+    use IPC::Open3;
     use Mezzanine::Util;
     use Mezzanine::PkgVars;
     use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
@@ -62,6 +64,8 @@ $specdata = undef;
 # Constants
 
 ### Initialize private global variables
+my $RPMVERCMP_IN = undef;
+my $RPMVERCMP_OUT = undef;
 
 ### Function prototypes
 sub rpm_form_command($);
@@ -84,6 +88,12 @@ sub parse_deps($);
 
 ### Module cleanup
 END {
+    if ($RPMVERCMP_IN) {
+        close($RPMVERCMP_IN);
+    }
+    if ($RPMVERCMP_OUT) {
+        close($RPMVERCMP_OUT);
+    }
 }
 
 ### Function definitions
@@ -646,6 +656,50 @@ rpm_compare_versions($$)
 {
     my ($v1, $v2) = @_;
 
+    # First, see if we have a pipe to clu or can make one.
+    if (!defined($RPMVERCMP_IN)) {
+        if (open3($RPMVERCMP_OUT, $RPMVERCMP_IN, 0, "clu cmp")) {
+            $SIG{"PIPE"} = sub { close($RPMVERCMP_IN); close($RPMVERCMP_OUT); $RPMVERCMP_IN = $RPMVERCMP_OUT = 0; };
+            select $RPMVERCMP_IN; $| = 1;
+            select $RPMVERCMP_OUT; $| = 1;
+            select STDOUT;
+            dprint "Started CLU process to do version comparisons.\n";
+        } else {
+            $RPMVERCMP_IN = $RPMVERCMP_OUT = 0;
+            dprint "Unable to start CLU process to do version comparisons -- $!.\n";
+        }
+    }
+
+    if ($RPMVERCMP_OUT) {
+        my $line;
+
+        # Write versions to be compared to CLU pipe.  Read back result.
+        print $RPMVERCMP_OUT "$v1 $v2\n";
+        if ($RPMVERCMP_IN) {
+            $line = <$RPMVERCMP_IN>;
+            if ($line && $RPMVERCMP_IN) {
+                chomp($line);
+                if ($line =~ /^$v1 (.) $v2$/) {
+                    my $result = $1;
+
+                    return (($result eq '=') ? (0) : (($result eq '<') ? (-1) : (1)));
+                } elsif (($line =~ /^open3:/) || ($line =~ /warning/i) || ($line =~ /error/i)) {
+                    close($RPMVERCMP_IN); close($RPMVERCMP_OUT);
+                    $RPMVERCMP_IN = $RPMVERCMP_OUT = 0;
+                    dprint "Detected open3() failure:  $line\n";
+                } else {
+                    dprint "Unrecognized output from CLU pipe:  $line\n";
+                }
+            } else {
+                dprint "Failed to read from CLU pipe.\n";
+            }
+        } else {
+            dprint "CLU pipe file descriptor closed unexpectedly.  Command failed?\n";
+        }
+        # If we get here, we failed.  Fall back on the perl-only method below.
+        dprint "Version comparison via CLU/librpm failed.\n";
+    }
+
     # Downcase everything right off the bat.
     $v1 =~ tr/[A-Z]/[a-z]/;
     $v2 =~ tr/[A-Z]/[a-z]/;
@@ -665,7 +719,7 @@ rpm_compare_versions($$)
 
             if ($s1 ne $s2) {
                 # Two arbitrary strings that differ.  Compare those normally.
-                return ($s1 <=> $s2);
+                return ($s1 cmp $s2);
             }
         } elsif (($v1 =~ /^\d+/) && ($v2 =~ /^\d+/)) {
             # Copy the initial alphanumeric portion of each version number
@@ -738,7 +792,42 @@ rpm_scan_files(@)
         my @rpm_files;
 
         dprint "Scanning $dir for RPM files.\n";
-        @rpm_files = &grepdir(sub { /\.(?:\w+)\.rpm$/ }, $dir);
+        if (-d $dir) {
+            @rpm_files = &grepdir(sub { /\.(?:\w+)\.rpm$/ }, $dir);
+        } elsif ($dir =~ m!^(http|ftp)://!) {
+            my $contents;
+
+            dprint "Detected URL:  $dir\n";
+            if (substr($dir, -1, 1) ne '/') {
+                $dir .= '/';
+            }
+            $contents = &fetch_url($dir, "mem", "Accept" => "text/html", ":no_progress" => 1);
+            if ($contents) {
+                #dprint "Got listing:  +++$contents+++\n\n";
+                if ($contents =~ /<\s*title/i) {
+                    # HTML-based listing
+                    while ($contents =~ m/<\s*a\s+[^>]*href=[\"\']?([^\"\'>]+\.rpm)/ig) {
+                        my $file = $1;
+
+                        dprint "Matched file:  $file\n";
+                        push @rpm_files, $dir . &basename($file);
+                    }
+                } elsif ($contents =~ /^.[-rwx]{3,9}\s+/) {
+                    # FTP directory listing; try to parse.  FIXME:  Doesn't work?
+                    foreach my $file (map { join(':', @_) } &parse_dir($contents)) {
+                        dprint "Matched file:  $file\n";
+                        push @rpm_files, $dir . &basename($file);
+                    }
+                } else {
+                    eprint "Unable to parse directory listing returned for $dir.\n";
+                    dprint "{{{\n$contents\n}}}\n\n";
+                    next;
+                }
+            } else {
+                eprint "Unable to get directory listing for $dir.\n";
+                next;
+            }
+        }
         foreach my $file (sort(@rpm_files)) {  # Sort only for debugging.
             my %pkg;
 
@@ -746,6 +835,7 @@ rpm_scan_files(@)
             $pkg{"PATH"} = $file;
             $pkg{"ORIGIN"} = &dirname($file);
             @pkg{("NAME", "VERSION", "RELEASE", "ARCH")} = &parse_rpm_name($file);
+            dprint "$pkg{ORIGIN}:  $pkg{NAME}:$pkg{VERSION}-$pkg{RELEASE}.$pkg{ARCH}\n";
             $scan->{$dir}{$file} = \%pkg;
         }
     }

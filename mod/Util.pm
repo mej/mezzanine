@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.68 2007/02/27 21:29:36 mej Exp $
+# $Id: Util.pm,v 1.69 2007/02/28 19:22:20 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -46,23 +46,23 @@ BEGIN {
     @ISA         = ('Exporter');
 
     @EXPORT = ('$debug', '$PROGNAME', '$VERSION', '$mz_uid',
-               '$mz_gid', '%OPTION', '&mezz_init', '&debug_get',
-               '&debug_set', '&print_version', '&file_user',
-               '&file_group', '&file_owner', '&get_timestamp',
-               '&fatal_error', '&dprintf', '&dprint', '&eprintf',
-               '&eprint', '&wprintf', '&wprint', '&handle_signal',
-               '&handle_fatal_signal', '&install_signal_handlers',
-               '&handle_warning', '&show_backtrace', '&print_args',
-               '&untaint', '&is_tainted', '&examine_object',
-               '&int_to_bytes', '&mkdirhier', '&nuke_tree',
-               '&move_files', '&copy_files', '&copy_tree',
-               '&get_temp_dir', '&create_temp_space',
-               '&clean_temp_space', '&basename', '&dirname',
-               '&grepdir', '&limit_files', '&str_trim', '&xpush',
-               '&cat_file', '&parse_rpm_name', '&find_spec_file',
-               '&should_ignore', '&trunc_file', '&touch_file',
-               '&newest_file', '&checksum_file', '&run_cmd',
-               '&run_mz_cmd', '&fetch_url', '&post_file',
+               '$mz_gid', '%OPTION', '&mezz_init', '&bool_config_opt',
+               '&debug_get', '&debug_set', '&print_version',
+               '&file_user', '&file_group', '&file_owner',
+               '&get_timestamp', '&fatal_error', '&dprintf',
+               '&dprint', '&eprintf', '&eprint', '&wprintf',
+               '&wprint', '&handle_signal', '&handle_fatal_signal',
+               '&install_signal_handlers', '&handle_warning',
+               '&show_backtrace', '&print_args', '&untaint',
+               '&is_tainted', '&examine_object', '&int_to_bytes',
+               '&mkdirhier', '&nuke_tree', '&move_files',
+               '&copy_files', '&copy_tree', '&get_temp_dir',
+               '&create_temp_space', '&clean_temp_space', '&basename',
+               '&dirname', '&grepdir', '&limit_files', '&str_trim',
+               '&xpush', '&cat_file', '&parse_rpm_name',
+               '&find_spec_file', '&should_ignore', '&trunc_file',
+               '&touch_file', '&newest_file', '&checksum_file',
+               '&run_cmd', '&run_mz_cmd', '&fetch_url', '&post_file',
                '&MEZZANINE_SUCCESS', '&MEZZANINE_FATAL_ERROR',
                '&MEZZANINE_SYNTAX_ERROR', '&MEZZANINE_SYSTEM_ERROR',
                '&MEZZANINE_COMMAND_FAILED', '&MEZZANINE_DUPLICATE',
@@ -106,6 +106,7 @@ my $CMD_TIMEOUT = 0;
 
 ### Function prototypes
 sub mezz_init($$@);
+sub bool_config_opt($$$$);
 sub debug_get();
 sub debug_set($);
 sub print_version($$$$);
@@ -237,6 +238,24 @@ mezz_init($$@)
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(\%OPTION, @valid_opts);
     return %OPTION;
+}
+
+# Convenience function for handling a boolean config variable with a command-line option.
+sub
+bool_config_opt($$$$)
+{
+    my ($config, $cfgname, $optname, $default) = @_;
+
+    if (!defined($default)) {
+        $default = 0;
+    }
+    if (defined($OPTION{$optname})) {
+        return $config->set($cfgname, $OPTION{$optname});
+    } elsif (defined($config->get($cfgname))) {
+        return $config->get($cfgname);
+    } else {
+        return $config->set($cfgname, $default);
+    }
 }
 
 # Get debugging state
@@ -1375,14 +1394,24 @@ run_mz_cmd($$$)
 sub
 fetch_url($)
 {
-    my ($url, $dest) = @_;
+    my $url = shift;
+    my $dest = shift;
+    my @headers = @_;
+    my %headers;
     my ($uri, $user_agent, $response, $coderef, $filehandle);
+
+    if (scalar(@headers) % 2) {
+        pop @headers;
+    }
+    %headers = @headers;
 
     # Local anonymous subroutine to handle chunks of data as they come in.
     $coderef = sub {
         my ($data_chunk, $response, $protocol) = @_;
 
-        print '.';
+        if (! $headers{":no_progress"}) {
+            print '.';
+        }
         if (! $filehandle) {
             dprintf("Response was:  %s\n", $response->status_line());
 
@@ -1397,13 +1426,21 @@ fetch_url($)
             if (! $dest) {
                 $dest = &basename($uri->path());
             }
-            if (!open($filehandle, ">$dest")) {
+            if ($dest eq "mem") {
+                # If dest is set to 'mem', $filehandle is actually a string
+                # buffer containing the content returned by the request.
+                $filehandle = "";
+            } elsif (!open($filehandle, ">$dest")) {
                 die("Unable to write to $dest -- $!");
             }
         }
 
         #dprintf("Writing %d bytes to %s\n", length($data_chunk), $dest);
-        print $filehandle $data_chunk;
+        if ($dest eq "mem") {
+            $filehandle .= $data_chunk;
+        } else {
+            print $filehandle $data_chunk;
+        }
     };
 
     # Create a URI object from the URL given.
@@ -1420,7 +1457,7 @@ fetch_url($)
     }
 
     dprint "Calling useragent GET method on $url\n";
-    $response = $user_agent->get($url, ":content_cb" => $coderef);
+    $response = $user_agent->get($url, ":content_cb" => $coderef, @headers);
     dprint "Back from GET.\n";
     dprintf("Response was:  %s\n", $response->status_line());
 
@@ -1431,7 +1468,7 @@ fetch_url($)
         return $response->status_line();
     }
 
-    if ($filehandle) {
+    if ($filehandle && ($dest ne "mem")) {
         close($filehandle);
     }
     
@@ -1441,8 +1478,11 @@ fetch_url($)
         }
         return $response->header("X-Die");
     }
-    print "done.\n";
-    return $dest;
+
+    if (! $headers{":no_progress"}) {
+        print "done.\n";
+    }
+    return (($dest eq "mem") ? ($filehandle) : ($dest));
 }
 
 sub

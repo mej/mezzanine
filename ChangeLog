@@ -985,3 +985,14 @@ Tue Feb 27 19:54:19 2007                        Michael Jennings (mej)
 
 More repo tool work.
 ----------------------------------------------------------------------
+Wed Feb 28 14:18:18 2007                        Michael Jennings (mej)
+
+pkgrepotool can now:
+ - Scan local repositories, FTP, or HTTP
+ - Find old, oldest, or newest packages, even across repositories
+ - Spawn a pipe to CLU for version comparisons, falling back on
+   built-in comparison routine if CLU is missing
+
+Added support for extra headers to &fetch_url() along with progress
+output suppression.
+----------------------------------------------------------------------
