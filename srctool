@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.63 2007/02/27 21:29:36 mej Exp $
+# $Id: srctool,v 1.64 2007/03/08 23:02:31 mej Exp $
 #
 
 use strict;
@@ -539,7 +539,7 @@ merge_file($$)
         ($type, $new_file) = ($2, $1);
     } elsif ($new_file =~ /\.(patch|diff)(\.gz|\.bz2|\.Z)?$/) {
         $type = 'P';
-    } elsif ($new_file =~ /\.(cpio|tar|cgz|tgz)(\.gz|\.bz2|\.Z)?$/) {
+    } elsif ($new_file =~ /\.(cpio|tar|cgz|tgz)(\.gz|\.bz2|\.Z)?(\.sig|\.asc)?$/) {
         $type = 'S';
     } elsif ($new_file =~ /\.spec(\.in)?$/) {
         $type = 'F';
@@ -549,6 +549,7 @@ merge_file($$)
         $type = 'E';
     } else {
         if (-t STDIN) {
+            $type = '';
             print "Please specify whether $new_file is a (S)ource file, (P)atch, spec (F)ile, or an (E)xtra file ";
             for (; $type !~ /^[SPFE]$/; ) {
                 print "[S/P/F/E]:  ";
@@ -833,7 +834,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.63 $ created on $Date: 2007/02/27 21:29:36 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.64 $ created on $Date: 2007/03/08 23:02:31 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();

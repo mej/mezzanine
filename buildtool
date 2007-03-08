@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.209 2007/03/08 18:21:32 mej Exp $
+# $Id: buildtool,v 1.210 2007/03/08 23:02:31 mej Exp $
 #
 
 use strict;
@@ -767,6 +767,9 @@ parallel_build
     my (@children, @vars);
     my %child_pkg;
 
+    # Make sure RPM doesn't try to parallelize itself.
+    $ENV{"RPM_BUILD_NCPUS"} = "1";
+
     # Create the directories for building this product
     if ($buildtree_layout eq "orc") {
         $builddir = $ENV{"MEZZANINE_BUILDDIR"};
@@ -1082,7 +1085,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.209 $ created on $Date: 2007/03/08 18:21:32 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.210 $ created on $Date: 2007/03/08 23:02:31 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();

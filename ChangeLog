@@ -1000,3 +1000,12 @@ Thu Mar  8 13:21:42 2007                        Michael Jennings (mej)
 
 Add debugging to SRPM timestamp check.
 ----------------------------------------------------------------------
+Thu Mar  8 18:01:11 2007                        Michael Jennings (mej)
+
+Set $RPM_BUILD_NCPUS so RPM doesn't parallelize itself.
+
+Treat .sig and .asc files as sources automatically.
+
+Don't forceably exclude /proc when copying buildroots; if it's there
+in the pristine original, there's probably a reason.
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: perlpkg,v 1.6 2007/02/27 21:29:36 mej Exp $
+# $Id: perlpkg,v 1.7 2007/03/08 23:02:31 mej Exp $
 #
 
 use strict;
@@ -370,7 +370,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.6 $ created on $Date: 2007/02/27 21:29:36 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.7 $ created on $Date: 2007/03/08 23:02:31 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -421,7 +421,7 @@ main
         local *RPMQA;
 
         $handle_build_deps = 0;
-        if (open(RPMQA, "rpm -qa |")) {
+        if (open(RPMQA, "rpm -qa --qf \"\%{name}-\%{version}-\%{release}\" \"name=perl*\" |")) {
             my $line;
 
             while ($line = <RPMQA>) {

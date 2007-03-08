@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.52 2007/02/27 21:29:36 mej Exp $
+# $Id: Build.pm,v 1.53 2007/03/08 23:02:31 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -157,10 +157,10 @@ set_instroot_info($$$$$)
             $instroot_src .= '/';
         }
         if (! $instroot_init) {
-            $instroot_init = "rsync -Ha --delete --delete-after --exclude=/proc $instroot_src";
+            $instroot_init = "rsync -Ha --delete --delete-after $instroot_src";
         }
         if (! $instroot_reset) {
-            $instroot_reset = "rsync -Ha --delete --delete-after --exclude=/proc $instroot_src";
+            $instroot_reset = "rsync -Ha --delete --delete-after $instroot_src";
         }
         if (! $instroot_copy) {
             $instroot_copy = "rsync -Ha --delete --delete-after";
