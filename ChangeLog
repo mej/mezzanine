@@ -996,3 +996,7 @@ pkgrepotool can now:
 Added support for extra headers to &fetch_url() along with progress
 output suppression.
 ----------------------------------------------------------------------
+Thu Mar  8 13:21:42 2007                        Michael Jennings (mej)
+
+Add debugging to SRPM timestamp check.
+----------------------------------------------------------------------

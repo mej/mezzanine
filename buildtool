@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.208 2007/02/27 21:29:36 mej Exp $
+# $Id: buildtool,v 1.209 2007/03/08 18:21:32 mej Exp $
 #
 
 use strict;
@@ -188,13 +188,14 @@ is_build_needed
     my @stat1;
     my @srpm_matches;
 
+    dprint &print_args(@_);
     if ($config->get("REBUILD")) {
         dprint "Rebuild forced by configuration.\n";
         return 1;
     } else {
-        foreach my $key ($config->keys()) {
-            dprintf("Got config key %s with value %s.\n", $key, $config->get($key));
-        }
+        #foreach my $key ($config->keys()) {
+        #    dprintf("Got config key %s with value %s.\n", $key, $config->get($key));
+        #}
     }
 
     $pkg = &pkgvar_name();
@@ -212,6 +213,10 @@ is_build_needed
     # If the file/module does not exist, we definitely need to build it.
     if (! -e $pkgfile) {
         dprint "Doh!  $pkgfile doesn't exist.  It must be built.\n";
+    } elsif (-s $pkgfile) {
+        @stat1 = stat($pkgfile);
+        dprintf("$pkgfile is a file.  Using its timestamp data:  %s\n",
+                POSIX::strftime("%Y-%m-%d %H:%M:%S", localtime($stat1[9])));
     } else {
         my $which_one;
 
@@ -227,17 +232,20 @@ is_build_needed
     $srpm_dir = &pkgvar_topdir() . "/SRPMS";
     if (! -d $srpm_dir) {
         dprint "SRPM directory $srpm_dir does not exist.\n";
-        dprint "Listing:  " . `/bin/ls -Fla $srpm_dir/../` . "\n\n----\n";
+        $srpm_dir = &pkgvar_topdir();
+        dprint "Listing:  " . `/bin/ls -Fla $srpm_dir` . "\n\n----\n";
         return 1;
     }
 
     # For each SRPM that matches the package name, see if it's newer than the directory.
     # If so, we do not need to build that package.
+    dprint "Looking for files matching $pkg.(no)src.rpm in $srpm_dir.\n";
     if ($pkgs->{$pkg}{"TYPE"} =~ /^s?rpm$/) {
         @srpm_matches = &grepdir(sub {&basename($_) =~ /^\Q$pkg\E\.(no)?src\.rpm$/}, $srpm_dir);
     } else {
         @srpm_matches = &grepdir(sub {&basename($_) =~ /^\Q$pkg\E-[^-]+-[^-]+\.(no)?src\.rpm$/}, $srpm_dir);
     }
+    dprintf("Got %d matches.\n", scalar(@srpm_matches));
 
     foreach my $srpm (@srpm_matches) {
         my @stat2;
@@ -1074,7 +1082,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.208 $ created on $Date: 2007/02/27 21:29:36 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.209 $ created on $Date: 2007/03/08 18:21:32 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
