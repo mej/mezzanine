@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.210 2007/03/08 23:02:31 mej Exp $
+# $Id: buildtool,v 1.211 2007/03/08 23:25:43 mej Exp $
 #
 
 use strict;
@@ -70,7 +70,7 @@ my @config_vars = ("DEBUG", "VERBOSITY", "TARGET", "BUILDTREE_LAYOUT",
                    "INSTROOT_RESET", "INSTROOT_SOURCE_RSYNC",
                    "BUILDROOT", "TMPDIR", "MAKE", "MFLAGS", "CFLAGS",
                    "PATH", "RETRY", "REBUILD", "PRODUCTS", "LOGDIR",
-                   "ALLOW_EPOCH");
+                   "ALLOW_EPOCH", "LAMEBRAIN");
 
 # Print usage information
 sub
@@ -115,6 +115,7 @@ print_usage_info
     print "       --rebuild                     Rebuild previously successful packages for verification\n";
     print "       --clean                       Clean up RPM and buildroot directories when done\n";
     print "       --allow-epoch                 Allow Epoch in spec file (prepend \"no\" to disallow)\n";
+    print "       --lamebrain <spec>            Enable one or more lamebrain work-arounds\n";
     print "       --savecfg                     Preserve current settings for future use\n";
     print "\n";
     exit(MEZZANINE_SUCCESS);
@@ -1076,16 +1077,16 @@ main
                "prod|p|prodfile|product=s", "dir|D|tree=s", "log|l=s",
                "parallel|P:s", "target|t=s", "cflags|C=s", "tag|T=s",
                "nocache", "clean:s", "repuser|U=s", "location|L=s",
-               "instroot|i|jail=s", "hints|H=s",
+               "instroot|i|jail=s", "hints|H=s", "lamebrain=s@",
                "depinstaller|dep-installer|hint-installer|hi|di=s",
                "instroot-src|is=s", "instroot-init|ii=s",
                "instroot-reset|ir=s", "instroot-copy|ic=s",
-               "user|u=s", "buildtree|b=s", "builddir=s", "retry",
-               "rebuild", "allow-epoch!", "savecfg!");
+               "user|u=s", "buildtree|b=s", "builddir=s", "args|A=s@",
+               "retry", "rebuild", "allow-epoch!", "savecfg!");
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.210 $ created on $Date: 2007/03/08 23:02:31 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.211 $ created on $Date: 2007/03/08 23:25:43 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
@@ -1098,11 +1099,8 @@ main
     }
 
     # Set basic options
-    if (defined($OPTION{"debug"}) && !($OPTION{"debug"})) {
-        &debug_set($config->set("DEBUG", 0));
-    } else {
-        &debug_set($config->set("DEBUG", $OPTION{"debug"} || $config->get("DEBUG") || 0));
-    }
+    &debug_set(&bool_config_opt($config, "DEBUG", "debug", 0));
+
     $verbosity = $config->get("VERBOSITY") || 2;
     if ($OPTION{"silent"}) {
         $verbosity = 0;
@@ -1112,7 +1110,7 @@ main
     $config->set("VERBOSITY", $verbosity);
 
     # Open log file, if any.
-    $config->set("LOGFILE", $OPTION{"log"} || $config->get("LOGFILE") || "");
+    &bool_config_opt($config, "LOGFILE", "log", "");
     if ($config->get("LOGFILE")) {
         my $log_filename = $config->get("LOGFILE");
 
@@ -1137,16 +1135,22 @@ main
     $global_tag = $OPTION{"tag"};
     $buildtree_layout = $config->set("BUILDTREE_LAYOUT", $OPTION{"buildtree"} || $config->get("BUILDTREE_LAYOUT") || "mej");
     $config->set("CLEAN", &pkgvar_cleanup($OPTION{"clean"} || $config->get("CLEAN") || $config->get("BUILDTREE_LAYOUT")));
-    $config->set("TARGET", &pkgvar_target($OPTION{"target"} || $config->get("TARGET") || ""));
-    $config->set("REBUILD", $OPTION{"rebuild"} || $config->get("REBUILD") || 0);
+    &pkgvar_target(&bool_config_opt($config, "TARGET", "target", ""));
+    &bool_config_opt($config, "REBUILD", "rebuild", 0);
 
     # Epoch toggle
-    if (defined($OPTION{"allow-epoch"})) {
-        &pkgvar_set("allow_epoch", $OPTION{"allow-epoch"});
-    } elsif (defined($config->get("ALLOW_EPOCH"))) {
-        &pkgvar_set("allow_epoch", $config->get("ALLOW_EPOCH"));
+    &pkgvar_set("allow_epoch", &bool_config_opt($config, "ALLOW_EPOCH", "allow-epoch", 0));
+
+    # Package build arguments.
+    if ($OPTION{"args"} && (ref($OPTION{"args"}) eq "ARRAY")) {
+        &pkgvar_parameters(join(' ', @{$OPTION{"args"}}));
     }
-    $config->set("ALLOW_EPOCH", &pkgvar_get("allow_epoch"));
+
+    # Requested lame-brain workarounds
+    if ($OPTION{"lamebrain"} && (ref($OPTION{"lamebrain"}) eq "ARRAY")) {
+        $config->set("LAMEBRAIN", join(':', map { uc($_) } @{$OPTION{"lamebrain"}}));
+    }
+    &pkgvar_set("lamebrain", uc($config->get("LAMEBRAIN") || ""));
 
     # SCM stuff.
     $config->set("DEFAULT_SCM", $config->get("DEFAULT_SCM") || "cvs");
@@ -1171,8 +1175,8 @@ main
     }
 
     # Handle hint file/directory specification
-    $config->set("HINTS", $OPTION{"hints"} || $config->get("HINTS") || $ENV{"MEZZANINE_HINTS"} || "");
-    $config->set("DEP_INSTALLER", $OPTION{"depinstaller"} || $config->get("DEP_INSTALLER") || "false");
+    &bool_config_opt($config, "HINTS", "hints", $ENV{"MEZZANINE_HINTS"} || "");
+    &bool_config_opt($config, "DEP_INSTALLER", "depinstaller", "false");
     if ($config->get("HINTS")) {
         if ($config->get("DEP_INSTALLER")) {
             &set_hints_info(sprintf("%s%%%s", $config->get("DEP_INSTALLER"), $config->get("HINTS")));

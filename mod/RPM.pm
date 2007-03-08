@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.47 2007/02/28 19:22:20 mej Exp $
+# $Id: RPM.pm,v 1.48 2007/03/08 23:25:43 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -230,11 +230,13 @@ parse_spec_file
     $contents = join("", @specfile_lines);
     $contents = &untaint(\$contents, qr/^(.*)$/s);  # Anything goes; no risk here.
 
-    dprint "Attempting to launch rpm --eval to parse spec file contents.\n";
+    dprint "Attempting to launch helper to parse spec file contents.\n";
     $pid = open(SPECFILE, "-|");
     if (!defined($pid)) {
         wprint "Unable to pre-process spec file $specfile -- $!\n";
     } elsif ($pid == 0) {
+        exec("clu", "eval", $contents);
+        wprint "Unable to exec clu -- $!.  Trying rpm.\n";
         exec("/bin/rpm", "--eval", $contents);
         &fatal_error("Unable to exec /bin/rpm -- $!\n");
     } else {
@@ -249,7 +251,7 @@ parse_spec_file
         #}
         @tmp = <SPECFILE>;
         close(SPECFILE);
-        dprintf("Got %d lines back from rpm --eval.\n", scalar(@tmp));
+        dprintf("Got %d lines back from helper.\n", scalar(@tmp));
         if (scalar(@tmp) > 10) {
             @specfile_lines = @tmp;
         } else {
@@ -265,6 +267,9 @@ parse_spec_file
         chomp($line);
         if ($line =~ /^(\s*\#\s*BuildSuggests:)/) {
             $line =~ s/$1/BuildRequires:/;
+        } elsif ($line =~ /(unable to exec \S+ -- .*)$/i) {
+            wprint "$1\n";
+            next;
         } elsif ($line =~ /^\s*\#/ || $line =~ /^\s*$/) {
             next;
         }

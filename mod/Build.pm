@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.53 2007/03/08 23:02:31 mej Exp $
+# $Id: Build.pm,v 1.54 2007/03/08 23:25:43 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -650,7 +650,7 @@ build_spm
         &parse_spec_file();
 
         if ($specdata) {
-            if (!&pkgvar_get("allow_epoch") && exists($specdata->{"HEADER"}{"epoch"})) {
+            if (!&pkgvar_get("allow_epoch") && exists($specdata->{"HEADER"}{"epoch"}) && $specdata->{"HEADER"}{"epoch"}) {
                 my $str;
 
                 $str = sprintf("Epoch %s not allowed", $specdata->{"HEADER"}{"epoch"});
@@ -723,7 +723,7 @@ build_pdr
     }
 
     if ($specdata) {
-        if (!&pkgvar_get("allow_epoch") && exists($specdata->{"HEADER"}{"epoch"})) {
+        if (!&pkgvar_get("allow_epoch") && exists($specdata->{"HEADER"}{"epoch"}) && $specdata->{"HEADER"}{"epoch"}) {
             my $str;
 
             $str = sprintf("Epoch %s not allowed", $specdata->{"HEADER"}{"epoch"});
@@ -879,7 +879,7 @@ build_fst
     } else {
         &parse_spec_file();
         if ($specdata) {
-            if (!&pkgvar_get("allow_epoch") && exists($specdata->{"HEADER"}{"epoch"})) {
+            if (!&pkgvar_get("allow_epoch") && exists($specdata->{"HEADER"}{"epoch"}) && $specdata->{"HEADER"}{"epoch"}) {
                 my $str;
 
                 $str = sprintf("Epoch %s not allowed", $specdata->{"HEADER"}{"epoch"});
@@ -970,7 +970,7 @@ build_srpm
     &pkgvar_instructions("$instroot$topdir/SPECS/$specs[0]");
     &parse_spec_file();
     if ($specdata) {
-        if (!&pkgvar_get("allow_epoch") && exists($specdata->{"HEADER"}{"epoch"})) {
+        if (!&pkgvar_get("allow_epoch") && exists($specdata->{"HEADER"}{"epoch"}) && $specdata->{"HEADER"}{"epoch"}) {
             my $str;
 
             $str = sprintf("Epoch %s not allowed", $specdata->{"HEADER"}{"epoch"});
@@ -986,6 +986,37 @@ build_srpm
             }
         } else {
             dprint "No build deps?\n";
+        }
+
+        # Lame-brain workaround AUTODIST -- Compensate for RH stupidity
+        # by automatically defining %{dist} in packages where needed.
+        if (&pkgvar_get("lamebrain") =~ /\bAUTODIST\b/) {
+            my ($file_rel, $spec_rel);
+            my @tmp;
+
+            dprint "LAMEBRAIN:  Checking $pkg for AUTODIST workaround.\n";
+            @tmp = &parse_rpm_name(&pkgvar_filename());
+            if (scalar(@tmp) == 4) {
+                $file_rel = $tmp[2];
+            }
+            $spec_rel = $specdata->{"HEADER"}{"release"};
+            dprint "Filename release value \"$file_rel\" vs. spec file release \"$spec_rel\".\n";
+            if ($file_rel =~ /^$spec_rel(.+)$/) {
+                my $dist = $1;
+                my $args = &pkgvar_parameters();
+
+                dprint "AUTODIST LAMEBRAIN workaround enabled:  %{dist} == \"$dist\"\n";
+                if ($args) {
+                    $args =~ s/--define \'dist \S+\'//g;
+                    $args .= "--define 'dist $dist'";
+                    $args = &str_trim($args);
+                } else {
+                    $args = "--define 'dist $dist'";
+                }
+                &pkgvar_parameters($args);
+            } else {
+                dprint "AUTODIST LAMEBRAIN workaround not required.\n";
+            }
         }
     }
 

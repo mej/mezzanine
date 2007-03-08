@@ -1009,3 +1009,11 @@ Treat .sig and .asc files as sources automatically.
 Don't forceably exclude /proc when copying buildroots; if it's there
 in the pristine original, there's probably a reason.
 ----------------------------------------------------------------------
+Thu Mar  8 18:24:59 2007                        Michael Jennings (mej)
+
+Enable use of "clu eval" as a spec file helper in addition to "rpm
+--eval" as it contains workarounds for the macro expansion buffer size
+limit.
+
+Always allow an epoch of 0.
+----------------------------------------------------------------------
