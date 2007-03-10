@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.54 2007/03/08 23:25:43 mej Exp $
+# $Id: Build.pm,v 1.55 2007/03/10 20:36:51 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -596,18 +596,33 @@ build_debs_from_topdir
 sub
 build_topdir
 {
+    my @ret = ();
+    my $proc_path = "";
+
     dprint &print_args(@_);
 
+    if (&pkgvar_get("lamebrain") =~ /\bNEEDPROC\b/) {
+        dprint "NEEDPROC LAMEBRAIN workaround enabled.\n";
+        $proc_path = &pkgvar_instroot() . "/proc";
+        system("mount", "-t", "proc", "proc", $proc_path);
+        if ($?) {
+            wprintf("LAMEBRAIN:  mount of /proc on $proc_path failed -- %s\n",
+                    (($? == -1) ? ("exec() failed")
+                     : (($? & 127) ? ("signal " . ($? & 127)) : ($? >> 8))));
+            $proc_path = "";
+        } else {
+            dprint "LAMEBRAIN:  /proc mounted on $proc_path.\n";
+        }
+    }
     if (&pkgvar_target() eq "rpms") {
-        return &build_rpms_from_topdir();
+        @ret = &build_rpms_from_topdir();
     } elsif (&pkgvar_target() eq "debs") {
-        return &build_debs_from_topdir();
+        @ret = &build_debs_from_topdir();
     } else {
         my ($err, $msg, $outfiles);
 
         &pkgvar_target("rpms");
-        ($err, $msg, $outfiles) = &build_rpms_from_topdir();
-        return ($err, $msg, $outfiles);
+        @ret = &build_rpms_from_topdir();
 
         # FIXME:  Use this when we actually support DEB's as a target.
         #
@@ -617,6 +632,17 @@ build_topdir
         #&pkgvar_target("debs");
         #return &build_debs_from_topdir();
     }
+    if ($proc_path) {
+        system("umount", $proc_path);
+        if ($?) {
+            wprintf("LAMEBRAIN:  unmount of /proc from $proc_path failed -- %s\n",
+                    (($? == -1) ? ("exec() failed")
+                     : (($? & 127) ? ("signal " . ($? & 127)) : ($? >> 8))));
+        } else {
+            dprint "LAMEBRAIN:  /proc unmounted from $proc_path.\n";
+        }
+    }
+    return @ret;
 }
 
 # This function knows how to build packages from Source Package Modules (SPM's).  It
