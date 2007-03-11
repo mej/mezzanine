@@ -1021,3 +1021,8 @@ Sat Mar 10 15:36:46 2007                        Michael Jennings (mej)
 
 Add /proc workaround.
 ----------------------------------------------------------------------
+Sun Mar 11 15:04:13 2007                        Michael Jennings (mej)
+
+Refactored /proc workaround to automatically detect whether or not
+/proc is mounted already and act accordingly.
+----------------------------------------------------------------------

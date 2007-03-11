@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.55 2007/03/10 20:36:51 mej Exp $
+# $Id: Build.pm,v 1.56 2007/03/11 19:05:52 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -41,7 +41,7 @@ use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
 BEGIN {
     # set the version for version checking
-    $VERSION     = 2.1;
+    $VERSION     = 2.2;
 
     @ISA         = ('Exporter');
 
@@ -602,16 +602,29 @@ build_topdir
     dprint &print_args(@_);
 
     if (&pkgvar_get("lamebrain") =~ /\bNEEDPROC\b/) {
+        my @stat_info;
+        my $dev_num;
+
         dprint "NEEDPROC LAMEBRAIN workaround enabled.\n";
+        # Compare device numbers for <instroot> and <instroot>/proc
         $proc_path = &pkgvar_instroot() . "/proc";
-        system("mount", "-t", "proc", "proc", $proc_path);
-        if ($?) {
-            wprintf("LAMEBRAIN:  mount of /proc on $proc_path failed -- %s\n",
-                    (($? == -1) ? ("exec() failed")
-                     : (($? & 127) ? ("signal " . ($? & 127)) : ($? >> 8))));
-            $proc_path = "";
+        @stat_info = stat(&dirname($proc_path));
+        $dev_num = $stat_info[0];
+        @stat_info = stat($proc_path);
+        if ($stat_info[0] != $dev_num) {
+            # Device numbers differ.  /proc is already mounted here.
+            dprintf("LAMEBRAIN:  Device numbers for %s (0x%04x) and %s (0x%04x) differ -- /proc already mounted!\n",
+                    &dirname($proc_path), $dev_num, $proc_path, $stat_info[0]);
         } else {
-            dprint "LAMEBRAIN:  /proc mounted on $proc_path.\n";
+            system("mount", "-t", "proc", "proc", $proc_path);
+            if ($?) {
+                wprintf("LAMEBRAIN:  mount of /proc on $proc_path failed -- %s\n",
+                        (($? == -1) ? ("exec() failed")
+                         : (($? & 127) ? ("signal " . ($? & 127)) : ($? >> 8))));
+                $proc_path = "";
+            } else {
+                dprint "LAMEBRAIN:  /proc mounted on $proc_path.\n";
+            }
         }
     }
     if (&pkgvar_target() eq "rpms") {
@@ -633,13 +646,25 @@ build_topdir
         #return &build_debs_from_topdir();
     }
     if ($proc_path) {
-        system("umount", $proc_path);
-        if ($?) {
-            wprintf("LAMEBRAIN:  unmount of /proc from $proc_path failed -- %s\n",
-                    (($? == -1) ? ("exec() failed")
-                     : (($? & 127) ? ("signal " . ($? & 127)) : ($? >> 8))));
+        my @stat_info;
+        my $dev_num;
+
+        @stat_info = stat(&dirname($proc_path));
+        $dev_num = $stat_info[0];
+        @stat_info = stat($proc_path);
+        if ($stat_info[0] == $dev_num) {
+            # Device numbers match.  /proc is not mounted here.
+            dprintf("LAMEBRAIN:  Device numbers for %s (0x%04x) and %s (0x%04x) match -- /proc not mounted!\n",
+                    &dirname($proc_path), $dev_num, $proc_path, $stat_info[0]);
         } else {
-            dprint "LAMEBRAIN:  /proc unmounted from $proc_path.\n";
+            system("umount", $proc_path);
+            if ($?) {
+                wprintf("LAMEBRAIN:  unmount of /proc from $proc_path failed -- %s\n",
+                        (($? == -1) ? ("exec() failed")
+                         : (($? & 127) ? ("signal " . ($? & 127)) : ($? >> 8))));
+            } else {
+                dprint "LAMEBRAIN:  /proc unmounted from $proc_path.\n";
+            }
         }
     }
     return @ret;
