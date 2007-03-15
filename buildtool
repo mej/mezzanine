@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.213 2007/03/15 05:21:22 mej Exp $
+# $Id: buildtool,v 1.214 2007/03/15 06:15:42 mej Exp $
 #
 
 use strict;
@@ -430,6 +430,7 @@ build_single_package
                     if ($pkgs->{$pkg}{"INSTROOT_RESET"} !~ /\b--exclude=\/proc\b/) {
                         $pkgs->{$pkg}{"INSTROOT_RESET"} .= " --exclude=/proc";
                     }
+                }
                 @output = &run_cmd($pkgs->{$pkg}{"INSTROOT_RESET"}, $pkgs->{$pkg}{"INSTROOT"}, "instroot-reset:  ");
                 if ($output[0] != MEZZANINE_SUCCESS) {
                     wprint "Reset of install root failed.\n";
@@ -1108,7 +1109,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.213 $ created on $Date: 2007/03/15 05:21:22 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.214 $ created on $Date: 2007/03/15 06:15:42 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
