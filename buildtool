@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.212 2007/03/11 19:05:51 mej Exp $
+# $Id: buildtool,v 1.213 2007/03/15 05:21:22 mej Exp $
 #
 
 use strict;
@@ -146,6 +146,15 @@ skipped_package
 
     push @completed_pkgs, $pkg;
     nprint "Package build for $pkg was not needed.  (${\(&get_timestamp())})\n";
+}
+
+# What to do if a package doesn't build on this architecture
+sub
+arch_incompat_package
+{
+    my $pkg = $_[0];
+
+    nprint "Package build for $pkg skipped due to architecture mismatch.  (${\(&get_timestamp())})\n";
 }
 
 # What to do if a package fails
@@ -590,6 +599,12 @@ build_package_forked
                     &move_files($logfile, "$logfile.latest");
                     &move_files("$logfile.save", $logfile);
                 }
+            } elsif ($err == MEZZANINE_ARCH_MISMATCH) {
+                if (-e "$logfile.broken") {
+                    &nuke_tree("$logfile.broken");
+                }
+                &move_files($logfile, "$logfile.latest");
+                &move_files("$logfile.save", $logfile);
             } else {
                 dprint "Renaming $logfile to $logfile.broken.\n";
                 &nuke_tree("$logfile.save");
@@ -883,6 +898,8 @@ parallel_build
         # Check to see how it exited
         if ($err == MEZZANINE_BUILD_UNNEEDED) {
             &skipped_package($pkg);
+        } elsif ($err == MEZZANINE_ARCH_MISMATCH) {
+            &arch_incompat_package($pkg);
         } elsif ($err == MEZZANINE_SUCCESS) {
             # Yay! :-)
             $num_built++;
@@ -1019,7 +1036,7 @@ build_product
 sub
 summarize_failures
 {
-    my ($ns, $nf, $nt, $nb, $face, $summary_file);
+    my ($ns, $nf, $nt, $ni, $nb, $face, $summary_file);
     local *SUMMARY;
 
     # $ns is the number of successful packages.  $nf is the number of failures.
@@ -1091,7 +1108,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.212 $ created on $Date: 2007/03/11 19:05:51 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.213 $ created on $Date: 2007/03/15 05:21:22 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();

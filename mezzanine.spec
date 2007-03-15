@@ -1,9 +1,9 @@
-# $Id: mezzanine.spec,v 1.148 2007/02/27 22:46:50 mej Exp $
+# $Id: mezzanine.spec,v 1.149 2007/03/15 05:21:22 mej Exp $
 
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
 Version: 1.9
-Release: 0.13
+Release: 0.14
 License: BSD
 Group: Development/Tools
 URL: http://www.kainx.org/mezzanine/
@@ -44,53 +44,53 @@ building, and releasing software products.
 %define perl_vendorlib %(eval "`perl -V:installsitelib`"; echo $installsitelib)
 %endif
 
-test "x$RPM_BUILD_ROOT" != "x" && rm -rf $RPM_BUILD_ROOT
-mkdir -p $RPM_BUILD_ROOT%{_bindir}
-mkdir -p $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine/templates
-mkdir -p $RPM_BUILD_ROOT%{_mandir}/man1
+test "x$RPM_BUILD_ROOT" != "x" && %{__rm} -rf $RPM_BUILD_ROOT
+%{__mkdir_p} $RPM_BUILD_ROOT%{_bindir}
+%{__mkdir_p} $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine/templates
+%{__mkdir_p} $RPM_BUILD_ROOT%{_mandir}/man1
 
 for i in abiscan *tool pkgsort perlpkg specgen ; do
-    install -m 755 $i $RPM_BUILD_ROOT%{_bindir}/
+    %{__install} -m 755 $i $RPM_BUILD_ROOT%{_bindir}/
 done
 
 for i in templates/* ; do
-    install -m 644 $i $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine/templates/
+    %{__install} -m 644 $i $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine/templates/
 done
 
-(cd mod ; tar -cf - *.pm */*.pm) | (cd $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine ; tar -xf -)
+(cd mod ; %{__tar} -cf - *.pm */*.pm) | (cd $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine ; %{__tar} -xf -)
 
 for i in doc/man/*.1 ; do
-    install -m 644 $i $RPM_BUILD_ROOT%{_mandir}/man1/
+    %{__install} -m 644 $i $RPM_BUILD_ROOT%{_mandir}/man1/
 done
 
 (
     cd $RPM_BUILD_ROOT%{_bindir}
     for i in abi abiscan ; do
-        ln -s abiscan mz$i
+        %{__ln_s} abiscan mz$i
     done
     for i in get co put ci info add new rm purge rtag tag reset login ann annotate blame diff stat status log init ; do
-        ln -s revtool mz$i
+        %{__ln_s} revtool mz$i
         echo ".so revtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/mz$i.1
     done
     for i in import prep merge patch clean sync mv ; do
-        ln -s srctool mz$i
+        %{__ln_s} srctool mz$i
         echo ".so srctool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/mz$i.1
     done
     for i in rpm pkg build inst ; do
-        ln -s pkgtool mz$i
+        %{__ln_s} pkgtool mz$i
         echo ".so pkgtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/mz$i.1
     done
     for i in prod pbuild prodbuild ; do
-        ln -s buildtool mz$i
+        %{__ln_s} buildtool mz$i
         echo ".so buildtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/mz$i.1
     done
     for i in repo repo{scan,closure,compare,comp,diff,add,rm,remove,merge} ; do
-        ln -s pkgrepotool mz$i
+        %{__ln_s} pkgrepotool mz$i
     done
 )
 
 %clean
-test "x$RPM_BUILD_ROOT" != "x" && rm -rf $RPM_BUILD_ROOT
+test "x$RPM_BUILD_ROOT" != "x" && %{__rm} -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-, root, root)

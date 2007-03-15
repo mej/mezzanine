@@ -1026,3 +1026,10 @@ Sun Mar 11 15:04:13 2007                        Michael Jennings (mej)
 Refactored /proc workaround to automatically detect whether or not
 /proc is mounted already and act accordingly.
 ----------------------------------------------------------------------
+Thu Mar 15 01:20:45 2007                        Michael Jennings (mej)
+
+Not building a package which doesn't build on the current architecture
+isn't a "failure."
+
+Fixed internal RPM version comparison bug.
+----------------------------------------------------------------------

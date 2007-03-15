@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.48 2007/03/08 23:25:43 mej Exp $
+# $Id: RPM.pm,v 1.49 2007/03/15 05:21:22 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -715,7 +715,7 @@ rpm_compare_versions($$)
 
         if (($v1 =~ /^[a-z]+/) && ($v2 =~ /^[a-z]+/)) {
 
-            # Copy the initial alphanumeric portion of each version number
+            # Copy the initial alphabetical portion of each version number
             # into $s1 and $s2 for comparison.
             $v1 =~ m/^([a-z]+)/;
             $s1 = $1;
@@ -727,7 +727,7 @@ rpm_compare_versions($$)
                 return ($s1 cmp $s2);
             }
         } elsif (($v1 =~ /^\d+/) && ($v2 =~ /^\d+/)) {
-            # Copy the initial alphanumeric portion of each version number
+            # Copy the initial numeric portion of each version number
             # into $s1 and $s2 for comparison.
             $v1 =~ m/^(\d+)/;
             $s1 = $1;
@@ -737,16 +737,19 @@ rpm_compare_versions($$)
             if ($s1 != $s2) {
                 return ($s1 <=> $s2);
             }
+        } elsif ($v1 =~ /^\d+/) {
+            # Numeric > alphabetical
+            return 1;
+        } elsif ($v2 =~ /^\d+/) {
+            # Alphabetical < numeric
+            return -1;
         } else {
-            # Copy the initial alphanumeric portion of each version number
-            # into $s1 and $s2 for comparison.
-            $v1 =~ m/^([^a-z0-9]+)/;
-            $s1 = $1;
-            $v2 =~ m/^([^a-z0-9]+)/;
-            $s2 = $1;
+            # Try a lexical comparison on whatever's there
+            $s1 = (($v1 =~ /^([^a-z0-9]+)/) ? ($1) : ($v1));
+            $s2 = (($v2 =~ /^([^a-z0-9]+)/) ? ($1) : ($v2));
 
             if ($s1 ne $s2) {
-                return ($s1 <=> $s2);
+                return ($s1 cmp $s2);
             }
         }
         $v1 =~ s/^$s1//;
