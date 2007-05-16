@@ -1,9 +1,10 @@
-# $Id: mezzanine.spec,v 1.156 2007/05/16 19:48:48 mej Exp $
+# $Id: mezzanine.spec,v 1.157 2007/05/16 19:54:59 mej Exp $
 
 %define perl_vendorlib %(eval "`perl -V:installvendorlib`"; echo $installvendorlib)
 %if "%{perl_vendorlib}" == "UNKNOWN"
 %define perl_vendorlib %(eval "`perl -V:installsitelib`"; echo $installsitelib)
 %endif
+
 %define debug_package %{nil}
 
 Summary: Mezzanine -- A Software Product Management System
