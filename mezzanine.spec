@@ -1,4 +1,4 @@
-# $Id: mezzanine.spec,v 1.152 2007/05/16 19:15:08 mej Exp $
+# $Id: mezzanine.spec,v 1.153 2007/05/16 19:28:09 mej Exp $
 
 %define debug_package %{nil}
 
@@ -105,4 +105,3 @@ test "x$RPM_BUILD_ROOT" != "x" && %{__rm} -rf $RPM_BUILD_ROOT
 %{_mandir}/*
 
 %changelog
-
