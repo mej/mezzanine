@@ -1045,3 +1045,8 @@ fixed upstream for some time but that some distro vendors have been
 slow in applying.  See the following bug for more details:
 https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=228215
 ----------------------------------------------------------------------
+Wed May 16 15:05:58 2007                        Michael Jennings (mej)
+
+Fix for RHEL4's RPM version from Jason Corley <jason.corley@gmail.com>
+and fixed build arch.
+----------------------------------------------------------------------

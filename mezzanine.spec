@@ -1,4 +1,6 @@
-# $Id: mezzanine.spec,v 1.150 2007/05/16 00:59:18 mej Exp $
+# $Id: mezzanine.spec,v 1.151 2007/05/16 19:09:14 mej Exp $
+
+%define debug_package %{nil}
 
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
@@ -13,7 +15,6 @@ Vendor: %{?_vendorinfo:%{_vendorinfo}}%{!?_vendorinfo:KainX.Org (http://www.kain
 Distribution: %{?_distribution:%{_distribution}}%{!?_distribution:%{_vendor}}
 #BuildSuggests: docbook-style-dsssl
 Requires: perl, perl(Net::FTP), perl(Cwd), perl(POSIX), perl(File::Copy), perl(Getopt::Long), perl(File::Find)
-BuildArch: noarch
 BuildRoot: %{?_tmppath}%{!?_tmppath:/tmp}/%{name}-%{version}-root
 
 %description
