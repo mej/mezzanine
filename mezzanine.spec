@@ -1,4 +1,4 @@
-# $Id: mezzanine.spec,v 1.149 2007/03/15 05:21:22 mej Exp $
+# $Id: mezzanine.spec,v 1.150 2007/05/16 00:59:18 mej Exp $
 
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
@@ -37,6 +37,8 @@ building, and releasing software products.
             $i
     done
 ) || :
+
+${CC:-%{__cc}} $CPPFLAGS ${CFLAGS:-$RPM_OPT_FLAGS} -o rpmeval rpmeval.c $LDFLAGS -lrpm $LIBS || :
 
 %install
 %define perl_vendorlib %(eval "`perl -V:installvendorlib`"; echo $installvendorlib)
@@ -88,6 +90,8 @@ done
         %{__ln_s} pkgrepotool mz$i
     done
 )
+
+test -f rpmeval && %{__install} -m 0755 rpmeval $RPM_BUILD_ROOT%{_bindir}/
 
 %clean
 test "x$RPM_BUILD_ROOT" != "x" && %{__rm} -rf $RPM_BUILD_ROOT

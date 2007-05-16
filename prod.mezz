@@ -1,1 +1,1 @@
-srcs: abiscan&*tool&perlpkg&pkgsort&specgen&mod&doc&debian&templates&unofficial&*.spec:mezzanine.tar.gz
+srcs: abiscan&*tool&perlpkg&pkgsort&*.c&specgen&mod&doc&debian&templates&unofficial&*.spec:mezzanine.tar.gz

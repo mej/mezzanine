@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.49 2007/03/15 05:21:22 mej Exp $
+# $Id: RPM.pm,v 1.50 2007/05/16 00:59:18 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -235,8 +235,8 @@ parse_spec_file
     if (!defined($pid)) {
         wprint "Unable to pre-process spec file $specfile -- $!\n";
     } elsif ($pid == 0) {
-        exec("clu", "eval", $contents);
-        wprint "Unable to exec clu -- $!.  Trying rpm.\n";
+        exec("rpmeval", $contents);
+        wprint "Unable to exec rpmeval -- $!.  Trying /bin/rpm --eval\n";
         exec("/bin/rpm", "--eval", $contents);
         &fatal_error("Unable to exec /bin/rpm -- $!\n");
     } else {

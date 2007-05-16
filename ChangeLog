@@ -1037,3 +1037,11 @@ Thu Mar 15 02:15:37 2007                        Michael Jennings (mej)
 
 Typo fix.
 ----------------------------------------------------------------------
+Tue May 15 20:48:00 2007                        Michael Jennings (mej)
+
+Add "rpmeval" from Jeff Johnson <n3npq@mac.com> to perform spec file
+pre-processing to work around a macro processing bug that has been
+fixed upstream for some time but that some distro vendors have been
+slow in applying.  See the following bug for more details:
+https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=228215
+----------------------------------------------------------------------
