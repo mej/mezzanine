@@ -1,4 +1,4 @@
-# $Id: mezzanine.spec,v 1.158 2007/05/16 19:57:38 mej Exp $
+# $Id: mezzanine.spec,v 1.159 2007/05/16 20:04:55 mej Exp $
 
 %define perl_vendorlib %(eval "`perl -V:installvendorlib`"; echo $installvendorlib)
 %if "%{perl_vendorlib}" == "UNKNOWN"
@@ -105,4 +105,3 @@ test "x$RPM_BUILD_ROOT" != "x" && %{__rm} -rf $RPM_BUILD_ROOT
 %{_mandir}/*
 
 %changelog
-
