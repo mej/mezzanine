@@ -1,5 +1,9 @@
-# $Id: mezzanine.spec,v 1.153 2007/05/16 19:28:09 mej Exp $
+# $Id: mezzanine.spec,v 1.154 2007/05/16 19:31:40 mej Exp $
 
+%define perl_vendorlib %(eval "`perl -V:installvendorlib`"; echo $installvendorlib)
+%if "%{perl_vendorlib}" == "UNKNOWN"
+%define perl_vendorlib %(eval "`perl -V:installsitelib`"; echo $installsitelib)
+%endif
 %define debug_package %{nil}
 
 Summary: Mezzanine -- A Software Product Management System
@@ -42,11 +46,6 @@ building, and releasing software products.
 ${CC:-%{__cc}} $CPPFLAGS ${CFLAGS:-$RPM_OPT_FLAGS} -o rpmeval rpmeval.c $LDFLAGS -lrpm $LIBS || :
 
 %install
-%define perl_vendorlib %(eval "`perl -V:installvendorlib`"; echo $installvendorlib)
-%if "%{perl_vendorlib}" == "UNKNOWN"
-%define perl_vendorlib %(eval "`perl -V:installsitelib`"; echo $installsitelib)
-%endif
-
 test "x$RPM_BUILD_ROOT" != "x" && %{__rm} -rf $RPM_BUILD_ROOT
 %{__mkdir_p} $RPM_BUILD_ROOT%{_bindir}
 %{__mkdir_p} $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine/templates
