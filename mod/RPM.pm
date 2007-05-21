@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.50 2007/05/16 00:59:18 mej Exp $
+# $Id: RPM.pm,v 1.51 2007/05/21 23:14:54 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -134,7 +134,7 @@ rpm_form_command
     if ($type eq "build") {
         $cmd .= " --define 'optflags $ENV{CFLAGS}'";
         if (&pkgvar_buildroot()) {
-            $cmd .= " --buildroot='" . &pkgvar_buildroot() . "'";
+            $cmd .= " --buildroot '" . &pkgvar_buildroot() . "'";
         }
         if (&pkgvar_architecture()) {
             $cmd .= " --target='" . &pkgvar_architecture() . "'";
@@ -839,6 +839,7 @@ rpm_scan_files(@)
         foreach my $file (sort(@rpm_files)) {  # Sort only for debugging.
             my %pkg;
 
+            # Resultant hash by directory, then file.
             dprint "Looking at $file.\n";
             $pkg{"PATH"} = $file;
             $pkg{"ORIGIN"} = &dirname($file);

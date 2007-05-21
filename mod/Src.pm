@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.27 2007/02/27 21:29:36 mej Exp $
+# $Id: Src.pm,v 1.28 2007/05/21 23:14:54 mej Exp $
 #
 
 package Mezzanine::Src;
@@ -187,7 +187,8 @@ convert_srpm_to_spm($)
         my $n = scalar(@tmp);
         &fatal_error("$n spec files in $pkgfile?!\n");
     }
-    $spec = "$destdir/F/" . substr($tmp[0], 59);
+    # FIXME:  We need a better way to get the spec file name off the line.
+    $spec = "$destdir/F/" . &str_trim(substr($tmp[0], 59));
     chomp($spec);
 
     # Get a list of all source and patch files
