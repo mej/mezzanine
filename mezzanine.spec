@@ -1,4 +1,4 @@
-# $Id: mezzanine.spec,v 1.161 2007/05/22 20:30:05 mej Exp $
+# $Id: mezzanine.spec,v 1.162 2007/05/22 21:45:29 mej Exp $
 
 %define perl_vendorlib %(eval "`perl -V:installvendorlib`"; echo $installvendorlib)
 %if "%{perl_vendorlib}" == "UNKNOWN"
@@ -88,7 +88,7 @@ done
         %{__ln_s} buildtool mz$i
         echo ".so buildtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/mz$i.1
     done
-    for i in repo repo{scan,closure,compare,comp,diff,add,rm,remove,merge} ; do
+    for i in repo repo{scan,closure,compare,comp,cmp,diff,add,rm,remove,merge} ; do
         %{__ln_s} pkgrepotool mz$i
     done
 )

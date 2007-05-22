@@ -1075,3 +1075,9 @@ CLU.  Not as good as jbj could do, but it's a start.  Needs some
 command line options and possibly a conversion to rpmds.  Works for
 now though.
 ----------------------------------------------------------------------
+Tue May 22 17:45:40 2007                        Michael Jennings (mej)
+
+Switch from "clu cmp" to "rpmcmp" for version comparison pipe.
+
+Begin work on repo merge.
+----------------------------------------------------------------------

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.52 2007/05/22 18:43:04 mej Exp $
+# $Id: RPM.pm,v 1.53 2007/05/22 21:45:29 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -662,24 +662,24 @@ rpm_compare_versions($$)
 {
     my ($v1, $v2) = @_;
 
-    # First, see if we have a pipe to clu or can make one.
+    # First, see if we have a pipe to rpmcmp or can make one.
     if (!defined($RPMVERCMP_IN)) {
-        if (open3($RPMVERCMP_OUT, $RPMVERCMP_IN, 0, "clu cmp")) {
+        if (open3($RPMVERCMP_OUT, $RPMVERCMP_IN, 0, "rpmcmp")) {
             $SIG{"PIPE"} = sub { close($RPMVERCMP_IN); close($RPMVERCMP_OUT); $RPMVERCMP_IN = $RPMVERCMP_OUT = 0; };
             select $RPMVERCMP_IN; $| = 1;
             select $RPMVERCMP_OUT; $| = 1;
             select STDOUT;
-            dprint "Started CLU process to do version comparisons.\n";
+            dprint "Started rpmcmp process to do version comparisons.\n";
         } else {
             $RPMVERCMP_IN = $RPMVERCMP_OUT = 0;
-            dprint "Unable to start CLU process to do version comparisons -- $!.\n";
+            dprint "Unable to start rpmcmp process to do version comparisons -- $!.\n";
         }
     }
 
     if ($RPMVERCMP_OUT) {
         my $line;
 
-        # Write versions to be compared to CLU pipe.  Read back result.
+        # Write versions to be compared to rpmcmp pipe.  Read back result.
         print $RPMVERCMP_OUT "$v1 $v2\n";
         if ($RPMVERCMP_IN) {
             $line = <$RPMVERCMP_IN>;
@@ -694,16 +694,16 @@ rpm_compare_versions($$)
                     $RPMVERCMP_IN = $RPMVERCMP_OUT = 0;
                     dprint "Detected open3() failure:  $line\n";
                 } else {
-                    dprint "Unrecognized output from CLU pipe:  $line\n";
+                    dprint "Unrecognized output from rpmcmp pipe:  $line\n";
                 }
             } else {
-                dprint "Failed to read from CLU pipe.\n";
+                dprint "Failed to read from rpmcmp pipe.\n";
             }
         } else {
-            dprint "CLU pipe file descriptor closed unexpectedly.  Command failed?\n";
+            dprint "rpmcmp pipe file descriptor closed unexpectedly.  Command failed?\n";
         }
         # If we get here, we failed.  Fall back on the perl-only method below.
-        dprint "Version comparison via CLU/librpm failed.\n";
+        dprint "Version comparison via rpmcmp failed.\n";
     }
 
     # Downcase everything right off the bat.

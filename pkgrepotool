@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgrepotool,v 1.5 2007/05/22 18:43:04 mej Exp $
+# $Id: pkgrepotool,v 1.6 2007/05/22 21:45:29 mej Exp $
 #
 
 use strict;
@@ -81,6 +81,7 @@ print_usage_info
     exit(MEZZANINE_SUCCESS);
 }
 
+# Return the newest RPM in a list, or the list sorted newest -> oldest
 sub
 get_newest(@)
 {
@@ -90,6 +91,7 @@ get_newest(@)
     return ((wantarray()) ? (@rpms) : ($rpms[0]));
 }
 
+# Return the oldest RPM in a list, or the list sorted oldest -> newest
 sub
 get_oldest(@)
 {
@@ -108,13 +110,14 @@ build_package_hash($)
 
     foreach my $dir (sort(keys(%{$scan}))) {
         foreach my $pkg (sort(keys(%{$scan->{$dir}}))) {
+            # pkgs->{DIR}{NAME} is a list of filenames
             push @{$pkgs->{$dir}{$scan->{$dir}{$pkg}{"NAME"}}}, $pkg;
         }
     }
     return $pkgs;
 }
 
-# Get only the newest packages
+# Get only the newest packages from the complete scan list.
 sub
 filter_newest($)
 {
@@ -137,7 +140,7 @@ filter_newest($)
     return $scan;
 }
 
-# Get only the oldest packages
+# Get only the oldest packages from the complete scan list.
 sub
 filter_oldest($)
 {
@@ -160,7 +163,7 @@ filter_oldest($)
     return $scan;
 }
 
-# Get only old packages (exact opposite of newest)
+# Get only old packages in the scan list (exact opposite of newest).
 sub
 filter_old($)
 {
@@ -282,6 +285,112 @@ compare_package_sets($$)
     }
 }
 
+# Merge packages from master repository (#1) to slave repository (#2)
+sub
+merge_dirs($$$)
+{
+    my ($pkgs, $master, $slave) = @_;
+    my ($pkgs1, $pkgs2) = ($pkgs->{$master}, $pkgs->{$slave});
+    my (@pkgs1, @pkgs2);
+    my ($i, $j);
+
+    # Create sorted arrays of package names
+    @pkgs1 = sort(keys(%{$pkgs1}));
+    @pkgs2 = sort(keys(%{$pkgs2}));
+
+    dprintf("Merging %d packages from $master with %d packages in $slave\n",
+            scalar(@pkgs1), scalar(@pkgs2));
+    for (($i, $j) = (0, 0); ($i < scalar(@pkgs1)) && ($j < scalar(@pkgs2)); ) {
+        my $c = $pkgs1[$i] cmp $pkgs2[$j];
+
+        dprintf("Comparing %s (%d) vs. %s (%d):  $c\n", $pkgs1[$i], $i, $pkgs2[$j], $j);
+        if ($c < 0) {
+            &merge_package_all($pkgs1->{$pkgs1[$i]}, $master, $slave);
+            $i++;
+        } elsif ($c > 0) {
+            # Only in the slave dir; do nothing.
+            dprint "Package $pkgs2[$j] is only in slave repo.\n";
+            $j++;
+        } else {
+            # For packages that both dirs contain, merge the RPM sets.
+            &merge_package_sets($pkgs1->{$pkgs1[$i]}, $pkgs2->{$pkgs2[$j]}, $master, $slave);
+            $i++, $j++;
+        }
+    }
+    # Handle any leftovers.
+    while ($i < scalar(@pkgs1)) {
+        &merge_package_all($pkgs1->{$pkgs1[$i]}, $master, $slave);
+        $i++;
+    }
+    while ($j < scalar(@pkgs2)) {
+        dprint "Package $pkgs2[$j] is only in slave repo.\n";
+        $j++;
+    }
+}
+
+# Merge package sets from master repository (#1) to slave repository (#2)
+sub
+merge_package_sets($$$$)
+{
+    my ($pkgs1, $pkgs2, $master, $slave) = @_;
+    my (@pkgs1, @pkgs2);
+    my ($i, $j);
+
+    # Create sorted arrays of RPM packages.
+    @pkgs1 = map { &basename($_) } &rpm_sort(@{$pkgs1});
+    @pkgs2 = map { &basename($_) } &rpm_sort(@{$pkgs2});
+
+    dprintf("Merging %d package files from master dir with %d package files from slave dir.\n",
+            scalar(@pkgs1), scalar(@pkgs2));
+    if ($config->get("INTERACTIVE")) {
+        &compare_package_sets($pkgs1, $pkgs2);
+    }
+    for ($i = 0, $j = 0; ($i < scalar(@pkgs1)) && ($j < scalar(@pkgs2)); ) {
+        my $c = &rpm_cmp($pkgs1[$i], $pkgs2[$j]);
+
+        dprintf("Comparing %s (%d) vs. %s (%d):  $c\n", $pkgs1[$i], $i, $pkgs2[$j], $j);
+        if ($c < 0) {
+            &merge_single_package($pkgs1[$i], $master, $slave);
+            $i++;
+        } elsif ($c > 0) {
+            dprint "Package file $pkgs2[$j] is only in slave repo.\n";
+            $j++;
+        } else {
+            dprint "Package file $pkgs1[$j] is in both repos already.\n";
+            $i++, $j++;
+        }
+    }
+    # Handle any leftovers.
+    while ($i < scalar(@pkgs1)) {
+        &merge_single_package($pkgs1[$i], $master, $slave);
+        $i++;
+    }
+    while ($j < scalar(@pkgs2)) {
+        dprint "Package file $pkgs2[$j] is only in slave repo.\n";
+        $j++;
+    }
+}
+
+# Merge a package that only the master repo has
+sub
+merge_package_all($$$)
+{
+    my ($pkgs, $master, $slave) = @_;
+
+    foreach my $pkg (map { &basename($_) } &rpm_sort(@{$pkgs})) {
+        &merge_single_package($pkg, $master, $slave);
+    }
+}
+
+# Copy a single package file from the master to the slave repo
+sub
+merge_single_package($$$)
+{
+    my ($pkg, $master, $slave) = @_;
+
+    dprint "Merging package $pkg from $master into $slave\n";
+}
+
 # main() here is basically the same as main() in C
 sub
 main
@@ -308,7 +417,7 @@ main
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.5 $ created on $Date: 2007/05/22 18:43:04 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.6 $ created on $Date: 2007/05/22 21:45:29 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || (!scalar(@ARGV) && !scalar(%OPTION) && &basename($0) !~ /^mz/)) {
         &print_usage_info();
     }
@@ -332,14 +441,14 @@ main
         $mode = "scan";
     } elsif (($0 =~ /closure$/) || ($OPTION{"closure"})) {
         $mode = "closure";
+    } elsif (($0 =~ /(compare|comp|cmp|diff)$/) || ($OPTION{"compare"})) {
+        $mode = "compare";
+    } elsif (($0 =~ /merge$/) || ($OPTION{"merge"})) {
+        $mode = "merge";
     } elsif (($0 =~ /add$/) || ($OPTION{"add"})) {
         $mode = "add";
     } elsif (($0 =~ /(rm|remove)$/) || ($OPTION{"remove"})) {
         $mode = "remove";
-    } elsif (($0 =~ /compare$/) || ($OPTION{"compare"})) {
-        $mode = "compare";
-    } elsif (($0 =~ /merge$/) || ($OPTION{"merge"})) {
-        $mode = "merge";
     } else {
         $mode = "scan";
     }
@@ -349,8 +458,8 @@ main
     if ($OPTION{"dirs"} && ref($OPTION{"dirs"}) && (ref($OPTION{"dirs"}) eq "ARRAY")) {
         @dirlist = @{$OPTION{"dirs"}};
     } elsif (scalar(@ARGV)) {
-        @dirlist = grep { -d $_ } @ARGV;
-        @ARGV = grep { ! -d $_ } @ARGV;
+        @dirlist = grep { -d $_ || ($_ =~ /^(ht|f)tps?:\/\//) } @ARGV;
+        @ARGV = grep { ! -d $_ || ($_ !~ /^(ht|f)tps?:\/\//) } @ARGV;
     }
     $config->set("DIRS", join(':', @dirlist));
     dprint "Using directory list:  ", join(', ', @dirlist), "\n";
@@ -360,7 +469,7 @@ main
         $config->save();
     }
 
-    if ($mode =~ /^(scan|closure|compare|merge)$/) {
+    if ($mode =~ /^(scan|closure|compare|merge|add|remove)$/) {
         $scan = &rpm_scan_files(@dirlist);
         if ($config->get("SPAN")) {
             &span_dirs($scan);
@@ -375,6 +484,18 @@ main
         }
     }
 
+    # Check for directory list stupidity
+    if ($mode eq "compare" || $mode eq "merge") {
+        if (scalar(@dirlist) <= 1) {
+            if ($config->get("SPAN")) {
+                eprint "Cannot use SPAN and $mode together.\n";
+            } else {
+                eprint "Two or more directories required for $mode.\n";
+            }
+            return MEZZANINE_SYNTAX_ERROR;
+        }
+    }
+
     if ($mode eq "scan") {
         foreach my $dir (sort(keys(%{$scan}))) {
             foreach my $pkg (&rpm_sort(keys(%{$scan->{$dir}}))) {
@@ -382,28 +503,30 @@ main
             }
         }
     } elsif ($mode eq "closure") {
-    } elsif ($mode eq "add") {
-    } elsif ($mode eq "remove") {
     } elsif ($mode eq "compare") {
         my $pkgs;
         my $maindir = shift @dirlist;
 
-        # Check for stupidity
-        if (!scalar(@dirlist)) {
-            if ($config->get("SPAN")) {
-                eprint "Cannot use SPAN and COMPARE together.\n";
-            } else {
-                eprint "Two or more directories required for comparison.\n";
-            }
-            return MEZZANINE_SYNTAX_ERROR;
-        }
         $pkgs = &build_package_hash($scan);
         foreach my $dir (@dirlist) {
             print "*** Comparing $maindir with $dir\n";
             &compare_dirs($pkgs->{$maindir}, $pkgs->{$dir});
         }
     } elsif ($mode eq "merge") {
-    } else {
+        my $pkgs;
+        my $maindir = shift @dirlist;
+
+        $pkgs = &build_package_hash($scan);
+        foreach my $dir (@dirlist) {
+            if ($dir =~ /^(ht|f)tps?:\/\//) {
+                eprint "Unable to merge into remote repository.  Skipping $dir\n";
+            } else {
+                print "*** Merging $maindir with $dir\n";
+                &merge_dirs($pkgs, $maindir, $dir);
+            }
+        }
+    } elsif ($mode eq "add") {
+    } elsif ($mode eq "remove") {
     }
     return $err;
 }
