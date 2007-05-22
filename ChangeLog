@@ -1055,3 +1055,15 @@ Mon May 21 19:13:04 2007                        Michael Jennings (mej)
 Tweaks for rpm 4.4.9, new PHP extension template, reorg of
 pkgrepotool.
 ----------------------------------------------------------------------
+Tue May 22 14:42:21 2007                        Michael Jennings (mej)
+
+Fleshed out the repository comparison stuff in pkgrepotool.  Not
+super-thoroughly tested, but the testing I've done so far looks
+*really* nice. :-)
+
+Added get_backtrace() to supplement show_backtrace() for situations
+where the trace is better provided in array form.
+
+Refactored rpm_sort() comparison code into separate rpm_cmp() function
+which can be used independently.
+----------------------------------------------------------------------

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.51 2007/05/21 23:14:54 mej Exp $
+# $Id: RPM.pm,v 1.52 2007/05/22 18:43:04 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -47,7 +47,7 @@ BEGIN {
                '&disable_patch', '&enable_patch', '&rpm_install',
                '&rpm_show_contents', '&rpm_query', '&rpm_build',
                '&rpm_compare_versions', '&rpm_get_installed',
-               '&rpm_scan_files', '&rpm_sort');
+               '&rpm_scan_files', '&rpm_cmp', '&rpm_sort');
 
     %EXPORT_TAGS = ( );
 
@@ -79,6 +79,7 @@ sub rpm_build();
 sub rpm_compare_versions($$);
 sub rpm_get_installed();
 sub rpm_scan_files(@);
+sub rpm_cmp($$);
 sub rpm_sort(@);
 
 # Private functions
@@ -706,13 +707,20 @@ rpm_compare_versions($$)
     }
 
     # Downcase everything right off the bat.
-    $v1 =~ tr/[A-Z]/[a-z]/;
-    $v2 =~ tr/[A-Z]/[a-z]/;
+    if ($v1) {
+        $v1 =~ tr/[A-Z]/[a-z]/;
+    }
+    if ($v2) {
+        $v2 =~ tr/[A-Z]/[a-z]/;
+    }
 
     for (; 1; ) {
-        my ($s1, $s2);
+        my ($s1, $s2) = ('', '');
         my ($ival1, $ival2) = (0, 0);
 
+        if ((! $v1) || (! $v2) || !length($v1) || !length($v2)) {
+            last;
+        }
         if (($v1 =~ /^[a-z]+/) && ($v2 =~ /^[a-z]+/)) {
 
             # Copy the initial alphabetical portion of each version number
@@ -752,17 +760,18 @@ rpm_compare_versions($$)
                 return ($s1 cmp $s2);
             }
         }
-        $v1 =~ s/^$s1//;
-        $v2 =~ s/^$s2//;
-        if (!length($v1) || !length($v2)) {
-            last;
+        if ($s1) {
+            $v1 =~ s/^$s1//;
+        }
+        if ($s2) {
+            $v2 =~ s/^$s2//;
         }
     }
 
     # We've reached the end of one of the strings.
-    if (length($v1)) {
+    if ($v1 && length($v1)) {
         return 1;
-    } elsif (length($v2)) {
+    } elsif ($v2 && length($v2)) {
         return -1;
     }
     return 0;
@@ -851,6 +860,51 @@ rpm_scan_files(@)
     return $scan;
 }
 
+# Compare 2 RPM's
+sub
+rpm_cmp($$)
+{
+    my ($a, $b) = @_;
+    my ($name_a, $name_b, $version_a, $version_b, $release_a, $release_b, $ret);
+
+    #dprint &examine_object(\$a), "\n---\n", &examine_object(\$b), "\n---\n";
+    if (ref($a) && defined($a->{"VERSION"})) {
+        $name_a = $a->{"NAME"};
+        $version_a = $a->{"VERSION"};
+        $release_a = $a->{"RELEASE"};
+    } elsif (scalar(@tmp = &parse_rpm_name($a)) == 4) {
+        $name_a = $tmp[0];
+        $version_a = $tmp[1];
+        $release_a = $tmp[2];
+    } else {
+        $name_a = $a || "";
+        $version_a = 0;
+        $release_a = 0;
+    }
+    if (ref($b) && defined($b->{"VERSION"})) {
+        $name_b = $b->{"NAME"};
+        $version_b = $b->{"VERSION"};
+        $release_b = $b->{"RELEASE"};
+    } elsif (scalar(@tmp = &parse_rpm_name($b)) == 4) {
+        $name_b = $tmp[0];
+        $version_b = $tmp[1];
+        $release_b = $tmp[2];
+    } else {
+        $name_b = $b || "";
+        $version_b = 0;
+        $release_b = 0;
+    }
+
+    $ret = $name_a cmp $name_b;
+    if (! $ret) {
+        $ret = &rpm_compare_versions($version_a, $version_b);
+    }
+    if (! $ret) {
+        $ret = &rpm_compare_versions($release_a, $release_b);
+    }
+    return $ret;
+}
+
 # Sort RPM's in version order
 sub
 rpm_sort(@)
@@ -858,36 +912,7 @@ rpm_sort(@)
     my @rpm_list = @_;
     my @tmp;
 
-    return sort {
-        my ($version_a, $version_b, $release_a, $release_b, $ret);
-
-        if (ref($a) && defined($a->{"VERSION"})) {
-            $version_a = $a->{"VERSION"};
-            $release_a = $a->{"RELEASE"};
-        } elsif (scalar(@tmp = &parse_rpm_name($a)) == 4) {
-            $version_a = $tmp[1];
-            $release_a = $tmp[2];
-        } else {
-            $version_a = 0;
-            $release_a = 0;
-        }
-        if (ref($b) && defined($b->{"VERSION"})) {
-            $version_b = $b->{"VERSION"};
-            $release_b = $b->{"RELEASE"};
-        } elsif (scalar(@tmp = &parse_rpm_name($b)) == 4) {
-            $version_b = $tmp[1];
-            $release_b = $tmp[2];
-        } else {
-            $version_b = 0;
-            $release_b = 0;
-        }
-
-        $ret = &rpm_compare_versions($version_a, $version_b);
-        if (! $ret) {
-            $ret = &rpm_compare_versions($release_a, $release_b);
-        }
-        return $ret;
-    } @rpm_list;
+    return sort rpm_cmp @rpm_list;
 }
 
 ### Private functions

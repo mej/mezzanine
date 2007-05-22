@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.69 2007/02/28 19:22:20 mej Exp $
+# $Id: Util.pm,v 1.70 2007/05/22 18:43:04 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -53,16 +53,17 @@ BEGIN {
                '&dprint', '&eprintf', '&eprint', '&wprintf',
                '&wprint', '&handle_signal', '&handle_fatal_signal',
                '&install_signal_handlers', '&handle_warning',
-               '&show_backtrace', '&print_args', '&untaint',
-               '&is_tainted', '&examine_object', '&int_to_bytes',
-               '&mkdirhier', '&nuke_tree', '&move_files',
-               '&copy_files', '&copy_tree', '&get_temp_dir',
-               '&create_temp_space', '&clean_temp_space', '&basename',
-               '&dirname', '&grepdir', '&limit_files', '&str_trim',
-               '&xpush', '&cat_file', '&parse_rpm_name',
-               '&find_spec_file', '&should_ignore', '&trunc_file',
-               '&touch_file', '&newest_file', '&checksum_file',
-               '&run_cmd', '&run_mz_cmd', '&fetch_url', '&post_file',
+               '&get_backtrace', '&show_backtrace', '&print_args',
+               '&untaint', '&is_tainted', '&examine_object',
+               '&int_to_bytes', '&mkdirhier', '&nuke_tree',
+               '&move_files', '&copy_files', '&copy_tree',
+               '&get_temp_dir', '&create_temp_space',
+               '&clean_temp_space', '&basename', '&dirname',
+               '&grepdir', '&limit_files', '&str_trim', '&xpush',
+               '&cat_file', '&parse_rpm_name', '&find_spec_file',
+               '&should_ignore', '&trunc_file', '&touch_file',
+               '&newest_file', '&checksum_file', '&run_cmd',
+               '&run_mz_cmd', '&fetch_url', '&post_file',
                '&MEZZANINE_SUCCESS', '&MEZZANINE_FATAL_ERROR',
                '&MEZZANINE_SYNTAX_ERROR', '&MEZZANINE_SYSTEM_ERROR',
                '&MEZZANINE_COMMAND_FAILED', '&MEZZANINE_DUPLICATE',
@@ -125,6 +126,7 @@ sub handle_signal(@);
 sub handle_fatal_signal(@);
 sub install_signal_handlers();
 sub handle_warning(@);
+sub get_backtrace();
 sub show_backtrace();
 sub print_args(@);
 sub untaint($);
@@ -510,6 +512,23 @@ BEGIN {
     $SIG{__WARN__} = \&handle_warning;
 }
 
+# Create a stack trace
+sub
+get_backtrace()
+{
+    my $start = shift || 1;
+    my ($file, $line, $subroutine);
+    my (@trace, @tmp);
+
+    for (my $i = $start; @tmp = caller($i); $i++) {
+        $subroutine = $tmp[3];
+        (undef, $file, $line) = caller($i - 1);
+        $file =~ s/^.*\/([^\/]+)$/$1/;
+        push @trace, sprintf("%s\[%d\] $subroutine() at $file:$line\n",  ' ' x $i, $i - $start);
+    }
+    return @trace;
+}
+
 # Print a stack trace
 sub
 show_backtrace()
@@ -519,12 +538,7 @@ show_backtrace()
 
     print "\n\nSTACK TRACE:\n";
     print "------------\n";
-    for ($i = 1; @tmp = caller($i); $i++) {
-        $subroutine = $tmp[3];
-        (undef, $file, $line) = caller($i - 1);
-        $file =~ s/^.*\/([^\/]+)$/$1/;
-        print ' ' x $i, "$subroutine() at $file:$line\n";
-    }
+    print &get_backtrace(2);
 }
 
 # Print function arguments
@@ -1106,10 +1120,20 @@ cat_file($)
 sub
 parse_rpm_name($)
 {
-    my $rpm = &basename($_[0]);
+    my $rpm = $_[0];
 
-    $rpm =~ m/^(\S+)-([^-]+)-([^-]+)\.([^\.]+)\.rpm$/;
-    return ($1, $2, $3, $4);
+    if (! $rpm) {
+        dprint "Bad value passed to parse_rpm_name().\n";
+        &show_backtrace();
+        return undef;
+    }
+    $rpm = &basename($rpm);
+    if ($rpm =~ m/^(\S+)-([^-]+)-([^-]+)\.([^\.]+)\.rpm$/) {
+        return ($1, $2, $3, $4);
+    } else {
+        dprint "\"$rpm\" doesn't look like an RPM name.\n";
+        return $rpm;
+    }
 }
 
 # Find spec file

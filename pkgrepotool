@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgrepotool,v 1.4 2007/05/21 23:14:54 mej Exp $
+# $Id: pkgrepotool,v 1.5 2007/05/22 18:43:04 mej Exp $
 #
 
 use strict;
@@ -65,14 +65,15 @@ print_usage_info
     print "    -c --compare                     Compare repos\n";
     print "    -m --merge                       Merge packages from one repo into others\n";
     print "    -C --closure                     Verify repository dependency closure\n";
-    print "       --newest                      Select only the newest version of each package\n";
-    print "       --oldest                      Select only the oldest version of each package\n";
-    print "       --old                         Select only outdated packages\n";
     print "    -i --interactive                 Prompt before taking action\n";
     print "    -t --test                        Test only; do not take action\n";
     print "    -S --scm                         Use Mezzanine SCM commands to add/remove\n";
-    print "       --span                        Treat all repositories as one\n";
     print "    -D --directories --dirs <dirs>   Directories to use as repositories\n";
+    print "       --newest                      Select only the newest version of each package\n";
+    print "       --oldest                      Select only the oldest version of each package\n";
+    print "       --old                         Select only outdated packages\n";
+    print "       --span                        Treat all repositories as one\n";
+    print "       --diffonly --do               When comparing, show only differences\n";
     #print "    -M --metadata <type>             Metadata type to generate\n";
     #print "                                     \n";
     print "       --savecfg                     Preserve current settings for future use\n";
@@ -107,7 +108,7 @@ build_package_hash($)
 
     foreach my $dir (sort(keys(%{$scan}))) {
         foreach my $pkg (sort(keys(%{$scan->{$dir}}))) {
-            push @{$pkgs->{$scan->{$dir}{$pkg}{"NAME"}}}, $pkg;
+            push @{$pkgs->{$dir}{$scan->{$dir}{$pkg}{"NAME"}}}, $pkg;
         }
     }
     return $pkgs;
@@ -123,11 +124,11 @@ filter_newest($)
     $pkgs = &build_package_hash($scan);
 
     # For each unique package, keep only the newest one.
-    foreach my $pkg (sort(keys(%{$pkgs}))) {
-        my @rpms = &get_newest(@{$pkgs->{$pkg}});
+    foreach my $dir (sort(keys(%{$pkgs}))) {
+        foreach my $pkg (sort(keys(%{$pkgs->{$dir}}))) {
+            my @rpms = &get_newest(@{$pkgs->{$dir}{$pkg}});
 
-        shift @rpms;
-        foreach my $dir (sort(keys(%{$scan}))) {
+            shift @rpms;
             foreach my $rpm (@rpms) {
                 delete $scan->{$dir}{$rpm};
             }
@@ -146,11 +147,11 @@ filter_oldest($)
     $pkgs = &build_package_hash($scan);
 
     # For each unique package, keep only the oldest one.
-    foreach my $pkg (sort(keys(%{$pkgs}))) {
-        my @rpms = &get_oldest(@{$pkgs->{$pkg}});
+    foreach my $dir (sort(keys(%{$pkgs}))) {
+        foreach my $pkg (sort(keys(%{$pkgs->{$dir}}))) {
+            my @rpms = &get_oldest(@{$pkgs->{$dir}{$pkg}});
 
-        shift @rpms;
-        foreach my $dir (sort(keys(%{$scan}))) {
+            shift @rpms;
             foreach my $rpm (@rpms) {
                 delete $scan->{$dir}{$rpm};
             }
@@ -169,11 +170,11 @@ filter_old($)
     $pkgs = &build_package_hash($scan);
 
     # For each unique package, pick only the old one.
-    foreach my $pkg (sort(keys(%{$pkgs}))) {
-        my @rpms = &get_newest(@{$pkgs->{$pkg}});
-        my $newest_rpm = shift @rpms;
+    foreach my $dir (sort(keys(%{$pkgs}))) {
+        foreach my $pkg (sort(keys(%{$pkgs->{$dir}}))) {
+            my @rpms = &get_newest(@{$pkgs->{$dir}{$pkg}});
+            my $newest_rpm = shift @rpms;
 
-        foreach my $dir (sort(keys(%{$scan}))) {
             delete $scan->{$dir}{$newest_rpm};
         }
     }
@@ -193,6 +194,92 @@ span_dirs($)
         delete $scan->{$dir};
     }
     return $scan;
+}
+
+# Display differences between two repositories
+sub
+compare_dirs($$)
+{
+    my ($pkgs1, $pkgs2) = @_;
+    my (@pkgs1, @pkgs2);
+    my ($i, $j);
+
+    # Create sorted arrays of package names
+    @pkgs1 = sort(keys(%{$pkgs1}));
+    @pkgs2 = sort(keys(%{$pkgs2}));
+
+    dprintf("Comparing %d packages from master dir with %d packages from slave dir.\n",
+            scalar(@pkgs1), scalar(@pkgs2));
+    for (($i, $j) = (0, 0); ($i < scalar(@pkgs1)) && ($j < scalar(@pkgs2)); ) {
+        my $c = $pkgs1[$i] cmp $pkgs2[$j];
+
+        dprintf("Comparing %s (%d) vs. %s (%d):  $c\n", $pkgs1[$i], $i, $pkgs2[$j], $j);
+        if ($c < 0) {
+            print "<< $pkgs1[$i]\n";
+            $i++;
+        } elsif ($c > 0) {
+            print ">> $pkgs2[$j]\n";
+            $j++;
+        } else {
+            # For packages that both dirs contain, compare the RPM sets.
+            if (! $config->get("DIFFONLY")) {
+                print "== $pkgs1[$i]\n";
+            }
+            &compare_package_sets($pkgs1->{$pkgs1[$i]}, $pkgs2->{$pkgs2[$j]});
+            $i++, $j++;
+        }
+    }
+    # Handle any leftovers.
+    while ($i < scalar(@pkgs1)) {
+        print "<< $pkgs1[$i]\n";
+        $i++;
+    }
+    while ($j < scalar(@pkgs2)) {
+        print ">> $pkgs2[$j]\n";
+        $j++;
+    }
+}
+
+# Display differences between two sets of a given package
+sub
+compare_package_sets($$)
+{
+    my ($pkgs1, $pkgs2) = @_;
+    my (@pkgs1, @pkgs2);
+    my ($i, $j);
+
+    # Create sorted arrays of RPM packages.
+    @pkgs1 = map { &basename($_) } &rpm_sort(@{$pkgs1});
+    @pkgs2 = map { &basename($_) } &rpm_sort(@{$pkgs2});
+
+    dprintf("Comparing %d package files from master dir with %d package files from slave dir.\n",
+            scalar(@pkgs1), scalar(@pkgs2));
+    for ($i = 0, $j = 0; ($i < scalar(@pkgs1)) && ($j < scalar(@pkgs2)); ) {
+        my $c = &rpm_cmp($pkgs1[$i], $pkgs2[$j]);
+
+        dprintf("Comparing %s (%d) vs. %s (%d):  $c\n", $pkgs1[$i], $i, $pkgs2[$j], $j);
+        if ($c < 0) {
+            print "< $pkgs1[$i]\n";
+            $i++;
+        } elsif ($c > 0) {
+            print "> $pkgs2[$j]\n";
+            $j++;
+        } else {
+            if (! $config->get("DIFFONLY")) {
+                print "= $pkgs1[$i]\n";
+            }
+            $i++, $j++;
+        }
+    }
+    # Handle any leftovers.
+    while ($i < scalar(@pkgs1)) {
+        print "< $pkgs1[$i]\n";
+        $i++;
+    }
+    while ($j < scalar(@pkgs2)) {
+        print "> $pkgs2[$j]\n";
+        $j++;
+    }
 }
 
 # main() here is basically the same as main() in C
@@ -215,13 +302,13 @@ main
     $err = 0;
     &mezz_init("pkgrepotool", "1.0", "help|h", "version|v", "debug|d!", "savecfg|save-config!",
                "scan|s", "closure|C", "add|a", "remove|rm|r", "compare|c", "merge|m",
-               "newest", "old", "oldest", "interactive|i!", "test|t!", "scm|S!", "span!",
+               "newest", "old", "oldest", "interactive|i!", "test|t!", "scm|S!", "span!", "diffonly|do!",
                "dirs|directories|D=s@", "metadata|M=s@");
 
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.4 $ created on $Date: 2007/05/21 23:14:54 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.5 $ created on $Date: 2007/05/22 18:43:04 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || (!scalar(@ARGV) && !scalar(%OPTION) && &basename($0) !~ /^mz/)) {
         &print_usage_info();
     }
@@ -235,6 +322,7 @@ main
     &bool_config_opt($config, "NEWEST", "newest");
     &bool_config_opt($config, "OLDEST", "oldest");
     &bool_config_opt($config, "OLD", "old");
+    &bool_config_opt($config, "DIFFONLY", "diffonly");
     &bool_config_opt($config, "INTERACTIVE", "interactive");
     &bool_config_opt($config, "TEST", "test");
     &bool_config_opt($config, "SCM", "scm");
@@ -289,7 +377,7 @@ main
 
     if ($mode eq "scan") {
         foreach my $dir (sort(keys(%{$scan}))) {
-            foreach my $pkg (sort(keys(%{$scan->{$dir}}))) {
+            foreach my $pkg (&rpm_sort(keys(%{$scan->{$dir}}))) {
                 print "$pkg\n";
             }
         }
@@ -297,6 +385,23 @@ main
     } elsif ($mode eq "add") {
     } elsif ($mode eq "remove") {
     } elsif ($mode eq "compare") {
+        my $pkgs;
+        my $maindir = shift @dirlist;
+
+        # Check for stupidity
+        if (!scalar(@dirlist)) {
+            if ($config->get("SPAN")) {
+                eprint "Cannot use SPAN and COMPARE together.\n";
+            } else {
+                eprint "Two or more directories required for comparison.\n";
+            }
+            return MEZZANINE_SYNTAX_ERROR;
+        }
+        $pkgs = &build_package_hash($scan);
+        foreach my $dir (@dirlist) {
+            print "*** Comparing $maindir with $dir\n";
+            &compare_dirs($pkgs->{$maindir}, $pkgs->{$dir});
+        }
     } elsif ($mode eq "merge") {
     } else {
     }
