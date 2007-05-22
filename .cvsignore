@@ -4,3 +4,5 @@ logs
 *.log
 rpmrc
 rpmmacros
+rpmeval
+rpmcmp

@@ -1067,3 +1067,11 @@ where the trace is better provided in array form.
 Refactored rpm_sort() comparison code into separate rpm_cmp() function
 which can be used independently.
 ----------------------------------------------------------------------
+Tue May 22 16:29:11 2007                        Michael Jennings (mej)
+
+Using jbj's rpmeval.c as a starting point, I whipped up rpmcmp.c, a
+quickie wrapper around rpmvercmp() based on my similar work done for
+CLU.  Not as good as jbj could do, but it's a start.  Needs some
+command line options and possibly a conversion to rpmds.  Works for
+now though.
+----------------------------------------------------------------------
