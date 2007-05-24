@@ -1,4 +1,4 @@
-# $Id: mezzanine.spec,v 1.162 2007/05/22 21:45:29 mej Exp $
+# $Id: mezzanine.spec,v 1.163 2007/05/24 20:37:41 mej Exp $
 
 %define perl_vendorlib %(eval "`perl -V:installvendorlib`"; echo $installvendorlib)
 %if "%{perl_vendorlib}" == "UNKNOWN"
@@ -10,7 +10,7 @@
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
 Version: 1.9
-Release: 0.15
+Release: 0.16
 License: BSD
 Group: Development/Tools
 URL: http://www.kainx.org/mezzanine/
@@ -88,7 +88,7 @@ done
         %{__ln_s} buildtool mz$i
         echo ".so buildtool.1" > $RPM_BUILD_ROOT%{_mandir}/man1/mz$i.1
     done
-    for i in repo repo{scan,closure,compare,comp,cmp,diff,add,rm,remove,merge} ; do
+    for i in repo repo{scan,closure,compare,comp,cmp,diff,add,rm,remove} ; do
         %{__ln_s} pkgrepotool mz$i
     done
 )

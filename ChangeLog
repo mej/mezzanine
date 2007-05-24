@@ -1089,3 +1089,12 @@ printing results so that merge can reuse the comparison routines.
 Decode HTML %xx encodings in filenames when using HTTP-based
 repositories.
 ----------------------------------------------------------------------
+Thu May 24 16:38:23 2007                        Michael Jennings (mej)
+
+Refactor repository functions into a module so they can be reused by
+other tools.
+
+Stripped out merging stuff; it's too hard to do generically because
+there's no single concept of what "merge" means.  As long as we can
+get a comparison, we can use it in other tools however we wish.
+----------------------------------------------------------------------
