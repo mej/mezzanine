@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgrepotool,v 1.6 2007/05/22 21:45:29 mej Exp $
+# $Id: pkgrepotool,v 1.7 2007/05/24 16:33:36 mej Exp $
 #
 
 use strict;
@@ -204,7 +204,7 @@ sub
 compare_dirs($$)
 {
     my ($pkgs1, $pkgs2) = @_;
-    my (@pkgs1, @pkgs2);
+    my (@pkgs1, @pkgs2, @results);
     my ($i, $j);
 
     # Create sorted arrays of package names
@@ -218,29 +218,30 @@ compare_dirs($$)
 
         dprintf("Comparing %s (%d) vs. %s (%d):  $c\n", $pkgs1[$i], $i, $pkgs2[$j], $j);
         if ($c < 0) {
-            print "<< $pkgs1[$i]\n";
+            push @results, [ '<<', $pkgs1[$i] ];
             $i++;
         } elsif ($c > 0) {
-            print ">> $pkgs2[$j]\n";
+            push @results, [ '>>', $pkgs2[$j] ];
             $j++;
         } else {
             # For packages that both dirs contain, compare the RPM sets.
             if (! $config->get("DIFFONLY")) {
-                print "== $pkgs1[$i]\n";
+                push @results, [ '==', $pkgs1[$i] ];
             }
-            &compare_package_sets($pkgs1->{$pkgs1[$i]}, $pkgs2->{$pkgs2[$j]});
+            push @results, &compare_package_sets($pkgs1->{$pkgs1[$i]}, $pkgs2->{$pkgs2[$j]});
             $i++, $j++;
         }
     }
     # Handle any leftovers.
     while ($i < scalar(@pkgs1)) {
-        print "<< $pkgs1[$i]\n";
+        push @results, [ '<<', $pkgs1[$i] ];
         $i++;
     }
     while ($j < scalar(@pkgs2)) {
-        print ">> $pkgs2[$j]\n";
+        push @results, [ '>>', $pkgs2[$j] ];
         $j++;
     }
+    return @results;
 }
 
 # Display differences between two sets of a given package
@@ -248,7 +249,7 @@ sub
 compare_package_sets($$)
 {
     my ($pkgs1, $pkgs2) = @_;
-    my (@pkgs1, @pkgs2);
+    my (@pkgs1, @pkgs2, @results);
     my ($i, $j);
 
     # Create sorted arrays of RPM packages.
@@ -262,27 +263,28 @@ compare_package_sets($$)
 
         dprintf("Comparing %s (%d) vs. %s (%d):  $c\n", $pkgs1[$i], $i, $pkgs2[$j], $j);
         if ($c < 0) {
-            print "< $pkgs1[$i]\n";
+            push @results, [ '<', $pkgs1[$i] ];
             $i++;
         } elsif ($c > 0) {
-            print "> $pkgs2[$j]\n";
+            push @results, [ '>', $pkgs2[$j] ];
             $j++;
         } else {
             if (! $config->get("DIFFONLY")) {
-                print "= $pkgs1[$i]\n";
+                push @results, [ '=', $pkgs1[$i] ];
             }
             $i++, $j++;
         }
     }
     # Handle any leftovers.
     while ($i < scalar(@pkgs1)) {
-        print "< $pkgs1[$i]\n";
+        push @results, [ '<', $pkgs1[$i] ];
         $i++;
     }
     while ($j < scalar(@pkgs2)) {
-        print "> $pkgs2[$j]\n";
+        push @results, [ '>', $pkgs2[$j] ];
         $j++;
     }
+    return @results;
 }
 
 # Merge packages from master repository (#1) to slave repository (#2)
@@ -290,96 +292,56 @@ sub
 merge_dirs($$$)
 {
     my ($pkgs, $master, $slave) = @_;
-    my ($pkgs1, $pkgs2) = ($pkgs->{$master}, $pkgs->{$slave});
-    my (@pkgs1, @pkgs2);
-    my ($i, $j);
+    my (@comparison);
 
-    # Create sorted arrays of package names
-    @pkgs1 = sort(keys(%{$pkgs1}));
-    @pkgs2 = sort(keys(%{$pkgs2}));
+    @comparison = &compare_dirs($pkgs->{$master}, $pkgs->{$slave});
 
-    dprintf("Merging %d packages from $master with %d packages in $slave\n",
-            scalar(@pkgs1), scalar(@pkgs2));
-    for (($i, $j) = (0, 0); ($i < scalar(@pkgs1)) && ($j < scalar(@pkgs2)); ) {
-        my $c = $pkgs1[$i] cmp $pkgs2[$j];
+    for (my $i = 0; $i < scalar(@comparison); ) {
+        my ($status, $pkg) = @{$comparison[$i]}[(0, 1)];
 
-        dprintf("Comparing %s (%d) vs. %s (%d):  $c\n", $pkgs1[$i], $i, $pkgs2[$j], $j);
-        if ($c < 0) {
-            &merge_package_all($pkgs1->{$pkgs1[$i]}, $master, $slave);
+        dprint "$status $pkg\n";
+        if ($status eq "<<") {
+            # Package only exists in master.  Merge to slave.
+            &merge_package_all($pkg, $pkgs->{$master}{$pkg}, $master, $slave);
             $i++;
-        } elsif ($c > 0) {
-            # Only in the slave dir; do nothing.
-            dprint "Package $pkgs2[$j] is only in slave repo.\n";
-            $j++;
-        } else {
-            # For packages that both dirs contain, merge the RPM sets.
-            &merge_package_sets($pkgs1->{$pkgs1[$i]}, $pkgs2->{$pkgs2[$j]}, $master, $slave);
-            $i++, $j++;
+        } elsif ($status eq "==") {
+            my @set_comparison;
+
+            # Package exists in both master and slave.  Check individual package files.
+            for ($i++; length($comparison[$i][0]) == 1; $i++) {
+                push @set_comparison, $comparison[$i];
+            }
+            if (!scalar(grep { $_->[0] eq '<' } @set_comparison)) {
+                # All package files match too.  Next!
+                next;
+            }
+            # If we get here, master has some files slave lacks.  Merge.
+            &merge_package_set(\@set_comparison, $master, $slave);
         }
-    }
-    # Handle any leftovers.
-    while ($i < scalar(@pkgs1)) {
-        &merge_package_all($pkgs1->{$pkgs1[$i]}, $master, $slave);
-        $i++;
-    }
-    while ($j < scalar(@pkgs2)) {
-        dprint "Package $pkgs2[$j] is only in slave repo.\n";
-        $j++;
     }
 }
 
-# Merge package sets from master repository (#1) to slave repository (#2)
-sub
-merge_package_sets($$$$)
-{
-    my ($pkgs1, $pkgs2, $master, $slave) = @_;
-    my (@pkgs1, @pkgs2);
-    my ($i, $j);
-
-    # Create sorted arrays of RPM packages.
-    @pkgs1 = map { &basename($_) } &rpm_sort(@{$pkgs1});
-    @pkgs2 = map { &basename($_) } &rpm_sort(@{$pkgs2});
-
-    dprintf("Merging %d package files from master dir with %d package files from slave dir.\n",
-            scalar(@pkgs1), scalar(@pkgs2));
-    if ($config->get("INTERACTIVE")) {
-        &compare_package_sets($pkgs1, $pkgs2);
-    }
-    for ($i = 0, $j = 0; ($i < scalar(@pkgs1)) && ($j < scalar(@pkgs2)); ) {
-        my $c = &rpm_cmp($pkgs1[$i], $pkgs2[$j]);
-
-        dprintf("Comparing %s (%d) vs. %s (%d):  $c\n", $pkgs1[$i], $i, $pkgs2[$j], $j);
-        if ($c < 0) {
-            &merge_single_package($pkgs1[$i], $master, $slave);
-            $i++;
-        } elsif ($c > 0) {
-            dprint "Package file $pkgs2[$j] is only in slave repo.\n";
-            $j++;
-        } else {
-            dprint "Package file $pkgs1[$j] is in both repos already.\n";
-            $i++, $j++;
-        }
-    }
-    # Handle any leftovers.
-    while ($i < scalar(@pkgs1)) {
-        &merge_single_package($pkgs1[$i], $master, $slave);
-        $i++;
-    }
-    while ($j < scalar(@pkgs2)) {
-        dprint "Package file $pkgs2[$j] is only in slave repo.\n";
-        $j++;
-    }
-}
-
-# Merge a package that only the master repo has
+# Merge an entire package set that only the master repo has
 sub
 merge_package_all($$$)
 {
-    my ($pkgs, $master, $slave) = @_;
+    my ($pkg, $pkgs, $master, $slave) = @_;
+    my @pkgs = @{$pkgs};
 
-    foreach my $pkg (map { &basename($_) } &rpm_sort(@{$pkgs})) {
-        &merge_single_package($pkg, $master, $slave);
+    print "Merging $pkg into $slave:\n";
+    print map { "    $_\n" } @pkgs;
+    if ($config->get("INTERACTIVE")) {
+
+    } else {
+
     }
+}
+
+# Merge a package set from master to slave where some files may already match.
+sub
+merge_package_set($$$)
+{
+
 }
 
 # Copy a single package file from the master to the slave repo
@@ -417,7 +379,7 @@ main
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.6 $ created on $Date: 2007/05/22 21:45:29 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.7 $ created on $Date: 2007/05/24 16:33:36 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || (!scalar(@ARGV) && !scalar(%OPTION) && &basename($0) !~ /^mz/)) {
         &print_usage_info();
     }
@@ -509,8 +471,12 @@ main
 
         $pkgs = &build_package_hash($scan);
         foreach my $dir (@dirlist) {
+            my @results;
+
+            @results = &compare_dirs($pkgs->{$maindir}, $pkgs->{$dir});
+            #dprint &examine_object(\@results);
             print "*** Comparing $maindir with $dir\n";
-            &compare_dirs($pkgs->{$maindir}, $pkgs->{$dir});
+            print map { "$_->[0] $_->[1]\n" } @results;
         }
     } elsif ($mode eq "merge") {
         my $pkgs;

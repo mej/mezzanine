@@ -1081,3 +1081,11 @@ Switch from "clu cmp" to "rpmcmp" for version comparison pipe.
 
 Begin work on repo merge.
 ----------------------------------------------------------------------
+Thu May 24 12:33:47 2007                        Michael Jennings (mej)
+
+Refactored repo comparison to generate data structures instead of
+printing results so that merge can reuse the comparison routines.
+
+Decode HTML %xx encodings in filenames when using HTTP-based
+repositories.
+----------------------------------------------------------------------

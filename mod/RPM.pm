@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.53 2007/05/22 21:45:29 mej Exp $
+# $Id: RPM.pm,v 1.54 2007/05/24 16:33:36 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -811,7 +811,7 @@ rpm_scan_files(@)
         dprint "Scanning $dir for RPM files.\n";
         if (-d $dir) {
             @rpm_files = &grepdir(sub { /\.(?:\w+)\.rpm$/ }, $dir);
-        } elsif ($dir =~ m!^(http|ftp)://!) {
+        } elsif ($dir =~ m!^(ht|f)tps?://!) {
             my $contents;
 
             dprint "Detected URL:  $dir\n";
@@ -826,6 +826,8 @@ rpm_scan_files(@)
                     while ($contents =~ m/<\s*a\s+[^>]*href=[\"\']?([^\"\'>]+\.rpm)/ig) {
                         my $file = $1;
 
+                        # Decode %xx escapes before storing filename.
+                        $file =~ s/\%([[:xdigit:]]{2})/chr(hex($1))/eg;
                         dprint "Matched file:  $file\n";
                         push @rpm_files, $dir . &basename($file);
                     }
