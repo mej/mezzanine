@@ -21,11 +21,11 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Subversion.pm,v 1.10 2007/06/05 16:13:54 mej Exp $
+# $Id: Subversion.pm,v 1.11 2007/06/05 20:47:08 mej Exp $
 #
 
 package Mezzanine::SCM::Subversion;
-use Cwd;
+use Cwd 'abs_path', 'getcwd';
 use File::Find;
 use Mezzanine::Util;
 use Mezzanine::SCM::Global;
@@ -197,8 +197,8 @@ parse_repository_path($)
     if (! $repository) {
         $repository = $self->{"repository"};
     }
-    if ($repository =~ m!^((?:svn\+)?(?:https|ssh))://(?:([^:]+)(:[^:]+)?\@)?([^:/]+)(:\d+)?(/.*)$!i) {
-        ($proto, $user, $pass, $host, $port, $path) = ($1, $2 || "", $3 || "", $4, $5 || "", $6);
+    if ($repository =~ m!^((?:svn\+)?(?:https?|ssh))://(?:([^:]+)(:[^:]+)?\@)?([^:/]+)(:\d+)?(/.*)$!i) {
+        ($proto, $user, $pass, $host, $port, $path) = ($1, $2 || "", $3 || " ", $4, $5 || " ", $6);
         # Strip extraneous chars.
         $pass = substr($pass, 1);
         $port = substr($port, 1);
@@ -221,9 +221,9 @@ compose_repository_path($$$$)
     } else {
         $repository = sprintf("%s://%s%s%s%s",
                               (($proto) ? ($proto) : ("https")),
-                              (($user) ? ($user) : ("anonymous")),
-                              (($host) ? ("\@$host:") : ("\@localhost:")),
-                              (($port) ? ("$port") : ("")),
+                              (($user) ? ("$user\@") : ("")),
+                              (($host) ? ("$host") : ("localhost")),
+                              (($port) ? (":$port") : ("")),
                               (($path) ? ($path) : ("/svn")));
     }
     return $self->scmobj_propset("repository", $repository);
@@ -232,15 +232,16 @@ compose_repository_path($$$$)
 sub
 detect_repository()
 {
-    my ($self, $path) = @_;
+    my ($self) = @_;
     my @tmp;
 
-    dprint &print_args(@_);
-    if (! $path) {
+    #if (!defined($path)) {
         $path = '.';
-    }
+    #    &show_backtrace();
+    #}
+    dprint &print_args(@_);
 
-    if ((-r "$path/.svn/entries") && (scalar(@tmp = &pull_repository_from_entries_file("$path/.svn/entries")))) {
+    if ((-r "$path/.svn/entries") && (scalar(@tmp = $self->pull_repository_from_entries_file("$path/.svn/entries")))) {
         dprintf("Found .svn/entries in $path with repository \"%s\".\n", $self->compose_repository_path(@tmp));
     } elsif ($ENV{"MEZZANINE_SVNROOT"}) {
         dprint "Using environment variable \$MEZZANINE_SVNROOT.\n";
@@ -258,15 +259,16 @@ detect_repository()
 sub
 relative_path($)
 {
-    my ($self, $path) = @_;
+    my ($self) = @_;
     my $rel_dir;
     my $save_repo;
 
     # FIXME:  I'm not sure how this should work with a path given,
     #         so at present it may not work at all that way.
     dprint &print_args(@_);
+
     $save_repo = $self->scmobj_propget("repository");
-    $self->detect_repository($path);
+    $self->detect_repository();
     if ($save_repo && ($save_repo ne $self->scmobj_propget("repository"))) {
         # We can't use the current directory for Subversion info because the repository
         # we were asked to use and the repository used by the directory we're in
@@ -277,32 +279,8 @@ relative_path($)
         return $path;
     }
 
-    if (! $path) {
-        $path = &getcwd();
-    } else {
-        $path = &abs_path($path);
-    }
-
-    # FIXME:  What needs to happen here for Subversion??
-    if ($path && -e "$path/.svn/entries") {
-        $rel_dir = &cat_file("$path/.svn/entries");
-        dprint "Got relative path $rel_dir from $path/.svn/entries.\n";
-    } elsif (-e ".svn/entries") {
-        $rel_dir = &cat_file(".svn/entries");
-        dprint "Got relative path $rel_dir from .svn/entries.\n";
-    } else {
-        $rel_dir = "";
-        dprint "Could not find relative path.\n";
-    }
-    chomp($rel_dir);
-
-    if ($rel_dir) {
-        if ($path && $path ne "..") {
-            $rel_dir .= $path;
-        }
-    } else {
         $rel_dir = undef;
-    }
+
     dprintf("Returning %s\n", ((defined($rel_dir)) ? ($rel_dir) : ("<undef>")));
     return $rel_dir;
 }
@@ -774,36 +752,8 @@ imprt()
 
     foreach my $module (@files) {
         my $cwd = &getcwd();
-        my ($vendor_tag, $release_tag) = @{$self}{("source_tag", "target_tag")};
 
         dprint "Importing from $cwd:  $module\n";
-        if ($module eq '.') {
-            $module = $self->relative_path(&basename($cwd));
-            if ((-r ".svn/Root") && ((! $self->{"repository"}) || ($self->{"repository"} eq $ENV{"SVNROOT"}))) {
-                my $tmp;
-
-                $tmp = &cat_file(".svn/Root");
-                chomp($tmp);
-                $self->{"repository"} = $tmp;
-            }
-        } elsif (-d $module) {
-            chdir($module);
-        }
-
-        if (! $vendor_tag) {
-            if ($release_tag && ($release_tag =~ /^([A-Z]+)/)) {
-                $vendor_tag = $1;
-            } else {
-                $vendor_tag = &basename($cwd);
-            }
-        }
-        $vendor_tag =~ tr/[a-z]/[A-Z]/;
-        $vendor_tag =~ s/[^-_A-Z0-9]/_/g;
-        if (! $release_tag) {
-            $release_tag = $vendor_tag;
-        }
-        $release_tag =~ tr/[a-z]/[A-Z]/;
-        $release_tag =~ s/[^-_A-Z0-9]/_/g;
 
         $self->create_symlink_file();
         #return MEZZANINE_INVALID_TAG if (! &check_tags($module));
@@ -814,11 +764,12 @@ imprt()
             push @params, $KEYWORD_EXPANSION{"default"};
         }
         if (! $self->{"use_standard_ignore"}) {
-            push @params, '-I!';
+            push @params, '--no-ignore';
         }
         push @params, "-m", (($self->{"changelog_message"}) ? ($self->{"changelog_message"})
                                                             : (sprintf("Import of %s", &basename($module))));
-        push @params, $module, $vendor_tag, $release_tag;
+        push @params, $module, $self->{"repository"} . "/$module";
+        dprint "Subversion import parameters:  ", join(' ', @params), "\n";
 
         if ($self->{"local_mode"}) {
             dprint "Local mode active.  Not performing imprt() operation.\n";
@@ -826,7 +777,6 @@ imprt()
         }
 
         $err = $self->talk_to_server("import", @params);
-        chdir($cwd);
     }
     return $err;
 }
@@ -867,7 +817,9 @@ pull_repository_from_entries_file($)
     my ($self, $path) = @_;
     local *ENTRIES;
 
+    dprint &print_args(@_);
     if (!open(ENTRIES, $path)) {
+        dprint "Unable to open $path for reading -- $!\n";
         return undef;
     }
     while (<ENTRIES>) {
@@ -875,7 +827,7 @@ pull_repository_from_entries_file($)
         my @info;
 
         chomp($line = $_);
-        if ($line =~ m!^\s+url=\"([^\"]+)\"!i) {
+        if (($line =~ m!^\s+url=\"([^\"]+)\"!i) || ($line =~ m!^([\w\+]+://.*)$!)) {
             my $repo = $1;
 
             dprint "Found .svn/entries in $path with repository \"$repo\".\n";
@@ -888,6 +840,7 @@ pull_repository_from_entries_file($)
             }
         }
     }
+    dprint "No repo URL found in entries file?!\n";
     close(ENTRIES);
     return ();
 }
