@@ -1098,3 +1098,8 @@ Stripped out merging stuff; it's too hard to do generically because
 there's no single concept of what "merge" means.  As long as we can
 get a comparison, we can use it in other tools however we wish.
 ----------------------------------------------------------------------
+Tue Jun  5 12:15:32 2007                        Michael Jennings (mej)
+
+Attempting to fix a bug in Subversion support found by Jim Perrin.
+Let's see if this works.
+----------------------------------------------------------------------

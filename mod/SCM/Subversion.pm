@@ -21,11 +21,12 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Subversion.pm,v 1.9 2007/02/27 21:29:36 mej Exp $
+# $Id: Subversion.pm,v 1.10 2007/06/05 16:13:54 mej Exp $
 #
 
 package Mezzanine::SCM::Subversion;
 use Cwd;
+use File::Find;
 use Mezzanine::Util;
 use Mezzanine::SCM::Global;
 
@@ -901,7 +902,7 @@ create_symlink_file(@)
     local *SYMLINKS;
 
     $path = '.' if (! $path);
-    &find(sub {-l && ($links{$File::Find::name} = readlink($_));}, $path);
+    &File::Find::find(sub {-l && ($links{$File::Find::name} = readlink($_));}, $path);
     $cnt = scalar(keys %links);
     if ($cnt) {
         dprint "Found $cnt symlinks.\n";
