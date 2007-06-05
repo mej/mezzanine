@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Subversion.pm,v 1.11 2007/06/05 20:47:08 mej Exp $
+# $Id: Subversion.pm,v 1.12 2007/06/05 21:12:20 mej Exp $
 #
 
 package Mezzanine::SCM::Subversion;
@@ -752,11 +752,14 @@ imprt()
 
     foreach my $module (@files) {
         my $cwd = &getcwd();
+        my $modname = $module;
 
-        dprint "Importing from $cwd:  $module\n";
+        if ($module eq '.') {
+            $modname = &basename($cwd);
+        }
+        dprint "Importing from $cwd:  $modname\n";
 
         $self->create_symlink_file();
-        #return MEZZANINE_INVALID_TAG if (! &check_tags($module));
 
         if ($self->{"keyword_expansion"} && ($self->{"keyword_expansion"} ne "auto")) {
             push @params, $KEYWORD_EXPANSION{$self->{"keyword_expansion"}};
@@ -767,8 +770,8 @@ imprt()
             push @params, '--no-ignore';
         }
         push @params, "-m", (($self->{"changelog_message"}) ? ($self->{"changelog_message"})
-                                                            : (sprintf("Import of %s", &basename($module))));
-        push @params, $module, $self->{"repository"} . "/$module";
+                                                            : ("Import of $modname"));
+        push @params, $module, $self->{"repository"} . "/$modname";
         dprint "Subversion import parameters:  ", join(' ', @params), "\n";
 
         if ($self->{"local_mode"}) {

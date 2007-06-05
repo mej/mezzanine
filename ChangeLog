@@ -1107,3 +1107,7 @@ Tue Jun  5 16:49:13 2007                        Michael Jennings (mej)
 
 Hopefully this will fix mzimport for Subversion.
 ----------------------------------------------------------------------
+Tue Jun  5 17:14:23 2007                        Michael Jennings (mej)
+
+One more touchup for svn import.
+----------------------------------------------------------------------
