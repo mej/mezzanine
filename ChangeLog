@@ -1111,3 +1111,8 @@ Tue Jun  5 17:14:23 2007                        Michael Jennings (mej)
 
 One more touchup for svn import.
 ----------------------------------------------------------------------
+Wed Jun 20 23:17:25 2007                        Michael Jennings (mej)
+
+Don't allow errors in the perl invocation to screw up the values
+obtained for %{perl_vendorlib}.
+----------------------------------------------------------------------

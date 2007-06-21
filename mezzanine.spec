@@ -1,8 +1,8 @@
-# $Id: mezzanine.spec,v 1.163 2007/05/24 20:37:41 mej Exp $
+# $Id: mezzanine.spec,v 1.164 2007/06/21 03:17:42 mej Exp $
 
-%define perl_vendorlib %(eval "`perl -V:installvendorlib`"; echo $installvendorlib)
+%define perl_vendorlib %(eval "`perl -V:installvendorlib 2>/dev/null`"; echo $installvendorlib)
 %if "%{perl_vendorlib}" == "UNKNOWN"
-%define perl_vendorlib %(eval "`perl -V:installsitelib`"; echo $installsitelib)
+%define perl_vendorlib %(eval "`perl -V:installsitelib 2>/dev/null`"; echo $installsitelib)
 %endif
 
 %define debug_package %{nil}
