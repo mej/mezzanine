@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Subversion.pm,v 1.12 2007/06/05 21:12:20 mej Exp $
+# $Id: Subversion.pm,v 1.13 2007/06/24 16:24:10 mej Exp $
 #
 
 package Mezzanine::SCM::Subversion;
@@ -761,11 +761,12 @@ imprt()
 
         $self->create_symlink_file();
 
-        if ($self->{"keyword_expansion"} && ($self->{"keyword_expansion"} ne "auto")) {
-            push @params, $KEYWORD_EXPANSION{$self->{"keyword_expansion"}};
-        } else {
-            push @params, $KEYWORD_EXPANSION{"default"};
-        }
+        # FIXME:  This is already taken care of...I think...?
+        #if ($self->{"keyword_expansion"} && ($self->{"keyword_expansion"} ne "auto")) {
+        #    push @params, $KEYWORD_EXPANSION{$self->{"keyword_expansion"}};
+        #} else {
+        #    push @params, $KEYWORD_EXPANSION{"default"};
+        #}
         if (! $self->{"use_standard_ignore"}) {
             push @params, '--no-ignore';
         }
@@ -780,6 +781,7 @@ imprt()
         }
 
         $err = $self->talk_to_server("import", @params);
+        #chdir($cwd);
     }
     return $err;
 }
@@ -1069,7 +1071,7 @@ talk_to_server($@)
             close(STDERR);
             open(STDERR, ">&STDOUT");
             select STDOUT; $| = 1;
-            exec(@params);
+            exec { $params[0] } @params;
         }
 
         while (<CMD>) {

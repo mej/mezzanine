@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.64 2007/03/08 23:02:31 mej Exp $
+# $Id: srctool,v 1.65 2007/06/24 16:24:10 mej Exp $
 #
 
 use strict;
@@ -195,17 +195,7 @@ import_package()
                 $scm->detect_repository();
             }
 
-            chdir($tmpdir);
-            if (! -f "ChangeLog") {
-                my ($tmpfile, $msg);
-
-                $msg = sprintf("Mezzanine auto-imported %s from %s.",
-                               $pkg, &basename($pkgfile));
-                #$tmpfile = &do_changelog_entry(1, $msg);
-                if ($tmpfile) {
-                    unlink($tmpfile);
-                }
-            }
+            chdir("$tmpdir/..");
             $err = $scm->imprt($module);
 
             if ($err != MEZZANINE_SUCCESS) {
@@ -834,7 +824,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.64 $ created on $Date: 2007/03/08 23:02:31 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.65 $ created on $Date: 2007/06/24 16:24:10 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();

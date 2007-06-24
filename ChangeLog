@@ -1116,3 +1116,7 @@ Wed Jun 20 23:17:25 2007                        Michael Jennings (mej)
 Don't allow errors in the perl invocation to screw up the values
 obtained for %{perl_vendorlib}.
 ----------------------------------------------------------------------
+Sun Jun 24 12:24:08 2007                        Michael Jennings (mej)
+
+More mzimport fixes for SVN.
+----------------------------------------------------------------------
