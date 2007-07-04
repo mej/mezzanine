@@ -1120,3 +1120,7 @@ Sun Jun 24 12:24:08 2007                        Michael Jennings (mej)
 
 More mzimport fixes for SVN.
 ----------------------------------------------------------------------
+Tue Jul  3 20:56:20 2007                        Michael Jennings (mej)
+
+Get buildroot pkgvar properly.
+----------------------------------------------------------------------
