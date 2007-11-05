@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.55 2007/06/21 03:17:42 mej Exp $
+# $Id: RPM.pm,v 1.56 2007/11/05 08:04:26 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -104,6 +104,8 @@ rpm_form_command
 {
     my $type = shift;
 
+    dprint &print_args(@_);
+
     $type = "" if (!defined($type));
 
     if ($type eq "build") {
@@ -118,11 +120,6 @@ rpm_form_command
             }
         } elsif (&pkgvar_instroot()) {
             &pkgvar_command("chroot " . &pkgvar_instroot() . " " . &pkgvar_command());
-        }
-    } elsif ($type eq "query") {
-        if (! &pkgvar_command()) {
-            &pkgvar_command(((&file_user() == $UID) ? ("") : (sprintf("/bin/su -s /bin/sh %s -c", &pkgvar_get("builduser"))))
-                            . " /bin/sh -c \"/usr/bin/rpmquery");
         }
     } else {
         if (! &pkgvar_command()) {

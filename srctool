@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.65 2007/06/24 16:24:10 mej Exp $
+# $Id: srctool,v 1.66 2007/11/05 08:04:26 mej Exp $
 #
 
 use strict;
@@ -654,7 +654,11 @@ clean_package
 
     print "Cleaning and resyncing $pkg, please wait....\n";
     $scm->scmobj_propset("handle_output", 0);
-    $err = $scm->get();
+    if ($scm->scmobj_propget("type") eq "CVS") {
+        $err = $scm->get();
+    } else {
+        $err = $scm->status();
+    }
     if ($err != MEZZANINE_SUCCESS) {
         print @{$scm->scmobj_propget("saved_output")};
         eprint "Unable to clean $pkg.  (See above error(s).)\n";
@@ -716,7 +720,11 @@ sync_package
     print "Syncing $pkg...\n";
     $scm->scmobj_propset("handle_output", 0);
     $scm->scmobj_propset("saved_output", \@output);
-    $err = $scm->get();
+    if ($scm->scmobj_propget("type") eq "CVS") {
+        $err = $scm->get();
+    } else {
+        $err = $scm->status();
+    }
     if ($err != MEZZANINE_SUCCESS) {
         print @output;
         eprint "Unable to sync repository to working copy of $pkg.  (See above error(s).)\n";
@@ -731,9 +739,9 @@ sync_package
         }
     }
     push @new, @add;
-    foreach my $r (grep(/^U\s/, @output)) {
+    foreach my $r (grep(/^(U|\!\s+\d+)\s+/, @output)) {
         chomp($r);
-        $r =~ s/^U\s+//;
+        $r =~ s/^(U|\!\s+\d+)\s+//;
         push @rm, $r;
     }
     push @old, @rm;
@@ -824,7 +832,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.65 $ created on $Date: 2007/06/24 16:24:10 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.66 $ created on $Date: 2007/11/05 08:04:26 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();
@@ -848,7 +856,7 @@ main
 
     if ($OPTION{"protocol"}) {
         $scm = Mezzanine::SCM->new($OPTION{"protocol"});
-    } elsif (scalar(@ARGV)) {
+    } elsif (scalar(@ARGV) && -e $ARGV[0]) {
         $scm = Mezzanine::SCM->auto_detect($ARGV[0]);
     } else {
         $scm = Mezzanine::SCM->auto_detect('.');

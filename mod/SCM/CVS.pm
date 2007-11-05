@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: CVS.pm,v 1.17 2007/02/27 21:29:36 mej Exp $
+# $Id: CVS.pm,v 1.18 2007/11/05 08:04:26 mej Exp $
 #
 
 package Mezzanine::SCM::CVS;
@@ -853,14 +853,18 @@ imprt()
                 $self->{"repository"} = $tmp;
             }
         } elsif (-d $module) {
+            dprint "Changing directory to $module.\n";
             chdir($module);
+        } elsif (-d &basename($module)) {
+            dprintf("Changing directory to %s.\n", &basename($module));
+            chdir(&basename($module));
         }
 
         if (! $vendor_tag) {
             if ($release_tag && ($release_tag =~ /^([A-Z]+)/)) {
                 $vendor_tag = $1;
             } else {
-                $vendor_tag = &basename($cwd);
+                $vendor_tag = &basename((($module eq '.') ? ($cwd) : ($module)));
             }
         }
         $vendor_tag =~ tr/[a-z]/[A-Z]/;
