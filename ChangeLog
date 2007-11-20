@@ -1128,3 +1128,7 @@ Mon Nov  5 00:04:22 2007                        Michael Jennings (mej)
 
 Fix mzsync and mzclean with Subversion.
 ----------------------------------------------------------------------
+Tue Nov 20 13:48:39 2007                        Michael Jennings (mej)
+
+Kernel module spec template improvements.
+----------------------------------------------------------------------
