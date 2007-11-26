@@ -38,10 +38,10 @@ This package contains the %{name} kernel module for the
 %{makeinstall} %{?mflags_install} MODDIR=$RPM_BUILD_ROOT/lib/modules/%{kernel_version}
 
 %post
-/sbin/depmod -aq
+/sbin/depmod -aq %{kernel_version}
 
 %postun
-/sbin/depmod -aq
+/sbin/depmod -aq %{kernel_version}
 
 %clean
 test "x$RPM_BUILD_ROOT" != "x/" && rm -rf $RPM_BUILD_ROOT

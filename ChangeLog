@@ -1132,3 +1132,7 @@ Tue Nov 20 13:48:39 2007                        Michael Jennings (mej)
 
 Kernel module spec template improvements.
 ----------------------------------------------------------------------
+Mon Nov 26 14:38:40 2007                        Michael Jennings (mej)
+
+Add version to depmod command in kernel templates.
+----------------------------------------------------------------------
