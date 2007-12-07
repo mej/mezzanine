@@ -1136,3 +1136,8 @@ Mon Nov 26 14:38:40 2007                        Michael Jennings (mej)
 
 Add version to depmod command in kernel templates.
 ----------------------------------------------------------------------
+Thu Dec  6 22:31:13 2007                        Michael Jennings (mej)
+
+Fix import for SVN:  when importing, always use the current directory,
+not the supplied package, for auto-detecting the SCM type.
+----------------------------------------------------------------------

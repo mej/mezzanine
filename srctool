@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: srctool,v 1.66 2007/11/05 08:04:26 mej Exp $
+# $Id: srctool,v 1.67 2007/12/07 06:31:05 mej Exp $
 #
 
 use strict;
@@ -832,7 +832,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.66 $ created on $Date: 2007/11/05 08:04:26 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.67 $ created on $Date: 2007/12/07 06:31:05 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
         &print_usage_info();
@@ -849,6 +849,25 @@ main
         &debug_set($config->set("DEBUG", $OPTION{"debug"} || $config->get("DEBUG") || 0));
     }
     &pkgvar_name($OPTION{"name"});
+
+    if ($0 =~ /mzimport$/ || $OPTION{"import"}) {
+        $command = "import";
+    } elsif ($0 =~ /mzprep$/ || $OPTION{"prepare"}) {
+        $command = "prep";
+    } elsif ($0 =~ /mzmerge$/ || $OPTION{"merge"}) {
+        $command = "merge";
+    } elsif ($0 =~ /mzpatch$/ || $OPTION{"patch"}) {
+        $command = "patch";
+    } elsif ($0 =~ /mzclean$/ || $OPTION{"clean"}) {
+        $command = "clean";
+    } elsif ($0 =~ /mz(re)?sync$/ || $OPTION{"resync"}) {
+        $command = "sync";
+    } elsif ($0 =~ /mzmv$/ || $OPTION{"move"}) {
+        $command = "move";
+    } else {
+        &print_usage_info();
+    }
+
     if (scalar(@ARGV)) {
         @flist = @ARGV;
     }
@@ -856,7 +875,7 @@ main
 
     if ($OPTION{"protocol"}) {
         $scm = Mezzanine::SCM->new($OPTION{"protocol"});
-    } elsif (scalar(@ARGV) && -e $ARGV[0]) {
+    } elsif (($command ne "import") && (scalar(@ARGV)) && (-e $ARGV[0])) {
         $scm = Mezzanine::SCM->auto_detect($ARGV[0]);
     } else {
         $scm = Mezzanine::SCM->auto_detect('.');
@@ -888,8 +907,7 @@ main
         $scm->scmobj_propset("repository", $config->get("REPOSITORY"));
     }
 
-    if ($0 =~ /mzimport$/ || $OPTION{"import"}) {
-        $command = "import";
+    if ($command eq "import") {
         if ($OPTION{"flat"}) {
             $import_as_pdr = 1;
         }
@@ -905,8 +923,7 @@ main
         } else {
             return &import_package();
         }
-    } elsif ($0 =~ /mzprep$/ || $OPTION{"prepare"}) {
-        $command = "prep";
+    } elsif ($command eq "prep") {
         if (scalar(@flist)) {
             foreach my $f (@flist) {
                 my $err;
@@ -918,10 +935,9 @@ main
         } else {
             return &prepare_tree();
         }
-    } elsif ($0 =~ /mzmerge$/ || $OPTION{"merge"}) {
+    } elsif ($command eq "merge") {
         my $pkg;
 
-        $command = "merge";
         if ($OPTION{"flat"}) {
             $import_as_pdr = 1;
         }
@@ -947,10 +963,9 @@ main
             $err = &merge_file($f);
             return $err if ($err);
         }
-    } elsif ($0 =~ /mzpatch$/ || $OPTION{"patch"}) {
+    } elsif ($command eq "patch") {
         my ($pkg, $patch);
 
-        $command = "patch";
         if (! $pkg) {
             $pkg = ".";
             &pkgvar_filename($pkg);
@@ -980,8 +995,7 @@ main
         &pkgvar_filename($pkg);
         &pkgvar_name($patch);
         return &gen_patch();
-    } elsif ($0 =~ /mzclean$/ || $OPTION{"clean"}) {
-        $command = "clean";
+    } elsif ($command eq "clean") {
         if (scalar(@flist)) {
             foreach my $f (@flist) {
                 my $err;
@@ -993,8 +1007,7 @@ main
         } else {
             return &clean_package();
         }
-    } elsif ($0 =~ /mz(re)?sync$/ || $OPTION{"resync"}) {
-        $command = "sync";
+    } elsif ($command eq "sync") {
         if (scalar(@flist)) {
             foreach my $f (@flist) {
                 my $err;
@@ -1006,8 +1019,7 @@ main
         } else {
             return &sync_package();
         }
-    } elsif ($0 =~ /mzmv$/ || $OPTION{"move"}) {
-        $command = "move";
+    } elsif ($command eq "move") {
         if (scalar(@flist) > 1) {
             $err = &move_package_files(@flist);
             return $err if ($err);
@@ -1015,7 +1027,6 @@ main
             eprint "Two or more parameters required for move.\n";
             return MEZZANINE_SYNTAX_ERROR;
         }
-    } else {
     }
     return MEZZANINE_SUCCESS;
 }
