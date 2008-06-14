@@ -1,4 +1,4 @@
-# $Id: mezzanine.spec,v 1.166 2007/12/07 06:31:05 mej Exp $
+# $Id: mezzanine.spec,v 1.167 2008/06/14 17:35:55 mej Exp $
 
 %define perl_vendorlib %(eval "`perl -V:installvendorlib 2>/dev/null`"; echo $installvendorlib)
 %if "%{perl_vendorlib}" == "UNKNOWN"
@@ -44,8 +44,8 @@ building, and releasing software products.
     done
 ) || :
 
-${CC:-%{__cc}} $CPPFLAGS ${CFLAGS:-$RPM_OPT_FLAGS} -o rpmeval rpmeval.c $LDFLAGS -lrpm $LIBS || :
-${CC:-%{__cc}} $CPPFLAGS ${CFLAGS:-$RPM_OPT_FLAGS} -o rpmcmp rpmcmp.c $LDFLAGS -lrpm $LIBS || :
+${CC:-%{__cc}} $CPPFLAGS ${CFLAGS:-$RPM_OPT_FLAGS} -I%{_includedir}/rpm -o rpmeval rpmeval.c $LDFLAGS -lrpm $LIBS || :
+${CC:-%{__cc}} $CPPFLAGS ${CFLAGS:-$RPM_OPT_FLAGS} -I%{_includedir}/rpm -o rpmcmp rpmcmp.c $LDFLAGS -lrpm $LIBS || :
 
 %install
 test "x$RPM_BUILD_ROOT" != "x" && %{__rm} -rf $RPM_BUILD_ROOT

@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdint.h>
+#include <rpm/rpmio.h>
 #include <rpm/rpmcli.h>
 #include <rpm/rpmmacro.h>
 

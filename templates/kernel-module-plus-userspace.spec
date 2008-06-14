@@ -19,7 +19,7 @@ Vendor: @VENDOR@
 Distribution: @DISTRIBUTION@
 #BuildSuggests: linux kernel
 Prefix: %{_prefix}
-BuildRoot: /var/tmp/%{name}-%{version}-%{release}-root
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
 %description
 @DESCRIPTION@

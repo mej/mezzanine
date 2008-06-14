@@ -9,7 +9,7 @@ Packager: @PACKAGER@
 Vendor: @VENDOR@
 Distribution: @DISTRIBUTION@
 Prefix: %{_prefix}
-BuildRoot: /var/tmp/%{name}-%{version}-%{release}-root
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
 %description
 @DESCRIPTION@

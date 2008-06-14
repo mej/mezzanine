@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.56 2007/03/11 19:05:52 mej Exp $
+# $Id: Build.pm,v 1.57 2008/06/14 17:35:55 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -996,7 +996,7 @@ build_srpm
 
         chomp($f);
         @fields = split(' ', $f);
-        push @specs, $fields[$#fields];
+        push @specs, &basename($fields[$#fields]);
     }
     if (scalar(@specs) != 1) {
         wprint "Found ${\(scalar(@specs))} spec files in $pkg?!\n";

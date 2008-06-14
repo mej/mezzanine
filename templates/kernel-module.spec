@@ -20,7 +20,7 @@ Distribution: @DISTRIBUTION@
 #BuildSuggests: linux kernel
 Requires: %{kernel_mod_path}/%{kernel_version}
 Prefix: %{_prefix}
-BuildRoot: /var/tmp/%{name}-%{version}-%{release}-root
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
 %description
 @DESCRIPTION@

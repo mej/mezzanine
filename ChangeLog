@@ -1141,3 +1141,7 @@ Thu Dec  6 22:31:13 2007                        Michael Jennings (mej)
 Fix import for SVN:  when importing, always use the current directory,
 not the supplied package, for auto-detecting the SCM type.
 ----------------------------------------------------------------------
+Sat Jun 14 10:35:17 2008                        Michael Jennings (mej)
+
+Changes required for use with RPM version 5 and higher.
+----------------------------------------------------------------------

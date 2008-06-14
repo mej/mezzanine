@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.56 2007/11/05 08:04:26 mej Exp $
+# $Id: RPM.pm,v 1.57 2008/06/14 17:35:55 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -402,6 +402,7 @@ disable_patch($)
             if ((($patch_num) && ($patch_num eq $patch))
                 || (!($patch_num) && !($patch))) {
                 dprint "Disabling:  $line\n";
+                $line =~ s/\%patch/\%\%patch/;
                 $line = '#' . $line;
             }
         }
@@ -434,13 +435,13 @@ enable_patch($)
     open(SPECFILE, ">$specfile") || return 0;
     foreach my $line (@contents) {
         chomp($line);
-        if ($line =~ /^\s*\#\s*\%patch(\d*)\s+/) {
+        if ($line =~ /^\s*\#\s*\%+patch(\d*)\s+/) {
             my $patch_num = $1;
 
             if ((($patch_num) && ($patch_num eq $patch))
                 || (!($patch_num) && !($patch))) {
                 dprint "Enabling:  $line\n";
-                $line =~ s/^\s*\#//;
+                $line =~ s/^\s*\#\s*\%+patch/\%patch/;
             }
         }
         print SPECFILE "$line\n";

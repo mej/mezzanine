@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdint.h>
+#include <rpm/rpmio.h>
 #include <rpm/rpmcli.h>
 #include <rpm/rpmmacro.h>
 #include <rpm/rpmts.h>
@@ -145,7 +147,7 @@ main(int argc, char *argv[])
             }
         }
     } else if (!av[1]) {
-        rpmError(RPMERR_BADARG, "compare requires 2 parameters.\n");
+        rpmlog(RPMLOG_ERR, "compare requires 2 parameters.\n");
         ret = 127;
     } else {
         /* Compare versions supplied on command line */
