@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.57 2008/06/14 17:35:55 mej Exp $
+# $Id: RPM.pm,v 1.58 2008/07/10 05:16:35 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -47,7 +47,7 @@ BEGIN {
                '&disable_patch', '&enable_patch', '&rpm_install',
                '&rpm_show_contents', '&rpm_query', '&rpm_build',
                '&rpm_compare_versions', '&rpm_get_installed',
-               '&rpm_scan_files', '&rpm_cmp', '&rpm_sort');
+               '&rpm_scan_files', '&rpm_cmp', '&rpm_sort', '&rpm_eval');
 
     %EXPORT_TAGS = ( );
 
@@ -81,6 +81,7 @@ sub rpm_get_installed();
 sub rpm_scan_files(@);
 sub rpm_cmp($$);
 sub rpm_sort(@);
+sub rpm_eval(@);
 
 # Private functions
 sub add_define($$);
@@ -157,6 +158,9 @@ rpm_form_command
                 $cmd .= " --root='" . &pkgvar_instroot() . "'";
             }
         }
+        if (&pkgvar_filename() && (substr(&pkgvar_filename(), -7, 7) eq "src.rpm")) {
+            $cmd .= " --nodeps";
+        }
     }
     if (&pkgvar_parameters()) {
         $cmd .= " " . &pkgvar_parameters();
@@ -230,37 +234,7 @@ parse_spec_file
     @specfile_lines = <SPECFILE>;
     close(SPECFILE);
 
-    $contents = join("", @specfile_lines);
-    $contents = &untaint(\$contents, qr/^(.*)$/s);  # Anything goes; no risk here.
-
-    dprint "Attempting to launch helper to parse spec file contents.\n";
-    $pid = open(SPECFILE, "-|");
-    if (!defined($pid)) {
-        wprint "Unable to pre-process spec file $specfile -- $!\n";
-    } elsif ($pid == 0) {
-        exec("rpmeval", $contents);
-        wprint "Unable to exec rpmeval -- $!.  Trying /bin/rpm --eval\n";
-        exec("/bin/rpm", "--eval", $contents);
-        &fatal_error("Unable to exec /bin/rpm -- $!\n");
-    } else {
-        my @tmp;
-
-        dprint "Child process $pid launched; reading from child's STDOUT.\n";
-        #while (<SPECFILE>) {
-        #    my $line = $_;
-
-        #    dprint "eval-> $line";
-        #    push @tmp, $line;
-        #}
-        @tmp = <SPECFILE>;
-        close(SPECFILE);
-        dprintf("Got %d lines back from helper.\n", scalar(@tmp));
-        if (scalar(@tmp) > 10) {
-            @specfile_lines = @tmp;
-        } else {
-            wprint "Pre-processing spec file $specfile failed; using internal parser.\n";
-        }
-    }
+    @specfile_lines = &rpm_eval(@specfile_lines);
 
     dprint "Internal parser reading spec file.\n";
     $stage = 0;
@@ -712,16 +686,21 @@ rpm_compare_versions($$)
     # Downcase everything right off the bat.
     if ($v1) {
         $v1 =~ tr/[A-Z]/[a-z]/;
+    } elsif (!defined($v1)) {
+        $v1 = '';
     }
     if ($v2) {
         $v2 =~ tr/[A-Z]/[a-z]/;
+    } elsif (!defined($v2)) {
+        $v2 = '';
     }
 
     for (; 1; ) {
         my ($s1, $s2) = ('', '');
         my ($ival1, $ival2) = (0, 0);
 
-        if ((! $v1) || (! $v2) || !length($v1) || !length($v2)) {
+        #dprint "Comparing $v1 vs. $v2\n";
+        if (!length($v1) || !length($v2)) {
             last;
         }
         if (($v1 =~ /^[a-z]+/) && ($v2 =~ /^[a-z]+/)) {
@@ -763,18 +742,18 @@ rpm_compare_versions($$)
                 return ($s1 cmp $s2);
             }
         }
-        if ($s1) {
+        if (defined($s1)) {
             $v1 =~ s/^$s1//;
         }
-        if ($s2) {
+        if (defined($s2)) {
             $v2 =~ s/^$s2//;
         }
     }
 
     # We've reached the end of one of the strings.
-    if ($v1 && length($v1)) {
+    if (length($v1)) {
         return 1;
-    } elsif ($v2 && length($v2)) {
+    } elsif (length($v2)) {
         return -1;
     }
     return 0;
@@ -918,6 +897,35 @@ rpm_sort(@)
     my @tmp;
 
     return sort rpm_cmp @rpm_list;
+}
+
+# Evaluate macros via RPM
+sub
+rpm_eval(@)
+{
+    my @contents = @_;
+    my ($contents, $pid);
+    my @tmp;
+
+    $contents = join("", @contents);
+    $contents = &untaint(\$contents, qr/^(.*)$/s);  # Anything goes; no risk here.
+
+    dprint "Attempting to launch helper to parse spec file contents.\n";
+    $pid = open(CMD, "-|");
+    if (!defined($pid)) {
+        wprint "Unable to fork/exec subprocess -- $!\n";
+    } elsif ($pid == 0) {
+        exec("rpmeval", $contents);
+        wprint "Unable to exec rpmeval -- $!.  Trying /bin/rpm --eval\n";
+        exec("/bin/rpm", "--eval", $contents);
+        &fatal_error("Unable to exec /bin/rpm -- $!\n");
+    } else {
+        dprint "Child process $pid launched; reading from child's STDOUT.\n";
+        @tmp = <CMD>;
+        close(CMD);
+        dprintf("Got %d lines back from helper.\n", scalar(@tmp));
+    }
+    return @tmp;
 }
 
 ### Private functions

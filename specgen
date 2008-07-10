@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: specgen,v 1.15 2008/06/14 17:35:55 mej Exp $
+# $Id: specgen,v 1.16 2008/07/10 05:16:35 mej Exp $
 #
 
 use strict;
@@ -349,6 +349,40 @@ confirm_info(\%)
 }
 
 sub
+calc_replacements()
+{
+    my %macro_defaults = (
+                          "%{webroot}" => "/var/www",
+                          "%{_bindir}" => "/usr/bin",
+                          "%{_sbindir}" => "/usr/sbin",
+                          "%{_libexecdir}" => "/usr/libexec",
+                          "%{_datadir}" => "/usr/share",
+                          "%{_sysconfdir}" => "/etc",
+                          "%{_sharedstatedir}" => "/usr/com",
+                          "%{_localstatedir}" => "/var",
+                          "%{_libdir}" => "/usr/lib",
+                          "%{_includedir}" => "/usr/include",
+                          "%{_infodir}" => "/usr/share/info",
+                          "%{_mandir}" => "/usr/share/man",
+                          "%{_initrddir}" => "/etc/init.d",
+                          "%{_prefix}" => "/usr"
+                         );
+    my %replacements;
+    my @values;
+
+    my @values = &rpm_eval(map { "$_\n" } sort(keys(%macro_defaults)));
+    foreach my $macro (sort(keys(%macro_defaults))) {
+        if ($values[0] && ($values[0] ne "$macro\n")) {
+            chomp($replacements{$macro} = shift @values);
+        } else {
+            $replacements{$macro} = $macro_defaults{$macro};
+        }
+        dprint "Got macro value:  $macro -> $replacements{$macro}\n";
+    }
+    return %replacements;
+}
+
+sub
 replace_macros(\% @)
 {
     my ($href, @keys) = @_;
@@ -421,24 +455,9 @@ watch_install(\%)
     my $pkgname = $href->{"NAME"};
     my ($tmpdir, $savecwd, $buildroot, $err, $msg, $outfiles);
     my @filelist;
-    my %replace_paths = (
-                         "/var/www" => "%{webroot}",
-                         "/usr/bin" => "%{_bindir}",
-                         "/usr/sbin" => "%{_sbindir}",
-                         "/usr/libexec" => "%{_libexecdir}",
-                         "/usr/share" => "%{_datadir}",
-                         "/etc" => "%{_sysconfdir}",
-                         "/usr/com" => "%{_sharedstatedir}",
-                         "/var" => "%{_localstatedir}",
-                         "/usr/lib" => "%{_libdir}",
-                         "/usr/include" => "%{_includedir}",
-                         "/usr/share/info" => "%{_infodir}",
-                         "/usr/share/man" => "%{_mandir}",
-                         "/etc/rc.d/init.d" => "%{_initrddir}",
-                         "/etc/init.d" => "%{_initrddir}",
-                         "/usr" => "%{_prefix}"
-                        );
+    my %replace_paths;
 
+    %replace_paths = reverse(&calc_replacements());
     $tmpdir = &create_temp_space($pkgname, "build");
     $buildroot = "$tmpdir/buildroot";
     $savecwd = &getcwd();
@@ -474,6 +493,7 @@ watch_install(\%)
                 $i--;
             } else {
                 foreach my $path (sort { length($b) <=> length($a) } keys(%replace_paths)) {
+                    dprint "Checking $filelist[$i] for $path -> $replace_paths{$path}\n";
                     if ($filelist[$i] =~ /^\Q$path\E/) {
                         $filelist[$i] =~ s/^\Q$path\E/$replace_paths{$path}/eg;
                     }
@@ -512,7 +532,7 @@ main
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.15 $ created on $Date: 2008/06/14 17:35:55 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.16 $ created on $Date: 2008/07/10 05:16:35 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || !scalar(@ARGV)) {
 	&print_usage_info();
     }

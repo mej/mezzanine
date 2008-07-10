@@ -1145,3 +1145,13 @@ Sat Jun 14 10:35:17 2008                        Michael Jennings (mej)
 
 Changes required for use with RPM version 5 and higher.
 ----------------------------------------------------------------------
+Wed Jul  9 22:13:29 2008                        Michael Jennings (mej)
+
+Refactor macro replacements in specgen to use actual values supplied
+by rpm.
+
+Fix fallback version comparison routine handling of "0" strings.
+
+Re-add rpm5 fix that somehow got lost -- install SRPMs regardless of
+dependencies.
+----------------------------------------------------------------------
