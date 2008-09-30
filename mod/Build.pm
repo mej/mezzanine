@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.57 2008/06/14 17:35:55 mej Exp $
+# $Id: Build.pm,v 1.58 2008/09/30 15:03:03 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -719,7 +719,7 @@ build_spm
         &pkgvar_instructions($specfile);
     }
 
-    @tmp = &grepdir(sub {-f $_ && -s _}, "S");
+    @tmp = &grepdir(sub {-f $_}, "S");
     @tmp2 = &grepdir(sub {-f $_ && -s _}, "P");
     if (!scalar(@tmp)) {
         @tmp = @tmp2;
@@ -734,11 +734,11 @@ build_spm
     if (&parse_prod_file()) {
         my $pkg = &pkgvar_name();
 
-        if ($pkgs->{$pkg}{SRCS}) {
-            &pkgvar_srcs($pkgs->{$pkg}{SRCS});
+        if ($pkgs->{$pkg}{"SRCS"}) {
+            &pkgvar_srcs($pkgs->{$pkg}{"SRCS"});
         }
-        if ($pkgs->{$pkg}{ARCH}) {
-            &pkgvar_architecture($pkgs->{$pkg}{ARCH});
+        if ($pkgs->{$pkg}{"ARCH"}) {
+            &pkgvar_architecture($pkgs->{$pkg}{"ARCH"});
         }
     }
     return &build_topdir();

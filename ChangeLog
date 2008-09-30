@@ -1155,3 +1155,7 @@ Fix fallback version comparison routine handling of "0" strings.
 Re-add rpm5 fix that somehow got lost -- install SRPMs regardless of
 dependencies.
 ----------------------------------------------------------------------
+Tue Sep 30 08:03:01 2008                        Michael Jennings (mej)
+
+Allow zero-byte source files, ridiculous as it is.
+----------------------------------------------------------------------
