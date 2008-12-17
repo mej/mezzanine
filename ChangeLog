@@ -1159,3 +1159,7 @@ Tue Sep 30 08:03:01 2008                        Michael Jennings (mej)
 
 Allow zero-byte source files, ridiculous as it is.
 ----------------------------------------------------------------------
+Tue Dec 16 20:40:36 2008                        Michael Jennings (mej)
+
+Order of rpm options matters.  Fixes mzbuild -a <arch>.
+----------------------------------------------------------------------

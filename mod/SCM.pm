@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: SCM.pm,v 1.7 2007/02/27 21:29:36 mej Exp $
+# $Id: SCM.pm,v 1.8 2008/12/17 04:40:38 mej Exp $
 #
 
 package Mezzanine::SCM;
@@ -100,9 +100,9 @@ new($)
 }
 
 sub
-auto_detect($)
+auto_detect($$)
 {
-    my ($self, $path) = @_;
+    my ($self, $path, $force) = @_;
     my $will;
 
     dprint &print_args(@_);
@@ -111,6 +111,9 @@ auto_detect($)
     }
     if (! $path) {
         $path = '.';
+    }
+    if (!defined($force)) {
+        $force = 0;
     }
     foreach my $mod (@SCM_MODULE_LIST) {
         my $ret;
@@ -136,9 +139,11 @@ auto_detect($)
             dprint $mod . "->can_handle($path) returned $ret?!\n";
         }
     }
-    if ($will) {
+    if ($force && $will) {
+        dprint "Forcing $will to handle \"$path\" by request.\n";
         return Mezzanine::SCM->new($will);
     }
+    dprint "No SCM module found for \"$path\" and force not requested.\n";
     return undef;
 }
 

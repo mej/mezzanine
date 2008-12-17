@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.58 2008/07/10 05:16:35 mej Exp $
+# $Id: RPM.pm,v 1.59 2008/12/17 04:40:38 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -129,20 +129,14 @@ rpm_form_command
         }
     }
     $cmd = &pkgvar_command();
-    if (&pkgvar_rcfile()) {
-        $cmd .= " --rcfile=\"/usr/lib/rpm/rpmrc:" . &pkgvar_rcfile() . "\"";
-    }
-    if (&pkgvar_topdir()) {
-        $cmd .= " --define '_topdir " . &pkgvar_topdir() . "'";
-    }
     if ($type eq "build") {
-        $cmd .= " --define 'optflags $ENV{CFLAGS}'";
-        if (&pkgvar_buildroot()) {
-            $cmd .= " --buildroot '" . &pkgvar_buildroot() . "'";
-        }
         if (&pkgvar_architecture()) {
             $cmd .= " --target='" . &pkgvar_architecture() . "'";
         }
+        if (&pkgvar_buildroot()) {
+            $cmd .= " --buildroot '" . &pkgvar_buildroot() . "'";
+        }
+        $cmd .= " --define 'optflags $ENV{CFLAGS}'";
     } elsif ($type eq "install" || $type eq "buildpkglist") {
         if (&pkgvar_instroot()) {
             if (-x (&pkgvar_instroot() . "/bin/rpm")) {
@@ -161,6 +155,12 @@ rpm_form_command
         if (&pkgvar_filename() && (substr(&pkgvar_filename(), -7, 7) eq "src.rpm")) {
             $cmd .= " --nodeps";
         }
+    }
+    if (&pkgvar_rcfile()) {
+        $cmd .= " --rcfile=\"/usr/lib/rpm/rpmrc:" . &pkgvar_rcfile() . "\"";
+    }
+    if (&pkgvar_topdir()) {
+        $cmd .= " --define '_topdir " . &pkgvar_topdir() . "'";
     }
     if (&pkgvar_parameters()) {
         $cmd .= " " . &pkgvar_parameters();
