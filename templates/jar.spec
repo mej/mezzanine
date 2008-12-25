@@ -8,8 +8,8 @@ Source: @TARBALL_URL@
 Packager: @PACKAGER@
 Vendor: @VENDOR@
 Distribution: @DISTRIBUTION@
-Prefix: %{_prefix}
 BuildArch: noarch
+Prefix: %{_prefix}
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
 %description

@@ -8,6 +8,7 @@ Source: @TARBALL_URL@
 Packager: @PACKAGER@
 Vendor: @VENDOR@
 Distribution: @DISTRIBUTION@
+BuildRequires: php-devel
 Prefix: %{_prefix}
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 

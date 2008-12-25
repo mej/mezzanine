@@ -10,8 +10,8 @@ Source: @TARBALL_URL@
 Packager: @PACKAGER@
 Vendor: @VENDOR@
 Distribution: @DISTRIBUTION@
-Prefix: %{webroot}
 BuildArch: noarch
+Prefix: %{webroot}
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
 %description

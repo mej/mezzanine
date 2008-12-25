@@ -2,8 +2,8 @@ Summary: @MODULENAME@ Perl module
 Name: @MODULE@
 Version: @VERSION@
 Release: 1.@VENDORSUFFIX@
-Group: Development/Libraries
 License: Artistic
+Group: Development/Libraries
 URL: http://search.cpan.org/search?mode=module&query=@MODULENAME@
 Source: @DISTFILE@
 Packager: @PACKAGER@

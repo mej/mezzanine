@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Subversion.pm,v 1.13 2007/06/24 16:24:10 mej Exp $
+# $Id: Subversion.pm,v 1.14 2008/12/25 07:52:39 mej Exp $
 #
 
 package Mezzanine::SCM::Subversion;
@@ -692,37 +692,27 @@ tag()
     my @params = ("tag");
 
     dprint &print_args(@_);
-    if ($self->{"local_mode"}) {
-        dprint "Local mode active.  Not performing tag() operation.\n";
-        return MEZZANINE_SUCCESS;
-    }
-
-    if (! $self->{"source_tag"}) {
-        return MEZZANINE_INVALID_TAG;
-    }
-    if (! $self->{"recursion"}) {
-        push @params, "-N";
-    }
-    push @params, "-F", $self->{"source_tag"};
-    return $self->talk_to_server("tag", @params, @files);
+    eprint "Subversion does not support tagging.\n";
+    return MEZZANINE_UNSUPPORTED;
 }
 
 sub
 branch()
 {
     my ($self, @files) = @_;
-    return $self->tag("-b", @files);
+    eprint "Subversion does not support in-place branching.\n";
+    return MEZZANINE_UNSUPPORTED;
 }
 
 sub
 merge()
 {
     my ($self, @files) = @_;
-    my @params;
+    my @params = ("merge");
 
     dprint &print_args(@_);
     if ($self->{"local_mode"}) {
-        dprint "Local mode active.  Not performing tag() operation.\n";
+        dprint "Local mode active.  Not performing merge() operation.\n";
         return MEZZANINE_SUCCESS;
     }
 
@@ -734,7 +724,7 @@ merge()
     if (! $self->{"recursion"}) {
         push @params, "-N";
     }
-    return $self->talk_to_server("get", "update", @params, @files);
+    return $self->talk_to_server("merge", @params, @files);
 }
 
 sub

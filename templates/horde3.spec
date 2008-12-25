@@ -12,8 +12,8 @@ Packager: @PACKAGER@
 Vendor: @VENDOR@
 Distribution: @DISTRIBUTION@
 Requires: horde >= 3
-Prefix: %{webroot}
 BuildArch: noarch
+Prefix: %{webroot}
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
 %description
