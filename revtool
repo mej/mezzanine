@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: revtool,v 1.94 2007/02/27 21:29:36 mej Exp $
+# $Id: revtool,v 1.95 2009/03/06 07:16:22 mej Exp $
 #
 
 use strict;
@@ -99,7 +99,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.94 $ created on $Date: 2007/02/27 21:29:36 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.95 $ created on $Date: 2009/03/06 07:16:22 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();
@@ -120,9 +120,9 @@ main
     if ($config->get("PROTOCOL")) {
         $scm = Mezzanine::SCM::new($config->get("PROTOCOL"));
     } elsif (scalar(@ARGV) && -d $ARGV[0]) {
-        $scm = Mezzanine::SCM::auto_detect($ARGV[0]);
+        $scm = Mezzanine::SCM->auto_detect($ARGV[0], 1);
     } else {
-        $scm = Mezzanine::SCM::auto_detect('.');
+        $scm = Mezzanine::SCM->auto_detect('.', 1);
     }
 
     # Set the mode, first based on executable name...

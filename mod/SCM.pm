@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: SCM.pm,v 1.8 2008/12/17 04:40:38 mej Exp $
+# $Id: SCM.pm,v 1.9 2009/03/06 07:16:22 mej Exp $
 #
 
 package Mezzanine::SCM;
@@ -100,7 +100,7 @@ new($)
 }
 
 sub
-auto_detect($$)
+auto_detect()
 {
     my ($self, $path, $force) = @_;
     my $will;
