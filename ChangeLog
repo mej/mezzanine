@@ -1174,3 +1174,9 @@ specgen.
 
 Please report any outstanding bugs.  I'm hoping to release 1.9 soon.
 ----------------------------------------------------------------------
+Fri Jun 26 19:47:18 2009                        Michael Jennings (mej)
+
+Fix subcommand execution.
+
+Exclude .svn trees from ISO's and generated sources.
+----------------------------------------------------------------------

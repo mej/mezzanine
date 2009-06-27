@@ -1,6 +1,6 @@
 # Mezzanine Utilities Perl Module
 # 
-# Copyright (C) 2001-2007, Michael Jennings
+# Copyright (C) 2001-2009, Michael Jennings
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.70 2007/05/22 18:43:04 mej Exp $
+# $Id: Util.pm,v 1.71 2009/06/27 02:47:55 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -1323,6 +1323,8 @@ run_cmd($$$)
     my ($err, $msg, $line, $cmd) = undef;
     my @output;
     local *CMD;
+    local $SIG{"ALRM"};
+    local $SIG{"CHLD"} = "DEFAULT";
 
     if (!defined($timeout)) {
         # Wait 15 minutes by default.
@@ -1373,15 +1375,21 @@ run_cmd($$$)
             alarm($timeout);
         }
     }
-    close(CMD);
+    if (close(CMD)) {
+        $err = 0;
+    } elsif ($!) {
+        push @output, "Error closing pipe:  $!\n";
+        $err = 555;
+    } else {
+        $err = $? >> 8;
+    }
+    dprint "\"$cmd\" returned $err\n";
 
     # It won't hurt to always reset.
     alarm(0);
     $SIG{"ALRM"} = "IGNORE";
     $CMD_TIMEOUT = 0;
 
-    $err = $? >> 8;
-    dprint "\"$cmd\" returned $err\n";
     if (wantarray()) {
         return ($err, @output);
     } else {

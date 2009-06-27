@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.58 2008/09/30 15:03:03 mej Exp $
+# $Id: Build.pm,v 1.59 2009/06/27 02:47:55 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -427,7 +427,7 @@ create_source_file
                 $zip = " ";
             }
             $cmd = "tar --owner=root --group=root "
-                   . "--exclude CVS --exclude RCS --exclude BitKeeper --exclude SCCS"
+                   . "--exclude CVS --exclude RCS --exclude BitKeeper --exclude SCCS --exclude .svn "
                    . "$zip -cf ${destdir}$tarball $src_files";
         }
         unlink($tarball);

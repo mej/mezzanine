@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: mediatool,v 1.12 2007/02/27 21:29:36 mej Exp $
+# $Id: mediatool,v 1.13 2009/06/27 02:47:55 mej Exp $
 #
 
 # Include the Perl Modules we need
@@ -108,7 +108,7 @@ create_iso
     my ($cmd, $ignore, $bootimg, $line, $err);
     local *MKISOFS;
 
-    $ignore = "-m CVS -m RCS -m BitKeeper -m SCCS -m .cvsignore -m '.mezz.*'";
+    $ignore = "-m CVS -m RCS -m BitKeeper -m SCCS -m .svn -m .cvsignore -m '.mezz.*'";
     if ($isolinux_dir) {
         $bootimg = "-b $isolinux_dir/isolinux.bin -c $isolinux_dir/boot.cat";
         $cmd = "mkisofs -o $iso $ignore $bootimg -no-emul-boot -boot-load-size 4 -boot-info-table -l -T -r -R -J -v $imagedir";
@@ -160,7 +160,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.12 $ created on $Date: 2007/02/27 21:29:36 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.13 $ created on $Date: 2009/06/27 02:47:55 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
