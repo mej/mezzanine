@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.59 2008/12/17 04:40:38 mej Exp $
+# $Id: RPM.pm,v 1.60 2009/07/09 08:35:13 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -168,13 +168,41 @@ rpm_form_command
 
     # Add final cleanups
     if ($type eq "build") {
+        my $stage = 'a';
+
+        if (&pkgvar_quickie()) {
+            $stage = lc(&pkgvar_quickie());
+
+            if ($stage eq "prep") {
+                $stage = 'p';
+            } elsif (($stage eq "compile") || ($stage eq "build")) {
+                $stage = 'c';
+            } elsif ($stage eq "install") {
+                $stage = 'i';
+            } elsif ($stage eq "files") {
+                $stage = 'l';
+            } elsif (($stage eq "bin") || ($stage eq "binary") || ($stage eq "binaries")) {
+                $stage = 'b';
+            } elsif (($stage eq "srpm") || ($stage eq "src") || ($stage eq "source")) {
+                $stage = 's';
+            } elsif ($stage eq "track") {
+                $stage = 't';
+            } elsif ($stage eq "fetch") {
+                $stage = 'f';
+            } elsif ($stage !~ /^[pcilbstf]$/) {
+                $stage = 'a';
+            }
+            if (($stage eq 'c') || ($stage eq 'i')) {
+                $cmd .= " --short-circuit";
+            }
+        }
         if (&pkgvar_instructions()) {
-            $cmd .= " -ba " . &pkgvar_instructions();
+            $cmd .= " -b$stage " . &pkgvar_instructions();
         } elsif (&pkgvar_filename()) {
             if (&pkgvar_type() eq "srpm") {
                 $cmd .= " --rebuild " . &pkgvar_filename();
             } elsif (&pkgvar_type() eq "tar") {
-                $cmd .= " -ta " . &pkgvar_filename();
+                $cmd .= " -t$stage " . &pkgvar_filename();
             } else {
                 &show_backtrace();
                 &fatal_error("Bad call to rpm_form_command(\"build\")!\n");

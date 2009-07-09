@@ -1180,3 +1180,9 @@ Fix subcommand execution.
 
 Exclude .svn trees from ISO's and generated sources.
 ----------------------------------------------------------------------
+Thu Jul  9 01:33:15 2009                        Michael Jennings (mej)
+
+Fixup for svn move.
+
+Add support for rpmbuild stages and short-circuiting.
+----------------------------------------------------------------------

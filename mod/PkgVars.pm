@@ -45,8 +45,8 @@ BEGIN {
                '&pkgvar_instroot', '&pkgvar_buildroot',
                '&pkgvar_architecture', '&pkgvar_parameters',
                '&pkgvar_command', '&pkgvar_rcfile', '&pkgvar_tar',
-               '&pkgvar_zip', '&pkgvar_cleanup', '&get_package_path',
-               '&identify_package_type');
+               '&pkgvar_zip', '&pkgvar_cleanup', '&pkgvar_quickie',
+               '&get_package_path', '&identify_package_type');
 
     %EXPORT_TAGS = ( );
 
@@ -84,6 +84,7 @@ $orig_pkg_vars{"cleanup"} = "none";
 $orig_pkg_vars{"builduser"} = $ENV{"USER"};
 $orig_pkg_vars{"buildpkglist_filename"} = "";
 $orig_pkg_vars{"allow_epoch"} = 1;
+$orig_pkg_vars{"quickie"} = "";
 %{$orig_pkg_vars{"type"}} = ();
 %{$orig_pkg_vars{"subtype"}} = ();
 
@@ -112,6 +113,7 @@ sub pkgvar_rcfile($);
 sub pkgvar_tar($);
 sub pkgvar_zip($);
 sub pkgvar_cleanup($);
+sub pkgvar_quickie($);
 sub get_package_path($$);
 sub identify_package_type();
 
@@ -196,6 +198,7 @@ sub pkgvar_rcfile($) {return &pkgvar_set("rcfile", @_);}
 sub pkgvar_tar($) {return &pkgvar_set("tar", @_);}
 sub pkgvar_zip($) {return &pkgvar_set("zip", @_);}
 sub pkgvar_cleanup($) {return &pkgvar_set("cleanup", @_);}
+sub pkgvar_quickie($) {return &pkgvar_set("quickie", @_);}
 
 # Convert a module and a filename to a full path
 sub

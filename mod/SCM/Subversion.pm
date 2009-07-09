@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Subversion.pm,v 1.14 2008/12/25 07:52:39 mej Exp $
+# $Id: Subversion.pm,v 1.15 2009/07/09 08:35:13 mej Exp $
 #
 
 package Mezzanine::SCM::Subversion;
@@ -495,12 +495,7 @@ move(@)
     if ($self->{"changelog_message"}) {
         push @params, "-m", &get_changelog_entry($self->{"changelog_message"});
     }
-    foreach my $file (@flist) {
-        $err = $self->talk_to_server("move", @params, @files);
-        if ($err != MEZZANINE_SUCCESS) {
-            last;
-        }
-    }
+    $err = $self->talk_to_server("move", @params, @flist, $target);
     return $err;
 }
 

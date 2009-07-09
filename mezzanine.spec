@@ -1,4 +1,4 @@
-# $Id: mezzanine.spec,v 1.169 2008/12/17 04:40:38 mej Exp $
+# $Id: mezzanine.spec,v 1.170 2009/07/09 08:35:13 mej Exp $
 
 %define perl_vendorlib %(eval "`perl -V:installvendorlib 2>/dev/null`"; echo $installvendorlib)
 %if "%{perl_vendorlib}" == "UNKNOWN"
@@ -10,7 +10,7 @@
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
 Version: 1.9
-Release: 0.20
+Release: 0.21
 License: BSD
 Group: Development/Tools
 URL: http://www.kainx.org/mezzanine/
