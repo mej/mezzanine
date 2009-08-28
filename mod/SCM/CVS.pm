@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: CVS.pm,v 1.18 2007/11/05 08:04:26 mej Exp $
+# $Id: CVS.pm,v 1.19 2009/08/28 04:11:47 mej Exp $
 #
 
 package Mezzanine::SCM::CVS;
@@ -128,6 +128,9 @@ can_handle($)
         return MZSCM_CAN_HANDLE;
     } elsif (! -d $path) {
         dprint "$path is not a directory.\n";
+        if (&dirname($path)) {
+            return can_handle($proto, &dirname($path));
+        }
         return MZSCM_CANNOT_HANDLE;
     } elsif ((-d "$path/CVS") && (-f "$path/CVS/Repository") && (-f "$path/CVS/Root")) {
         dprint "$path has CVS subdirectories.\n";

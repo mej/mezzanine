@@ -1186,3 +1186,7 @@ Fixup for svn move.
 
 Add support for rpmbuild stages and short-circuiting.
 ----------------------------------------------------------------------
+Thu Aug 27 21:11:44 2009                        Michael Jennings (mej)
+
+Check parent directory of non-directory modules.
+----------------------------------------------------------------------
