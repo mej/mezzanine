@@ -23,25 +23,26 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: perlpkg,v 1.7 2007/03/08 23:02:31 mej Exp $
+# $Id: perlpkg,v 1.8 2009/09/02 03:33:07 mej Exp $
 #
 
 use strict;
 use vars '$progname', '$version', '$opt_v', '$opt_h', '$opt_d',
-    '$opt_t', '$opt_s', '$opt_p', '$opt_n', '$opt_u', '$opt_L';
+    '$opt_t', '$opt_s', '$opt_p', '$opt_n', '$opt_u', '$opt_L', '$opt_x';
 use CPAN;
 use POSIX;
 use Getopt::Long;
 use Mezzanine::Util;
 use Mezzanine::Template;
 use Mezzanine::RPM '&rpm_compare_versions';
+use Mezzanine::Tar '&tar_show_contents';
 
 my ($SAVE_STDIN, $SAVE_STDOUT, $SAVE_STDERR);
 my %distributions;
 my @tried;
 my @built;
 my ($template, $save_pwd);
-my ($handle_build_deps, $pkgonly, $update, $local_mode);
+my ($handle_build_deps, $pkgonly, $update, $local_mode, $exact);
 
 # Print usage information
 sub
@@ -66,6 +67,7 @@ print_usage_info
     print "    -n --nodeps                      Do not handle build dependencies\n";
     print "    -u --update                      Check for updates\n";
     print "    -L --local                       Local mode; do not contact CPAN\n";
+    print "    -x --exact                       Match exact distribution/module name only\n";
     print "\n";
     exit(MEZZANINE_SUCCESS);
 }
@@ -87,16 +89,30 @@ sub
 create_cpan_list()
 {
     foreach my $mod (CPAN::Shell->expand("Module", "/./")) {
-        my @tmp = split(/\s+/, $mod->as_glimpse());
-        my $name = $tmp[1];
-        my $file = $mod->cpan_file();
+        my $name;
+        my $file = $mod->cpan_file() || $mod->inst_file();
         my $installed = $mod->inst_version() || "";
         my $uptodate = $mod->uptodate();
+        my $dslip = $mod->dslip_status();
+        my $noarch = undef;
 
-        #print $SAVE_STDERR "Got module:  $name ($file)\n";
+        if (substr($file, 0, 14) eq "Contact Author") {
+            # Skip stuff we can't actually download.
+            next;
+        }
+        if ($mod->as_glimpse() =~ /^\s*Module\s+[<= ]\s+(\S+)\s+.*$/) {
+            $name = $1;
+        } else {
+            printf $SAVE_STDERR "Unparseable package metadata obtained from CPAN:  %s\n", $mod->as_glimpse();
+            next;
+        }
+        #dprint "Got module:  $name ($file)\n";
         push @{$distributions{$file}{"MODLIST"}}, $name;
         push @{$distributions{$file}{"MODOBJLIST"}}, $mod;
-        next;
+        #next;
+        if ($dslip && ref($dslip) && $dslip->{"L"}) {
+            $noarch = (($dslip->{"L"} eq 'p' || $dslip->{"L"} eq 'h') ? (1) : (0));
+        }
         if (defined($distributions{$file}{"INSTALLED"})) {
             if ($distributions{$file}{"INSTALLED"} && !($installed)) {
                 $distributions{$file}{"INSTALLED"} = 0;
@@ -111,7 +127,65 @@ create_cpan_list()
         } else {
             $distributions{$file}{"UPTODATE"} = (($uptodate) ? (1) : (0));
         }
+        if (defined($noarch)) {
+            if (defined($distributions{$file}{"NOARCH"})) {
+                if ($distributions{$file}{"NOARCH"} && !($noarch)) {
+                    $distributions{$file}{"NOARCH"} = 0;
+                    #print $SAVE_STDERR "Noarch for $file turned off by $name ($dslip->{L}).\n";
+                }
+            } else {
+                $distributions{$file}{"NOARCH"} = $noarch;
+                #print $SAVE_STDERR "Noarch for $file set to $noarch by $name ($dslip->{L}).\n";
+            }
+        }
     }
+}
+
+# Sort distributions in a sane fashion
+sub
+sort_distributions($@)
+{
+    my $req = shift;
+
+    #print $SAVE_STDERR "Sorting distributions based on $req\n";
+    return sort {
+            my ($a_mod_list, $b_mod_list);
+            my ($a_exact_matches, $b_exact_matches);
+            my ($a_start_matches, $b_start_matches);
+            my ($a_matches, $b_matches);
+
+            if (defined($distributions{$a}{"MODLIST"})) {
+                $a_mod_list = $distributions{$a}{"MODLIST"};
+            } else {
+                $a_mod_list = [];
+            }
+            if (defined($distributions{$b}{"MODLIST"})) {
+                $b_mod_list = $distributions{$b}{"MODLIST"};
+            } else {
+                $b_mod_list = [];
+            }
+
+            # Sort method:  Distributions that contain the exact request come first,
+            # then any distributions where the request matches the beginning of a module,
+            # then any distributions that contain a partial match (on word boundaries).
+            # After that, sort lexically.
+            $a_exact_matches = scalar(grep { $_ eq $req } @{$a_mod_list});
+            $b_exact_matches = scalar(grep { $_ eq $req } @{$b_mod_list});
+            if ($a_exact_matches != $b_exact_matches) {
+                return ($b_exact_matches <=> $a_exact_matches);
+            }
+            $a_start_matches = scalar(grep { $_ =~ /^\Q$req\E\b/ } @{$a_mod_list});
+            $b_start_matches = scalar(grep { $_ =~ /^\Q$req\E\b/ } @{$b_mod_list});
+            if ($a_start_matches != $b_start_matches) {
+                return ($b_start_matches <=> $a_start_matches);
+            }
+            $a_matches = scalar(grep { $_ =~ /\b\Q$req\E\b/ } @{$a_mod_list});
+            $b_matches = scalar(grep { $_ =~ /\b\Q$req\E\b/ } @{$b_mod_list});
+            if ($a_matches != $b_matches) {
+                return ($b_matches <=> $a_matches);
+            }
+            return (&basename($a) cmp &basename($b));
+        } @_;
 }
 
 sub
@@ -206,7 +280,11 @@ build(@)
         }
         $dist_obj->make();
         $href = $dist_obj->prereq_pm();
+        #printf $SAVE_STDOUT "Buildreqs:  %s\n\n", &examine_object($href);
         push @tried, $file;
+        if ($href && ref($href) eq "HASH" && exists($href->{"build_requires"})) {
+            $href = $href->{"build_requires"};
+        }
         if ($href && ref($href) eq "HASH" && scalar(keys(%{$href})) > 0) {
             if ($handle_build_deps) {
                 my @deps;
@@ -294,6 +372,12 @@ package_perl_dist(@)
             next;
         }
 
+        if (!defined($distributions{$file}{"NOARCH"})) {
+            # FIXME:  Do test build?  For now, default to "noarch"
+            print $SAVE_STDERR "Warning:  No architecture information for $file.  Assuming \"noarch.\"\n";
+            $distributions{$file}{"NOARCH"} = 1;
+        }
+
         # Assign variables.
         $template->vars("DISTNAME", $distname);
         $template->vars("MODULE", $pkgname);
@@ -304,7 +388,7 @@ package_perl_dist(@)
         $template->vars("DISTRIBUTION", "%{?_distribution:%{_distribution}}%{!?_distribution:%{_vendor}}");
         $template->vars("MODULENAME", $modname);
         $template->vars("DISTFILE", &basename($file));
-        $template->vars("BUILDARCH", "noarch");
+        $template->vars("BUILDARCH", (($distributions{$file}{"NOARCH"}) ? ("\nBuildArch: noarch") : ("")));
         $template->vars("CHANGELOG", sprintf("* %s Mezzanine <mezzanine\@kainx.org>\n- %s\n",
                                              POSIX::strftime("%a %b %d %Y", localtime()),
                                              "PDR auto-generated from CPAN by $progname"));
@@ -356,13 +440,13 @@ main
 
     # Set up the basic variables
     $progname = "perlpkg";
-    $version = "0.2";
+    $version = "0.3";
     #&print_usage_info() if (!scalar(@ARGV));
     umask 022;
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "s|search", "L|local",
-                   "t|template=s", "p|pkgonly", "n|nodeps", "u|update");
+                   "t|template=s", "p|pkgonly", "n|nodeps", "u|update", "x|exact");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -370,7 +454,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.7 $ created on $Date: 2007/03/08 23:02:31 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.8 $ created on $Date: 2009/09/02 03:33:07 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
@@ -394,6 +478,7 @@ main
     $handle_build_deps = (($opt_n) ? (0) : (1));
     $update = (($opt_u) ? (1) : (0));
     $local_mode = (($opt_L) ? (1) : (0));
+    $exact = (($opt_x) ? (1) : (0));
     $save_pwd = &getcwd();
 
     # Create template object for new spec file.
@@ -421,7 +506,7 @@ main
         local *RPMQA;
 
         $handle_build_deps = 0;
-        if (open(RPMQA, "rpm -qa --qf \"\%{name}-\%{version}-\%{release}\" \"name=perl*\" |")) {
+        if (open(RPMQA, "rpm -qa --qf \"\%{name}-\%{version}-\%{release}\\n\" \"name=perl*\" |")) {
             my $line;
 
             while ($line = <RPMQA>) {
@@ -457,18 +542,21 @@ main
         if (-s $req) {
             @distributions = ($req);
         } elsif (($req =~ /\//) || ($req =~ /-/)) {
-            @distributions = grep { $_ =~ $req } keys(%distributions);
+            @distributions = grep { (($exact) ? ($_ eq $req) : ($_ =~ $req)) } keys(%distributions);
         } else {
-            @distributions = grep { grep { $_ =~ $req } @{$distributions{$_}{"MODLIST"}} } keys(%distributions);
+            @distributions = grep {
+                                 grep { (($exact) ? ($_ eq $req) : ($_ =~ $req)) } @{$distributions{$_}{"MODLIST"}}
+                             } keys(%distributions);
         }
+        @distributions = &sort_distributions($req, @distributions);
 
         if ($opt_s || scalar(@distributions) != 1) {
             if (scalar(@distributions) > 1) {
                 print $SAVE_STDOUT "Distributions which contain $req:\n";
-                foreach my $dist (sort(@distributions)) {
-                    my @mods = grep { $_ =~ $req } @{$distributions{$dist}{"MODLIST"}};
+                foreach my $dist (@distributions) {
+                    my @mods = grep { (($exact) ? ($_ eq $req) : ($_ =~ $req)) } @{$distributions{$dist}{"MODLIST"}};
 
-                    printf $SAVE_STDOUT "%-40s (%s)\n", &basename($dist),
+                    printf $SAVE_STDOUT "  %-40s (%s)\n", &basename($dist),
                         ((!scalar(@mods))
                          ? ("none")
                          : ((scalar(@mods) > 3)
@@ -485,7 +573,11 @@ main
                     print $SAVE_STDOUT "     $mod\n";
                 }
             } else {
-                print $SAVE_STDOUT "Nothing found for $req.\n";
+                if ($exact) {
+                    print $SAVE_STDOUT "No exact matches found for $req.  Try without -x.\n";
+                } else {
+                    print $SAVE_STDOUT "Nothing found for $req.\n";
+                }
             }
             next;
         }

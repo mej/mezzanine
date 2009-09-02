@@ -1190,3 +1190,9 @@ Thu Aug 27 21:11:44 2009                        Michael Jennings (mej)
 
 Check parent directory of non-directory modules.
 ----------------------------------------------------------------------
+Tue Sep  1 20:32:41 2009                        Michael Jennings (mej)
+
+Major functionality enhancements to perlpkg, including improved output
+sorting, exact searches, and some automatic detection of package
+architecture.  Some bugs were also fixed.
+----------------------------------------------------------------------

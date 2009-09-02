@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Tar.pm,v 1.4 2007/02/27 21:29:36 mej Exp $
+# $Id: Tar.pm,v 1.5 2009/09/02 03:33:07 mej Exp $
 #
 
 package Mezzanine::Tar;
@@ -41,7 +41,7 @@ BEGIN {
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
-    @EXPORT_OK   = ('$VERSION');
+    @EXPORT_OK   = ('$VERSION', '&tar_show_contents');
 }
 use vars ('@EXPORT_OK');
 
@@ -110,6 +110,7 @@ tar_show_contents
 {
     my $pkg_file = $_[0];
     my ($tar, $cmd);
+    my @results;
     local *TAR;
 
     $tar = ($pkg_prog ? $pkg_prog : "tar");
@@ -118,20 +119,20 @@ tar_show_contents
     } elsif ($pkg_file =~ /\.bz2$/) {
         $tar .= " --use-compress-program=bzip2";
     }
-    $cmd = "$tar -tvf $pkg_file";
+    if ($pkg_file =~ /\.zip$/) {
+        $cmd = "unzip -l $pkg_file | awk '{$1=\"\";$2=\"\";$3=\"\";print $0}' "
+            . "| sed 's/^[[:space:]]*//' | egrep -v '^(Name|----)$'";
+    } else {
+        $cmd = "$tar -tvf $pkg_file";
+    }
     dprint "About to run \"$cmd\"\n";
     if (!open(TAR, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }
-    while (<TAR>) {
-        print;
-    }
+    @results = <TAR>;
     close(TAR);
     dprint "\"$cmd\" returned $?\n";
-    if ($? != 0) {
-        return MEZZANINE_UNSPECIFIED_ERROR;
-    }
-    return MEZZANINE_SUCCESS;
+    return ($? >> 8, @results);
 }
 
 sub

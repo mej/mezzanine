@@ -8,8 +8,7 @@ URL: http://search.cpan.org/search?mode=module&query=@MODULENAME@
 Source: @DISTFILE@
 Packager: @PACKAGER@
 Vendor: @VENDOR@
-Distribution: @DISTRIBUTION@
-BuildArch: @BUILDARCH@
+Distribution: @DISTRIBUTION@@BUILDARCH@
 BuildRoot: %{_tmppath}/%{name}-%{version}-root
 
 %description
