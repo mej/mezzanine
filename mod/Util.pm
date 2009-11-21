@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.71 2009/06/27 02:47:55 mej Exp $
+# $Id: Util.pm,v 1.72 2009/11/21 20:25:55 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -59,11 +59,11 @@ BEGIN {
                '&move_files', '&copy_files', '&copy_tree',
                '&get_temp_dir', '&create_temp_space',
                '&clean_temp_space', '&basename', '&dirname',
-               '&grepdir', '&limit_files', '&str_trim', '&xpush',
-               '&cat_file', '&parse_rpm_name', '&find_spec_file',
-               '&should_ignore', '&trunc_file', '&touch_file',
-               '&newest_file', '&checksum_file', '&run_cmd',
-               '&run_mz_cmd', '&fetch_url', '&post_file',
+               '&grepdir', '&limit_files', '&str_trim', '&str_tokens',
+               '&xpush', '&cat_file', '&parse_rpm_name',
+               '&find_spec_file', '&should_ignore', '&trunc_file',
+               '&touch_file', '&newest_file', '&checksum_file',
+               '&run_cmd', '&run_mz_cmd', '&fetch_url', '&post_file',
                '&MEZZANINE_SUCCESS', '&MEZZANINE_FATAL_ERROR',
                '&MEZZANINE_SYNTAX_ERROR', '&MEZZANINE_SYSTEM_ERROR',
                '&MEZZANINE_COMMAND_FAILED', '&MEZZANINE_DUPLICATE',
@@ -145,6 +145,7 @@ sub basename($);
 sub dirname($);
 sub grepdir(& $);
 sub str_trim(\$);
+sub str_tokens($$);
 sub xpush(\@; @);
 sub limit_files(@ $);
 sub cat_file($);
@@ -397,6 +398,9 @@ dprintf(@)
             $params[$i] = "<undef>";
         }
     }
+    if ($f ne $PROGNAME) {
+        $f = "$PROGNAME/$f";
+    }
     printf("[$f/$l/$s] $format", @params);
 }
 
@@ -422,6 +426,9 @@ dprint(@)
         if (!defined($params[$i])) {
             $params[$i] = "<undef>";
         }
+    }
+    if ($f ne $PROGNAME) {
+        $f = "$PROGNAME/$f";
     }
     print "[$f/$l/$s] ", @params;
 }
@@ -1084,6 +1091,65 @@ str_trim(\$)
     $_[0] =~ s/^\s+//;
     $_[0] =~ s/\s+$//;
     return $_[0];
+}
+
+# Tokenize a string in whitespace and quotes
+sub
+str_tokens($$)
+{
+    my ($str, $delim) = @_;
+    my @str = split(//, $str);
+    my @tokens = ();
+    my ($i, $quote, $cnt, $len);
+    sub is_delim { return ((defined($delim)) ? (index($delim, $_[0]) >= 0) : (isspace($_[0]))); }
+    sub is_quote { return ($quote && ($quote eq $_[0])); }
+
+    $i = 0;
+    $len = scalar(@str);
+
+    # Before we do anything, skip leading "whitespace."
+    while (($i < $len) && (is_delim($str[$i]))) {
+        $i++;
+    }
+
+    # The outermost loop is where we traverse the string.  Each new word
+    # brings us back up to the top of the loop to start a new array element.
+    for ($cnt = 0; $i < $len; $cnt++) {
+        $tokens[$cnt] = "";
+
+        # Process each character.
+        while (($i < $len) && ($quote || !is_delim($str[$i]))) {
+            if (($str[$i] eq "\'") || ($str[$i] eq "\"")) {
+                # It's a quote character, so set/unset the quote variable.
+                if ($quote) {
+                    if ($quote eq $str[$i]) {
+                        $quote = '';
+                    } else {
+                        # It's a single quote inside double quotes,
+                        # or vice versa.  Leave it alone.
+                        $tokens[$cnt] .= $str[$i];
+                        $i++;
+                    }
+                } else {
+                    $quote = $str[$i];
+                }
+                $i++;
+            } else {
+                # Handle any backslashes that are escaping delimiters or quotes.
+                if (($str[$i] eq "\\") && (($str[$i+1] eq "\\") || is_delim($str[$i+1]) || is_quote($str[$i+1]))) {
+                    $i++;
+                }
+                $tokens[$cnt] .= $str[$i];
+                $i++;
+            }
+        }
+
+        # Move past any additional "whitespace."
+        while (($i < $len) && (is_delim($str[$i]))) {
+            $i++;
+        }
+    }
+    return @tokens;
 }
 
 # Exclusive push.  Only push if the item(s) aren't already in the list

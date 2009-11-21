@@ -1196,3 +1196,8 @@ Major functionality enhancements to perlpkg, including improved output
 sorting, exact searches, and some automatic detection of package
 architecture.  Some bugs were also fixed.
 ----------------------------------------------------------------------
+Sat Nov 21 12:24:44 2009                        Michael Jennings (mej)
+
+Port LibAST's spiftool_split() function to Perl as str_tokens().  It
+tokenizes strings on customizable whitespace and supports quoting.
+----------------------------------------------------------------------
