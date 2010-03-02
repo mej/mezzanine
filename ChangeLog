@@ -1201,3 +1201,7 @@ Sat Nov 21 12:24:44 2009                        Michael Jennings (mej)
 Port LibAST's spiftool_split() function to Perl as str_tokens().  It
 tokenizes strings on customizable whitespace and supports quoting.
 ----------------------------------------------------------------------
+Tue Mar  2 11:58:52 2010                                           mej
+
+Fix infinite loop in source scanning.
+----------------------------------------------------------------------

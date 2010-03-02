@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Subversion.pm,v 1.16 2009/08/28 04:11:47 mej Exp $
+# $Id: Subversion.pm,v 1.17 2010/03/02 19:58:54 mej Exp $
 #
 
 package Mezzanine::SCM::Subversion;
@@ -121,9 +121,11 @@ can_handle($)
         dprint "$path is a Subversion repository URL.\n";
         return MZSCM_CAN_HANDLE;
     } elsif (! -d $path) {
+        my $tmp = &dirname($path);
+
         dprint "$path is not a directory.\n";
-        if (&dirname($path)) {
-            return can_handle($proto, &dirname($path));
+        if ($tmp && ($tmp ne $path)) {
+            return can_handle($proto, $tmp);
         }
         return MZSCM_CANNOT_HANDLE;
     } elsif ((-d "$path/.svn") && (-f "$path/.svn/entries")) {
