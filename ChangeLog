@@ -1213,3 +1213,7 @@ Mon Jan 31 23:18:03 2011                        Michael Jennings (mej)
 
 Refactor spec file detection for FST's.  Needs testing.  :-)
 ----------------------------------------------------------------------
+Tue Feb  1 00:42:23 2011                        Michael Jennings (mej)
+
+Move that back to Util.pm until I can refactor this mess. :-(
+----------------------------------------------------------------------

@@ -29,7 +29,6 @@ use strict;
 use Exporter;
 use POSIX;
 use Mezzanine::Util;
-use Mezzanine::RPM;
 use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
 BEGIN {
