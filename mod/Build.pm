@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.60 2011/02/01 07:16:34 mej Exp $
+# $Id: Build.pm,v 1.61 2011/02/01 07:18:05 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -912,17 +912,18 @@ build_fst
     # Look for the build instructions (spec file, debian/ directory, etc.)
     if (! $specfile || ! -f $specfile) {
         if ($target_format eq "rpms") {
-            @tmp = sort(&grepdir(sub {/spec(\.in)?$/}));
+            $specfile = &find_spec_file($pkg);
         } elsif ($target_format eq "debs") {
-            @tmp = &grepdir(sub {$_ =~ m/debian/ && -d $_});
+            $specfile = &grepdir(sub {$_ =~ m/debian/ && -d $_});
         } else {
-            @tmp = sort(&grepdir(sub {/spec(\.in)?$/ || ($_ =~ m/debian/ && -d $_)}));
+            # FIXME:  Do something less dumb.
+            $specfile = &find_spec_file($pkg);
         }
-        dprint @tmp, "\n";
-        if (!scalar(@tmp)) {
+        dprint $specfile, "\n";
+        if (! $specfile) {
             return (MEZZANINE_MISSING_FILES, "I'm sorry, but \"$pkg\" doesn't seem to have instructions for building $target_format", undef);
         }
-        $specfile = &pkgvar_instructions($tmp[0]);
+        $specfile = &pkgvar_instructions($specfile);
     }
 
     if (! &copy($specfile, "$instroot$topdir/SPECS/")) {

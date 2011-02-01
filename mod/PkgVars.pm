@@ -29,6 +29,7 @@ use strict;
 use Exporter;
 use POSIX;
 use Mezzanine::Util;
+use Mezzanine::RPM;
 use vars ('$VERSION', '@ISA', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
 
 BEGIN {
@@ -307,10 +308,12 @@ identify_package_type
             $spec = &find_spec_file(&pkgvar_name(), ".");
             if ($spec && ($spec !~ m|^\./F/|)) {
                 $pkg_vars{"type"}{$filename} = "PDR";
+                $pkg_vars{"instructions"} = $spec;
             } elsif (-d "F") {
                 $spec = &find_spec_file(&pkgvar_name(), "F");
                 if ($spec) {
                     $pkg_vars{"type"}{$filename} = "SPM";
+                    $pkg_vars{"instructions"} = $spec;
                 }
             }
         }

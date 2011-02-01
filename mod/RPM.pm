@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.60 2009/07/09 08:35:13 mej Exp $
+# $Id: RPM.pm,v 1.61 2011/02/01 07:18:05 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -43,11 +43,12 @@ BEGIN {
 
     @ISA         = ('Exporter');
 
-    @EXPORT = ('$specdata', '&rpm_form_command', '&parse_spec_file',
-               '&disable_patch', '&enable_patch', '&rpm_install',
-               '&rpm_show_contents', '&rpm_query', '&rpm_build',
-               '&rpm_compare_versions', '&rpm_get_installed',
-               '&rpm_scan_files', '&rpm_cmp', '&rpm_sort', '&rpm_eval');
+    @EXPORT = ('$specdata', '&rpm_form_command', '&find_spec_file',
+               '&parse_spec_file', '&disable_patch', '&enable_patch',
+               '&rpm_install', '&rpm_show_contents', '&rpm_query',
+               '&rpm_build', '&rpm_compare_versions',
+               '&rpm_get_installed', '&rpm_scan_files', '&rpm_cmp',
+               '&rpm_sort', '&rpm_eval');
 
     %EXPORT_TAGS = ( );
 
@@ -69,6 +70,7 @@ my $RPMVERCMP_OUT = undef;
 
 ### Function prototypes
 sub rpm_form_command($);
+sub find_spec_file($);
 sub parse_spec_file();
 sub disable_patch($);
 sub enable_patch($);
@@ -234,6 +236,78 @@ rpm_form_command
 
     dprint "Command:  $cmd\n";
     return &untaint(\$cmd, qr/^(.*)$/s);
+}
+
+# Find spec file
+sub
+find_spec_file
+{
+    my ($pkgname, $dir, $recurse) = @_;
+    my ($spec_count, $spec_in_count);
+    my (@spec_ins, @specs);
+
+    if (! $dir) {
+        $dir = ".";
+    }
+
+    if (-d $dir) {
+        if ($recurse) {
+            find({ "wanted" => sub { /\.spec(?:\.in)?$/ && push @specs, &untaint(\$_); }, "no_chdir" => 1 }, $dir);
+        } else {
+            @specs = &grepdir(sub { /\.spec(?:\.in)?$/ }, $dir);
+        }
+        @specs = sort @specs;
+    }
+
+    if (scalar(@specs) == 0) {
+        dprint "No spec files found for $pkgname in $dir!\n";
+        return undef;
+    } elsif (scalar(@specs) == 1) {
+        dprint "Found single spec file for $pkgname in $dir:  $specs[0]\n";
+        return $specs[0];
+    }
+
+    # First, see which are *.spec and which are *.spec.in
+    @spec_ins = grep { substr($_, -3, 3) eq ".in" } @specs;
+    $spec_in_count = scalar(@spec_ins);
+    @specs = grep { substr($_, -3, 3) ne ".in" } @specs;
+    $spec_count = scalar(@specs);
+
+    if ($spec_count == 0) {
+        # No *.spec files, so use *.spec.in.
+        @specs = @spec_ins;
+        $spec_count = $spec_count_in;
+        @spec_ins = ();
+        $spec_count_in = 0;
+    }
+
+    if ($spec_count == 1) {
+        dprint "Found primary spec file for $pkgname in $dir:  $specs[0]\n";
+        return $specs[0];
+    }
+
+    # Didn't work.  We still have too many.
+    if ($pkgname) {
+        my @pkg_specs;
+
+        # See if there's a package name match.
+        @pkg_specs = grep { /^$pkgname/ } @specs;
+        if (scalar(@pkg_specs)) {
+            # If we have some, focus on those.
+            @specs = @pkg_specs;
+            if (scalar(@specs) == 1) {
+                dprint "Found single package spec file for $pkgname in $dir:  $specs[0]\n";
+                return $specs[0];
+            }
+        }
+
+        if (scalar(@specs) > 1) {
+            # Still have too many.  What to do next?
+        }
+    }
+    dprintf("Found %d spec file(s) for $pkgname in $dir:  %s\n",
+            join(", ", @specs));
+    return $specs[0];
 }
 
 # Parse spec file

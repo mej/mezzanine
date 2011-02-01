@@ -1209,3 +1209,7 @@ Mon Jan 31 23:16:32 2011                        Michael Jennings (mej)
 
 Merge old caos-builder into Mezzanine as autobuilder/mzbuilder.
 ----------------------------------------------------------------------
+Mon Jan 31 23:18:03 2011                        Michael Jennings (mej)
+
+Refactor spec file detection for FST's.  Needs testing.  :-)
+----------------------------------------------------------------------
