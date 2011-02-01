@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.59 2009/06/27 02:47:55 mej Exp $
+# $Id: Build.pm,v 1.60 2011/02/01 07:16:34 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -912,11 +912,11 @@ build_fst
     # Look for the build instructions (spec file, debian/ directory, etc.)
     if (! $specfile || ! -f $specfile) {
         if ($target_format eq "rpms") {
-            @tmp = &grepdir(sub {/spec(\.in)?$/});
+            @tmp = sort(&grepdir(sub {/spec(\.in)?$/}));
         } elsif ($target_format eq "debs") {
             @tmp = &grepdir(sub {$_ =~ m/debian/ && -d $_});
         } else {
-            @tmp = &grepdir(sub {/spec(\.in)?$/ || ($_ =~ m/debian/ && -d $_)});
+            @tmp = sort(&grepdir(sub {/spec(\.in)?$/ || ($_ =~ m/debian/ && -d $_)}));
         }
         dprint @tmp, "\n";
         if (!scalar(@tmp)) {

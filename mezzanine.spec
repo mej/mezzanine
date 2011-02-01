@@ -1,4 +1,4 @@
-# $Id: mezzanine.spec,v 1.170 2009/07/09 08:35:13 mej Exp $
+# $Id: mezzanine.spec,v 1.171 2011/02/01 07:16:34 mej Exp $
 
 %define perl_vendorlib %(eval "`perl -V:installvendorlib 2>/dev/null`"; echo $installvendorlib)
 %if "%{perl_vendorlib}" == "UNKNOWN"
@@ -10,7 +10,7 @@
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
 Version: 1.9
-Release: 0.21
+Release: 0.22
 License: BSD
 Group: Development/Tools
 URL: http://www.kainx.org/mezzanine/
@@ -53,7 +53,7 @@ test "x$RPM_BUILD_ROOT" != "x" && %{__rm} -rf $RPM_BUILD_ROOT
 %{__mkdir_p} $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine/templates
 %{__mkdir_p} $RPM_BUILD_ROOT%{_mandir}/man1
 
-for i in abiscan *tool pkgsort perlpkg specgen ; do
+for i in abiscan autobuilder *tool pkgsort perlpkg specgen ; do
     %{__install} -m 755 $i $RPM_BUILD_ROOT%{_bindir}/
 done
 
@@ -71,6 +71,9 @@ done
     cd $RPM_BUILD_ROOT%{_bindir}
     for i in abi abiscan ; do
         %{__ln_s} abiscan mz$i
+    done
+    for i in builder autobuild autobuilder ; do
+        %{__ln_s} autobuilder mz$i
     done
     for i in get co put ci info add new rm purge rtag tag reset login ann annotate blame diff stat status log init ; do
         %{__ln_s} revtool mz$i

@@ -1205,3 +1205,7 @@ Tue Mar  2 11:58:52 2010                                           mej
 
 Fix infinite loop in source scanning.
 ----------------------------------------------------------------------
+Mon Jan 31 23:16:32 2011                        Michael Jennings (mej)
+
+Merge old caos-builder into Mezzanine as autobuilder/mzbuilder.
+----------------------------------------------------------------------

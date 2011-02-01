@@ -1,0 +1,391 @@
+#!/usr/bin/perl -Tw
+#
+# autobuilder -- buildtool wrapper to simplify creating/running autobuilders
+# 
+# Copyright (C) 2005, Michael Jennings <mej@eterm.org>
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies of the Software, its documentation and marketing & publicity
+# materials, and acknowledgment shall be given in the documentation, materials
+# and software packages that this Software was used.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+# $Id: autobuilder,v 1.1 2011/02/01 07:16:34 mej Exp $
+#
+
+use lib '.';
+use strict;
+use POSIX;
+use Mezzanine::Util;
+use Mezzanine::Config;
+use Mezzanine::Builder;
+
+# Config vars
+my @CONFIG_VARS = (
+
+                   "DEBUG", "LOOP", "PRECLEAN", "REPAIR", "UPDATE",
+                   "GET", "BUILD", "CREATEREPO", "FLUSH", "SYNC",
+                   "TIME_FORMAT", "ARCH", "BUILDROOT", "BUILDDIR",
+                   "BUILDTREES", "OPTIONS", "DEPSOLVER", "SYNCTARGET"
+
+                  );
+
+# Config description hash
+my %CONFIG = (
+              "DEBUG" => {
+                  "OPTION" => "debug",
+                  "OPTSPEC" => "debug|d!",
+                  "DESCRIPTION" => "Toggle debugging output",
+                  "DEFAULT" => "0"
+              },
+              "LOOP" => {
+                  "OPTION" => "loop",
+                  "OPTSPEC" => "loop|l!",
+                  "DESCRIPTION" => "Build in a continuous loop",
+                  "DEFAULT" => "1"
+              },
+              "PRECLEAN" => {
+                  "OPTION" => "preclean",
+                  "OPTSPEC" => "preclean|p!",
+                  "DESCRIPTION" => "Remove old temporary directories before build",
+                  "DEFAULT" => "1"
+              },
+              "REPAIR" => {
+                  "OPTION" => "repair",
+                  "OPTSPEC" => "repair|r!",
+                  "DESCRIPTION" => "Fix buildroot RPM database before build",
+                  "DEFAULT" => "1"
+              },
+              "UPDATE" => {
+                  "OPTION" => "update",
+                  "OPTSPEC" => "update|u!",
+                  "DESCRIPTION" => "Update buildroot before build",
+                  "DEFAULT" => "1"
+              },
+              "GET" => {
+                  "OPTION" => "get",
+                  "OPTSPEC" => "get|g!",
+                  "DESCRIPTION" => "Update build tree before build",
+                  "DEFAULT" => "1"
+             },
+              "BUILD" => {
+                  "OPTION" => "build",
+                  "OPTSPEC" => "build|b!",
+                  "DESCRIPTION" => "Invoke buildtool for each build tree",
+                  "DEFAULT" => "1"
+              },
+              "CREATEREPO" => {
+                  "OPTION" => "createrepo",
+                  "OPTSPEC" => "createrepo|c!",
+                  "DESCRIPTION" => "Create yum repositories",
+                  "DEFAULT" => "1"
+              },
+              "FLUSH" => {
+                  "OPTION" => "flush",
+                  "OPTSPEC" => "flush|f!",
+                  "DESCRIPTION" => "Purge outdated packages from repositories",
+                  "DEFAULT" => "1"
+              },
+              "SYNC" => {
+                  "OPTION" => "sync",
+                  "OPTSPEC" => "sync|s!",
+                  "DESCRIPTION" => "Sync repositories to another location",
+                  "DEFAULT" => "1"
+              },
+              "TIME_FORMAT" => {
+                  "OPTION" => "time-format",
+                  "OPTSPEC" => "time-format|t=s",
+                  "DESCRIPTION" => "date(1)-style format for timestamps",
+                  "DEFAULT" => "[%Y-%m-%d %H:%M:%S]"
+              },
+              "ARCH" => {
+                  "OPTION" => "arch",
+                  "OPTSPEC" => "arch|a=s",
+                  "DESCRIPTION" => "Target architecture (e.g., i386)",
+                  "DEFAULT" => "i386"
+              },
+              "BUILDROOT" => {
+                  "OPTION" => "buildroot",
+                  "OPTSPEC" => "buildroot=s",
+                  "DESCRIPTION" => "Location of chroot jail for build",
+                  "DEFAULT" => "/"
+              },
+              "BUILDDIR" => {
+                  "OPTION" => "builddir",
+                  "OPTSPEC" => "builddir=s",
+                  "DESCRIPTION" => "Top-level directory for built packages",
+                  "DEFAULT" => "builddir"
+              },
+              "BUILDTREES" => {
+                  "OPTION" => "buildtrees",
+                  "OPTSPEC" => "buildtrees=s@",
+                  "DESCRIPTION" => "Path(s)/glob(s) for build trees",
+                  "DEFAULT" => "."
+              },
+              "OPTIONS" => {
+                  "OPTION" => "options",
+                  "OPTSPEC" => "options=s",
+                  "DESCRIPTION" => "Additional buildtool options",
+                  "DEFAULT" => "--retry"
+              },
+              "DEPSOLVER" => {
+                  "OPTION" => "depsolver",
+                  "OPTSPEC" => "depsolver=s",
+                  "DESCRIPTION" => "Command for dependency resolution",
+                  "DEFAULT" => "/usr/bin/smart install -y"
+              },
+              "SYNCTARGET" => {
+                  "OPTION" => "sync-target",
+                  "OPTSPEC" => "sync-target=s",
+                  "DESCRIPTION" => "Target ([[user@]host:]/path) for sync",
+                  "DEFAULT" => ""
+              },
+#              "" => {
+#                  "OPTION" => "",
+#                  "OPTSPEC" => "",
+#                  "DESCRIPTION" => "",
+#                  "DEFAULT" => ""
+#              },
+             );
+
+# Config object
+my $config;
+
+# Builder object
+my $builder;
+
+sub
+tprint(@)
+{
+    return print POSIX::strftime($config->get("TIME_FORMAT"), localtime(time())), ' ', @_;
+}
+
+sub
+tprintf(@)
+{
+    print POSIX::strftime($config->get("TIME_FORMAT"), localtime(time())), ' ';
+    return printf @_;
+}
+
+# Print usage information
+sub
+print_usage_info()
+{
+    my ($leader, $underbar);
+
+    print "\n";
+    $leader = "$PROGNAME $VERSION Usage Information";
+    $underbar = $leader;
+    $underbar =~ s/./-/g;
+    print "$leader\n$underbar\n";
+    print "\n";
+    printf("  Syntax:   %s [ options ]\n", &basename($0));
+    print "\n";
+    print "   -h, --help               This usage screen\n";
+    print "   -v, --version            Print version and copyright info.\n";
+    print "   -B, --builder <name>     Specify builder mode (i.e., named config).\n";
+
+    foreach my $var (@CONFIG_VARS) {
+        my $optspec = $CONFIG{$var}{"OPTSPEC"};
+        my ($opt_req, $opt_type, $opt_dest, $out_str) = ("", "", "", "");
+        my @opts;
+
+        if ($optspec =~ /^(.+)([=:])([siof\+]|[0-9]+)([\@\%])?$/) {
+            ($optspec, $opt_req, $opt_type, $opt_dest) = ($1, $2, $3, $4);
+        } elsif ($optspec =~ /^(.+)([\!\+])$/) {
+            ($optspec, $opt_type) = ($1, $2);
+        }
+        @opts = sort { length($a) <=> length($b) } split(/\|/, $optspec);
+        for (my $i = 0; $i < scalar(@opts); $i++) {
+            if (length($opts[$i]) == 1) {
+                $opts[$i] = '-' . $opts[$i];
+            } elsif ($opt_type eq '!') {
+                $opts[$i] = "--[no]" . $opts[$i];
+            } else {
+                $opts[$i] = "--" . $opts[$i];
+            }
+        }
+
+        if (length($opts[0]) != 2) {
+            # No single-char option, so skip some spaces.
+            $out_str = "    ";
+        }
+        $out_str .= join(", ", @opts);
+        if ($opt_type) {
+            if ($opt_type eq 's') {
+                $opt_type = "str";
+            } elsif (($opt_type eq 'i') || ($opt_type eq 'o')) {
+                $opt_type = "int";
+            } elsif ($opt_type eq 'f') {
+                $opt_type = "float";
+            } else {
+                $opt_type = "";
+            }
+            if ($opt_req) {
+                if ($opt_req eq '=') {
+                    $opt_type = '<' . $opt_type . '>';
+                } else {
+                    $opt_type = '<' . $opt_type . '>';
+                }
+            }
+        }
+        if ($opt_type) {
+            $out_str .= ' ' . $opt_type;
+        }
+        printf("   %-24s %s.\n", $out_str, $CONFIG{$var}{"DESCRIPTION"});
+    }
+
+    print "       --[no]savecfg        Save configuration data.\n";
+    print "       --justcfg            Exit after saving config.\n";
+    print "\n";
+    exit(0);
+}
+
+sub
+handle_hup_signal($)
+{
+    my $sig = shift;
+
+    wprint "Received SIGHUP.  Terminating builder after this cycle completes.\n";
+    $config->set("LOOP", 0);
+}
+
+sub
+main()
+{
+    my $ret = 0;
+    my @optspecs;
+
+    # For taint checks
+    delete @ENV{("IFS", "CDPATH", "ENV", "BASH_ENV")};
+    $ENV{"PATH"} = "/bin:/usr/bin:/sbin:/usr/sbin:/etc:/usr/ucb";
+    foreach my $shell ("/bin/bash", "/usr/bin/ksh", "/bin/ksh", "/bin/sh", "/sbin/sh") {
+        if (-f $shell) {
+            $ENV{"SHELL"} = $shell;
+            last;
+        }
+    }
+
+    foreach my $var (@CONFIG_VARS) {
+        push @optspecs, $CONFIG{$var}{"OPTSPEC"};
+    }
+    &mezz_init("autobuilder", "1.0", "help|h", "version|v", "builder|B=s", @optspecs, "savecfg!", "justcfg");
+
+    if ($OPTION{"version"}) {
+        # Do not edit this.  It is updated automatically by CVS when you commit.
+        &print_version($PROGNAME, $VERSION, "Michael Jennings",
+                       'CVS Revision $Revision: 1.1 $ created on $Date: 2011/02/01 07:16:34 $ by $Author: mej $ ');
+    } elsif ($OPTION{"help"}) {
+        &print_usage_info();
+    }
+
+    # Load the requested config and remove that option (if present).
+    $config = Mezzanine::Config->new("build/" . (($OPTION{"builder"}) ? ($OPTION{"builder"}) : ("autobuilder")));
+    delete $OPTION{"builder"};
+
+    # If this is a new config file, save the defaults for later.
+    if (!scalar($config->keys()) && ((!defined($OPTION{"savecfg"})) || ($OPTION{"savecfg"}))) {
+        $OPTION{"savecfg"} = 1;
+    }
+
+    # Set simple options and untaint.
+    foreach my $var (grep { substr($CONFIG{$_}{"OPTSPEC"}, -1, 1) !~ /^[\@\%]$/ } @CONFIG_VARS) {
+        my $option = $CONFIG{$var}{"OPTION"};
+        my $default = $CONFIG{$var}{"DEFAULT"};
+
+        if (exists($OPTION{$option})) {
+            if ($OPTION{$option} =~ /^([^\`\$\(\)]*)$/) {
+                $config->set($var, $1);
+            } else {
+                wprint "Tainted value for --$option:  \"$OPTION{$option}\"\n";
+            }
+        } elsif (!defined($config->get($var))) {
+            if ($default =~ /^([^\`\$\(\)]*)$/) {
+                $config->set($var, $1);
+            } else {
+                wprint "Tainted value for --$option:  \"$default\"\n";
+            }
+        } else {
+            if ($config->get($var) =~ /^([^\`\$\(\)]*)$/) {
+                $config->set($var, $1);
+            } else {
+                wprint "Tainted value for --$option:  \"$default\"\n";
+            }
+        }
+    }
+    &debug_set($config->get("DEBUG"));
+
+    # Translate all specified build trees to a single :-delimited string.
+    dprint "Assembling build trees.\n";
+    if (ref($OPTION{"buildtrees"}) && (ref($OPTION{"buildtrees"}) eq "ARRAY")) {
+        for (my $i = 0; $i < scalar(@{$OPTION{"buildtrees"}}); $i++) {
+            if (index($OPTION{"buildtrees"}[$i], ':') >= 0) {
+                splice(@{$OPTION{"buildtrees"}}, $i, 1, split(':', $OPTION{"buildtrees"}[$i]));
+            }
+        }
+        $config->set("BUILDTREES", join(':', @{$OPTION{"buildtrees"}}));
+    }
+
+    # Save configuration if needed.
+    if ($OPTION{"savecfg"} || $OPTION{"justcfg"}) {
+        $config->save();
+        if ($OPTION{"justcfg"}) {
+            return 0;
+        }
+    }
+
+    # Allow graceful termination using SIGHUP
+    $SIG{"HUP"} = \&handle_hup_signal;
+
+    # Create builder object.
+    $builder = CAOS::Builder->new($config);
+
+    # Perform pre-clean step.
+    $builder->preclean();
+
+    ### BUILD LOOP!
+    do {
+        tprint "Build loop commencing...\n";
+
+        # Perform repair step.
+        $builder->repair();
+
+        # Perform update step.
+        $builder->update();
+
+        # Perform get step.
+        $builder->get_phase();
+
+        # Perform build step.
+        $builder->build();
+
+        # Perform createrepo step.
+        $builder->createrepo();
+
+        # Perform flush step.
+        $builder->flush();
+
+        # Perform sync step.
+        $builder->sync();
+
+        tprint "Build loop complete.\n";
+    } while ($config->get("LOOP"));
+
+    tprint "$PROGNAME $VERSION exiting.\n";
+    return $ret;
+}
+
+exit &main();
