@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.214 2007/03/15 06:15:42 mej Exp $
+# $Id: buildtool,v 1.215 2011/02/10 02:11:35 mej Exp $
 #
 
 use strict;
@@ -879,7 +879,7 @@ parallel_build
             $line .= "$child_pkg{$pid} ($pid)    ";
         }
         nprint "$PROGNAME:  Currently building:  $line\n";
-        nprint "$PROGNAME:  ${\(scalar(@completed_pkgs))} packages completed (${\(scalar(@failed_pkgs))} failed), "
+        nprint "$PROGNAME:  ${\(scalar(@completed_pkgs))} packages built, ${\(scalar(@failed_pkgs))} failed, "
             . "${\(scalar(@children))} building, ${\(scalar(@packages))} in queue.\n";
 
         # This loop waits until one of our immediate children dies before continuing.
@@ -1109,7 +1109,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.214 $ created on $Date: 2007/03/15 06:15:42 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.215 $ created on $Date: 2011/02/10 02:11:35 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();

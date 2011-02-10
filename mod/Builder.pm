@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Builder.pm,v 1.1 2011/02/01 07:16:34 mej Exp $
+# $Id: Builder.pm,v 1.2 2011/02/10 02:11:35 mej Exp $
 #
 
 package Mezzanine::Builder;
@@ -234,7 +234,7 @@ build()
         return;
     }
 
-    $common_params = sprintf("%s -b orc --no-allow-epoch --di '%s' -i '%s' -L '/src.rpm\$/=%s,/rpm\$/=%s' %s",
+    $common_params = sprintf("%s -b orc --di '%s' -i '%s' -L '/src.rpm\$/=%s,/rpm\$/=%s' %s",
                              (($self->{"CONFIG"}->get("DEBUG")) ? ("--debug") : ("")),
                              $self->{"CONFIG"}->get("DEPSOLVER"), $self->{"CONFIG"}->get("BUILDROOT"),
                              $self->{"SRPMDIR"}, $self->{"ARCHDIR"}, $self->{"CONFIG"}->get("OPTIONS"));

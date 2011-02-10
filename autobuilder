@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: autobuilder,v 1.1 2011/02/01 07:16:34 mej Exp $
+# $Id: autobuilder,v 1.2 2011/02/10 02:11:35 mej Exp $
 #
 
 use lib '.';
@@ -287,7 +287,7 @@ main()
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.1 $ created on $Date: 2011/02/01 07:16:34 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.2 $ created on $Date: 2011/02/10 02:11:35 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"}) {
         &print_usage_info();
     }
@@ -351,7 +351,7 @@ main()
     $SIG{"HUP"} = \&handle_hup_signal;
 
     # Create builder object.
-    $builder = CAOS::Builder->new($config);
+    $builder = Mezzanine::Builder->new($config);
 
     # Perform pre-clean step.
     $builder->preclean();
