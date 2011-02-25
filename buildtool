@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: buildtool,v 1.215 2011/02/10 02:11:35 mej Exp $
+# $Id: buildtool,v 1.216 2011/02/25 03:14:57 mej Exp $
 #
 
 use strict;
@@ -50,6 +50,7 @@ my $global_tag;  # Tag to get packages with
 my $buildtree_layout = "mej";  # The layout style to use for the build tree.
 my $prod = "";
 my $failure;
+my @skipped_pkgs;
 my @failed_pkgs;
 my @completed_pkgs;
 my $num_processes;
@@ -144,7 +145,7 @@ skipped_package
 {
     my $pkg = $_[0];
 
-    push @completed_pkgs, $pkg;
+    push @skipped_pkgs, $pkg;
     nprint "Package build for $pkg was not needed.  (${\(&get_timestamp())})\n";
 }
 
@@ -878,9 +879,11 @@ parallel_build
         foreach my $pid (@children) {
             $line .= "$child_pkg{$pid} ($pid)    ";
         }
+        nprint "$PROGNAME:  Status at @{[&get_timestamp()]}:\n";
         nprint "$PROGNAME:  Currently building:  $line\n";
-        nprint "$PROGNAME:  ${\(scalar(@completed_pkgs))} packages built, ${\(scalar(@failed_pkgs))} failed, "
-            . "${\(scalar(@children))} building, ${\(scalar(@packages))} in queue.\n";
+        nprintf("$PROGNAME:  %d packages built, %d skipped, %d failed, %d building, %d in queue.\n",
+                scalar(@completed_pkgs), scalar(@skipped_pkgs), scalar(@failed_pkgs),
+                scalar(@children), scalar(@packages));
 
         # This loop waits until one of our immediate children dies before continuing.
         do {
@@ -1037,15 +1040,16 @@ build_product
 sub
 summarize_failures
 {
-    my ($ns, $nf, $nt, $ni, $nb, $face, $summary_file);
+    my ($ns, $nf, $nt, $ni, $nb, $nk, $face, $summary_file);
     local *SUMMARY;
 
     # $ns is the number of successful packages.  $nf is the number of failures.
     # $nt is the total number of packages we tried to build.
     $ns = scalar(@completed_pkgs);
+    $nk = scalar(@skipped_pkgs);
     $nf = scalar(@failed_pkgs);
     $nt = scalar(@packages);
-    $nb = $nt - $ns - $nf;
+    $nb = $nt - $ns - $nf - $nk;
 
     if ($nf == 0) {
         $face = ":-)";
@@ -1067,9 +1071,9 @@ summarize_failures
     if (!open(SUMMARY, ">$summary_file")) {
         $summary_file = "";
     }
-    qprint "Build Summary:  $ns Successful    $nf Failed    $nb Not Built    $nt Total    $face\n";
+    qprint "Build Summary:  $ns Successful    $nk Skipped    $nf Failed    $nb Not Built    $nt Total    $face\n";
     if ($summary_file) {
-        print SUMMARY "Build Summary:  $ns Successful    $nf Failed    $nb Not Built    $nt Total    $face\n";
+        print SUMMARY "Build Summary:  $ns Successful    $nk Skipped    $nf Failed    $nb Not Built    $nt Total    $face\n";
     }
     if ($nf) {
         foreach my $pkg (@failed_pkgs) {
@@ -1109,7 +1113,7 @@ main
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
-                       'CVS Revision $Revision: 1.215 $ created on $Date: 2011/02/10 02:11:35 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.216 $ created on $Date: 2011/02/25 03:14:57 $ by $Author: mej $ ');
     }
     if ($OPTION{"help"}) {
 	&print_usage_info();

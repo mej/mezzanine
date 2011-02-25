@@ -1225,3 +1225,9 @@ Fri Feb 11 18:20:56 2011                        Michael Jennings (mej)
 
 Don't cross mount points when syncing instroot.
 ----------------------------------------------------------------------
+Thu Feb 24 19:14:09 2011                        Michael Jennings (mej)
+
+Refine build-time stats display.
+
+Allow mzreposcan --old --remove to actually remove packages.
+----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: pkgrepotool,v 1.8 2007/05/24 20:37:41 mej Exp $
+# $Id: pkgrepotool,v 1.9 2011/02/25 03:14:58 mej Exp $
 #
 
 use strict;
@@ -107,7 +107,7 @@ main
     if ($OPTION{"version"}) {
         # Do not edit this.  It is updated automatically by CVS when you commit.
         &print_version($PROGNAME, $VERSION, "Michael Jennings",
-                       'CVS Revision $Revision: 1.8 $ created on $Date: 2007/05/24 20:37:41 $ by $Author: mej $ ');
+                       'CVS Revision $Revision: 1.9 $ created on $Date: 2011/02/25 03:14:58 $ by $Author: mej $ ');
     } elsif ($OPTION{"help"} || (!scalar(@ARGV) && !scalar(%OPTION) && &basename($0) !~ /^mz/)) {
         &print_usage_info();
     }
@@ -188,6 +188,19 @@ main
         foreach my $dir (sort(keys(%{$scan}))) {
             foreach my $pkg (&rpm_sort(keys(%{$scan->{$dir}}))) {
                 print "$pkg\n";
+                if ($OPTION{"add"}) {
+                    if ($OPTION{"scm"}) {
+
+                    } else {
+
+                    }
+                } elsif ($OPTION{"remove"}) {
+                    if ($OPTION{"scm"}) {
+
+                    } else {
+                        &nuke_tree($pkg);
+                    }
+                }
             }
         }
     } elsif ($mode eq "closure") {
