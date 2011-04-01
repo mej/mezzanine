@@ -8,6 +8,11 @@
 #include <rpm/rpmcli.h>
 #include <rpm/rpmmacro.h>
 #include <rpm/rpmts.h>
+#include <rpm/rpmlog.h>
+#ifdef HAVE_RPM_RPMLEGACY_H
+#  define _RPM_4_4_COMPAT
+#  include <rpm/rpmlegacy.h>
+#endif
 
 static struct poptOption optionsTable[] = {
    POPT_AUTOALIAS
@@ -34,7 +39,7 @@ rpm_get_version(const char *rpmfile)
                 }
                 rc = rpmReadPackageFile(ts, fd, rpmfile, &hdr);
                 if (rc != RPMRC_NOTFOUND && rc != RPMRC_FAIL) {
-                    tmp = headerSprintf(hdr, "%{VERSION}-%{RELEASE}", rpmTagTable, rpmHeaderFormats, NULL);
+                    tmp = headerSprintf(hdr, "%{VERSION}-%{RELEASE}", NULL, NULL, NULL);
                     hdr = headerFree(hdr);
                 }
             }

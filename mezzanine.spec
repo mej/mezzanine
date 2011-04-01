@@ -1,4 +1,4 @@
-# $Id: mezzanine.spec,v 1.173 2011/02/25 03:14:58 mej Exp $
+# $Id: mezzanine.spec,v 1.174 2011/04/01 20:59:13 mej Exp $
 
 %define perl_vendorlib %(eval "`perl -V:installvendorlib 2>/dev/null`"; echo $installvendorlib)
 %if "%{perl_vendorlib}" == "UNKNOWN"
@@ -10,7 +10,7 @@
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
 Version: 1.9
-Release: 0.24
+Release: 0.25
 License: BSD
 Group: Development/Tools
 URL: http://www.kainx.org/mezzanine/
@@ -44,8 +44,9 @@ building, and releasing software products.
     done
 ) || :
 
+[ -f %{_includedir}/rpm/rpmlegacy.h ] && CPPFLAGS="$CPPFLAGS -DHAVE_RPM_RPMLEGACY_H"
 ${CC:-%{__cc}} $CPPFLAGS ${CFLAGS:-$RPM_OPT_FLAGS} -I%{_includedir}/rpm -o rpmeval rpmeval.c $LDFLAGS -lrpm $LIBS || :
-${CC:-%{__cc}} $CPPFLAGS ${CFLAGS:-$RPM_OPT_FLAGS} -I%{_includedir}/rpm -o rpmcmp rpmcmp.c $LDFLAGS -lrpm $LIBS || :
+${CC:-%{__cc}} $CPPFLAGS ${CFLAGS:-$RPM_OPT_FLAGS} -I%{_includedir}/rpm -o rpmcmp rpmcmp.c $LDFLAGS -lrpm $LIBS
 
 %install
 test "x$RPM_BUILD_ROOT" != "x" && %{__rm} -rf $RPM_BUILD_ROOT
