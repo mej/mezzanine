@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Deb.pm,v 1.7 2007/02/27 21:29:36 mej Exp $
+# $Id: Deb.pm,v 1.8 2011/06/25 19:41:34 mej Exp $
 #
 
 package Mezzanine::Deb;
@@ -93,6 +93,7 @@ deb_form_command
             $cmd .= " --root=\"" . &pkgvar_instroot() . "\"";
         }
     } elsif ($type eq "contents") {
+    } elsif ($type eq "files") {
     } elsif ($type eq "query") {
     }
     if (&pkgvar_parameters()) {
@@ -140,6 +141,25 @@ deb_show_contents
         return (MEZZANINE_SYNTAX_ERROR, "No package specified for query");
     }
     $cmd = &deb_form_command("contents") . " -c " . &pkgvar_filename();
+    if (!open(DPKG, "$cmd 2>&1 |")) {
+        eprint "Execution of \"$cmd\" failed -- $!\n";
+    }
+    @results = <DPKG>;
+    close(DPKG);
+    return ($? >> 8, @results);
+}
+
+sub
+deb_list_files
+{
+    my ($cmd, $line);
+    my @results;
+    local *DPKG;
+
+    if (! &pkgvar_filename()) {
+        return (MEZZANINE_SYNTAX_ERROR, "No package specified for query");
+    }
+    $cmd = &deb_form_command("files") . " -c " . &pkgvar_filename();
     if (!open(DPKG, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }

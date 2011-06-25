@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: RPM.pm,v 1.62 2011/02/01 08:42:25 mej Exp $
+# $Id: RPM.pm,v 1.63 2011/06/25 19:41:34 mej Exp $
 #
 
 package Mezzanine::RPM;
@@ -45,10 +45,10 @@ BEGIN {
 
     @EXPORT = ('$specdata', '&rpm_form_command', '&parse_spec_file',
                '&disable_patch', '&enable_patch', '&rpm_install',
-               '&rpm_show_contents', '&rpm_query', '&rpm_build',
-               '&rpm_compare_versions', '&rpm_get_installed',
-               '&rpm_scan_files', '&rpm_cmp', '&rpm_sort',
-               '&rpm_eval');
+               '&rpm_show_contents', '&rpm_list_files', '&rpm_query',
+               '&rpm_build', '&rpm_compare_versions',
+               '&rpm_get_installed', '&rpm_scan_files', '&rpm_cmp',
+               '&rpm_sort', '&rpm_eval');
 
     %EXPORT_TAGS = ( );
 
@@ -214,6 +214,8 @@ rpm_form_command
         }
     } elsif ($type eq "contents") {
         $cmd .= " -qlv -p " . &pkgvar_filename();
+    } elsif ($type eq "files") {
+        $cmd .= " -ql -p " . &pkgvar_filename();
     } elsif ($type eq "install") {
         if (&pkgvar_command() =~ /^(.*\/)?rpm$/) {
             $cmd .= " -U " . &pkgvar_filename();
@@ -506,6 +508,23 @@ rpm_show_contents
     local *RPM;
 
     $cmd = &rpm_form_command("contents");
+    if (!open(RPM, "$cmd 2>&1 |")) {
+        eprint "Execution of \"$cmd\" failed -- $!\n";
+    }
+    @results = <RPM>;
+    close(RPM);
+    dprint "\"$cmd\" returned $?\n" if ($?);
+    return ($? >> 8, @results);
+}
+
+sub
+rpm_list_files
+{
+    my $cmd;
+    my @results;
+    local *RPM;
+
+    $cmd = &rpm_form_command("files");
     if (!open(RPM, "$cmd 2>&1 |")) {
         eprint "Execution of \"$cmd\" failed -- $!\n";
     }

@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Src.pm,v 1.29 2008/06/14 17:35:55 mej Exp $
+# $Id: Src.pm,v 1.30 2011/06/25 19:41:34 mej Exp $
 #
 
 package Mezzanine::Src;
@@ -181,15 +181,13 @@ convert_srpm_to_spm($)
     }
 
     # The spec file should be the only file in $destdir/F
-    @tmp = grep(/\.spec(\.in)?\s*$/, &package_show_contents());
+    @tmp = grep(/\.spec(\.in)?\s*$/, &package_list_files());
     dprint "Spec file(s):  ", join(' ', @tmp), "\n";
     if (scalar(@tmp) != 1) {
         my $n = scalar(@tmp);
         &fatal_error("$n spec files in $pkgfile?!\n");
     }
-    # FIXME:  We need a better way to get the spec file name off the line.
-    $spec = &str_trim(substr($tmp[0], 59));
-    chomp($spec);
+    chomp($spec = $tmp[0]);
     $spec = "$destdir/F/" . &basename($spec);
 
     # Get a list of all source and patch files

@@ -1239,3 +1239,7 @@ Fri Apr  1 13:58:49 2011                        Michael Jennings (mej)
 
 Fix rpmcmp.c to be compatible with RPM 4.8.  Sigh.
 ----------------------------------------------------------------------
+Sat Jun 25 12:41:32 2011                        Michael Jennings (mej)
+
+Fix problem importing packages on RHEL6.
+----------------------------------------------------------------------

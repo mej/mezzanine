@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Pkg.pm,v 1.25 2007/02/27 21:29:36 mej Exp $
+# $Id: Pkg.pm,v 1.26 2011/06/25 19:41:34 mej Exp $
 #
 
 package Mezzanine::Pkg;
@@ -43,8 +43,8 @@ BEGIN {
     @ISA         = ('Exporter');
     # Exported functions go here
     @EXPORT      = ('&fetch_package', '&package_install',
-                    '&package_show_contents', '&package_query',
-                    '&package_compare_versions');
+                    '&package_show_contents', '&package_list_files',
+                    '&package_query', '&package_compare_versions');
     %EXPORT_TAGS = ( );
 
     # Exported variables go here
@@ -62,6 +62,7 @@ use vars ('@EXPORT_OK');
 sub fetch_package($);
 sub package_install();
 sub package_show_contents();
+sub package_list_files();
 sub package_query($);
 sub package_compare_versions($$);
 
@@ -141,6 +142,27 @@ package_show_contents
         return &deb_show_contents($pkg_file);
     } elsif ($pkg_type eq "tar") {
         return &tar_show_contents($pkg_file);
+    }
+    return (MEZZANINE_INVALID_PACKAGE, "Unable to identify package $pkg_file.\n");
+}
+
+sub
+package_list_files
+{
+    my ($pkg_file, $pkg_type);
+
+    $pkg_file = &pkgvar_filename();
+    $pkg_type = &pkgvar_type();
+
+    if (! $pkg_file) {
+        return (MEZZANINE_SYNTAX_ERROR, "You cannot display contents without specifying a package.\n");
+    }
+    if ($pkg_type eq "rpm") {
+        return &rpm_list_files($pkg_file);
+    } elsif ($pkg_type eq "deb") {
+        return &deb_list_files($pkg_file);
+    } elsif ($pkg_type eq "tar") {
+        return &tar_list_files($pkg_file);
     }
     return (MEZZANINE_INVALID_PACKAGE, "Unable to identify package $pkg_file.\n");
 }
