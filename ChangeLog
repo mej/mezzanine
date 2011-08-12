@@ -1243,3 +1243,7 @@ Sat Jun 25 12:41:32 2011                        Michael Jennings (mej)
 
 Fix problem importing packages on RHEL6.
 ----------------------------------------------------------------------
+Thu Aug 11 18:12:37 2011                        Michael Jennings (mej)
+
+Object-related fixes to examine_object().
+----------------------------------------------------------------------

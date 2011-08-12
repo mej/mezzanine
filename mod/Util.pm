@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Util.pm,v 1.74 2011/02/01 08:42:25 mej Exp $
+# $Id: Util.pm,v 1.75 2011/08/12 01:12:39 mej Exp $
 #
 
 package Mezzanine::Util;
@@ -610,7 +610,7 @@ is_tainted($) {
 sub
 examine_object(@)
 {
-    my ($item, $buffer, $indent, $indent_step) = @_;
+    my ($item, $buffer, $indent, $indent_step, $seen) = @_;
     my $tainted;
 
     # Set default parameters.
@@ -622,6 +622,9 @@ examine_object(@)
     }
     if (!defined($indent_step)) {
         $indent_step = 4;
+    }
+    if (!defined($seen)) {
+        $seen = {};
     }
     if (&is_tainted($item)) {
         $tainted = ' *TAINTED*';
@@ -635,52 +638,54 @@ examine_object(@)
     } elsif (ref($item)) {
         my $type = ref($item);
 
+        if (exists($seen->{$item})) {
+            # Use a hash table to avoid recursing the same reference
+            # multiple times.  Avoids infinite recursion in
+            # self-referential data structures.
+            $buffer .= "SEEN $seen->{$item} REF $item$tainted";
+            return $buffer;
+        }
         if ($type eq "SCALAR") {
+            $seen->{$item} = "SCALAR";
             $buffer .= "SCALAR REF $item$tainted {\n" . (' ' x ($indent + $indent_step));
-            $buffer = &examine_object(${$item}, $buffer, $indent + $indent_step, $indent_step);
+            $buffer = &examine_object(${$item}, $buffer, $indent + $indent_step, $indent_step, $seen);
             $buffer .= "\n" . (' ' x $indent) . '}';
-        } elsif ($type eq "ARRAY") {
-            $buffer .= "ARRAY REF $item$tainted {\n";
+        } elsif (UNIVERSAL::isa($item, "ARRAY")) {
+            $seen->{$item} = (($type eq "ARRAY") ? ("ARRAY") : ("OBJECT"));
+            $buffer .= "$seen->{$item} REF $item$tainted {\n";
             for (my $i = 0; $i < scalar(@{$item}); $i++) {
                 $buffer .= (' ' x ($indent + $indent_step)) . "$i:  ";
-                $buffer = &examine_object($item->[$i], $buffer, $indent + $indent_step, $indent_step) . "\n";
+                $buffer = &examine_object($item->[$i], $buffer, $indent + $indent_step, $indent_step, $seen) . "\n";
             }
             $buffer .= (' ' x $indent) . '}';
-        } elsif ($type eq "HASH") {
-            $buffer .= "HASH REF $item$tainted {\n";
+        } elsif (UNIVERSAL::isa($item, "HASH")) {
+            $seen->{$item} = (($type eq "HASH") ? ("HASH") : ("OBJECT"));
+            $buffer .= "$seen->{$item} REF $item$tainted {\n";
             foreach my $key (sort(keys(%{$item}))) {
                 $buffer .= (' ' x ($indent + $indent_step));
-                $buffer = &examine_object($key, $buffer, $indent + $indent_step, $indent_step) . " => ";
-                $buffer = &examine_object($item->{$key}, $buffer, $indent + $indent_step, $indent_step) . "\n";
+                $buffer = &examine_object($key, $buffer, $indent + $indent_step, $indent_step, $seen) . " => ";
+                $buffer = &examine_object($item->{$key}, $buffer, $indent + $indent_step, $indent_step, $seen) . "\n";
             }
             $buffer .= (' ' x $indent) . '}';
-        } elsif ($type eq "CODE") {
-            $buffer .= "CODE REF $item$tainted";
-        } elsif ($type eq "REF") {
-            $buffer .= "REF REF $item$tainted {\n" . (' ' x ($indent + $indent_step));
-            $buffer = &examine_object(${$item}, $buffer, $indent + $indent_step, $indent_step);
+        } elsif (UNIVERSAL::isa($item, "CODE")) {
+            $seen->{$item} = (($type eq "CODE") ? ("CODE") : ("OBJECT"));
+            $buffer .= "$seen->{$item} REF $item$tainted";
+        } elsif (UNIVERSAL::isa($item, "REF")) {
+            $seen->{$item} = (($type eq "REF") ? ("REF") : ("OBJECT"));
+            $buffer .= "$seen->{$item} REF $item$tainted {\n" . (' ' x ($indent + $indent_step));
+            $buffer = &examine_object(${$item}, $buffer, $indent + $indent_step, $indent_step, $seen);
             $buffer .= "\n" . (' ' x $indent) . '}';
         } elsif ($type eq "GLOB") {
+            $seen->{$item} = $type;
             $buffer .= "GLOB REF $item$tainted";
         } elsif ($type eq "LVALUE") {
+            $seen->{$item} = $type;
             $buffer .= "LVALUE REF $item$tainted";
         #} elsif ($type eq "Regexp") {
         } else {
-            # Some object type.
-            $buffer .= ref($item) . " REF $item$tainted {\n" . (' ' x ($indent + $indent_step));
-            if (UNIVERSAL::isa($item, "CODE")) {
-                $item = \&{$item};
-            } elsif (UNIVERSAL::isa($item, "REF")) {
-                $item = \${$item};
-            } elsif (UNIVERSAL::isa($item, "HASH")) {
-                $item = \%{$item};
-            } elsif (UNIVERSAL::isa($item, "ARRAY")) {
-                $item = \@{$item};
-            } else {
-                $item = \"UNKNOWN";  #"
-            }
-            $buffer = &examine_object($item, $buffer, $indent + $indent_step, $indent_step);
-            $buffer .= "\n" . (' ' x $indent) . '}';
+            # Some unknown reference type.
+            $seen->{$item} = "UNKNOWN";
+            $buffer .= "UNKNOWN REF $item$tainted";
         }
     } elsif ($item =~ /^\d+$/) {
         $buffer .= "$item$tainted";
