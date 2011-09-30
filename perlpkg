@@ -23,7 +23,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: perlpkg,v 1.8 2009/09/02 03:33:07 mej Exp $
+# $Id: perlpkg,v 1.9 2011/09/30 23:35:07 mej Exp $
 #
 
 use strict;
@@ -93,7 +93,6 @@ create_cpan_list()
         my $file = $mod->cpan_file() || $mod->inst_file();
         my $installed = $mod->inst_version() || "";
         my $uptodate = $mod->uptodate();
-        my $dslip = $mod->dslip_status();
         my $noarch = undef;
 
         if (substr($file, 0, 14) eq "Contact Author") {
@@ -110,8 +109,12 @@ create_cpan_list()
         push @{$distributions{$file}{"MODLIST"}}, $name;
         push @{$distributions{$file}{"MODOBJLIST"}}, $mod;
         #next;
-        if ($dslip && ref($dslip) && $dslip->{"L"}) {
-            $noarch = (($dslip->{"L"} eq 'p' || $dslip->{"L"} eq 'h') ? (1) : (0));
+        if ($mod->can("dslip_status")) {
+            my $dslip = $mod->dslip_status();
+
+            if ($dslip && ref($dslip) && $dslip->{"L"}) {
+                $noarch = (($dslip->{"L"} eq 'p' || $dslip->{"L"} eq 'h') ? (1) : (0));
+            }
         }
         if (defined($distributions{$file}{"INSTALLED"})) {
             if ($distributions{$file}{"INSTALLED"} && !($installed)) {
@@ -454,7 +457,7 @@ main
     select STDOUT; $| = 1;
     if ($opt_v) {
         # Do not edit this variable.  It is updated automatically by CVS when you commit
-        my $rcs_info = 'CVS Revision $Revision: 1.8 $ created on $Date: 2009/09/02 03:33:07 $ by $Author: mej $ ';
+        my $rcs_info = 'CVS Revision $Revision: 1.9 $ created on $Date: 2011/09/30 23:35:07 $ by $Author: mej $ ';
 
         $rcs_info =~ s/\$\s*Revision: (\S+) \$/$1/;
         $rcs_info =~ s/\$\s*Date: (\S+) (\S+) \$/$1 at $2/;
