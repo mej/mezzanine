@@ -1253,3 +1253,7 @@ Fix portability issue with perlpkg.
 
 Add C source function info to generated patches.
 ----------------------------------------------------------------------
+Fri May  4 15:58:17 2012                        Michael Jennings (mej)
+
+Fix building tarball in chroot jail.
+----------------------------------------------------------------------

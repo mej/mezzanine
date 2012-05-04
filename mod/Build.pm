@@ -21,7 +21,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# $Id: Build.pm,v 1.62 2011/02/12 02:20:58 mej Exp $
+# $Id: Build.pm,v 1.63 2012/05/04 22:58:20 mej Exp $
 #
 
 package Mezzanine::Build;
@@ -1088,6 +1088,9 @@ build_tarball
 
     $target_format = &pkgvar_target();
     &prepare_build_tree();
+    if (&pkgvar_instroot()) {
+        &copy_files(&pkgvar_filename(), &pkgvar_instroot() . '/' . &pkgvar_filename());
+    }
     if ($target_format eq "rpms") {
         return &build_rpms_from_tarball($pkg);
     } elsif ($target_format eq "debs") {
