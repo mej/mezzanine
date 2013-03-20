@@ -385,10 +385,10 @@ package_perl_dist(@)
         $template->vars("DISTNAME", $distname);
         $template->vars("MODULE", $pkgname);
         $template->vars("VERSION", $version);
-        $template->vars("VENDORSUFFIX", "%{?_vendorsuffix:%{_vendorsuffix}}%{!?_vendorsuffix:%{_vendor}}");
-        $template->vars("PACKAGER", "%{?_packager:%{_packager}}%{!?_packager:%{_vendor}}");
-        $template->vars("VENDOR", "%{?_vendorinfo:%{_vendorinfo}}%{!?_vendorinfo:%{_vendor}}");
-        $template->vars("DISTRIBUTION", "%{?_distribution:%{_distribution}}%{!?_distribution:%{_vendor}}");
+        $template->vars("VENDORSUFFIX", "%{?_vendorsuffix}%{!?_vendorsuffix:mz}%{?dist}");
+        $template->vars("PACKAGER", "%{?_packager}%{!?_packager:Mezzanine <mezzanine\@kainx.org>}");
+        $template->vars("VENDOR", "%{?_vendorinfo}%{!?_vendorinfo:https://github.com/kainx/mezzanine/}");
+        $template->vars("DISTRIBUTION", "%{?_distribution}%{!?_distribution:%{_vendor}}");
         $template->vars("MODULENAME", $modname);
         $template->vars("DISTFILE", &basename($file));
         $template->vars("BUILDARCH", (($distributions{$file}{"NOARCH"}) ? ("\nBuildArch: noarch") : ("")));
