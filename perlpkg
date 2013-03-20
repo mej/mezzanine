@@ -28,7 +28,8 @@
 
 use strict;
 use vars '$progname', '$version', '$opt_v', '$opt_h', '$opt_d',
-    '$opt_t', '$opt_s', '$opt_p', '$opt_n', '$opt_u', '$opt_L', '$opt_x';
+    '$opt_t', '$opt_s', '$opt_p', '$opt_n', '$opt_u', '$opt_L', '$opt_x',
+    '$opt_f';
 use CPAN;
 use POSIX;
 use Getopt::Long;
@@ -42,7 +43,7 @@ my %distributions;
 my @tried;
 my @built;
 my ($template, $save_pwd);
-my ($handle_build_deps, $pkgonly, $update, $local_mode, $exact);
+my ($handle_build_deps, $pkgonly, $update, $local_mode, $exact, $force);
 
 # Print usage information
 sub
@@ -58,16 +59,17 @@ print_usage_info
     print "\n";
     print "  Syntax:   perlpkg [ options ]\n";
     print "\n";
-    print "    -h --help                        Show this usage information\n";
-    print "    -d --debug                       Turn on debugging\n";
-    print "    -v --version                     Show version and copyright\n";
-    print "    -s --search                      Search only; don't build anything\n";
-    print "    -t --template <path>             Use specified template file/directory\n";
-    print "    -p --pkgonly                     Package only; do not attempt to build\n";
-    print "    -n --nodeps                      Do not handle build dependencies\n";
-    print "    -u --update                      Check for updates\n";
-    print "    -L --local                       Local mode; do not contact CPAN\n";
-    print "    -x --exact                       Match exact distribution/module name only\n";
+    print "    -h --help               Show this usage information\n";
+    print "    -d --debug              Turn on debugging\n";
+    print "    -v --version            Show version and copyright\n";
+    print "    -s --search             Search only; don't build anything\n";
+    print "    -t --template <path>    Use specified template file/directory\n";
+    print "    -p --pkgonly            Package only; do not attempt to build\n";
+    print "    -n --nodeps             Do not handle build dependencies\n";
+    print "    -u --update             Check for updates\n";
+    print "    -L --local              Local mode; do not contact CPAN\n";
+    print "    -x --exact              Match exact distribution/module name only\n";
+    print "    -f --force              Attempt to force CPAN to perform requested action\n";
     print "\n";
     exit(MEZZANINE_SUCCESS);
 }
@@ -265,10 +267,10 @@ build(@)
         } elsif (&basename($file) =~ /^Meta-[\d\.]+\.(t|tar\.)(gz|bz2?)$/) {
             print $SAVE_STDOUT "${depth_str}Something requires the evil Meta package (", &basename($file), "); aborting!\n";
             next;
-        } elsif (!($update) && $distributions{$file}{"INSTALLED"}) {
+        } elsif (!($force) && !($update) && $distributions{$file}{"INSTALLED"}) {
             print $SAVE_STDOUT "${depth_str}Skipping installed package $file\n";
             next;
-        } elsif ($update && $distributions{$file}{"UPTODATE"}) {
+        } elsif (!($force) && $update && $distributions{$file}{"UPTODATE"}) {
             print $SAVE_STDOUT "${depth_str}Skipping up-to-date package $file\n";
             next;
         } elsif (&debug_get()) {
@@ -276,12 +278,20 @@ build(@)
         }
         print $SAVE_STDOUT "${depth_str}Building $file:  ";
         print $SAVE_STDOUT "downloading...";
-        $dist_obj->get();
+        if ($force) {
+            $dist_obj->force("get");
+        } else {
+            $dist_obj->get();
+        }
 
         if (! $pkgonly) {
             print $SAVE_STDOUT "building...";
         }
-        $dist_obj->make();
+        if ($force) {
+            $dist_obj->force("make");
+        } else {
+            $dist_obj->make();
+        }
         $href = $dist_obj->prereq_pm();
         #printf $SAVE_STDOUT "Buildreqs:  %s\n\n", &examine_object($href);
         push @tried, $file;
@@ -307,7 +317,11 @@ build(@)
                     }
                     &build($depth + 1, @deps);
                     print $SAVE_STDOUT "${depth_str}Resuming $file...building...";
-                    $dist_obj->make();
+                    if ($force) {
+                        $dist_obj->force("make");
+                    } else {
+                        $dist_obj->make();
+                    }
                 }
             } else {
                 print $SAVE_STDOUT "Not handling dependencies:  ", join(", ", map { &basename($_) } keys(%{$href})), "\n";
@@ -315,7 +329,11 @@ build(@)
         }
         if (! $pkgonly) {
             print $SAVE_STDOUT "testing...";
-            $dist_obj->test();
+            if ($force) {
+                $dist_obj->force("test");
+            } else {
+                $dist_obj->test();
+            }
             print $SAVE_STDOUT "cleaning...";
             $dist_obj->clean();
         }
@@ -449,7 +467,8 @@ main
 
     # See the Getopt::Long man page for details on the syntax of this line
     @valid_opts = ("h|help", "v|version", "d|debug", "s|search", "L|local",
-                   "t|template=s", "p|pkgonly", "n|nodeps", "u|update", "x|exact");
+                   "t|template=s", "p|pkgonly", "n|nodeps", "u|update", "x|exact",
+                   "f|force");
     Getopt::Long::Configure("no_getopt_compat", "bundling", "no_ignore_case");
     Getopt::Long::GetOptions(@valid_opts);
 
@@ -482,6 +501,7 @@ main
     $update = (($opt_u) ? (1) : (0));
     $local_mode = (($opt_L) ? (1) : (0));
     $exact = (($opt_x) ? (1) : (0));
+    $force = (($opt_f) ? (1) : (0));
     $save_pwd = &getcwd();
 
     # Create template object for new spec file.
