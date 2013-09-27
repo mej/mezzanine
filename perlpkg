@@ -278,11 +278,7 @@ build(@)
         }
         print $SAVE_STDOUT "${depth_str}Building $file:  ";
         print $SAVE_STDOUT "downloading...";
-        if ($force) {
-            $dist_obj->force("get");
-        } else {
-            $dist_obj->get();
-        }
+        $dist_obj->get();
 
         if (! $pkgonly) {
             print $SAVE_STDOUT "building...";
