@@ -45,8 +45,8 @@ building, and releasing software products.
 ) || :
 
 [ -f %{_includedir}/rpm/rpmlegacy.h ] && CPPFLAGS="$CPPFLAGS -DHAVE_RPM_RPMLEGACY_H"
-${CC:-%{__cc}} $CPPFLAGS ${CFLAGS:-$RPM_OPT_FLAGS} -I%{_includedir}/rpm -o rpmeval rpmeval.c $LDFLAGS -lrpm $LIBS || :
-${CC:-%{__cc}} $CPPFLAGS ${CFLAGS:-$RPM_OPT_FLAGS} -I%{_includedir}/rpm -o rpmcmp rpmcmp.c $LDFLAGS -lrpm $LIBS
+${CC:-%{__cc}} $CPPFLAGS ${CFLAGS:-$RPM_OPT_FLAGS} -I%{_includedir}/rpm -o rpmeval rpmeval.c $LDFLAGS -lrpm -lrpmio -lpopt $LIBS || :
+${CC:-%{__cc}} $CPPFLAGS ${CFLAGS:-$RPM_OPT_FLAGS} -I%{_includedir}/rpm -o rpmcmp rpmcmp.c $LDFLAGS -lrpm -lrpmio -lpopt $LIBS
 
 %install
 test "x$RPM_BUILD_ROOT" != "x" && %{__rm} -rf $RPM_BUILD_ROOT
