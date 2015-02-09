@@ -147,7 +147,7 @@ sub grepdir(& $);
 sub str_trim(\$);
 sub str_tokens($$);
 sub xpush(\@; @);
-sub limit_files(@ $);
+sub limit_files(@);
 sub cat_file($);
 sub parse_rpm_name($);
 sub find_spec_file($$);
@@ -1067,7 +1067,7 @@ grepdir(& $)
 
 # Remove files in a directory which are not in the list
 sub
-limit_files(@ $)
+limit_files(@)
 {
     my $dir = pop;
     my @files = @_;
