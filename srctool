@@ -71,6 +71,7 @@ print_usage_info
     print "    -r --resync                      Prepare to sync the repository with the current sources\n";
     print "    -n --name <name>                 Specify the name of a package (-i) or patch (-a)\n";
     print "    -D --dir <repository>            Specify the repository to use\n";
+    print "    -s --specfile --scripts <path>   Specify the spec file (or debian script directory) to use\n";
     print "    -L --local                       Local mode; do not talk to the master server\n";
     print "    -f --flat --pdr                  Import as PDR (all files in top dir) instead of SPM\n";
     print "    -R --path --relpath <repo path>  Import into repository at specified path\n";
@@ -827,7 +828,7 @@ main
                "patch|apply|a", "move|mv", "name|n=s", "clean|c",
                "repository|dir|D=s", "local|L", "flat|pdr|f",
                "path|relpath|R=s", "protocol|P=s", "keep|k=s",
-               "savecfg!");
+               "specfile|s|scripts=s", "savecfg!");
 
     if ($OPTION{"version"}) {
         &print_version($PROGNAME, $VERSION, "Michael Jennings <mej\@eterm.org>",
@@ -848,6 +849,7 @@ main
         &debug_set($config->set("DEBUG", $OPTION{"debug"} || $config->get("DEBUG") || 0));
     }
     &pkgvar_name($OPTION{"name"});
+    &pkgvar_instructions($OPTION{"specfile"});
 
     if ($0 =~ /mzimport$/ || $OPTION{"import"}) {
         $command = "import";

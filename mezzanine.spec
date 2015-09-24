@@ -1,5 +1,3 @@
-# $Id: mezzanine.spec,v 1.177 2012/05/04 22:58:20 mej Exp $
-
 %define perl_vendorlib %(eval "`perl -V:installvendorlib 2>/dev/null`"; echo $installvendorlib)
 %if "%{perl_vendorlib}" == "UNKNOWN"
 %define perl_vendorlib %(eval "`perl -V:installsitelib 2>/dev/null`"; echo $installsitelib)
@@ -10,7 +8,7 @@
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
 Version: 1.9
-Release: 0.29
+Release: 0.30
 License: BSD
 Group: Development/Tools
 URL: http://www.kainx.org/mezzanine/
@@ -18,7 +16,7 @@ Source: http://www.kainx.org/mezzanine/%{name}.tar.gz
 Packager: %{?_packager:%{_packager}}%{!?_packager:Michael Jennings <mezzanine@kainx.org>}
 Vendor: %{?_vendorinfo:%{_vendorinfo}}%{!?_vendorinfo:KainX.Org (http://www.kainx.org/)}
 Distribution: %{?_distribution:%{_distribution}}%{!?_distribution:%{_vendor}}
-#BuildSuggests: docbook-style-dsssl
+#BuildSuggests: docbook-style-dsssl openjade
 Requires: perl, perl(Net::FTP), perl(Cwd), perl(POSIX), perl(File::Copy), perl(Getopt::Long), perl(File::Find)
 BuildRoot: %{?_tmppath}%{!?_tmppath:/tmp}/%{name}-%{version}-root
 
