@@ -166,6 +166,7 @@ main
     if ($config->set("BUILDUSER", &pkgvar_set("builduser", $OPTION{"user"} || $config->get("BUILDUSER") || ""))) {
         &file_owner(&pkgvar_get("builduser"), "", &pkgvar_instroot());
     }
+    &pkgvar_set("lamebrain", "");
 
     if (!&pkgvar_filename()) {
         if (scalar(@ARGV)) {
