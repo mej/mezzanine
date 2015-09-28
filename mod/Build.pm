@@ -342,7 +342,7 @@ install_deps($)
         return "";
     }
     dprint "Installing the following:  $deps\n";
-
+    $deps =~ s/([^A-Za-z0-9_-\s])/\\$1/g;
     if (&pkgvar_instroot()) {
         $inst = "chroot " . &pkgvar_instroot() . ' ';
     } else {
