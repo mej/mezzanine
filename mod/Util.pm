@@ -1215,6 +1215,9 @@ find_spec_file($$)
     my ($spec_count, $spec_in_count);
     my (@spec_ins, @specs);
 
+    if (! $pkgname) {
+        $pkgname = "package";
+    }
     if (! $dir) {
         $dir = ".";
     }
@@ -1275,7 +1278,7 @@ find_spec_file($$)
         }
     }
     dprintf("Found %d spec file(s) for $pkgname in $dir:  %s\n",
-            join(", ", @specs));
+            scalar(@specs), join(", ", @specs));
     return $specs[0];
 }
 
