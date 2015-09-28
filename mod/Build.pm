@@ -689,7 +689,7 @@ build_spm
     $topdir = &pkgvar_topdir();
     $instroot = &pkgvar_instroot();
 
-    $specfile = &find_spec_file(&pkgvar_name(), "F");
+    $specfile = &pkgvar_instructions() || &find_spec_file(&pkgvar_name(), "F");
     if (! $specfile) {
         return (MEZZANINE_MISSING_FILES, "@{[getcwd()]} does not seem to contain build instructions", undef);
     } else {
@@ -760,7 +760,7 @@ build_pdr
     $topdir = &pkgvar_topdir();
     $instroot = &pkgvar_instroot();
 
-    $specfile = &find_spec_file(&pkgvar_name(), ".");
+    $specfile = &pkgvar_instructions() || &find_spec_file(&pkgvar_name(), ".");
     if (! $specfile) {
         return (MEZZANINE_MISSING_FILES, "@{[getcwd()]} does not seem to contain build instructions", undef);
     }
@@ -1125,7 +1125,7 @@ build_package
             # There's a custom Makefile.  It's a Custom Full Source Tree (FST).
             @ret = &build_cfst();
         } else {
-            my $spec = &find_spec_file(&pkgvar_name(), ".");
+            my $spec = &pkgvar_instructions() || &find_spec_file(&pkgvar_name(), ".");
 
             if ($spec) {
                 # There's a spec file.  Make sure we have all sources.

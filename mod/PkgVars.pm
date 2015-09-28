@@ -302,14 +302,18 @@ identify_package_type
         if (-s "Makefile.mezz") {
             $pkg_vars{"type"}{$filename} = "CFST";
         } else {
-            my $spec;
+            my $spec = $pkg_vars{"instructions"};
 
-            $spec = &find_spec_file(&pkgvar_name(), ".");
+            if (! $spec) {
+                $spec = &find_spec_file(&pkgvar_name(), ".");
+            }
             if ($spec && ($spec !~ m|^\./F/|)) {
                 $pkg_vars{"type"}{$filename} = "PDR";
                 $pkg_vars{"instructions"} = $spec;
             } elsif (-d "F") {
-                $spec = &find_spec_file(&pkgvar_name(), "F");
+                if (! $spec) {
+                    $spec = &find_spec_file(&pkgvar_name(), "F");
+                }
                 if ($spec) {
                     $pkg_vars{"type"}{$filename} = "SPM";
                     $pkg_vars{"instructions"} = $spec;
