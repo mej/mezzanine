@@ -376,7 +376,7 @@ get_source_list
             if (-d $fname) {
                 my @tmp;
 
-                if (defined(%{$specdata->{SOURCE}})) {
+                if (defined($specdata->{SOURCE}) && scalar(%{$specdata->{SOURCE}})) {
                     @tmp = grep($_ =~ /^\Q$fname\E\.(tgz|tar\.gz|tar\.Z|tar\.bz2|tbz)$/, values %{$specdata->{SOURCE}});
                 }
                 if (scalar(@tmp)) {
