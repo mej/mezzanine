@@ -426,7 +426,7 @@ create_source_file
             } else {
                 $zip = " ";
             }
-            $cmd = "tar --owner=root --group=root "
+            $cmd = "tar --owner=0 --group=0 "
                    . "--exclude CVS --exclude RCS --exclude BitKeeper --exclude SCCS --exclude .svn "
                    . "$zip -cf ${destdir}$tarball $src_files";
         }
