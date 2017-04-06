@@ -8,7 +8,7 @@
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
 Version: 1.9
-Release: 0.30
+Release: 0.31
 License: BSD
 Group: Development/Tools
 URL: http://www.kainx.org/mezzanine/
