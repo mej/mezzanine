@@ -91,30 +91,30 @@ $orig_pkg_vars{"quickie"} = "";
 my %pkg_vars = %orig_pkg_vars;
 
 ### Function prototypes
-sub pkgvar_get($);
+sub pkgvar_get();
 sub pkgvar_get_all();
-sub pkgvar_set(%);
-sub pkgvar_reset(%);
-sub pkgvar_name($);
-sub pkgvar_type($);
-sub pkgvar_subtype($);
-sub pkgvar_filename($);
-sub pkgvar_target($);
+sub pkgvar_set();
+sub pkgvar_reset();
+sub pkgvar_name();
+sub pkgvar_type();
+sub pkgvar_subtype();
+sub pkgvar_filename();
+sub pkgvar_target();
 sub pkgvar_srcs(@);
-sub pkgvar_hints($);
-sub pkgvar_instructions($);
-sub pkgvar_topdir($);
-sub pkgvar_instroot($);
-sub pkgvar_buildroot($);
-sub pkgvar_architecture($);
-sub pkgvar_parameters($);
-sub pkgvar_command($);
-sub pkgvar_rcfile($);
-sub pkgvar_tar($);
-sub pkgvar_zip($);
-sub pkgvar_cleanup($);
-sub pkgvar_quickie($);
-sub get_package_path($$);
+sub pkgvar_hints();
+sub pkgvar_instructions();
+sub pkgvar_topdir();
+sub pkgvar_instroot();
+sub pkgvar_buildroot();
+sub pkgvar_architecture();
+sub pkgvar_parameters();
+sub pkgvar_command();
+sub pkgvar_rcfile();
+sub pkgvar_tar();
+sub pkgvar_zip();
+sub pkgvar_cleanup();
+sub pkgvar_quickie();
+sub get_package_path();
 sub identify_package_type();
 
 # Private functions
@@ -126,7 +126,7 @@ END {
 ### Function definitions
 
 sub
-pkgvar_get($)
+pkgvar_get()
 {
     dprintf("Package variable \"%s\" -> \"%s\"\n", $_[0],
             ((defined($pkg_vars{$_[0]})) ? ($pkg_vars{$_[0]}) : ("<undef>")));
@@ -136,16 +136,20 @@ pkgvar_get($)
 sub
 pkgvar_get_all()
 {
+    dprint &print_args(@_);
     return %pkg_vars;
 }
 
 sub
-pkgvar_set(%)
+pkgvar_set()
 {
     my %new_pkg_vars;
     my $ret;
 
-    if (ref($_[0]) eq "HASH") {
+    dprint &print_args(@_);
+    if (!scalar(@_) || !defined($_[0])) {
+        return undef;
+    } elsif (ref($_[0]) eq "HASH") {
         %new_pkg_vars = %{$_[0]};
     } elsif (scalar(@_) % 2 == 0) {
         %new_pkg_vars = @_;
@@ -170,8 +174,9 @@ pkgvar_set(%)
 }
 
 sub
-pkgvar_reset(%)
+pkgvar_reset()
 {
+    dprint &print_args(@_);
     if (ref($_[0]) eq "HASH") {
         %pkg_vars = %{$_[0]};
     } elsif (scalar(@_)) {
@@ -182,23 +187,23 @@ pkgvar_reset(%)
 }
 
 # Default set routines for backward compatability.
-sub pkgvar_name($) {return &pkgvar_set("name", @_);}
-sub pkgvar_target($) {return &pkgvar_set("target", @_);}
-sub pkgvar_srcs($) {return &pkgvar_set("srcs", @_);}
-sub pkgvar_hints($) {return &pkgvar_set("hints", @_);}
-sub pkgvar_hint_installer($) {return &pkgvar_set("hint_installer", @_);}
-sub pkgvar_instructions($) {return &pkgvar_set("instructions", @_);}
-sub pkgvar_topdir($) {return &pkgvar_set("topdir", @_);}
-sub pkgvar_instroot($) {return &pkgvar_set("instroot", @_);}
-sub pkgvar_buildroot($) {return &pkgvar_set("buildroot", @_);}
-sub pkgvar_architecture($) {return &pkgvar_set("architecture", @_);}
-sub pkgvar_parameters($) {return &pkgvar_set("parameters", @_);}
-sub pkgvar_command($) {return &pkgvar_set("command", @_);}
-sub pkgvar_rcfile($) {return &pkgvar_set("rcfile", @_);}
-sub pkgvar_tar($) {return &pkgvar_set("tar", @_);}
-sub pkgvar_zip($) {return &pkgvar_set("zip", @_);}
-sub pkgvar_cleanup($) {return &pkgvar_set("cleanup", @_);}
-sub pkgvar_quickie($) {return &pkgvar_set("quickie", @_);}
+sub pkgvar_name() {return &pkgvar_set("name", @_);}
+sub pkgvar_target() {return &pkgvar_set("target", @_);}
+sub pkgvar_srcs() {return &pkgvar_set("srcs", @_);}
+sub pkgvar_hints() {return &pkgvar_set("hints", @_);}
+sub pkgvar_hint_installer() {return &pkgvar_set("hint_installer", @_);}
+sub pkgvar_instructions() {return &pkgvar_set("instructions", @_);}
+sub pkgvar_topdir() {return &pkgvar_set("topdir", @_);}
+sub pkgvar_instroot() {return &pkgvar_set("instroot", @_);}
+sub pkgvar_buildroot() {return &pkgvar_set("buildroot", @_);}
+sub pkgvar_architecture() {return &pkgvar_set("architecture", @_);}
+sub pkgvar_parameters() {return &pkgvar_set("parameters", @_);}
+sub pkgvar_command() {return &pkgvar_set("command", @_);}
+sub pkgvar_rcfile() {return &pkgvar_set("rcfile", @_);}
+sub pkgvar_tar() {return &pkgvar_set("tar", @_);}
+sub pkgvar_zip() {return &pkgvar_set("zip", @_);}
+sub pkgvar_cleanup() {return &pkgvar_set("cleanup", @_);}
+sub pkgvar_quickie() {return &pkgvar_set("quickie", @_);}
 
 # Convert a module and a filename to a full path
 sub

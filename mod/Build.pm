@@ -731,16 +731,16 @@ build_spm
     }
 
     # Parse the prod file for this SPM if it exists.
-    if (&parse_prod_file()) {
-        my $pkg = &pkgvar_name();
+    #if (&parse_prod_file()) {
+    #    my $pkg = &pkgvar_name();
 
-        if ($pkgs->{$pkg}{"SRCS"}) {
-            &pkgvar_srcs($pkgs->{$pkg}{"SRCS"});
-        }
-        if ($pkgs->{$pkg}{"ARCH"}) {
-            &pkgvar_architecture($pkgs->{$pkg}{"ARCH"});
-        }
-    }
+    #    if ($pkgs->{$pkg}{"SRCS"}) {
+    #        &pkgvar_srcs($pkgs->{$pkg}{"SRCS"});
+    #    }
+    #    if ($pkgs->{$pkg}{"ARCH"}) {
+    #        &pkgvar_architecture($pkgs->{$pkg}{"ARCH"});
+    #    }
+    #}
     return &build_topdir();
 }
 
@@ -799,17 +799,17 @@ build_pdr
         &copy_files(@tmp, "$instroot$topdir/SOURCES");
     }
 
-    # Parse the prod file for this PDR if it exists.
-    if (&parse_prod_file()) {
-        my $pkg = &pkgvar_name();
+    ## Parse the prod file for this PDR if it exists.
+    #if (&parse_prod_file()) {
+    #    my $pkg = &pkgvar_name();
 
-        if ($pkgs->{$pkg}{SRCS}) {
-            &pkgvar_srcs($pkgs->{$pkg}{SRCS});
-        }
-        if ($pkgs->{$pkg}{ARCH}) {
-            &pkgvar_architecture($pkgs->{$pkg}{ARCH});
-        }
-    }
+    #    if ($pkgs->{$pkg}{SRCS}) {
+    #        &pkgvar_srcs($pkgs->{$pkg}{SRCS});
+    #    }
+    #    if ($pkgs->{$pkg}{ARCH}) {
+    #        &pkgvar_architecture($pkgs->{$pkg}{ARCH});
+    #    }
+    #}
     return &build_topdir();
 }
 
@@ -949,17 +949,17 @@ build_fst
         &pkgvar_instructions("$topdir/SPECS/" . &basename($specfile));
     }
 
-    # Get ready to build, figure out what sources we need, and create them all.
-    if (&parse_prod_file()) {
-        my $pkg = &pkgvar_name();
+    ## Get ready to build, figure out what sources we need, and create them all.
+    #if (&parse_prod_file()) {
+    #    my $pkg = &pkgvar_name();
 
-        if ($pkgs->{$pkg}{SRCS}) {
-            &pkgvar_srcs($pkgs->{$pkg}{SRCS});
-        }
-        if ($pkgs->{$pkg}{ARCH}) {
-            &pkgvar_architecture($pkgs->{$pkg}{ARCH});
-        }
-    }
+    #    if ($pkgs->{$pkg}{SRCS}) {
+    #        &pkgvar_srcs($pkgs->{$pkg}{SRCS});
+    #    }
+    #    if ($pkgs->{$pkg}{ARCH}) {
+    #        &pkgvar_architecture($pkgs->{$pkg}{ARCH});
+    #    }
+    #}
 
     &get_source_list();
     $ret = &create_source_files("$instroot$topdir/SOURCES");
@@ -1118,6 +1118,12 @@ build_package
         if (!chdir($pkg)) {
             @ret = (MEZZANINE_SYSTEM_ERROR, "Unable to chdir into \"$pkg\" -- $!", undef);
         }
+
+        # Parse the prod file for this module if it exists.
+        if (&parse_prod_file()) {
+            $pkg = &pkgvar_name();
+        }
+
         if (($pkgtype eq "SPM") || (-d "F")) {
             # Okay, there's an F/ directory.  I bet it's an SPM.
             @ret = &build_spm();

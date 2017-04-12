@@ -517,8 +517,9 @@ parse_prod_file($$$)
         dprint "Parsing $prodfile:  \"$line\"\n";
         $line =~ s/^\s*(.*\S)\s*$/$1/;  # Strip leading and trailing whitespace
         next if ($line =~ /^\#/ || $line !~ /\S/);
-        if ($line =~ /^name\s*:/i) {
+        if ($line =~ /^name\s*:\s*(\S.*)$/i) {
             if ($pkg) {
+                $pkg = $1;
                 next;
             } else {
                 last;
@@ -548,6 +549,9 @@ parse_prod_file($$$)
         if ($line !~ /^(prod|mod|s?rpm|ima?ge?)/i && $line =~ /^([^ \t:]+)\s*:\s*(\S+.*)$/) {
             if ($pkg) {
                 &assign_package_variable($pkg, $1, $2);
+                if (! $prod) {
+                    &pkgvar_set($1, $2);
+                }
             } else {
                 &assign_product_variable($prod, $1, $2);
             }
@@ -557,7 +561,7 @@ parse_prod_file($$$)
     }
     dprint "Closing file $prodfile\n";
     close(PRODFILE);
-    return (1);
+    return (($pkg) ? ($pkg) : ($prod));
 }
 
 sub
