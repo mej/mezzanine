@@ -137,7 +137,9 @@ rpm_form_command
         if (&pkgvar_buildroot()) {
             $cmd .= " --buildroot '" . &pkgvar_buildroot() . "'";
         }
-        $cmd .= " --define 'optflags $ENV{CFLAGS}'";
+        if ($ENV{"CFLAGS"}) {
+            $cmd .= " --define 'optflags $ENV{CFLAGS}'";
+        }
     } elsif ($type eq "install" || $type eq "buildpkglist") {
         if (&pkgvar_instroot()) {
             if (-x (&pkgvar_instroot() . "/bin/rpm")) {
