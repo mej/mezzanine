@@ -215,6 +215,11 @@ main
     $ENV{"CFLAGS"} = $config->set("CFLAGS", $OPTION{"cflags"} || $config->get("CFLAGS") || $ENV{"MEZZANINE_CFLAGS"})
         || $ENV{"CFLAGS"};
     $ENV{"PATH"} = $config->set("PATH", $config->get("PATH") || $ENV{"MEZZANINE_PATH"}) || $ENV{"PATH"};
+    foreach my $var ("MAKE", "CFLAGS", "PATH") {
+        if (! $ENV{$var}) {
+            delete $ENV{$var};
+        }
+    }
 
     # Don't hard code any RPATH's into binaries
     delete $ENV{"LD_RUN_PATH"};
