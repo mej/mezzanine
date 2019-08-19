@@ -2,3 +2,5 @@
 *.orig
 *.rej
 *.gz
+build*.log
+mezzanine*.rpm
