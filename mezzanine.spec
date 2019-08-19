@@ -8,7 +8,7 @@
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
 Version: 1.9
-Release: 0.32%{?dist}
+Release: 0.33%{?dist}
 License: BSD
 Group: Development/Tools
 URL: http://www.kainx.org/mezzanine/
@@ -51,19 +51,21 @@ test "x$RPM_BUILD_ROOT" != "x" && %{__rm} -rf $RPM_BUILD_ROOT
 %{__mkdir_p} $RPM_BUILD_ROOT%{_bindir}
 %{__mkdir_p} $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine/templates
 %{__mkdir_p} $RPM_BUILD_ROOT%{_mandir}/man1
+%{__mkdir_p} $RPM_BUILD_ROOT%{_sysconfdir}/cron.d
 
 for i in abiscan autobuilder *tool pkgsort perlpkg specgen ; do
-    %{__install} -m 755 $i $RPM_BUILD_ROOT%{_bindir}/
+    %{__install} -m 0755 $i $RPM_BUILD_ROOT%{_bindir}/
 done
+%{__install} -m 0644 autobuilder.cron $RPM_BUILD_ROOT%{_sysconfdir}/cron.d/
 
 for i in templates/* ; do
-    %{__install} -m 644 $i $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine/templates/
+    %{__install} -m 0644 $i $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine/templates/
 done
 
 (cd mod ; %{__tar} -cf - *.pm */*.pm) | (cd $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine ; %{__tar} -xf -)
 
 for i in doc/man/*.1 ; do
-    %{__install} -m 644 $i $RPM_BUILD_ROOT%{_mandir}/man1/
+    %{__install} -m 0644 $i $RPM_BUILD_ROOT%{_mandir}/man1/
 done
 
 (
@@ -104,6 +106,7 @@ test "x$RPM_BUILD_ROOT" != "x" && %{__rm} -rf $RPM_BUILD_ROOT
 %files
 %defattr(-, root, root)
 %doc doc/*ml
+%config(noreplace) %verify(not md5 size mtime) %{_sysconfdir}/cron.d/*
 %{_bindir}/*
 %{perl_vendorlib}/*
 %{_mandir}/*

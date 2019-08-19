@@ -1,0 +1,13 @@
+# autobuilder.cron
+#
+# Cron jobs required for Mezzanine Autobuilder
+#
+# 19 August 2019
+# Michael Jennings <mej@lanl.gov>
+#
+
+# Rebuild and restart containers weekly on Sundays
+00 01  *  *  0  root  /bin/bash -c 'source /etc/sysconfig/mezzanine && cd $BUILDDIR && date && make && docker-mzbuild-bootstrap' >/var/log/mzautobuilder-refresh.log 2>&1
+
+# Restart autobuilder if it dies
+ *  *  *  *  *  root  /bin/bash -c 'source /etc/sysconfig/mezzanine && test -s $AUTOBUILD_PIDFILE && kill -0 $AUTOBUILD_PIDFILE && /bin/true || exec mzautobuilder' >/var/log/mzautobuilder.log 2>&1
