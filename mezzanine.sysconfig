@@ -1,0 +1,39 @@
+# Mezzanine / Zathras Environment Settings
+#
+# Michael Jennings <mej@lanl.gov>
+# 24 October 2019
+#
+# $Header$
+#
+
+#################
+###  GENERAL  ###
+#################
+
+### Known safe, secure value for $PATH
+# PATH="/usr/mz/bin:/usr/bin:/usr/sbin:/bin:/sbin"
+
+
+###################
+###  MZBUILDER  ###
+###################
+
+### Tree that contains build infrastructure for updating Mezzanine builder containers
+# MZBUILDER_IMG_SRCTREE="/usr/src/mezzanine/containers"
+
+### Mezzanine builder log file directory
+# MZBUILDER_LOGDIR="/var/log/mezzanine"
+
+### Mezzanine builder log file pathname
+# MZBUILDER_LOGFILE="$MZBUILDER_LOGDIR/mzbuilder.log"
+
+### Mezzanine builder container image update log file pathname
+# MZBUILDER_IMG_LOGFILE="$MZBUILDER_LOGDIR/mzbuilder-refresh.log"
+
+### One or more paths to Mezzanine builder package source tree(s)
+# MZBUILDER_PKG_SRCTREE="/path/to/package/tree"
+# MZBUILDER_PKG_SRCTREE="/path/to/tree1 /path/to/tree2 /path/to/tree3"
+# MZBUILDER_PKG_SRCTREE=( "/path/to/tree 1" "/path/to/tree 2" "/path/to/tree 3" )
+
+### Location of process ID file for Mezzanine autobuilder
+# MZBUILDER_PIDFILE="/var/run/mzbuilder.pid"

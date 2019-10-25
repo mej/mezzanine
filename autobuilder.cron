@@ -7,7 +7,7 @@
 #
 
 # Rebuild and restart containers weekly on Sundays
-00 01  *  *  0  root  /bin/bash -c 'source /etc/sysconfig/mezzanine && cd $BUILDDIR && date && make && docker-mzbuild-bootstrap' >/var/log/mzautobuilder-refresh.log 2>&1
+00 01  *  *  *  root  /bin/bash -c 'source /etc/sysconfig/mezzanine && cd $MZBUILDER_IMG_SRCTREE && date && make && docker-mzbuild-bootstrap' > "$MZBUILDER_IMG_LOGFILE" 2>&1
 
 # Restart autobuilder if it dies
- *  *  *  *  *  root  /bin/bash -c 'source /etc/sysconfig/mezzanine && test -s $AUTOBUILD_PIDFILE && kill -0 $AUTOBUILD_PIDFILE && /bin/true || exec mzautobuilder' >/var/log/mzautobuilder.log 2>&1
+ *  *  *  *  *  root  /bin/bash -c 'source /etc/sysconfig/mezzanine && test -s $MZBUILDER_PIDFILE && kill -0 $MZBUILDER_PIDFILE && /bin/true || exec mzbuilder' > "$MZBUILDER_LOGFILE" 2>&1

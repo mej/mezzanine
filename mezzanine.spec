@@ -1,3 +1,4 @@
+%{!?_rel:%{expand:%%global _rel 0.%(git describe --abbrev=4 --always --tags --long --dirty=1 | cut -d- -f 2- | tr '-' '.')}}
 %define perl_vendorlib %(eval "`perl -V:installvendorlib 2>/dev/null`"; echo $installvendorlib)
 %if "%{perl_vendorlib}" == "UNKNOWN"
 %define perl_vendorlib %(eval "`perl -V:installsitelib 2>/dev/null`"; echo $installsitelib)
@@ -8,7 +9,7 @@
 Summary: Mezzanine -- A Software Product Management System
 Name: mezzanine
 Version: 1.9
-Release: 0.33%{?dist}
+Release: %{_rel}%{?dist}
 License: BSD
 Group: Development/Tools
 URL: http://www.kainx.org/mezzanine/
@@ -16,7 +17,7 @@ Source: http://www.kainx.org/mezzanine/%{name}.tar.gz
 Packager: %{?_packager:%{_packager}}%{!?_packager:Michael Jennings <mezzanine@kainx.org>}
 Vendor: %{?_vendorinfo:%{_vendorinfo}}%{!?_vendorinfo:KainX.Org (http://www.kainx.org/)}
 Distribution: %{?_distribution:%{_distribution}}%{!?_distribution:%{_vendor}}
-#BuildSuggests: docbook-style-dsssl openjade
+#BuildSuggests: docbook-style-dsssl openjade texlive-jadetex
 Requires: perl, perl(Net::FTP), perl(Cwd), perl(POSIX), perl(File::Copy), perl(Getopt::Long), perl(File::Find)
 BuildRoot: %{?_tmppath}%{!?_tmppath:/tmp}/%{name}-%{version}-root
 
@@ -52,11 +53,13 @@ test "x$RPM_BUILD_ROOT" != "x" && %{__rm} -rf $RPM_BUILD_ROOT
 %{__mkdir_p} $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine/templates
 %{__mkdir_p} $RPM_BUILD_ROOT%{_mandir}/man1
 %{__mkdir_p} $RPM_BUILD_ROOT%{_sysconfdir}/cron.d
+%{__mkdir_p} $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig
 
 for i in abiscan autobuilder *tool pkgsort perlpkg specgen ; do
     %{__install} -m 0755 $i $RPM_BUILD_ROOT%{_bindir}/
 done
 %{__install} -m 0644 autobuilder.cron $RPM_BUILD_ROOT%{_sysconfdir}/cron.d/
+%{__install} -m 0644 mezzanine.sysconfig $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig/%{name}
 
 for i in templates/* ; do
     %{__install} -m 0644 $i $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine/templates/
@@ -106,6 +109,7 @@ test "x$RPM_BUILD_ROOT" != "x" && %{__rm} -rf $RPM_BUILD_ROOT
 %files
 %defattr(-, root, root)
 %doc doc/*ml
+%config(noreplace) %verify(not md5 size mtime) %{_sysconfdir}/sysconfig/%{name}
 %config(noreplace) %verify(not md5 size mtime) %{_sysconfdir}/cron.d/*
 %{_bindir}/*
 %{perl_vendorlib}/*
