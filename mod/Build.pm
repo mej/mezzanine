@@ -313,20 +313,27 @@ install_hints($)
         }
     }
 
-    if (!open(HINTFILE, $hints)) {
-        return "Unable to open hint file $hints -- $!";
-    }
-    while (<HINTFILE>) {
-        my $line;
+    if (-f $hints && -s _) {
+        if (!open(HINTFILE, $hints)) {
+            return "Unable to open hint file $hints -- $!";
+        }
+        while (<HINTFILE>) {
+            my $line;
 
-        chomp($line = $_);
-        xpush @hint_packages, $line;
+            chomp($line = $_);
+            xpush @hint_packages, $line;
+        }
+        close(HINTFILE);
+    } else {
+        @hint_packages = split(' ', $hints);
     }
-    close(HINTFILE);
 
-    # Install hints.
-    dprintf("Installing hints:  %s\n", join(' ', @hint_packages));
-    return &install_deps(join(' ', @hint_packages));
+    if (scalar(@hint_packages)) {
+        # Install hints.
+        dprintf("Installing hints:  %s\n", join(' ', @hint_packages));
+        return &install_deps(join(' ', @hint_packages));
+    }
+    return "";
 }
 
 # Install dependencies.
