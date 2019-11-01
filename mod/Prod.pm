@@ -127,7 +127,7 @@ get_var_name
     my $var = $_[0];
 
     # Variable names are all uppercase because they are struct members.
-    $var =~ tr/[a-z]/[A-Z]/;
+    $var =~ tr/\-a-z/_A-Z/;
 
     if ($var =~ /^REV/ || $var eq "TAG") {
         $var = "TAG";
@@ -152,6 +152,8 @@ get_var_name
         $var = "INSTROOT$3";
     } elsif ($var =~ /^BUILD_?(USER|AS)$/) {
         $var = "BUILDUSER";
+    } elsif ($var =~ /^(DEP|HINT)_INSTALLER$/) {
+        $var = "DEP_INSTALLER";
     }
     return $var;
 }

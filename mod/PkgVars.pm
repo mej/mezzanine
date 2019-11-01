@@ -66,7 +66,7 @@ $orig_pkg_vars{"file"} = "";
 $orig_pkg_vars{"target"} = "rpms";
 $orig_pkg_vars{"srcs"} = "";
 $orig_pkg_vars{"hints"} = "";
-$orig_pkg_vars{"hint_installer"} = "";
+$orig_pkg_vars{"dep_installer"} = "";
 $orig_pkg_vars{"instructions"} = "";
 $orig_pkg_vars{"topdir"} = "";
 $orig_pkg_vars{"instroot"} = "";
@@ -191,7 +191,7 @@ sub pkgvar_name() {return &pkgvar_set("name", @_);}
 sub pkgvar_target() {return &pkgvar_set("target", @_);}
 sub pkgvar_srcs() {return &pkgvar_set("srcs", @_);}
 sub pkgvar_hints() {return &pkgvar_set("hints", @_);}
-sub pkgvar_hint_installer() {return &pkgvar_set("hint_installer", @_);}
+sub pkgvar_dep_installer() {return &pkgvar_set("dep_installer", @_);}
 sub pkgvar_instructions() {return &pkgvar_set("instructions", @_);}
 sub pkgvar_topdir() {return &pkgvar_set("topdir", @_);}
 sub pkgvar_instroot() {return &pkgvar_set("instroot", @_);}
