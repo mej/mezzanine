@@ -40,7 +40,7 @@ BEGIN {
     @ISA         = ('Exporter');
 
     @EXPORT = ('@products', '@packages', '$prods', '$pkgs',
-               '&make_build_dir', '&make_log_dir', '&get_var_name',
+               '&make_build_dir', '&make_log_dir',
                '&find_product_file', '&parse_product_entry',
                '&parse_prod_file', '&assign_product_variable',
                '&assign_package_variable');
@@ -69,7 +69,6 @@ my @allvars = ("TAG", "REPOSITORY", "LOCATIONS");
 ### Function prototypes
 sub make_build_dir($);
 sub make_log_dir($);
-sub get_var_name($);
 sub find_product_file($$);
 sub parse_product_entry($$$);
 sub parse_prod_file($$$);
@@ -118,44 +117,6 @@ make_log_dir
     chown($mz_uid, $mz_gid, $logdir);
     #dprint "Chose log directory $logdir\n";
     return $logdir;
-}
-
-# Translate abbreviated variable names into their canonical forms
-sub
-get_var_name
-{
-    my $var = $_[0];
-
-    # Variable names are all uppercase because they are struct members.
-    $var =~ tr/\-a-z/_A-Z/;
-
-    if ($var =~ /^REV/ || $var eq "TAG") {
-        $var = "TAG";
-    } elsif ($var =~ /^EPOCH/) {
-        $var = "EPOCH";
-    } elsif ($var =~ /^REL/) {
-        $var = "RELEASE";
-    } elsif ($var =~ /^VER/) {
-        $var = "VERSION";
-    } elsif ($var =~ /^LOC/) {
-        $var = "LOCATIONS";
-    } elsif ($var =~ /^SOURCE/) {
-        $var = "SRCS";
-    } elsif ($var =~ /^ARCH/) {
-        $var = "ARCH";
-    } elsif ($var =~ /^TARGET/) {
-        $var = "TARGET";
-    } elsif ($var =~ /^CVS(DIR|ROOT)/) {
-        $var = "REPOSITORY";
-    } elsif ($var =~ /^((CH|INST)ROOT|JAIL)([_A-Z]*)$/) {
-        # This one case covers CHROOT, CHROOT_INIT, CHROOT_RESET, et al.
-        $var = "INSTROOT$3";
-    } elsif ($var =~ /^BUILD_?(USER|AS)$/) {
-        $var = "BUILDUSER";
-    } elsif ($var =~ /^(DEP|HINT)_INSTALLER$/) {
-        $var = "DEP_INSTALLER";
-    }
-    return $var;
 }
 
 # Locate the product file for a particular product
@@ -302,7 +263,7 @@ parse_product_entry
     $pkgvars{"TYPE"} = $type;
     foreach my $varval (@inp) {
         ($var, $val) = split("=", $varval, 2);
-        $var = &get_var_name($var);
+        $var = &pkgvar_canonicalize($var);
 	# Store them in %pkgvars for now; we'll move them later.
         $pkgvars{$var} = $val;
     }
@@ -571,7 +532,7 @@ assign_product_variable
 {
     my ($prod, $var, $val) = @_;
 
-    $var = &get_var_name($var);
+    $var = &pkgvar_canonicalize($var);
     dprint "Product variable for $prod:  $var -> $val\n";
     $prods->{$prod}{$var} = $val;
     xpush @allvars, $var;
@@ -582,7 +543,7 @@ assign_package_variable
 {
     my ($pkg, $var, $val) = @_;
 
-    $var = &get_var_name($var);
+    $var = &pkgvar_canonicalize($var);
     dprint "Package variable for $pkg:  $var -> $val\n";
     $pkgs->{$pkg}{$var} = $val;
     xpush @allvars, $var;

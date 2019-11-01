@@ -38,14 +38,15 @@ BEGIN {
     @ISA         = ('Exporter');
 
     @EXPORT = ('&pkgvar_get', '&pkgvar_get_all', '&pkgvar_set',
-               '&pkgvar_reset', '&pkgvar_name', '&pkgvar_type',
-               '&pkgvar_subtype', '&pkgvar_filename',
-               '&pkgvar_target', '&pkgvar_srcs', '&pkgvar_hints',
-               '&pkgvar_instructions', '&pkgvar_topdir',
-               '&pkgvar_instroot', '&pkgvar_buildroot',
-               '&pkgvar_architecture', '&pkgvar_parameters',
-               '&pkgvar_command', '&pkgvar_rcfile', '&pkgvar_tar',
-               '&pkgvar_zip', '&pkgvar_cleanup', '&pkgvar_quickie',
+               '&pkgvar_reset', '&pkgvar_canonicalize',
+               '&pkgvar_name', '&pkgvar_type', '&pkgvar_subtype',
+               '&pkgvar_filename', '&pkgvar_target', '&pkgvar_srcs',
+               '&pkgvar_hints', '&pkgvar_instructions',
+               '&pkgvar_topdir', '&pkgvar_instroot',
+               '&pkgvar_buildroot', '&pkgvar_architecture',
+               '&pkgvar_parameters', '&pkgvar_command',
+               '&pkgvar_rcfile', '&pkgvar_tar', '&pkgvar_zip',
+               '&pkgvar_cleanup', '&pkgvar_quickie',
                '&get_package_path', '&identify_package_type');
 
     %EXPORT_TAGS = ( );
@@ -95,6 +96,7 @@ sub pkgvar_get();
 sub pkgvar_get_all();
 sub pkgvar_set();
 sub pkgvar_reset();
+sub pkgvar_canonicalize();
 sub pkgvar_name();
 sub pkgvar_type();
 sub pkgvar_subtype();
@@ -128,9 +130,12 @@ END {
 sub
 pkgvar_get()
 {
-    dprintf("Package variable \"%s\" -> \"%s\"\n", $_[0],
-            ((defined($pkg_vars{$_[0]})) ? ($pkg_vars{$_[0]}) : ("<undef>")));
-    return $pkg_vars{$_[0]};
+    my $var = &pkgvar_canonicalize($_[0]);
+
+    dprintf("Package variable \"%s\"%s -> \"%s\"\n", $_[0],
+            (($_[0] ne $var) ? (" ($var)") : ("")),
+            ((defined($pkg_vars{$var})) ? ($pkg_vars{$var}) : ("<undef>")));
+    return $pkg_vars{$var};
 }
 
 sub
@@ -153,16 +158,21 @@ pkgvar_set()
         %new_pkg_vars = %{$_[0]};
     } elsif (scalar(@_) % 2 == 0) {
         %new_pkg_vars = @_;
-    } elsif (defined($pkg_vars{$_[0]})) {
-        return $pkg_vars{$_[0]};
     } else {
-        return undef;
+        my $var = &pkgvar_canonicalize($_[0]);
+
+        if (defined($pkg_vars{$var})) {
+            return $pkg_vars{$var};
+        } else {
+            return undef;
+        }
     }
 
     foreach my $var (keys(%new_pkg_vars)) {
         my $param = $new_pkg_vars{$var};
 
         if (defined($param)) {
+            $var = &pkgvar_canonicalize($var);
             dprint "Setting $var\n";
             $pkg_vars{$var} = $param;
         }
@@ -184,6 +194,44 @@ pkgvar_reset()
     } else {
         %pkg_vars = %orig_pkg_vars;
     }
+}
+
+# Translate abbreviated variable names into their canonical forms
+sub
+pkgvar_canonicalize()
+{
+    my $var = $_[0];
+
+    # Variable names are all uppercase because they are struct members.
+    $var =~ tr/\-a-z/_A-Z/;
+
+    if ($var =~ /^REV/ || $var eq "TAG") {
+        $var = "TAG";
+    } elsif ($var =~ /^EPOCH/) {
+        $var = "EPOCH";
+    } elsif ($var =~ /^REL/) {
+        $var = "RELEASE";
+    } elsif ($var =~ /^VER/) {
+        $var = "VERSION";
+    } elsif ($var =~ /^LOC/) {
+        $var = "LOCATIONS";
+    } elsif ($var =~ /^SOURCE/) {
+        $var = "SRCS";
+    } elsif ($var =~ /^ARCH/) {
+        $var = "ARCH";
+    } elsif ($var =~ /^TARGET/) {
+        $var = "TARGET";
+    } elsif ($var =~ /^CVS(DIR|ROOT)/) {
+        $var = "REPOSITORY";
+    } elsif ($var =~ /^((CH|INST)ROOT|JAIL)([_A-Z]*)$/) {
+        # This one case covers CHROOT, CHROOT_INIT, CHROOT_RESET, et al.
+        $var = "INSTROOT$3";
+    } elsif ($var =~ /^BUILD_?(USER|AS)$/) {
+        $var = "BUILDUSER";
+    } elsif ($var =~ /^(DEP|HINT)_INSTALLER$/) {
+        $var = "DEP_INSTALLER";
+    }
+    return $var;
 }
 
 # Default set routines for backward compatability.
