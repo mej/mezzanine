@@ -52,14 +52,10 @@ test "x$RPM_BUILD_ROOT" != "x" && %{__rm} -rf $RPM_BUILD_ROOT
 %{__mkdir_p} $RPM_BUILD_ROOT%{_bindir}
 %{__mkdir_p} $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine/templates
 %{__mkdir_p} $RPM_BUILD_ROOT%{_mandir}/man1
-%{__mkdir_p} $RPM_BUILD_ROOT%{_sysconfdir}/cron.d
-%{__mkdir_p} $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig
 
 for i in abiscan autobuilder *tool pkgsort perlpkg specgen ; do
     %{__install} -m 0755 $i $RPM_BUILD_ROOT%{_bindir}/
 done
-%{__install} -m 0644 autobuilder.cron $RPM_BUILD_ROOT%{_sysconfdir}/cron.d/
-%{__install} -m 0644 mezzanine.sysconfig $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig/%{name}
 
 for i in templates/* ; do
     %{__install} -m 0644 $i $RPM_BUILD_ROOT%{perl_vendorlib}/Mezzanine/templates/
@@ -109,8 +105,6 @@ test "x$RPM_BUILD_ROOT" != "x" && %{__rm} -rf $RPM_BUILD_ROOT
 %files
 %defattr(-, root, root)
 %doc doc/*ml
-%config(noreplace) %verify(not md5 size mtime) %{_sysconfdir}/sysconfig/%{name}
-%config(noreplace) %verify(not md5 size mtime) %{_sysconfdir}/cron.d/*
 %{_bindir}/*
 %{perl_vendorlib}/*
 %{_mandir}/*
