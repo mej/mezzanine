@@ -38,8 +38,11 @@ my @CONFIG_VARS = (
 
                    "DEBUG", "LOOP", "PRECLEAN", "REPAIR", "UPDATE",
                    "GET", "BUILD", "CREATEREPO", "FLUSH", "SYNC",
-                   "TIME_FORMAT", "ARCH", "BUILDROOT", "BUILDDIR",
-                   "BUILDTREES", "OPTIONS", "DEPSOLVER", "SYNCTARGET"
+                   "PRECLEAN_CMD", "REPAIR_CMD", "UPDATE_CMD",
+                   "GET_CMD", "BUILD_CMD", "CREATEREPO_CMD",
+                   "FLUSH_CMD", "SYNC_CMD", "TIME_FORMAT", "ARCH",
+                   "BUILDROOT", "BUILDDIR", "BUILDTREES", "OPTIONS",
+                   "DEPSOLVER", "SYNCTARGET"
 
                   );
 
@@ -104,6 +107,54 @@ my %CONFIG = (
                   "OPTSPEC" => "sync|s!",
                   "DESCRIPTION" => "Sync repositories to another location",
                   "DEFAULT" => "1"
+              },
+              "PRECLEAN_CMD" => {
+                  "OPTION" => "preclean-cmd",
+                  "OPTSPEC" => "preclean-cmd=s",
+                  "DESCRIPTION" => "Use the specified command for Preclean step",
+                  "DEFAULT" => ""
+              },
+              "REPAIR_CMD" => {
+                  "OPTION" => "repair-cmd",
+                  "OPTSPEC" => "repair-cmd=s",
+                  "DESCRIPTION" => "Use the specified command for Repair step",
+                  "DEFAULT" => ""
+              },
+              "UPDATE_CMD" => {
+                  "OPTION" => "update-cmd",
+                  "OPTSPEC" => "update-cmd=s",
+                  "DESCRIPTION" => "Use the specified command for Update step",
+                  "DEFAULT" => ""
+              },
+              "GET_CMD" => {
+                  "OPTION" => "get-cmd",
+                  "OPTSPEC" => "get-cmd=s",
+                  "DESCRIPTION" => "Use the specified command for Get step",
+                  "DEFAULT" => ""
+              },
+              "BUILD_CMD" => {
+                  "OPTION" => "build-cmd",
+                  "OPTSPEC" => "build-cmd=s",
+                  "DESCRIPTION" => "Use the specified command for Build step",
+                  "DEFAULT" => ""
+              },
+              "CREATEREPO_CMD" => {
+                  "OPTION" => "createrepo-cmd",
+                  "OPTSPEC" => "createrepo-cmd=s",
+                  "DESCRIPTION" => "Use the specified command for Createrepo step",
+                  "DEFAULT" => ""
+              },
+              "FLUSH_CMD" => {
+                  "OPTION" => "flush-cmd",
+                  "OPTSPEC" => "flush-cmd=s",
+                  "DESCRIPTION" => "Use the specified command for Flush step",
+                  "DEFAULT" => ""
+              },
+              "SYNC_CMD" => {
+                  "OPTION" => "sync-cmd",
+                  "OPTSPEC" => "sync-cmd=s",
+                  "DESCRIPTION" => "Use the specified command for Sync step",
+                  "DEFAULT" => ""
               },
               "TIME_FORMAT" => {
                   "OPTION" => "time-format",
@@ -293,7 +344,7 @@ main()
     }
 
     # Load the requested config and remove that option (if present).
-    $config = Mezzanine::Config->new("build/" . (($OPTION{"builder"}) ? ($OPTION{"builder"}) : ("autobuilder")));
+    $config = Mezzanine::Config->new("autobuilder/" . (($OPTION{"builder"}) ? ($OPTION{"builder"}) : ("default")));
     delete $OPTION{"builder"};
 
     # If this is a new config file, save the defaults for later.
