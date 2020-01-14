@@ -30,7 +30,7 @@ use Mezzanine::Util;
 
 BEGIN {
     use Exporter ();
-    use vars ('$VERSION', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS');
+    use vars ('$VERSION', '@EXPORT', '@EXPORT_OK', '%EXPORT_TAGS', '$UNDEF_SENTINEL');
 
     # set the version for version checking
     $VERSION     = 0.1;
@@ -43,12 +43,11 @@ BEGIN {
 
     %EXPORT_TAGS = ( "FIELDS" => [ @EXPORT_OK, @EXPORT ] );
 }
-use vars ('@EXPORT_OK');
 
 ### Private global variables
-my $UNDEF_SENTINAL = "!!<undef>!!";
 
 ### Initialize exported package variables
+$UNDEF_SENTINEL = "!!<undef>!!";
 
 # Constants
 
@@ -57,21 +56,21 @@ new($) {
     my $proto = shift;
     my $class = ref($proto) || $proto;
     my $self  = {};
-    my $config_type = shift;
+    my $config_subpath = shift;
 
     bless($self, $class);
-    &load($self, $config_type);
+    &load($self, $config_subpath);
     return $self;
 }
 
 sub
 load($)
 {
-    my ($self, $config_type) = @_;
+    my ($self, $config_subpath) = @_;
     my ($filename, $path, $line);
 
-    $config_type =~ s/::/\//g;
-    $filename = sprintf("%s/.mezz/%s", $ENV{"HOME"}, $config_type);
+    $config_subpath =~ s/::/\//g;
+    $filename = sprintf("%s/.mezz/%s", $ENV{"HOME"}, $config_subpath);
     if ($filename =~ m!^(/[^\`\'\"]*)$!) {
         $filename = $1;
     } else {
@@ -244,9 +243,9 @@ load_config_vars()
         my $line;
 
         chomp($line = $_);
-        ($key, $value) = split(/ = /, $line, 2);
+        ($key, $value) = split(/\s*=\s*/, $line, 2);
         xpush @{$self->{"__KEYS"}}, $key;
-        if ($value eq $UNDEF_SENTINAL) {
+        if ($value eq $UNDEF_SENTINEL) {
             $self->{$key} = undef;
         } else {
             $self->{$key} = $value;
@@ -278,7 +277,7 @@ save_config_vars()
     }
 
     foreach my $key (sort(grep { substr($_, 0, 2) ne "__" } keys(%{$self}))) {
-        printf CFG "%s = %s\n", $key, ((defined($self->{$key})) ? ($self->{$key}) : ($UNDEF_SENTINAL));
+        printf CFG "%s = %s\n", $key, ((defined($self->{$key})) ? ($self->{$key}) : ($UNDEF_SENTINEL));
     }
     close(CFG);
 }
